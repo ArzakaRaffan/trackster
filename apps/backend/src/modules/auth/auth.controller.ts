@@ -6,6 +6,9 @@ import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 
 const COOKIE_NAME = 'trackster_jwt';
 const isProd = process.env.NODE_ENV === 'production';
+// Di production, frontend & backend beda subdomain (track.x vs api.track.x), jadi cookie perlu
+// di-scope ke domain induk bersama biar keduanya bisa baca cookie yang sama.
+const COOKIE_DOMAIN = process.env.COOKIE_DOMAIN || undefined;
 
 @Controller('auth')
 export class AuthController {
@@ -19,6 +22,7 @@ export class AuthController {
       httpOnly: true,
       secure: isProd,
       sameSite: 'lax',
+      domain: COOKIE_DOMAIN,
       maxAge: 7 * 24 * 60 * 60 * 1000, // 7 hari
     });
 
@@ -27,7 +31,7 @@ export class AuthController {
 
   @Post('logout')
   async logout(@Res({ passthrough: true }) res: Response) {
-    res.clearCookie(COOKIE_NAME);
+    res.clearCookie(COOKIE_NAME, { domain: COOKIE_DOMAIN });
     return { success: true };
   }
 
