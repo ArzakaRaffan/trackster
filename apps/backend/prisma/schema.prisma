@@ -1,0 +1,71 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id        Int      @id @default(autoincrement())
+  username  String   @unique
+  password  String
+  createdAt DateTime @default(now())
+}
+
+model Transaction {
+  id          Int      @id @default(autoincrement())
+  amount      Decimal  @db.Decimal(12, 2)
+  description String
+  source      Source
+  emailId     String   @unique
+  occurredAt  DateTime
+  createdAt   DateTime @default(now())
+
+  @@index([occurredAt])
+}
+
+enum Source {
+  BCA
+  JAGO
+  GOPAY
+}
+
+model DailyBudget {
+  id        Int      @id @default(autoincrement())
+  dayOfWeek Int      @unique // 0=Minggu ... 6=Sabtu
+  amount    Decimal  @db.Decimal(12, 2)
+  updatedAt DateTime @updatedAt
+}
+
+model EmailSyncLog {
+  id         Int      @id @default(autoincrement())
+  lastSyncAt DateTime
+  status     String // SUCCESS | ERROR
+  message    String?
+  createdAt  DateTime @default(now())
+}
+
+model TelegramConfig {
+  id        Int      @id @default(autoincrement())
+  botToken  String
+  chatId    String
+  isActive  Boolean  @default(true)
+  updatedAt DateTime @updatedAt
+}
+
+model GmailToken {
+  id           Int      @id @default(autoincrement())
+  refreshToken String
+  email        String
+  updatedAt    DateTime @updatedAt
+}
+
+model AlertLog {
+  id        Int      @id @default(autoincrement())
+  date      DateTime @db.Date
+  sentAt    DateTime @default(now())
+
+  @@unique([date])
+}
