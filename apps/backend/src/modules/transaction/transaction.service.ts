@@ -81,6 +81,10 @@ export class TransactionService {
     const existing = await this.prisma.transaction.findUnique({ where: { emailId: parsed.emailId } });
     if (existing) return null;
 
+    this.logger.debug(
+      `DEBUG parsed transaction -> amount: ${parsed.amount}, description: "${parsed.description}", source: ${parsed.source}, occurredAt: ${parsed.occurredAt}`,
+    );
+
     return this.prisma.transaction.create({
       data: {
         amount: parsed.amount,
