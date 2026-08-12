@@ -1,0 +1,15 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: trackster
+      POSTGRES_PASSWORD: trackster
+      POSTGRES_DB: trackster
+    ports:
+      - '5434:5432'
+    volumes:
+      - trackster_pg_data:/var/lib/postgresql/data
+
+volumes:
+  trackster_pg_data:
