@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import useSWR from 'swr';
 import { api, API_URL } from '@/lib/api';
@@ -20,7 +20,7 @@ interface TelegramStatus {
 const gmailFetcher = (path: string) => api.get<GmailStatus>(path);
 const telegramFetcher = (path: string) => api.get<TelegramStatus>(path);
 
-export default function SettingsPage() {
+function SettingsContent() {
   const searchParams = useSearchParams();
   const { data: gmailStatus, mutate: mutateGmail } = useSWR('/gmail/status', gmailFetcher);
   const { data: telegramStatus, mutate: mutateTelegram } = useSWR('/telegram/status', telegramFetcher);
@@ -168,5 +168,13 @@ export default function SettingsPage() {
 
       <p className="text-xs text-gray-400 text-center">API: {API_URL}</p>
     </div>
+  );
+}
+
+export default function SettingsPage() {
+  return (
+    <Suspense fallback={<p className="text-gray-400 text-sm">Memuat...</p>}>
+      <SettingsContent />
+    </Suspense>
   );
 }
