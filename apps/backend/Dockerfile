@@ -1,4 +1,5 @@
 FROM node:20-alpine AS builder
+RUN apk add --no-cache openssl
 WORKDIR /app
 COPY package*.json ./
 COPY prisma ./prisma
@@ -9,6 +10,7 @@ ENV NODE_OPTIONS=--max-old-space-size=1536
 RUN npm run build
 
 FROM node:20-alpine AS runner
+RUN apk add --no-cache openssl
 WORKDIR /app
 ENV NODE_ENV=production
 COPY package*.json ./
