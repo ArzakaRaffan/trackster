@@ -4,6 +4,8 @@ import useSWR from 'swr';
 import { api } from '@/lib/api';
 import { AlertTriangle, Bell, Inbox, Mail, Plus, RefreshCw } from 'lucide-react';
 import { TransactionNoteRow } from '@/components/ui/TransactionNoteRow';
+import { AmountDisplay } from '@/components/ui/AmountDisplay';
+import { BudgetProgress } from '@/components/ui/BudgetProgress';
 
 interface Transaction {
   id: number;
@@ -47,8 +49,6 @@ export default function TodayPage() {
 
   const ratio = data.budget > 0 ? data.totalSpent / data.budget : 0;
   const status = data.isOverBudget ? 'over' : ratio >= 0.8 ? 'near' : 'under';
-  const barColor = { over: 'bg-status-over', near: 'bg-status-near', under: 'bg-status-under' }[status];
-  const textColor = { over: 'text-status-over', near: 'text-status-near', under: 'text-status-under' }[status];
 
   return (
     <div className="pb-navbar animate-fade-in-up">
@@ -73,20 +73,16 @@ export default function TodayPage() {
         </button>
       </header>
 
-      <div className="flex flex-col gap-4 px-4">
+      <div className="flex flex-col gap-3 px-4">
         {/* Money hero */}
         <section className="rounded-medium bg-surface p-5">
           <div className="flex flex-wrap items-start justify-between gap-3">
-            <div>
-              <p className="text-small font-bold uppercase tracking-caps text-ink-muted">Terpakai hari ini</p>
-              <p
-                className={`font-title text-amount-hero font-extrabold tabular-nums ${
-                  data.isOverBudget ? 'text-status-over' : 'text-ink'
-                }`}
-              >
-                {rp(data.totalSpent)}
-              </p>
-            </div>
+            <AmountDisplay
+              label="Terpakai hari ini"
+              value={data.totalSpent}
+              size="hero"
+              tone={data.isOverBudget ? 'over' : 'base'}
+            />
             <span
               className={`shrink-0 rounded-full px-2 py-[3px] text-badge font-semibold ${
                 status === 'over'
@@ -100,33 +96,24 @@ export default function TodayPage() {
             </span>
           </div>
 
-          {/* Progress bar */}
-          <div className={`mt-4 h-4 overflow-hidden rounded-pill ${data.isOverBudget ? 'bg-status-over-bg' : 'bg-track'}`}>
-            <div
-              className={`h-full rounded-pill transition-[width] duration-slow ease-expressive ${barColor}`}
-              style={{ width: Math.min(100, Math.max(0, ratio * 100)) + '%' }}
-            />
-          </div>
-          <div className="mt-2 flex items-baseline justify-between tabular-nums">
-            <span className={`text-small font-bold ${textColor}`}>{Math.round(ratio * 100)}% terpakai</span>
-            <span className="text-small text-ink-muted">
-              {data.isOverBudget ? `lewat ${rp(data.totalSpent - data.budget)}` : `${rp(data.remaining)} sisa`}
-            </span>
+          <div className="mt-4">
+            <BudgetProgress spent={data.totalSpent} budget={data.budget} isOverBudget={data.isOverBudget} height={16} />
           </div>
 
           <div className="mt-4 flex gap-5">
-            <Figure label="Budget" value={rp(data.budget)} tone="text-ink-muted" />
-            <Figure
+            <AmountDisplay label="Budget" value={data.budget} size="body" tone="muted" />
+            <AmountDisplay
               label={data.isOverBudget ? 'Lewat' : 'Sisa'}
-              value={rp(data.isOverBudget ? data.totalSpent - data.budget : data.remaining)}
-              tone={data.isOverBudget ? 'text-status-over' : 'text-status-under'}
+              value={data.isOverBudget ? data.totalSpent - data.budget : data.remaining}
+              size="body"
+              tone={data.isOverBudget ? 'over' : 'under'}
             />
           </div>
         </section>
 
         {/* Over-budget alert */}
         {data.isOverBudget && (
-          <div className="flex items-start gap-3 rounded-comfortable bg-status-over-bg p-3.5 shadow-[inset_0_0_0_1px_#f3727f]">
+          <div className="flex items-start gap-3 rounded-comfortable bg-status-over-bg p-4 shadow-[inset_0_0_0_1px_#f3727f]">
             <AlertTriangle size={18} className="mt-px shrink-0 text-status-over" />
             <div className="min-w-0">
               <p className="text-label font-bold text-status-over">Lewat budget harian</p>
@@ -212,19 +199,10 @@ export default function TodayPage() {
   );
 }
 
-function Figure({ label, value, tone }: { label: string; value: string; tone: string }) {
-  return (
-    <div>
-      <p className="text-small font-bold uppercase tracking-caps text-ink-muted">{label}</p>
-      <p className={`font-title text-body font-bold tabular-nums ${tone}`}>{value}</p>
-    </div>
-  );
-}
-
 function TodaySkeleton() {
   return (
     <div className="px-4 pb-navbar pt-6">
-      <div className="flex flex-col gap-4">
+      <div className="flex flex-col gap-3">
         <div className="h-14 w-56 animate-pulse rounded-comfortable bg-track" />
         <div className="h-4 animate-pulse rounded-pill bg-track" />
         {[0, 1, 2].map((i) => (

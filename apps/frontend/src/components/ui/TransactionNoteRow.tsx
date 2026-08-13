@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { api } from '@/lib/api';
 import { Button } from './Button';
 import { Input } from './Input';
+import { SourceTag } from './SourceTag';
 import { Pencil, StickyNote } from 'lucide-react';
 
 export interface NoteableTransaction {
@@ -19,12 +20,6 @@ export interface NoteableTransaction {
 
 const rp = (n: number) => 'Rp' + Math.abs(Math.round(n)).toLocaleString('id-ID');
 const clock = (iso: string) => new Date(iso).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' });
-
-const SOURCE_STYLE: Record<string, string> = {
-  BCA: 'bg-source-bca-bg text-source-bca',
-  JAGO: 'bg-source-jago-bg text-source-jago',
-};
-const sourceLabel = (source: string) => (source === 'JAGO' ? 'Jago' : source);
 
 export const CATEGORY_LABELS: Record<string, string> = {
   MAKANAN: 'Makanan',
@@ -114,13 +109,7 @@ export function TransactionNoteRow({
         <span className="min-w-0 flex-1">
           <span className="block truncate text-body font-bold text-ink">{title}</span>
           <span className="mt-0.75 flex items-center gap-2">
-            <span
-              className={`rounded-subtle px-1.5 py-0.5 text-micro font-bold uppercase tracking-caps ${
-                SOURCE_STYLE[transaction.source] || 'bg-track text-ink-muted'
-              }`}
-            >
-              {sourceLabel(transaction.source)}
-            </span>
+            <SourceTag source={transaction.source} size="sm" />
             <span className="text-small tabular-nums text-ink-muted">{clock(transaction.occurredAt)}</span>
             {transaction.category && transaction.category !== 'LAINNYA' && (
               <span className="rounded-subtle bg-track px-1.5 py-0.5 text-micro font-bold uppercase tracking-caps text-ink-muted">

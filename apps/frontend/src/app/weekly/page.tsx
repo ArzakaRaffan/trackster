@@ -6,6 +6,8 @@ import { formatRupiah } from '@/lib/format';
 import { StatTile } from '@/components/ui/StatTile';
 import { DayBarChart } from '@/components/ui/DayBarChart';
 import { TransactionNoteRow } from '@/components/ui/TransactionNoteRow';
+import { AmountDisplay } from '@/components/ui/AmountDisplay';
+import { BudgetProgress } from '@/components/ui/BudgetProgress';
 
 interface DayTransaction {
   id: number;
@@ -62,19 +64,21 @@ export default function WeeklyPage() {
         <h1 className="font-title text-title font-bold text-ink">Mingguan</h1>
       </header>
 
-      <div className="flex flex-col gap-4 px-4">
+      <div className="flex flex-col gap-3 px-4">
         <section className="rounded-medium bg-surface p-5">
-          <p className="text-small font-bold uppercase tracking-caps text-ink-muted">Total minggu ini</p>
-          <p className={`font-title text-amount font-extrabold tabular-nums ${totalSpent > totalBudget ? 'text-status-over' : 'text-ink'}`}>
-            {formatRupiah(totalSpent)}
-          </p>
+          <AmountDisplay
+            label="Total minggu ini"
+            value={totalSpent}
+            size="large"
+            tone={totalSpent > totalBudget ? 'over' : 'base'}
+          />
 
           <div className="mt-5">
             <DayBarChart days={chartDays} />
           </div>
         </section>
 
-        <div className="grid grid-cols-3 gap-2.5">
+        <div className="grid grid-cols-3 gap-3">
           <StatTile label="Budget" value={formatRupiah(totalBudget)} size="heading" />
           <StatTile
             label={remaining < 0 ? 'Lewat' : 'Sisa'}
@@ -82,19 +86,18 @@ export default function WeeklyPage() {
             tone={remaining < 0 ? 'over' : 'under'}
             size="heading"
           />
-          <StatTile label="Rata-rata" value={formatRupiah(totalSpent / data.days.length)} tone="muted" size="heading" />
+          <StatTile label="Rerata" value={formatRupiah(totalSpent / data.days.length)} tone="muted" size="heading" />
         </div>
 
         <h2 className="text-heading font-semibold text-ink">Per hari</h2>
 
-        <ul className="flex flex-col gap-2">
+        <ul className="flex flex-col gap-3">
           {data.days.map((d) => {
             const over = d.totalSpent > d.budget;
-            const ratio = d.budget > 0 ? Math.min((d.totalSpent / d.budget) * 100, 100) : 0;
             return (
               <li
                 key={d.date}
-                className={`rounded-comfortable bg-surface p-3.5 ${isToday(d.date) ? 'shadow-[inset_0_0_0_1px_theme(colors.brand.DEFAULT)]' : ''}`}
+                className={`rounded-comfortable bg-surface p-4 ${isToday(d.date) ? 'shadow-[inset_0_0_0_1px_theme(colors.brand.DEFAULT)]' : ''}`}
               >
                 <div className="flex items-baseline justify-between gap-3">
                   <p className="text-body font-bold text-ink">
@@ -105,11 +108,8 @@ export default function WeeklyPage() {
                     {formatRupiah(d.totalSpent)} / {formatRupiah(d.budget)}
                   </p>
                 </div>
-                <div className={`mt-2 h-1.5 overflow-hidden rounded-pill ${over ? 'bg-status-over-bg' : 'bg-track'}`}>
-                  <div
-                    className={`h-full rounded-pill ${over ? 'bg-status-over' : 'bg-status-under'}`}
-                    style={{ width: `${ratio}%` }}
-                  />
+                <div className="mt-2">
+                  <BudgetProgress spent={d.totalSpent} budget={d.budget} isOverBudget={over} height={6} showLegend={false} />
                 </div>
 
                 {d.transactions.length > 0 && (
@@ -178,9 +178,9 @@ export default function WeeklyPage() {
 function WeeklySkeleton() {
   return (
     <div className="px-4 pb-navbar pt-6">
-      <div className="flex flex-col gap-4">
+      <div className="flex flex-col gap-3">
         <div className="h-40 animate-pulse rounded-medium bg-track" />
-        <div className="grid grid-cols-3 gap-2.5">
+        <div className="grid grid-cols-3 gap-3">
           {[0, 1, 2].map((i) => (
             <div key={i} className="h-16 animate-pulse rounded-comfortable bg-track" />
           ))}
