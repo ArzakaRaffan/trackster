@@ -14,6 +14,7 @@ interface DayTransaction {
   source: string;
   occurredAt: string;
   note?: string | null;
+  category?: string;
 }
 
 interface DaySummary {
@@ -54,7 +55,7 @@ export default function WeeklyPage() {
   }));
 
   return (
-    <div className="pb-navbar">
+    <div className="pb-navbar animate-fade-in-up">
       <header className="sticky top-0 z-10 bg-base/[0.86] px-4 py-4 backdrop-blur-md">
         <p className="text-small font-bold uppercase tracking-caps text-ink-muted">7 hari terakhir</p>
         <h1 className="font-title text-title font-bold text-ink">Mingguan</h1>
@@ -123,6 +124,19 @@ export default function WeeklyPage() {
                                 days: current.days.map((day) =>
                                   day.date === d.date
                                     ? { ...day, transactions: day.transactions.map((tx) => (tx.id === id ? { ...tx, note } : tx)) }
+                                    : day,
+                                ),
+                              },
+                            { revalidate: false },
+                          )
+                        }
+                        onCategorySaved={(id, category) =>
+                          mutate(
+                            (current) =>
+                              current && {
+                                days: current.days.map((day) =>
+                                  day.date === d.date
+                                    ? { ...day, transactions: day.transactions.map((tx) => (tx.id === id ? { ...tx, category } : tx)) }
                                     : day,
                                 ),
                               },

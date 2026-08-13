@@ -31,7 +31,7 @@ export default function LoginPage() {
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-base px-4">
-      <div className="w-full max-w-sm">
+      <div className="w-full max-w-sm animate-fade-in-up">
         <div className="mb-8 text-center">
           <p className="font-title text-title font-black tracking-[-2px] text-ink">
             Trackster<span className="text-brand">.</span>

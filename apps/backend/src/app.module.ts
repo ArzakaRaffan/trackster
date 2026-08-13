@@ -7,6 +7,8 @@ import { TransactionModule } from './modules/transaction/transaction.module';
 import { GmailModule } from './modules/gmail/gmail.module';
 import { TelegramModule } from './modules/telegram/telegram.module';
 import { SyncModule } from './modules/sync/sync.module';
+import { BalanceModule } from './modules/balance/balance.module';
+import { IncomeModule } from './modules/income/income.module';
 
 @Module({
   imports: [
@@ -18,6 +20,8 @@ import { SyncModule } from './modules/sync/sync.module';
     GmailModule,
     TelegramModule,
     SyncModule,
+    BalanceModule,
+    IncomeModule,
   ],
 })
 export class AppModule {}

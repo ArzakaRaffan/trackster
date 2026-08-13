@@ -55,6 +55,18 @@ module.exports = {
       transitionTimingFunction: { standard: 'cubic-bezier(.3,0,.4,1)', expressive: 'cubic-bezier(.16,1,.3,1)' },
       maxWidth: { content: '720px' },
       screens: { xs: '425px', sm: '576px', md: '768px', 'md-lg': '896px', lg: '1024px', xl: '1280px' },
+      // Motion stays within the existing --motion-slow (320ms) / --ease-out vocabulary — no new
+      // durations invented, just applied to page entrances and sheet transitions.
+      keyframes: {
+        fadeInUp: { from: { opacity: '0', transform: 'translateY(6px)' }, to: { opacity: '1', transform: 'translateY(0)' } },
+        fadeIn: { from: { opacity: '0' }, to: { opacity: '1' } },
+        slideUp: { from: { opacity: '0', transform: 'translateY(16px)' }, to: { opacity: '1', transform: 'translateY(0)' } },
+      },
+      animation: {
+        'fade-in-up': 'fadeInUp 320ms cubic-bezier(.16,1,.3,1) both',
+        'fade-in': 'fadeIn 200ms cubic-bezier(.3,0,.4,1) both',
+        'slide-up': 'slideUp 320ms cubic-bezier(.16,1,.3,1) both',
+      },
     },
   },
   plugins: [],

@@ -2,12 +2,15 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { BarChart3, Settings, Sun, Wallet } from 'lucide-react';
+import { BarChart3, LineChart, PiggyBank, Settings, Sparkles, Sun, Wallet } from 'lucide-react';
 
 const LINKS = [
   { href: '/', label: 'Hari Ini', Icon: Sun },
   { href: '/weekly', label: 'Mingguan', Icon: BarChart3 },
   { href: '/budget', label: 'Budget', Icon: Wallet },
+  { href: '/income', label: 'Pemasukan', Icon: PiggyBank },
+  { href: '/reports', label: 'Laporan', Icon: LineChart },
+  { href: '/insights', label: 'Analisis', Icon: Sparkles },
   { href: '/settings', label: 'Setting', Icon: Settings },
 ];
 

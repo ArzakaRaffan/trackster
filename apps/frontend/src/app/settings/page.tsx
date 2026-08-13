@@ -7,7 +7,8 @@ import { api, API_URL } from '@/lib/api';
 import { Input } from '@/components/ui/Input';
 import { Button } from '@/components/ui/Button';
 import { Switch } from '@/components/ui/Switch';
-import { Mail, Send, LogOut, Check } from 'lucide-react';
+import { formatRupiah } from '@/lib/format';
+import { Mail, Send, LogOut, Check, Wallet, History } from 'lucide-react';
 
 interface GmailStatus {
   connected: boolean;
@@ -26,9 +27,26 @@ interface NextRun {
   nextRunAt: string;
 }
 
+interface BankBalanceData {
+  id: number;
+  source: 'BCA' | 'JAGO' | 'GOPAY';
+  balance: number;
+  lastUpdatedAt: string;
+}
+
+interface BalanceAdjustmentData {
+  id: number;
+  source: string;
+  delta: number;
+  note: string | null;
+  createdAt: string;
+}
+
 const gmailFetcher = (path: string) => api.get<GmailStatus>(path);
 const telegramFetcher = (path: string) => api.get<TelegramStatus>(path);
 const nextRunFetcher = (path: string) => api.get<NextRun>(path);
+const balanceFetcher = (path: string) => api.get<BankBalanceData[]>(path);
+const adjustmentsFetcher = (path: string) => api.get<BalanceAdjustmentData[]>(path);
 
 function useCountdown(targetIso?: string) {
   const [label, setLabel] = useState('');
@@ -62,6 +80,7 @@ function SettingsContent() {
     refreshInterval: 30_000,
   });
   const countdown = useCountdown(nextRun?.nextRunAt);
+  const { data: balances, mutate: mutateBalances } = useSWR('/balance', balanceFetcher);
 
   const [botToken, setBotToken] = useState('');
   const [chatId, setChatId] = useState('');
@@ -132,7 +151,7 @@ function SettingsContent() {
   };
 
   return (
-    <div className="pb-navbar">
+    <div className="pb-navbar animate-fade-in-up">
       <header className="sticky top-0 z-10 bg-base/[0.86] px-4 py-4 backdrop-blur-md">
         <p className="text-small font-bold uppercase tracking-caps text-ink-muted">Akun & sinkronisasi</p>
         <h1 className="font-title text-title font-bold text-ink">Setting</h1>
@@ -183,6 +202,27 @@ function SettingsContent() {
           {countdown && (
             <p className="mt-2 text-small text-ink-subtle">Sync otomatis berikutnya dalam {countdown}</p>
           )}
+        </section>
+
+        {/* Saldo bank */}
+        <section className="rounded-comfortable bg-surface p-5">
+          <h2 className="flex items-center gap-2 text-heading font-semibold text-ink">
+            <Wallet size={18} /> Saldo bank
+          </h2>
+          <p className="mt-1 text-small leading-relaxed text-ink-muted">
+            Perkiraan saldo, bergerak otomatis dari transaksi & pemasukan. Koreksi manual kalau meleset.
+          </p>
+
+          <div className="mt-4 flex flex-col gap-3">
+            {(['BCA', 'JAGO'] as const).map((source) => (
+              <BankBalanceRow
+                key={source}
+                source={source}
+                data={balances?.find((b) => b.source === source)}
+                onAdjusted={() => mutateBalances()}
+              />
+            ))}
+          </div>
         </section>
 
         {/* Telegram */}
@@ -262,5 +302,128 @@ export default function SettingsPage() {
     <Suspense fallback={<div className="px-4 pt-6 text-small text-ink-muted">Memuat...</div>}>
       <SettingsContent />
     </Suspense>
+  );
+}
+
+const SOURCE_LABEL: Record<string, string> = { BCA: 'BCA', JAGO: 'Jago' };
+
+function BankBalanceRow({
+  source,
+  data,
+  onAdjusted,
+}: {
+  source: 'BCA' | 'JAGO';
+  data?: BankBalanceData;
+  onAdjusted: () => void;
+}) {
+  const [adjustOpen, setAdjustOpen] = useState(false);
+  const [historyOpen, setHistoryOpen] = useState(false);
+  const [newBalance, setNewBalance] = useState('');
+  const [note, setNote] = useState('');
+  const [saving, setSaving] = useState(false);
+
+  const { data: adjustments } = useSWR(
+    historyOpen ? `/balance/${source}/adjustments` : null,
+    adjustmentsFetcher,
+  );
+
+  const openAdjustForm = () => {
+    setNewBalance(data ? String(data.balance) : '0');
+    setNote('');
+    setAdjustOpen(true);
+  };
+
+  const handleSubmit = async () => {
+    setSaving(true);
+    try {
+      await api.put(`/balance/${source}`, {
+        newBalance: parseFloat(newBalance) || 0,
+        note: note || undefined,
+      });
+      onAdjusted();
+      setAdjustOpen(false);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div className="rounded-standard bg-surface-interactive p-3.5">
+      <div className="flex items-center justify-between gap-3">
+        <div>
+          <p className="text-label font-bold text-ink">{SOURCE_LABEL[source]}</p>
+          {data && (
+            <p className="text-small text-ink-muted">
+              Update {new Date(data.lastUpdatedAt).toLocaleString('id-ID', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}
+            </p>
+          )}
+        </div>
+        <p className="font-title text-heading font-bold tabular-nums text-ink">
+          {data ? formatRupiah(data.balance) : '—'}
+        </p>
+      </div>
+
+      <div className="mt-3 flex items-center gap-4">
+        <button
+          onClick={() => (adjustOpen ? setAdjustOpen(false) : openAdjustForm())}
+          className="text-small font-bold text-ink-muted hover:text-ink"
+        >
+          {adjustOpen ? 'Batal' : 'Sesuaikan saldo'}
+        </button>
+        <button
+          onClick={() => setHistoryOpen((v) => !v)}
+          className="flex items-center gap-1 text-small text-ink-muted hover:text-ink"
+        >
+          <History size={13} /> Lihat riwayat penyesuaian
+        </button>
+      </div>
+
+      {adjustOpen && (
+        <div className="mt-3 flex flex-col gap-2.5 border-t border-line-subtle pt-3">
+          <Input
+            label="Saldo baru"
+            type="number"
+            inputMode="numeric"
+            prefix="Rp"
+            value={newBalance}
+            onChange={(e) => setNewBalance(e.target.value)}
+          />
+          <Input
+            label="Catatan (opsional)"
+            placeholder="Kenapa dikoreksi..."
+            value={note}
+            onChange={(e) => setNote(e.target.value)}
+          />
+          <Button variant="primary" size="sm" onClick={handleSubmit} disabled={saving}>
+            {saving ? 'Menyimpan...' : 'Simpan koreksi'}
+          </Button>
+        </div>
+      )}
+
+      {historyOpen && (
+        <div className="mt-3 flex flex-col gap-1.5 border-t border-line-subtle pt-3">
+          {!adjustments ? (
+            <p className="text-small text-ink-muted">Memuat...</p>
+          ) : adjustments.length === 0 ? (
+            <p className="text-small text-ink-muted">Belum ada riwayat penyesuaian.</p>
+          ) : (
+            adjustments.map((adj) => (
+              <div key={adj.id} className="flex items-center justify-between gap-2 text-small">
+                <div className="min-w-0">
+                  <p className="truncate text-ink-muted">{adj.note || 'Tanpa catatan'}</p>
+                  <p className="text-micro text-ink-subtle">
+                    {new Date(adj.createdAt).toLocaleString('id-ID', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}
+                  </p>
+                </div>
+                <span className={`shrink-0 font-bold tabular-nums ${adj.delta >= 0 ? 'text-status-under' : 'text-status-over'}`}>
+                  {adj.delta >= 0 ? '+' : ''}
+                  {formatRupiah(adj.delta)}
+                </span>
+              </div>
+            ))
+          )}
+        </div>
+      )}
+    </div>
   );
 }
