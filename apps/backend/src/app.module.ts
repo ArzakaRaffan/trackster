@@ -9,6 +9,7 @@ import { TelegramModule } from './modules/telegram/telegram.module';
 import { SyncModule } from './modules/sync/sync.module';
 import { BalanceModule } from './modules/balance/balance.module';
 import { IncomeModule } from './modules/income/income.module';
+import { MerchantAliasModule } from './modules/merchant-alias/merchant-alias.module';
 
 @Module({
   imports: [
@@ -22,6 +23,7 @@ import { IncomeModule } from './modules/income/income.module';
     SyncModule,
     BalanceModule,
     IncomeModule,
+    MerchantAliasModule,
   ],
 })
 export class AppModule {}

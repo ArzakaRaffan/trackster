@@ -8,7 +8,7 @@ import { Input } from '@/components/ui/Input';
 import { Button } from '@/components/ui/Button';
 import { Switch } from '@/components/ui/Switch';
 import { formatRupiah } from '@/lib/format';
-import { Mail, Send, LogOut, Check, Wallet, History } from 'lucide-react';
+import { Mail, Send, LogOut, Check, Wallet, History, Tag, Pencil, Trash2, X } from 'lucide-react';
 
 interface GmailStatus {
   connected: boolean;
@@ -42,11 +42,18 @@ interface BalanceAdjustmentData {
   createdAt: string;
 }
 
+interface MerchantAliasData {
+  id: number;
+  rawDescription: string;
+  displayName: string;
+}
+
 const gmailFetcher = (path: string) => api.get<GmailStatus>(path);
 const telegramFetcher = (path: string) => api.get<TelegramStatus>(path);
 const nextRunFetcher = (path: string) => api.get<NextRun>(path);
 const balanceFetcher = (path: string) => api.get<BankBalanceData[]>(path);
 const adjustmentsFetcher = (path: string) => api.get<BalanceAdjustmentData[]>(path);
+const merchantAliasFetcher = (path: string) => api.get<MerchantAliasData[]>(path);
 
 function useCountdown(targetIso?: string) {
   const [label, setLabel] = useState('');
@@ -81,6 +88,7 @@ function SettingsContent() {
   });
   const countdown = useCountdown(nextRun?.nextRunAt);
   const { data: balances, mutate: mutateBalances } = useSWR('/balance', balanceFetcher);
+  const { data: aliases, mutate: mutateAliases } = useSWR('/merchant-aliases', merchantAliasFetcher);
 
   const [botToken, setBotToken] = useState('');
   const [chatId, setChatId] = useState('');
@@ -287,6 +295,30 @@ function SettingsContent() {
           )}
         </section>
 
+        {/* Alias merchant */}
+        <section className="rounded-comfortable bg-surface p-5">
+          <h2 className="flex items-center gap-2 text-heading font-semibold text-ink">
+            <Tag size={18} /> Alias merchant
+          </h2>
+          <p className="mt-1 text-small leading-relaxed text-ink-muted">
+            Nama panggilan buat merchant. Berlaku otomatis ke semua transaksi dengan nama asli yang sama.
+          </p>
+
+          <div className="mt-4 flex flex-col gap-2">
+            {!aliases ? (
+              <p className="text-small text-ink-muted">Memuat...</p>
+            ) : aliases.length === 0 ? (
+              <p className="text-small text-ink-muted">
+                Belum ada alias. Set dari baris transaksi (tombol &quot;Ganti nama&quot;) di halaman Hari Ini/Mingguan/Laporan.
+              </p>
+            ) : (
+              aliases.map((alias) => (
+                <MerchantAliasRow key={alias.id} alias={alias} onChanged={() => mutateAliases()} />
+              ))
+            )}
+          </div>
+        </section>
+
         <Button variant="danger" fullWidth icon={<LogOut size={18} />} onClick={handleLogout}>
           Keluar
         </Button>
@@ -422,6 +454,73 @@ function BankBalanceRow({
               </div>
             ))
           )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function MerchantAliasRow({ alias, onChanged }: { alias: MerchantAliasData; onChanged: () => void }) {
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState(alias.displayName);
+  const [saving, setSaving] = useState(false);
+
+  const handleSave = async () => {
+    setSaving(true);
+    try {
+      await api.put(`/merchant-aliases/${alias.id}`, { displayName: draft });
+      onChanged();
+      setEditing(false);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleDelete = async () => {
+    await api.delete(`/merchant-aliases/${alias.id}`);
+    onChanged();
+  };
+
+  return (
+    <div className="rounded-standard bg-surface-interactive p-3">
+      {editing ? (
+        <div className="flex items-end gap-2">
+          <div className="flex-1">
+            <Input label="Nama panggilan" value={draft} onChange={(e) => setDraft(e.target.value)} />
+          </div>
+          <Button variant="primary" size="md" onClick={handleSave} disabled={saving || !draft.trim()}>
+            {saving ? '...' : 'Simpan'}
+          </Button>
+          <button
+            onClick={() => setEditing(false)}
+            aria-label="Batal"
+            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-ink-muted hover:text-ink"
+          >
+            <X size={16} />
+          </button>
+        </div>
+      ) : (
+        <div className="flex items-center justify-between gap-3">
+          <div className="min-w-0">
+            <p className="truncate text-label font-bold text-ink">{alias.displayName}</p>
+            <p className="truncate text-small text-ink-muted">{alias.rawDescription}</p>
+          </div>
+          <div className="flex shrink-0 items-center gap-1">
+            <button
+              onClick={() => setEditing(true)}
+              aria-label="Edit alias"
+              className="flex h-9 w-9 items-center justify-center rounded-full text-ink-muted hover:text-ink"
+            >
+              <Pencil size={15} />
+            </button>
+            <button
+              onClick={handleDelete}
+              aria-label="Hapus alias"
+              className="flex h-9 w-9 items-center justify-center rounded-full text-ink-muted hover:text-status-over"
+            >
+              <Trash2 size={15} />
+            </button>
+          </div>
         </div>
       )}
     </div>

@@ -13,6 +13,7 @@ interface Transaction {
   occurredAt: string;
   note?: string | null;
   category?: string;
+  displayDescription?: string;
 }
 
 interface TodaySummary {
@@ -174,6 +175,18 @@ export default function TodayPage() {
                       current && {
                         ...current,
                         transactions: current.transactions.map((tx) => (tx.id === id ? { ...tx, category } : tx)),
+                      },
+                    { revalidate: false },
+                  )
+                }
+                onAliasSaved={(id, displayName) =>
+                  mutate(
+                    (current) =>
+                      current && {
+                        ...current,
+                        transactions: current.transactions.map((tx) =>
+                          tx.id === id ? { ...tx, displayDescription: displayName } : tx,
+                        ),
                       },
                     { revalidate: false },
                   )

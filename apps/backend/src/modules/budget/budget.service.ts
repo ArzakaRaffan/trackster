@@ -1,10 +1,14 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../../prisma.service';
 import { UpdateBudgetDto } from './dto/update-budget.dto';
+import { MerchantAliasService } from '../merchant-alias/merchant-alias.service';
 
 @Injectable()
 export class BudgetService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private merchantAliasService: MerchantAliasService,
+  ) {}
 
   async getAll() {
     return this.prisma.dailyBudget.findMany({ orderBy: { dayOfWeek: 'asc' } });
@@ -45,6 +49,7 @@ export class BudgetService {
     });
 
     const totalSpent = transactions.reduce((sum, t) => sum + Number(t.amount), 0);
+    const transactionsWithDisplay = await this.merchantAliasService.attachDisplayNames(transactions);
 
     return {
       date: startOfDay.toISOString().slice(0, 10),
@@ -52,7 +57,7 @@ export class BudgetService {
       totalSpent,
       remaining: budget - totalSpent,
       isOverBudget: totalSpent > budget,
-      transactions,
+      transactions: transactionsWithDisplay,
     };
   }
 }

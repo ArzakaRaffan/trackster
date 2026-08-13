@@ -1,13 +1,24 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import useSWR from 'swr';
 import { Bar, BarChart, Cell, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import { api } from '@/lib/api';
 import { formatRupiah, MONTH_NAMES } from '@/lib/format';
 import { CATEGORY_COLORS, CATEGORY_LABELS, TransactionNoteRow, type NoteableTransaction } from '@/components/ui/TransactionNoteRow';
+import { Input } from '@/components/ui/Input';
 import { StatTile } from '@/components/ui/StatTile';
-import { ChevronLeft, ChevronRight, Inbox, TrendingDown, TrendingUp, X } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Inbox, Search, TrendingDown, TrendingUp, X } from 'lucide-react';
+
+/** Debounce a fast-changing value (search input) so we don't fire a request per keystroke. */
+function useDebouncedValue<T>(value: T, delayMs: number): T {
+  const [debounced, setDebounced] = useState(value);
+  useEffect(() => {
+    const id = setTimeout(() => setDebounced(value), delayMs);
+    return () => clearTimeout(id);
+  }, [value, delayMs]);
+  return debounced;
+}
 
 interface CategoryTotal {
   category: string;
@@ -36,9 +47,20 @@ interface DayDetail {
   transactions: NoteableTransaction[];
 }
 
+interface TransactionListResponse {
+  data: NoteableTransaction[];
+  total: number;
+  page: number;
+  limit: number;
+}
+
+const CATEGORY_FILTER_OPTIONS = Object.keys(CATEGORY_LABELS);
+const SOURCE_FILTER_OPTIONS = ['ALL', 'BCA', 'JAGO'] as const;
+
 const monthlyFetcher = (path: string) => api.get<MonthlyReport>(path);
 const summaryFetcher = (path: string) => api.get<AllTimeSummary>(path);
 const dayFetcher = (path: string) => api.get<DayDetail>(path);
+const transactionListFetcher = (path: string) => api.get<TransactionListResponse>(path);
 
 const formatMonthLabel = (yyyyMM: string) => {
   const [y, m] = yyyyMM.split('-').map(Number);
@@ -206,6 +228,22 @@ function MonthlyTab({
 function AllTimeTab() {
   const { data, error, isLoading } = useSWR('/transactions/summary?range=all', summaryFetcher);
 
+  const [searchInput, setSearchInput] = useState('');
+  const [category, setCategory] = useState('ALL');
+  const [source, setSource] = useState<(typeof SOURCE_FILTER_OPTIONS)[number]>('ALL');
+  const search = useDebouncedValue(searchInput, 400);
+
+  const listParams = new URLSearchParams({ limit: '50' });
+  if (search) listParams.set('search', search);
+  if (category !== 'ALL') listParams.set('category', category);
+  if (source !== 'ALL') listParams.set('source', source);
+
+  const {
+    data: listData,
+    isLoading: listLoading,
+    mutate: mutateList,
+  } = useSWR(`/transactions?${listParams.toString()}`, transactionListFetcher);
+
   if (isLoading) return <ReportSkeleton />;
   if (error || !data) return <p className="text-label text-status-over">Gagal memuat laporan.</p>;
 
@@ -216,6 +254,94 @@ function AllTimeTab() {
 
   return (
     <>
+      {/* Search & filter */}
+      <section className="flex flex-col gap-2.5 rounded-comfortable bg-surface p-4">
+        <Input
+          placeholder="Cari transaksi, catatan, atau nama alias..."
+          prefix={<Search size={16} />}
+          value={searchInput}
+          onChange={(e) => setSearchInput(e.target.value)}
+        />
+        <div className="flex flex-wrap gap-2">
+          <span className="relative flex items-center">
+            <select
+              value={category}
+              onChange={(e) => setCategory(e.target.value)}
+              className="appearance-none rounded-full-pill bg-surface-interactive py-1.5 pl-3 pr-7 text-small font-bold text-ink outline-none"
+            >
+              <option value="ALL">Semua kategori</option>
+              {CATEGORY_FILTER_OPTIONS.map((c) => (
+                <option key={c} value={c}>
+                  {CATEGORY_LABELS[c]}
+                </option>
+              ))}
+            </select>
+            <span className="pointer-events-none absolute right-2.5 text-micro text-ink-muted">▾</span>
+          </span>
+          {SOURCE_FILTER_OPTIONS.map((s) => (
+            <button
+              key={s}
+              onClick={() => setSource(s)}
+              className={`rounded-full-pill px-3 py-1.5 text-small font-bold transition-colors duration-base ease-standard ${
+                source === s ? 'bg-brand text-base' : 'bg-surface-interactive text-ink-muted'
+              }`}
+            >
+              {s === 'ALL' ? 'Semua bank' : s === 'JAGO' ? 'Jago' : s}
+            </button>
+          ))}
+        </div>
+      </section>
+
+      {(search || category !== 'ALL' || source !== 'ALL') && (
+        <section className="rounded-comfortable bg-surface p-2">
+          <p className="px-2 pb-1 pt-1 text-small text-ink-muted">
+            {listLoading ? 'Mencari...' : `${listData?.total ?? 0} hasil`}
+          </p>
+          {!listLoading && listData?.data.length === 0 ? (
+            <div className="flex flex-col items-center gap-2 p-6 text-center">
+              <Inbox size={20} className="text-ink-muted" />
+              <p className="text-small text-ink-muted">Tidak ada transaksi yang cocok.</p>
+            </div>
+          ) : (
+            <ul className="flex flex-col gap-1">
+              {listData?.data.map((t) => (
+                <TransactionNoteRow
+                  key={t.id}
+                  transaction={t}
+                  onSaved={(id, note) =>
+                    mutateList(
+                      (current) =>
+                        current && { ...current, data: current.data.map((tx) => (tx.id === id ? { ...tx, note } : tx)) },
+                      { revalidate: false },
+                    )
+                  }
+                  onCategorySaved={(id, cat) =>
+                    mutateList(
+                      (current) =>
+                        current && {
+                          ...current,
+                          data: current.data.map((tx) => (tx.id === id ? { ...tx, category: cat } : tx)),
+                        },
+                      { revalidate: false },
+                    )
+                  }
+                  onAliasSaved={(id, displayName) =>
+                    mutateList(
+                      (current) =>
+                        current && {
+                          ...current,
+                          data: current.data.map((tx) => (tx.id === id ? { ...tx, displayDescription: displayName } : tx)),
+                        },
+                      { revalidate: false },
+                    )
+                  }
+                />
+              ))}
+            </ul>
+          )}
+        </section>
+      )}
+
       <section className="rounded-medium bg-surface p-5">
         <p className="text-small font-bold uppercase tracking-caps text-ink-muted">Total sepanjang waktu</p>
         <p className="font-title text-amount-hero font-extrabold tabular-nums text-ink">{formatRupiah(data.totalSpent)}</p>
@@ -338,6 +464,18 @@ function DayDetailSheet({ date, onClose }: { date: string; onClose: () => void }
                         current && {
                           ...current,
                           transactions: current.transactions.map((tx) => (tx.id === id ? { ...tx, category } : tx)),
+                        },
+                      { revalidate: false },
+                    )
+                  }
+                  onAliasSaved={(id, displayName) =>
+                    mutate(
+                      (current) =>
+                        current && {
+                          ...current,
+                          transactions: current.transactions.map((tx) =>
+                            tx.id === id ? { ...tx, displayDescription: displayName } : tx,
+                          ),
                         },
                       { revalidate: false },
                     )

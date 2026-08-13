@@ -1,9 +1,10 @@
 import { Body, Controller, Delete, Get, Param, ParseIntPipe, Patch, Query, UseGuards } from '@nestjs/common';
 import { TransactionService } from './transaction.service';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
-import { Source } from '@prisma/client';
+import { Category, Source } from '@prisma/client';
 import { UpdateNoteDto } from './dto/update-note.dto';
 import { UpdateCategoryDto } from './dto/update-category.dto';
+import { SetAliasDto } from './dto/set-alias.dto';
 
 @UseGuards(JwtAuthGuard)
 @Controller('transactions')
@@ -15,6 +16,8 @@ export class TransactionController {
     @Query('startDate') startDate?: string,
     @Query('endDate') endDate?: string,
     @Query('source') source?: Source,
+    @Query('category') category?: Category,
+    @Query('search') search?: string,
     @Query('page') page?: string,
     @Query('limit') limit?: string,
   ) {
@@ -22,6 +25,8 @@ export class TransactionController {
       startDate,
       endDate,
       source,
+      category,
+      search,
       page: page ? parseInt(page, 10) : undefined,
       limit: limit ? parseInt(limit, 10) : undefined,
     });
@@ -68,5 +73,10 @@ export class TransactionController {
   @Patch(':id/category')
   async updateCategory(@Param('id', ParseIntPipe) id: number, @Body() dto: UpdateCategoryDto) {
     return this.transactionService.updateCategory(id, dto.category);
+  }
+
+  @Patch(':id/alias')
+  async setAlias(@Param('id', ParseIntPipe) id: number, @Body() dto: SetAliasDto) {
+    return this.transactionService.setAlias(id, dto.displayName);
   }
 }

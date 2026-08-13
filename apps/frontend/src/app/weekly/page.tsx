@@ -15,6 +15,7 @@ interface DayTransaction {
   occurredAt: string;
   note?: string | null;
   category?: string;
+  displayDescription?: string;
 }
 
 interface DaySummary {
@@ -137,6 +138,24 @@ export default function WeeklyPage() {
                                 days: current.days.map((day) =>
                                   day.date === d.date
                                     ? { ...day, transactions: day.transactions.map((tx) => (tx.id === id ? { ...tx, category } : tx)) }
+                                    : day,
+                                ),
+                              },
+                            { revalidate: false },
+                          )
+                        }
+                        onAliasSaved={(id, displayName) =>
+                          mutate(
+                            (current) =>
+                              current && {
+                                days: current.days.map((day) =>
+                                  day.date === d.date
+                                    ? {
+                                        ...day,
+                                        transactions: day.transactions.map((tx) =>
+                                          tx.id === id ? { ...tx, displayDescription: displayName } : tx,
+                                        ),
+                                      }
                                     : day,
                                 ),
                               },

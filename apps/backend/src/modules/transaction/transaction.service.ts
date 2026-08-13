@@ -2,6 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../../prisma.service';
 import { Category, Source } from '@prisma/client';
 import { BalanceService } from '../balance/balance.service';
+import { MerchantAliasService } from '../merchant-alias/merchant-alias.service';
 
 export interface ParsedTransaction {
   amount: number;
@@ -18,10 +19,25 @@ export class TransactionService {
   constructor(
     private prisma: PrismaService,
     private balanceService: BalanceService,
+    private merchantAliasService: MerchantAliasService,
   ) {}
 
-  async findAll(params: { startDate?: string; endDate?: string; source?: Source; page?: number; limit?: number }) {
-    const { startDate, endDate, source, page = 1, limit = 50 } = params;
+  /** Tempel displayDescription (alias merchant kalau ada) ke tiap transaksi — satu query per
+   * request, tidak per-transaksi. Lihat MerchantAliasService.attachDisplayNames untuk detail. */
+  async attachDisplayNames<T extends { description: string }>(transactions: T[]) {
+    return this.merchantAliasService.attachDisplayNames(transactions);
+  }
+
+  async findAll(params: {
+    startDate?: string;
+    endDate?: string;
+    source?: Source;
+    category?: Category;
+    search?: string;
+    page?: number;
+    limit?: number;
+  }) {
+    const { startDate, endDate, source, category, search, page = 1, limit = 50 } = params;
     const where: any = {};
     if (startDate || endDate) {
       where.occurredAt = {};
@@ -29,6 +45,18 @@ export class TransactionService {
       if (endDate) where.occurredAt.lte = new Date(endDate);
     }
     if (source) where.source = source;
+    if (category) where.category = category;
+
+    if (search) {
+      // Alias juga ikut dicari: transaksi dengan description mentah yang alias-nya cocok search
+      // term ikut match, meskipun search term-nya tidak ada di description asli.
+      const aliasedDescriptions = await this.merchantAliasService.findRawDescriptionsMatchingSearch(search);
+      where.OR = [
+        { description: { contains: search, mode: 'insensitive' } },
+        { note: { contains: search, mode: 'insensitive' } },
+        ...(aliasedDescriptions.length > 0 ? [{ description: { in: aliasedDescriptions } }] : []),
+      ];
+    }
 
     const [data, total] = await Promise.all([
       this.prisma.transaction.findMany({
@@ -40,7 +68,8 @@ export class TransactionService {
       this.prisma.transaction.count({ where }),
     ]);
 
-    return { data, total, page, limit };
+    const dataWithDisplay = await this.attachDisplayNames(data);
+    return { data: dataWithDisplay, total, page, limit };
   }
 
   async getWeekly() {
@@ -73,6 +102,16 @@ export class TransactionService {
       });
     }
 
+    // Satu query alias buat seluruh minggu (bukan per hari) — flatten lalu redistribusi balik
+    // per hari sambil tetap menjaga urutan aslinya.
+    const flatWithDisplay = await this.attachDisplayNames(days.flatMap((d) => d.transactions));
+    let idx = 0;
+    for (const day of days) {
+      const count = day.transactions.length;
+      day.transactions = flatWithDisplay.slice(idx, idx + count);
+      idx += count;
+    }
+
     return { days };
   }
 
@@ -94,6 +133,14 @@ export class TransactionService {
     return this.prisma.transaction.update({ where: { id }, data: { category } });
   }
 
+  /** Shortcut buat set alias langsung dari baris transaksi: ambil description transaksi itu,
+   * lalu upsert ke MerchantAlias pakai description tersebut sebagai rawDescription. Otomatis
+   * berlaku ke SEMUA transaksi lama & baru yang description-nya sama, bukan cuma transaksi ini. */
+  async setAlias(id: number, displayName: string) {
+    const transaction = await this.prisma.transaction.findUniqueOrThrow({ where: { id } });
+    return this.merchantAliasService.upsert(transaction.description, displayName);
+  }
+
   /** Semua transaksi di satu tanggal (YYYY-MM-DD) — buat drill-down dari chart bulanan/mingguan. */
   async getByDay(date: string) {
     const start = new Date(`${date}T00:00:00`);
@@ -105,8 +152,9 @@ export class TransactionService {
       orderBy: { occurredAt: 'asc' },
     });
     const totalSpent = transactions.reduce((sum, t) => sum + Number(t.amount), 0);
+    const transactionsWithDisplay = await this.attachDisplayNames(transactions);
 
-    return { date, totalSpent, transactions };
+    return { date, totalSpent, transactions: transactionsWithDisplay };
   }
 
   /** Total, breakdown per kategori, dan breakdown per hari (buat chart) dalam satu bulan. */
@@ -143,7 +191,8 @@ export class TransactionService {
       return { date, totalSpent: byDayMap.get(date) ?? 0 };
     });
 
-    return { year, month, totalSpent, byCategory, byDay, transactions };
+    const transactionsWithDisplay = await this.attachDisplayNames(transactions);
+    return { year, month, totalSpent, byCategory, byDay, transactions: transactionsWithDisplay };
   }
 
   /** Total sepanjang waktu, breakdown per kategori, dan bulan tertinggi/terendah. */
