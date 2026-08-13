@@ -1,9 +1,12 @@
 'use client';
 
 import { useEffect, useState, Suspense } from 'react';
-import { useSearchParams } from 'next/navigation';
+import { useSearchParams, useRouter } from 'next/navigation';
 import useSWR from 'swr';
 import { api, API_URL } from '@/lib/api';
+import { Input } from '@/components/ui/Input';
+import { Button } from '@/components/ui/Button';
+import { Mail, Send, LogOut, Check } from 'lucide-react';
 
 interface GmailStatus {
   connected: boolean;
@@ -22,6 +25,7 @@ const telegramFetcher = (path: string) => api.get<TelegramStatus>(path);
 
 function SettingsContent() {
   const searchParams = useSearchParams();
+  const router = useRouter();
   const { data: gmailStatus, mutate: mutateGmail } = useSWR('/gmail/status', gmailFetcher);
   const { data: telegramStatus, mutate: mutateTelegram } = useSWR('/telegram/status', telegramFetcher);
 
@@ -76,104 +80,125 @@ function SettingsContent() {
     }
   };
 
+  const handleLogout = async () => {
+    await api.post('/auth/logout');
+    router.push('/login');
+  };
+
   return (
-    <div className="space-y-6">
-      {/* Gmail */}
-      <section className="bg-white border rounded-2xl p-6">
-        <h2 className="font-semibold mb-1">Gmail</h2>
-        <p className="text-sm text-gray-500 mb-4">
-          Hubungkan akun Gmail untuk membaca notifikasi transaksi otomatis.
-        </p>
+    <div className="pb-navbar">
+      <header className="sticky top-0 z-10 bg-base/[0.86] px-4 py-4 backdrop-blur-md">
+        <p className="text-small font-bold uppercase tracking-caps text-ink-muted">Akun & sinkronisasi</p>
+        <h1 className="font-title text-title font-bold text-ink">Setting</h1>
+      </header>
 
-        {gmailStatus?.connected ? (
-          <div className="flex items-center justify-between bg-green-50 border border-green-200 rounded-lg px-4 py-3">
-            <div>
-              <p className="text-sm font-medium text-green-800">Terhubung</p>
-              <p className="text-xs text-green-600">{gmailStatus.email}</p>
-            </div>
-            <button onClick={handleDisconnectGmail} className="text-xs text-red-500">
-              Putuskan
-            </button>
-          </div>
-        ) : (
-          <button
-            onClick={handleConnectGmail}
-            className="w-full bg-gray-900 text-white rounded-lg py-2.5 font-medium text-sm"
-          >
-            Hubungkan Gmail
-          </button>
-        )}
-
-        {gmailParam === 'error' && (
-          <p className="text-warn text-sm mt-2">
-            Gagal connect: {searchParams.get('message') || 'unknown error'}
+      <div className="flex flex-col gap-4 px-4">
+        {/* Gmail */}
+        <section className="rounded-comfortable bg-surface p-5">
+          <h2 className="flex items-center gap-2 text-heading font-semibold text-ink">
+            <Mail size={18} /> Gmail
+          </h2>
+          <p className="mt-1 text-small leading-relaxed text-ink-muted">
+            Hubungkan akun Gmail untuk membaca notifikasi transaksi otomatis.
           </p>
-        )}
 
-        <button
-          onClick={handleManualSync}
-          disabled={syncing || !gmailStatus?.connected}
-          className="w-full mt-3 border rounded-lg py-2 text-sm font-medium disabled:opacity-40"
-        >
-          {syncing ? 'Sinkronisasi...' : 'Sync Manual Sekarang'}
-        </button>
-        {syncResult && <p className="text-xs text-gray-500 mt-2">{syncResult}</p>}
-      </section>
+          {gmailStatus?.connected ? (
+            <div className="mt-4 flex items-center justify-between rounded-standard bg-status-under-bg px-3.5 py-3">
+              <div>
+                <p className="text-label font-bold text-status-under">Terhubung</p>
+                <p className="text-small text-ink-muted">{gmailStatus.email}</p>
+              </div>
+              <button onClick={handleDisconnectGmail} className="text-small text-ink-muted hover:text-status-over">
+                Putuskan
+              </button>
+            </div>
+          ) : (
+            <Button variant="dark" fullWidth className="mt-4" onClick={handleConnectGmail}>
+              Hubungkan Gmail
+            </Button>
+          )}
 
-      {/* Telegram */}
-      <section className="bg-white border rounded-2xl p-6">
-        <h2 className="font-semibold mb-1">Telegram</h2>
-        <p className="text-sm text-gray-500 mb-4">Bot untuk kirim notifikasi kalau budget harian terlampaui.</p>
-
-        {telegramStatus?.configured && (
-          <div className="bg-blue-50 border border-blue-200 rounded-lg px-4 py-3 mb-4 text-sm">
-            <p className="text-blue-800">Sudah dikonfigurasi</p>
-            <p className="text-xs text-blue-600">
-              Token: {telegramStatus.botTokenPreview} · Chat ID: {telegramStatus.chatId}
+          {gmailParam === 'error' && (
+            <p className="mt-2 text-small text-status-over">
+              Gagal connect: {searchParams.get('message') || 'unknown error'}
             </p>
+          )}
+
+          <Button
+            variant="outlined"
+            fullWidth
+            className="mt-3"
+            onClick={handleManualSync}
+            disabled={syncing || !gmailStatus?.connected}
+          >
+            {syncing ? 'Sinkronisasi...' : 'Sync manual sekarang'}
+          </Button>
+          {syncResult && <p className="mt-2 text-small text-ink-muted">{syncResult}</p>}
+        </section>
+
+        {/* Telegram */}
+        <section className="rounded-comfortable bg-surface p-5">
+          <h2 className="flex items-center gap-2 text-heading font-semibold text-ink">
+            <Send size={18} /> Telegram
+          </h2>
+          <p className="mt-1 text-small leading-relaxed text-ink-muted">
+            Bot untuk kirim notifikasi kalau budget harian terlampaui.
+          </p>
+
+          {telegramStatus?.configured && (
+            <div className="mt-4 rounded-standard bg-status-info-bg px-3.5 py-3">
+              <p className="text-label font-bold text-status-info">Sudah dikonfigurasi</p>
+              <p className="text-small text-ink-muted">
+                Token: {telegramStatus.botTokenPreview} · Chat ID: {telegramStatus.chatId}
+              </p>
+            </div>
+          )}
+
+          <div className="mt-4 flex flex-col gap-3">
+            <Input
+              label="Bot token"
+              placeholder="123456:ABC-DEF..."
+              value={botToken}
+              onChange={(e) => setBotToken(e.target.value)}
+            />
+            <Input label="Chat ID" placeholder="6642095960" value={chatId} onChange={(e) => setChatId(e.target.value)} />
           </div>
-        )}
 
-        <label className="block text-sm mb-1">Bot Token</label>
-        <input
-          className="w-full border rounded-lg px-3 py-2 mb-3 text-sm"
-          placeholder="123456:ABC-DEF..."
-          value={botToken}
-          onChange={(e) => setBotToken(e.target.value)}
-        />
+          <Button
+            variant="primary"
+            fullWidth
+            className="mt-4"
+            onClick={handleSaveTelegram}
+            disabled={savingTelegram || !botToken || !chatId}
+          >
+            {savingTelegram ? 'Menyimpan...' : 'Simpan'}
+          </Button>
 
-        <label className="block text-sm mb-1">Chat ID</label>
-        <input
-          className="w-full border rounded-lg px-3 py-2 mb-4 text-sm"
-          placeholder="6642095960"
-          value={chatId}
-          onChange={(e) => setChatId(e.target.value)}
-        />
+          {telegramStatus?.configured && (
+            <Button variant="outlined" fullWidth className="mt-2" onClick={handleTestTelegram}>
+              Kirim test notifikasi
+            </Button>
+          )}
+          {testResult && (
+            <p className="mt-2 flex items-center gap-1.5 text-small text-ink-muted">
+              <Check size={14} /> {testResult}
+            </p>
+          )}
+        </section>
 
-        <button
-          onClick={handleSaveTelegram}
-          disabled={savingTelegram || !botToken || !chatId}
-          className="w-full bg-blue-600 text-white rounded-lg py-2.5 font-medium text-sm disabled:opacity-50"
-        >
-          {savingTelegram ? 'Menyimpan...' : 'Simpan'}
-        </button>
+        <Button variant="danger" fullWidth icon={<LogOut size={18} />} onClick={handleLogout}>
+          Keluar
+        </Button>
 
-        {telegramStatus?.configured && (
-          <button onClick={handleTestTelegram} className="w-full mt-2 border rounded-lg py-2 text-sm font-medium">
-            Kirim Test Notifikasi
-          </button>
-        )}
-        {testResult && <p className="text-xs text-gray-500 mt-2">{testResult}</p>}
-      </section>
-
-      <p className="text-xs text-gray-400 text-center">API: {API_URL}</p>
+        <p className="text-center text-small text-ink-subtle">API: {API_URL}</p>
+      </div>
     </div>
   );
 }
 
 export default function SettingsPage() {
   return (
-    <Suspense fallback={<p className="text-gray-400 text-sm">Memuat...</p>}>
+    <Suspense fallback={<div className="px-4 pt-6 text-small text-ink-muted">Memuat...</div>}>
       <SettingsContent />
     </Suspense>
   );

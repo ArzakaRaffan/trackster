@@ -1,0 +1,5 @@
+:root{
+--radius-minimal:2px;--radius-subtle:4px;--radius-standard:6px;--radius-comfortable:8px;
+--radius-medium:10px;--radius-panel:20px;--radius-large:100px;
+--radius-pill:500px;--radius-full-pill:9999px;--radius-circle:50%;
+}

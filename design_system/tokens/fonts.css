@@ -1,0 +1,7 @@
+/* Trackster type — SUBSTITUTION NOTICE
+   The Spotify reference specifies SpotifyMixUI / SpotifyMixUITitle (CircularSp / Circular by Lineto).
+   Those are proprietary and were not provided. Figtree is the nearest free geometric-sans match
+   (similar single-storey-adjacent geometry, closed apertures, tall x-height, 300-900 range).
+   Swap in the real binaries by replacing the @import below with local @font-face rules. */
+@import url("https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600;700;800;900&display=swap");
+@import url("https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&display=swap");
