@@ -3,6 +3,7 @@
 import useSWR from 'swr';
 import { api } from '@/lib/api';
 import { AlertTriangle, Bell, Inbox, Mail, Plus, RefreshCw } from 'lucide-react';
+import { TransactionNoteRow } from '@/components/ui/TransactionNoteRow';
 
 interface Transaction {
   id: number;
@@ -10,6 +11,7 @@ interface Transaction {
   description: string;
   source: 'BCA' | 'JAGO' | 'GOPAY';
   occurredAt: string;
+  note?: string | null;
 }
 
 interface TodaySummary {
@@ -24,15 +26,8 @@ interface TodaySummary {
 const fetcher = (path: string) => api.get<TodaySummary>(path);
 
 const rp = (n: number) => 'Rp' + Math.abs(Math.round(n)).toLocaleString('id-ID');
-const clock = (iso: string) => new Date(iso).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' });
 const dateLabel = (iso: string) =>
   new Date(iso).toLocaleDateString('id-ID', { weekday: 'long', day: 'numeric', month: 'long' });
-
-const SOURCE_STYLE: Record<string, string> = {
-  BCA: 'bg-source-bca-bg text-source-bca',
-  JAGO: 'bg-source-jago-bg text-source-jago',
-};
-const sourceLabel = (source: string) => (source === 'JAGO' ? 'Jago' : source);
 
 export default function TodayPage() {
   const { data, error, isLoading, mutate } = useSWR('/budget/today', fetcher, {
@@ -159,28 +154,20 @@ export default function TodayPage() {
         ) : (
           <ul className="rounded-comfortable bg-surface p-2">
             {data.transactions.map((t) => (
-              <li
+              <TransactionNoteRow
                 key={t.id}
-                className="flex min-h-[56px] items-center gap-3 rounded-standard px-3 py-2.5 transition-colors duration-fast ease-standard hover:bg-white/[0.07]"
-              >
-                <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-surface-interactive text-label font-bold text-ink-muted">
-                  {t.description.trim().charAt(0).toUpperCase()}
-                </span>
-                <span className="min-w-0 flex-1">
-                  <span className="block truncate text-body font-bold text-ink">{t.description}</span>
-                  <span className="mt-0.75 flex items-center gap-2">
-                    <span
-                      className={`rounded-subtle px-1.5 py-0.5 text-micro font-bold uppercase tracking-caps ${
-                        SOURCE_STYLE[t.source] || 'bg-track text-ink-muted'
-                      }`}
-                    >
-                      {sourceLabel(t.source)}
-                    </span>
-                    <span className="text-small tabular-nums text-ink-muted">{clock(t.occurredAt)}</span>
-                  </span>
-                </span>
-                <span className="shrink-0 text-body font-bold tabular-nums text-ink">−{rp(t.amount)}</span>
-              </li>
+                transaction={t}
+                onSaved={(id, note) =>
+                  mutate(
+                    (current) =>
+                      current && {
+                        ...current,
+                        transactions: current.transactions.map((tx) => (tx.id === id ? { ...tx, note } : tx)),
+                      },
+                    { revalidate: false },
+                  )
+                }
+              />
             ))}
           </ul>
         )}

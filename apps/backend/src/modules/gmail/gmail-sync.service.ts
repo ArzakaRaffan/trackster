@@ -1,5 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { Cron, CronExpression } from '@nestjs/schedule';
+import { Cron, CronExpression, SchedulerRegistry } from '@nestjs/schedule';
 import { GmailAuthService } from './gmail-auth.service';
 import { ParserRegistryService } from './parsers/parser-registry.service';
 import { RawEmail } from './parsers/parser.interface';
@@ -12,6 +12,9 @@ import { PrismaService } from '../../prisma.service';
 // Sementara pakai keyword umum yang sudah terbukti match nama tampilan sender.
 const GMAIL_QUERY = 'from:(bca OR jago) newer_than:7d';
 
+// Nama job di SchedulerRegistry — dibutuhkan biar next-run bisa di-query dari luar (lihat getNextRun()).
+const SYNC_CRON_JOB_NAME = 'gmail-sync';
+
 @Injectable()
 export class GmailSyncService {
   private readonly logger = new Logger(GmailSyncService.name);
@@ -23,11 +26,19 @@ export class GmailSyncService {
     private budgetService: BudgetService,
     private telegramService: TelegramService,
     private prisma: PrismaService,
+    private schedulerRegistry: SchedulerRegistry,
   ) {}
 
-  @Cron(CronExpression.EVERY_5_MINUTES)
+  @Cron(CronExpression.EVERY_5_MINUTES, { name: SYNC_CRON_JOB_NAME })
   async handleCron() {
     await this.syncEmails();
+  }
+
+  /** Kapan sync otomatis berikutnya bakal jalan, buat ditampilin sebagai countdown di frontend. */
+  getNextRun(): string {
+    const job = this.schedulerRegistry.getCronJob(SYNC_CRON_JOB_NAME);
+    const next = job.nextDate();
+    return next.toISO() ?? next.toJSDate().toISOString();
   }
 
   async syncEmails() {
@@ -47,6 +58,7 @@ export class GmailSyncService {
       const messages = listRes.data.messages || [];
       let syncedCount = 0;
       let newestTransaction: { source: string; description: string; amount: number } | null = null;
+      const notifyEveryTransaction = await this.telegramService.isNotifyEveryTransactionEnabled();
 
       for (const msg of messages) {
         if (!msg.id) continue;
@@ -78,6 +90,15 @@ export class GmailSyncService {
             description: parsed.description,
             amount: parsed.amount,
           };
+
+          if (notifyEveryTransaction) {
+            await this.telegramService.sendTransactionNotif({
+              source: parsed.source,
+              description: parsed.description,
+              amount: parsed.amount,
+              occurredAt: parsed.occurredAt,
+            });
+          }
         }
       }
 

@@ -1,11 +1,18 @@
-import { IsString, MinLength } from 'class-validator';
+import { IsBoolean, IsOptional, IsString, MinLength } from 'class-validator';
 
 export class TelegramConfigDto {
+  // Optional biar toggle notifyEveryTransaction bisa PUT tanpa perlu kirim ulang token/chatId.
+  @IsOptional()
   @IsString()
   @MinLength(1)
-  botToken: string;
+  botToken?: string;
 
+  @IsOptional()
   @IsString()
   @MinLength(1)
-  chatId: string;
+  chatId?: string;
+
+  @IsOptional()
+  @IsBoolean()
+  notifyEveryTransaction?: boolean;
 }

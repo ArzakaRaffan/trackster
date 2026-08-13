@@ -76,6 +76,11 @@ export class TransactionService {
     return this.prisma.transaction.delete({ where: { id } });
   }
 
+  /** Catatan bebas dari user, terpisah dari data hasil parse email (amount/description/source read-only). */
+  async updateNote(id: number, note: string) {
+    return this.prisma.transaction.update({ where: { id }, data: { note } });
+  }
+
   /** Dipanggil oleh Gmail sync service. Return null kalau sudah ada (deduplicated). */
   async createFromParsed(parsed: ParsedTransaction) {
     const existing = await this.prisma.transaction.findUnique({ where: { emailId: parsed.emailId } });

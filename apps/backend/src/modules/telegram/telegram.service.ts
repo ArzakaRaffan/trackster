@@ -11,26 +11,39 @@ export class TelegramService {
 
   async getConfig() {
     const config = await this.prisma.telegramConfig.findFirst();
-    if (!config) return { configured: false };
+    if (!config) return { configured: false, notifyEveryTransaction: false };
     return {
       configured: true,
       isActive: config.isActive,
       // jangan expose full token ke frontend, cukup preview
       botTokenPreview: config.botToken.slice(0, 8) + '...',
       chatId: config.chatId,
+      notifyEveryTransaction: config.notifyEveryTransaction,
     };
   }
 
+  // Partial update: field yang tidak dikirim (undefined) tidak menimpa nilai lama —
+  // ini yang bikin toggle notifyEveryTransaction bisa PUT tanpa perlu botToken/chatId.
   async updateConfig(dto: TelegramConfigDto) {
     const existing = await this.prisma.telegramConfig.findFirst();
     if (existing) {
       return this.prisma.telegramConfig.update({
         where: { id: existing.id },
-        data: { botToken: dto.botToken, chatId: dto.chatId, isActive: true },
+        data: {
+          ...(dto.botToken !== undefined && { botToken: dto.botToken }),
+          ...(dto.chatId !== undefined && { chatId: dto.chatId }),
+          ...(dto.notifyEveryTransaction !== undefined && { notifyEveryTransaction: dto.notifyEveryTransaction }),
+          isActive: true,
+        },
       });
     }
     return this.prisma.telegramConfig.create({
-      data: { botToken: dto.botToken, chatId: dto.chatId, isActive: true },
+      data: {
+        botToken: dto.botToken ?? '',
+        chatId: dto.chatId ?? '',
+        notifyEveryTransaction: dto.notifyEveryTransaction ?? false,
+        isActive: true,
+      },
     });
   }
 
@@ -75,6 +88,37 @@ export class TelegramService {
       '',
       'Transaksi terakhir:',
       `${lastTransaction.source} - ${formatRp(lastTransaction.amount)} (${lastTransaction.description})`,
+    ].join('\n');
+
+    return this.sendMessage(text);
+  }
+
+  /** Cek toggle notifyEveryTransaction tanpa expose config penuh. */
+  async isNotifyEveryTransactionEnabled(): Promise<boolean> {
+    const config = await this.prisma.telegramConfig.findFirst({ where: { isActive: true } });
+    return !!config?.notifyEveryTransaction;
+  }
+
+  /** Notifikasi per transaksi baru masuk — terpisah dari alert over-budget, dua-duanya bisa jalan bareng. */
+  async sendTransactionNotif(transaction: {
+    source: string;
+    description: string;
+    amount: number;
+    occurredAt: Date;
+  }) {
+    const { source, description, amount, occurredAt } = transaction;
+    const formatRp = (n: number) => `Rp ${n.toLocaleString('id-ID')}`;
+    const jam = occurredAt.toLocaleTimeString('id-ID', {
+      hour: '2-digit',
+      minute: '2-digit',
+      timeZone: 'Asia/Jakarta',
+    });
+
+    const text = [
+      '💸 <b>Transaksi baru</b>',
+      '',
+      `${formatRp(amount)} — ${description}`,
+      `${jam} · ${source}`,
     ].join('\n');
 
     return this.sendMessage(text);

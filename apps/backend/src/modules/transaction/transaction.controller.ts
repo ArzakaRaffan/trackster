@@ -1,7 +1,8 @@
-import { Controller, Delete, Get, Param, ParseIntPipe, Query, UseGuards } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, ParseIntPipe, Patch, Query, UseGuards } from '@nestjs/common';
 import { TransactionService } from './transaction.service';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { Source } from '@prisma/client';
+import { UpdateNoteDto } from './dto/update-note.dto';
 
 @UseGuards(JwtAuthGuard)
 @Controller('transactions')
@@ -33,5 +34,10 @@ export class TransactionController {
   @Delete(':id')
   async remove(@Param('id', ParseIntPipe) id: number) {
     return this.transactionService.remove(id);
+  }
+
+  @Patch(':id/note')
+  async updateNote(@Param('id', ParseIntPipe) id: number, @Body() dto: UpdateNoteDto) {
+    return this.transactionService.updateNote(id, dto.note);
   }
 }

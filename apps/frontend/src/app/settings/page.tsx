@@ -6,6 +6,7 @@ import useSWR from 'swr';
 import { api, API_URL } from '@/lib/api';
 import { Input } from '@/components/ui/Input';
 import { Button } from '@/components/ui/Button';
+import { Switch } from '@/components/ui/Switch';
 import { Mail, Send, LogOut, Check } from 'lucide-react';
 
 interface GmailStatus {
@@ -18,16 +19,49 @@ interface TelegramStatus {
   isActive?: boolean;
   botTokenPreview?: string;
   chatId?: string;
+  notifyEveryTransaction?: boolean;
+}
+
+interface NextRun {
+  nextRunAt: string;
 }
 
 const gmailFetcher = (path: string) => api.get<GmailStatus>(path);
 const telegramFetcher = (path: string) => api.get<TelegramStatus>(path);
+const nextRunFetcher = (path: string) => api.get<NextRun>(path);
+
+function useCountdown(targetIso?: string) {
+  const [label, setLabel] = useState('');
+
+  useEffect(() => {
+    if (!targetIso) {
+      setLabel('');
+      return;
+    }
+    const target = new Date(targetIso).getTime();
+    const tick = () => {
+      const diff = Math.max(0, Math.floor((target - Date.now()) / 1000));
+      const m = Math.floor(diff / 60);
+      const s = diff % 60;
+      setLabel(`${m}:${String(s).padStart(2, '0')}`);
+    };
+    tick();
+    const id = setInterval(tick, 1000);
+    return () => clearInterval(id);
+  }, [targetIso]);
+
+  return label;
+}
 
 function SettingsContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const { data: gmailStatus, mutate: mutateGmail } = useSWR('/gmail/status', gmailFetcher);
   const { data: telegramStatus, mutate: mutateTelegram } = useSWR('/telegram/status', telegramFetcher);
+  const { data: nextRun, mutate: mutateNextRun } = useSWR('/sync/next-run', nextRunFetcher, {
+    refreshInterval: 30_000,
+  });
+  const countdown = useCountdown(nextRun?.nextRunAt);
 
   const [botToken, setBotToken] = useState('');
   const [chatId, setChatId] = useState('');
@@ -35,6 +69,7 @@ function SettingsContent() {
   const [testResult, setTestResult] = useState<string | null>(null);
   const [syncing, setSyncing] = useState(false);
   const [syncResult, setSyncResult] = useState<string | null>(null);
+  const [notifyingEveryTx, setNotifyingEveryTx] = useState(false);
 
   const gmailParam = searchParams.get('gmail');
 
@@ -75,8 +110,19 @@ function SettingsContent() {
     try {
       const res = await api.post<{ synced: number; error?: string }>('/sync/trigger');
       setSyncResult(res.error ? `Error: ${res.error}` : `${res.synced} transaksi baru disinkronkan.`);
+      mutateNextRun();
     } finally {
       setSyncing(false);
+    }
+  };
+
+  const handleToggleNotifyEveryTx = async (next: boolean) => {
+    setNotifyingEveryTx(true);
+    try {
+      await api.put('/telegram/config', { notifyEveryTransaction: next });
+      await mutateTelegram();
+    } finally {
+      setNotifyingEveryTx(false);
     }
   };
 
@@ -134,6 +180,9 @@ function SettingsContent() {
             {syncing ? 'Sinkronisasi...' : 'Sync manual sekarang'}
           </Button>
           {syncResult && <p className="mt-2 text-small text-ink-muted">{syncResult}</p>}
+          {countdown && (
+            <p className="mt-2 text-small text-ink-subtle">Sync otomatis berikutnya dalam {countdown}</p>
+          )}
         </section>
 
         {/* Telegram */}
@@ -183,6 +232,18 @@ function SettingsContent() {
             <p className="mt-2 flex items-center gap-1.5 text-small text-ink-muted">
               <Check size={14} /> {testResult}
             </p>
+          )}
+
+          {telegramStatus?.configured && (
+            <div className="mt-4 border-t border-line-subtle pt-4">
+              <Switch
+                checked={!!telegramStatus.notifyEveryTransaction}
+                onChange={handleToggleNotifyEveryTx}
+                disabled={notifyingEveryTx}
+                label="Notifikasi tiap transaksi baru"
+                description="Kirim pesan Telegram setiap ada transaksi masuk, bukan cuma pas over budget."
+              />
+            </div>
           )}
         </section>
 

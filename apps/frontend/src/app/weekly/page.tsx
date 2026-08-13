@@ -5,13 +5,23 @@ import { api } from '@/lib/api';
 import { formatRupiah } from '@/lib/format';
 import { StatTile } from '@/components/ui/StatTile';
 import { DayBarChart } from '@/components/ui/DayBarChart';
+import { TransactionNoteRow } from '@/components/ui/TransactionNoteRow';
+
+interface DayTransaction {
+  id: number;
+  amount: number;
+  description: string;
+  source: string;
+  occurredAt: string;
+  note?: string | null;
+}
 
 interface DaySummary {
   date: string;
   dayOfWeek: number;
   budget: number;
   totalSpent: number;
-  transactions: { id: number; amount: number; description: string; source: string }[];
+  transactions: DayTransaction[];
 }
 
 const SHORT_DAY = ['Min', 'Sen', 'Sel', 'Rab', 'Kam', 'Jum', 'Sab'];
@@ -19,7 +29,7 @@ const SHORT_DAY = ['Min', 'Sen', 'Sel', 'Rab', 'Kam', 'Jum', 'Sab'];
 const fetcher = (path: string) => api.get<{ days: DaySummary[] }>(path);
 
 export default function WeeklyPage() {
-  const { data, error, isLoading } = useSWR('/transactions/weekly', fetcher);
+  const { data, error, isLoading, mutate } = useSWR('/transactions/weekly', fetcher);
 
   if (isLoading) return <WeeklySkeleton />;
   if (error)
@@ -99,6 +109,30 @@ export default function WeeklyPage() {
                     style={{ width: `${ratio}%` }}
                   />
                 </div>
+
+                {d.transactions.length > 0 && (
+                  <ul className="mt-3 flex flex-col gap-1 border-t border-line-subtle pt-2">
+                    {d.transactions.map((t) => (
+                      <TransactionNoteRow
+                        key={t.id}
+                        transaction={t}
+                        onSaved={(id, note) =>
+                          mutate(
+                            (current) =>
+                              current && {
+                                days: current.days.map((day) =>
+                                  day.date === d.date
+                                    ? { ...day, transactions: day.transactions.map((tx) => (tx.id === id ? { ...tx, note } : tx)) }
+                                    : day,
+                                ),
+                              },
+                            { revalidate: false },
+                          )
+                        }
+                      />
+                    ))}
+                  </ul>
+                )}
               </li>
             );
           })}
