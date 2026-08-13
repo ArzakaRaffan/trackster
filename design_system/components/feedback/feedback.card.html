@@ -1,0 +1,20 @@
+<!-- @dsCard group="Components" viewport="700x280" name="Feedback" subtitle="Inline alerts, empty state, loading skeletons" -->
+<!doctype html><html><head><meta charset="utf-8"><link rel="stylesheet" href="../../styles.css"><script src="https://unpkg.com/lucide@0.427.0/dist/umd/lucide.min.js"></script><script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script><script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script><script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script><script src="../../_ds_bundle.js"></script><style>body{padding:16px;display:grid;grid-template-columns:1fr 1fr;gap:16px;align-items:start}.cap{font-size:10px;font-weight:700;letter-spacing:1.4px;text-transform:uppercase;color:var(--text-subtle);margin-bottom:8px}</style></head><body><div id="root"></div>
+<script type="text/babel">
+const { Alert, EmptyState, Skeleton, Button, Icon, Card } = window.TracksterDesignSystem_4b3ed2;
+function Demo(){return (<>
+<div><div className="cap">Alert</div><div style={{display:"flex",flexDirection:"column",gap:10}}>
+<Alert tone="over" title="Lewat budget harian" icon={<Icon name="triangle-alert" size={18}/>} action={<Button variant="outlined" size="sm">Atur budget</Button>}>Kamu Rp19.700 di atas budget. Alert Telegram sudah dikirim 19:05.</Alert>
+<Alert tone="near" title="Sisa Rp18.000" icon={<Icon name="gauge" size={18}/>}>88% budget hari ini sudah terpakai.</Alert>
+<Alert tone="info" title="Sinkron email" icon={<Icon name="mail" size={18}/>} onDismiss={()=>{}}>Terakhir baca inbox 2 menit lalu.</Alert>
+</div></div>
+<div><div className="cap">EmptyState · Skeleton</div>
+<EmptyState icon={<Icon name="inbox" size={22}/>} title="Belum ada transaksi" description="Begitu ada email notifikasi dari BCA atau Jago, transaksinya muncul di sini otomatis."/>
+<Card padding={14} style={{marginTop:12,display:"flex",flexDirection:"column",gap:12}}>
+<Skeleton width={200} height={44} radius="comfortable"/>
+<Skeleton height={10} radius="pill"/>
+<div style={{display:"flex",gap:12,alignItems:"center"}}><Skeleton width={40} circle/><div style={{flex:1,display:"flex",flexDirection:"column",gap:6}}><Skeleton width="60%" height={12}/><Skeleton width="30%" height={10}/></div></div>
+</Card></div>
+</>);}
+ReactDOM.createRoot(document.getElementById("root")).render(<Demo/>);
+</script></body></html>

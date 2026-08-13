@@ -1,0 +1,11 @@
+:root{
+/* Base unit 8px; the reference also uses odd micro values verbatim — kept, not snapped */
+--space-px:1px;--space-2:2px;--space-3:3px;--space-4:4px;--space-5:5px;--space-6:6px;--space-8:8px;
+--space-10:10px;--space-12:12px;--space-14:14px;--space-15:15px;--space-16:16px;--space-20:20px;
+--space-24:24px;--space-32:32px;--space-40:40px;--space-48:48px;
+
+/* Mobile-first layout */
+--gutter-mobile:16px;--gutter-desktop:24px;
+--content-max:720px;--sidebar-width:240px;
+--navbar-height:64px;--navbar-safe:calc(64px + env(safe-area-inset-bottom,0px));
+}

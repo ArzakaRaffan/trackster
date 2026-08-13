@@ -1,0 +1,15 @@
+:root{
+--font-ui:"Figtree","SpotifyMixUI","CircularSp-Arab","CircularSp-Hebr","CircularSp-Cyrl","CircularSp-Grek","CircularSp-Deva","Helvetica Neue",helvetica,arial,"Hiragino Sans","Hiragino Kaku Gothic ProN",Meiryo,"MS Gothic",sans-serif;
+--font-title:"Figtree","SpotifyMixUITitle","CircularSp-Arab","CircularSp-Hebr","Helvetica Neue",helvetica,arial,sans-serif;
+--font-mono:"JetBrains Mono",ui-monospace,SFMono-Regular,Menlo,monospace;
+
+/* Scale — reference range 10–24px, plus two amount sizes Trackster needs for the money hero */
+--text-amount-hero:56px;--text-amount:40px;
+--text-title:24px;--text-heading:18px;--text-body:16px;--text-label:14px;--text-small:12px;--text-badge:10.5px;--text-micro:10px;
+
+--weight-regular:400;--weight-semibold:600;--weight-bold:700;--weight-black:800;
+
+--leading-tight:1.00;--leading-snug:1.30;--leading-normal:normal;--leading-relaxed:1.50;
+
+--tracking-normal:normal;--tracking-button:.14px;--tracking-caps:1.4px;--tracking-caps-wide:2px;--tracking-amount:-1.5px;
+}

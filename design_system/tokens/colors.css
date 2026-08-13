@@ -1,0 +1,43 @@
+:root{
+/* ---- Base neutrals (near-black immersion) ---- */
+--black-base:#121212;--black-surface:#181818;--black-mid:#1f1f1f;--black-card:#252525;--black-card-alt:#272727;
+--gray-border:#4d4d4d;--gray-border-light:#7c7c7c;--gray-silver:#b3b3b3;--gray-near-white:#cbcbcb;
+--white-light:#fdfdfd;--white:#ffffff;--light-surface:#eeeeee;--pure-black:#000000;
+
+/* ---- Brand ---- */
+--green:#1ed760;--green-border:#1db954;--green-press:#1aa34a;
+
+/* ---- Semantic hues ---- */
+--red:#f3727f;--orange:#ffa42b;--blue:#539df5;
+
+/* ---- Surfaces ---- */
+--surface-base:var(--black-base);--surface-raised:var(--black-surface);--surface-interactive:var(--black-mid);
+--surface-card:var(--black-surface);--surface-card-alt:var(--black-card);--surface-overlay:var(--black-card-alt);
+--surface-light:var(--light-surface);
+--surface-hover:rgba(255,255,255,.07);--surface-press:rgba(255,255,255,.12);
+--surface-track:rgba(255,255,255,.10);
+
+/* ---- Text ---- */
+--text-base:var(--white);--text-bright:var(--white-light);--text-muted:var(--gray-silver);
+--text-subtle:var(--gray-border-light);--text-secondary:var(--gray-near-white);
+--text-accent:var(--green);--text-negative:var(--red);--text-warning:var(--orange);--text-announcement:var(--blue);
+--text-on-accent:var(--pure-black);--text-on-light:var(--black-surface);
+
+/* ---- Borders ---- */
+--border-default:var(--gray-border);--border-strong:var(--gray-border-light);
+--border-subtle:rgba(255,255,255,.10);--border-accent:var(--green-border);
+
+/* ---- Budget status (Trackster extension) ---- */
+--status-under:var(--green);           /* on track / money left */
+--status-under-bg:rgba(30,215,96,.12);
+--status-near:var(--orange);           /* >=80% of daily budget spent */
+--status-near-bg:rgba(255,164,43,.12);
+--status-over:var(--red);              /* budget exceeded */
+--status-over-bg:rgba(243,114,127,.12);
+--status-info:var(--blue);
+--status-info-bg:rgba(83,157,245,.12);
+
+/* ---- Bank sources ---- */
+--source-bca:var(--blue);--source-bca-bg:rgba(83,157,245,.14);
+--source-jago:var(--orange);--source-jago-bg:rgba(255,164,43,.14);
+}

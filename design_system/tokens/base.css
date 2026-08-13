@@ -1,0 +1,10 @@
+html{-webkit-text-size-adjust:100%}
+body{margin:0;background:var(--surface-base);color:var(--text-base);font-family:var(--font-ui);font-size:var(--text-body);font-weight:var(--weight-regular);-webkit-font-smoothing:antialiased}
+*,*::before,*::after{box-sizing:border-box}
+a{color:var(--text-base);text-decoration:none}
+a:hover{color:var(--green)}
+button{font-family:inherit}
+.tabular{font-variant-numeric:tabular-nums}
+.tk-icon>svg{display:block;width:100%;height:100%}
+::selection{background:var(--green);color:var(--pure-black)}
+@keyframes tk-shimmer{0%{background-position:200% 0}100%{background-position:-200% 0}}

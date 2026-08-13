@@ -3,7 +3,10 @@
 import { useEffect, useState } from 'react';
 import useSWR from 'swr';
 import { api } from '@/lib/api';
-import { DAY_NAMES } from '@/lib/format';
+import { DAY_NAMES, formatRupiah } from '@/lib/format';
+import { Input } from '@/components/ui/Input';
+import { Button } from '@/components/ui/Button';
+import { Check } from 'lucide-react';
 
 interface DailyBudget {
   dayOfWeek: number;
@@ -49,37 +52,56 @@ export default function BudgetPage() {
 
   const weeklyTotal = Object.values(values).reduce((sum, v) => sum + (parseInt(v, 10) || 0), 0);
 
+  if (!data) return <BudgetSkeleton />;
+
   return (
-    <div className="space-y-4">
-      <div className="bg-white border rounded-2xl p-6">
-        <p className="text-sm text-gray-500 mb-1">Total budget mingguan</p>
-        <p className="text-2xl font-bold">Rp {weeklyTotal.toLocaleString('id-ID')}</p>
-      </div>
+    <div className="pb-navbar">
+      <header className="sticky top-0 z-10 bg-base/[0.86] px-4 py-4 backdrop-blur-md">
+        <p className="text-small font-bold uppercase tracking-caps text-ink-muted">Atur budget</p>
+        <h1 className="font-title text-title font-bold text-ink">Budget</h1>
+      </header>
 
-      <div className="bg-white border rounded-2xl divide-y">
-        {[0, 1, 2, 3, 4, 5, 6].map((day) => (
-          <div key={day} className="flex items-center justify-between px-4 py-3">
-            <label className="text-sm font-medium">{DAY_NAMES[day]}</label>
-            <div className="flex items-center gap-1">
-              <span className="text-sm text-gray-400">Rp</span>
-              <input
-                type="number"
-                className="w-28 border rounded-lg px-2 py-1 text-right text-sm"
-                value={values[day] ?? ''}
-                onChange={(e) => handleChange(day, e.target.value)}
-              />
-            </div>
-          </div>
-        ))}
-      </div>
+      <div className="flex flex-col gap-4 px-4">
+        <section className="rounded-medium bg-surface p-5">
+          <p className="text-small font-bold uppercase tracking-caps text-ink-muted">Total budget mingguan</p>
+          <p className="font-title text-amount-hero font-extrabold tabular-nums text-ink">{formatRupiah(weeklyTotal)}</p>
+        </section>
 
-      <button
-        onClick={handleSave}
-        disabled={saving}
-        className="w-full bg-blue-600 text-white rounded-lg py-2.5 font-medium disabled:opacity-50"
-      >
-        {saving ? 'Menyimpan...' : saved ? 'Tersimpan ✓' : 'Simpan Budget'}
-      </button>
+        <div className="flex flex-col gap-3 rounded-comfortable bg-surface p-3.5">
+          {[0, 1, 2, 3, 4, 5, 6].map((day) => (
+            <Input
+              key={day}
+              label={DAY_NAMES[day]}
+              type="number"
+              inputMode="numeric"
+              prefix="Rp"
+              value={values[day] ?? ''}
+              onChange={(e) => handleChange(day, e.target.value)}
+            />
+          ))}
+        </div>
+
+        <Button variant="primary" size="lg" fullWidth onClick={handleSave} disabled={saving}>
+          {saving ? 'Menyimpan...' : saved ? (
+            <>
+              <Check size={18} /> Tersimpan
+            </>
+          ) : (
+            'Simpan budget'
+          )}
+        </Button>
+      </div>
+    </div>
+  );
+}
+
+function BudgetSkeleton() {
+  return (
+    <div className="px-4 pb-navbar pt-6">
+      <div className="flex flex-col gap-4">
+        <div className="h-24 animate-pulse rounded-medium bg-track" />
+        <div className="h-64 animate-pulse rounded-comfortable bg-track" />
+      </div>
     </div>
   );
 }

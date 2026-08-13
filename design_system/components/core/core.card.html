@@ -1,0 +1,28 @@
+<!-- @dsCard group="Components" viewport="700x300" name="Core" subtitle="Pill buttons, circular icon buttons, cards, badges, fields" -->
+<!doctype html><html><head><meta charset="utf-8"><link rel="stylesheet" href="../../styles.css"><script src="https://unpkg.com/lucide@0.427.0/dist/umd/lucide.min.js"></script><script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script><script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script><script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script><script src="../../_ds_bundle.js"></script><style>body{padding:16px;display:flex;flex-direction:column;gap:14px}.row{display:flex;align-items:center;gap:10px;flex-wrap:wrap}.cap{font-size:10px;font-weight:700;letter-spacing:1.4px;text-transform:uppercase;color:var(--text-subtle)}</style></head><body><div id="root"></div>
+<script type="text/babel">
+const { Button, IconButton, Icon, Card, Badge, Input, Switch, Select } = window.TracksterDesignSystem_4b3ed2;
+function Demo(){return (<>
+<div className="cap">Button — variants</div>
+<div className="row"><Button variant="primary">Simpan</Button><Button variant="dark">Detail</Button><Button variant="outlined">Filter</Button><Button variant="ghost">Batal</Button><Button variant="light">Masuk</Button><Button variant="danger">Hapus</Button><Button variant="primary" disabled>Disabled</Button></div>
+<div className="cap">Sizes &amp; caps</div>
+<div className="row"><Button size="sm" variant="dark">sm</Button><Button size="md" variant="dark">md</Button><Button size="lg" variant="primary">lg primary</Button><Button size="sm" variant="outlined" caps>Minggu ini</Button><Button variant="dark" icon={<Icon name="filter" size={16}/>}>Dengan ikon</Button></div>
+<div className="cap">IconButton</div>
+<div className="row"><IconButton variant="accent" size={56} label="Tambah"><Icon name="plus" size={24}/></IconButton><IconButton variant="dark" label="Sinkron"><Icon name="refresh-cw" size={18}/></IconButton><IconButton variant="outlined" label="Bell"><Icon name="bell" size={18}/></IconButton><IconButton variant="ghost" label="Lebih"><Icon name="ellipsis" size={18}/></IconButton></div>
+<div className="cap">Card · Badge</div>
+<div className="row" style={{alignItems:"stretch"}}>
+<Card padding={14} style={{width:190}}><div style={{fontSize:14,fontWeight:700}}>raised #181818</div><div style={{fontSize:12,color:"var(--text-muted)"}}>default surface</div></Card>
+<Card variant="alt" padding={14} elevated style={{width:190}}><div style={{fontSize:14,fontWeight:700}}>alt + elevated</div><div style={{fontSize:12,color:"var(--text-muted)"}}>shadow-medium</div></Card>
+<Card variant="outlined" padding={14} style={{width:190}}><div style={{fontSize:14,fontWeight:700}}>outlined</div><div style={{fontSize:12,color:"var(--text-muted)"}}>empty states only</div></Card>
+</div>
+<div className="row"><Badge tone="under">Aman</Badge><Badge tone="near">Hampir</Badge><Badge tone="over" icon={<Icon name="triangle-alert" size={12}/>}>Over budget</Badge><Badge tone="info">Sinkron</Badge><Badge tone="neutral">8 transaksi</Badge><Badge tone="accent" caps>Baru</Badge></div>
+<div className="cap">Input · Select · Switch</div>
+<div className="row" style={{alignItems:"flex-start"}}>
+<Input label="Budget harian" prefix="Rp" value="150.000" style={{width:200}}/>
+<Input pill placeholder="Cari merchant" prefix={<Icon name="search" size={18}/>} style={{width:210}}/>
+<Select label="Alert saat" value="100" options={[{value:"80",label:"80% budget"},{value:"100",label:"Lewat budget"}]} style={{width:170}}/>
+</div>
+<Card padding={14}><Switch label="Alert Telegram" description="Kirim pesan kalau pengeluaran lewat budget harian" checked={true} /></Card>
+</>);}
+ReactDOM.createRoot(document.getElementById("root")).render(<Demo/>);
+</script></body></html>

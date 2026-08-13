@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<!-- @template name="Trackster screen" description="Mobile app screen scaffold: sticky header, money hero with budget bar, transaction list, bottom nav." -->
+<helmet><script src="./ds-base.js"></script><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;600;700;800;900&display=swap"><script src="https://unpkg.com/lucide@0.427.0/dist/umd/lucide.min.js"></script><style>body{margin:0;background:#121212}</style></helmet>
+<div style="min-height:100vh;background:#121212;color:#fff;font-family:Figtree,Helvetica Neue,arial,sans-serif;display:flex;justify-content:center">
+<div style="width:100%;max-width:420px;display:flex;flex-direction:column;padding-bottom:88px">
+<header style="position:sticky;top:0;z-index:5;background:rgba(18,18,18,.86);backdrop-filter:blur(12px);padding:16px;display:flex;align-items:center;gap:12px">
+<div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:2px">
+<span style="font-size:12px;font-weight:700;letter-spacing:1.4px;text-transform:uppercase;color:#b3b3b3">Rabu, 12 Agustus</span>
+<h1 style="margin:0;font-size:24px;font-weight:700;line-height:1">Hari Ini</h1>
+</div>
+<span style="width:40px;height:40px;border-radius:50%;background:#1f1f1f;display:inline-flex;align-items:center;justify-content:center;color:#fff">
+<x-import component-from-global-scope="TracksterDesignSystem_4b3ed2.Icon" name="bell" size="18" hint-size="18px,18px"></x-import>
+</span>
+</header>
+<div style="display:flex;flex-direction:column;gap:16px;padding:0 16px">
+<section style="background:#181818;border-radius:10px;padding:20px;display:flex;flex-direction:column;gap:16px">
+<div style="display:flex;flex-wrap:wrap;align-items:flex-start;justify-content:space-between;gap:12px">
+<div style="display:flex;flex-direction:column;gap:4px">
+<span style="font-size:12px;font-weight:700;letter-spacing:1.4px;text-transform:uppercase;color:#b3b3b3">Terpakai hari ini</span>
+<span style="font-size:56px;font-weight:800;letter-spacing:-1.5px;line-height:1;color:#f3727f;font-variant-numeric:tabular-nums">Rp169.700</span>
+</div>
+<span style="background:rgba(243,114,127,.12);color:#f3727f;font-size:10.5px;font-weight:600;line-height:1.33;padding:3px 8px;border-radius:9999px;white-space:nowrap">Over budget</span>
+</div>
+<x-import component-from-global-scope="TracksterDesignSystem_4b3ed2.BudgetProgress" spent="169700" budget="150000" height="16" hint-size="100%,44px"></x-import>
+<div style="display:flex;gap:20px">
+<div style="display:flex;flex-direction:column;gap:4px">
+<span style="font-size:12px;font-weight:700;letter-spacing:1.4px;text-transform:uppercase;color:#b3b3b3">Budget</span>
+<span style="font-size:16px;font-weight:700;color:#b3b3b3;font-variant-numeric:tabular-nums">Rp150.000</span>
+</div>
+<div style="display:flex;flex-direction:column;gap:4px">
+<span style="font-size:12px;font-weight:700;letter-spacing:1.4px;text-transform:uppercase;color:#b3b3b3">Lewat</span>
+<span style="font-size:16px;font-weight:700;color:#f3727f;font-variant-numeric:tabular-nums">Rp19.700</span>
+</div>
+</div>
+</section>
+<div style="display:flex;align-items:baseline;gap:12px">
+<h2 style="margin:0;flex:1;font-size:18px;font-weight:600;line-height:1.3">Transaksi</h2>
+<span style="font-size:12px;color:#b3b3b3;font-variant-numeric:tabular-nums">3 transaksi</span>
+</div>
+<section style="background:#181818;border-radius:8px;padding:8px">
+<x-import component-from-global-scope="TracksterDesignSystem_4b3ed2.TransactionRow" description="Indomaret Tebet" amount="87200" source="BCA" time="19:05" hint-size="100%,56px"></x-import>
+<x-import component-from-global-scope="TracksterDesignSystem_4b3ed2.TransactionRow" description="GoFood — Nasi Padang" amount="58500" source="JAGO" time="12:40" hint-size="100%,56px"></x-import>
+<x-import component-from-global-scope="TracksterDesignSystem_4b3ed2.TransactionRow" description="Kopi Kenangan" amount="24000" source="BCA" time="08:12" hint-size="100%,56px"></x-import>
+</section>
+</div>
+</div>
+<nav style="position:fixed;left:0;right:0;bottom:0;display:flex;background:rgba(18,18,18,.92);backdrop-filter:blur(12px);box-shadow:inset 0 1px 0 rgba(255,255,255,.1);padding:8px">
+<x-import component-from-global-scope="TracksterDesignSystem_4b3ed2.NavBar" active="/" hint-size="100%,64px" style="width:100%"></x-import>
+</nav>
+</div>
+</x-dc>
+</body>
+</html>

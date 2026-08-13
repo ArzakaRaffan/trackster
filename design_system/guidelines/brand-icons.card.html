@@ -1,0 +1,11 @@
+<!-- @dsCard group="Brand" viewport="700x160" name="Iconography" subtitle="Lucide, 2px stroke, currentColor — substituted set, no icons were supplied" -->
+<!doctype html><html><head><meta charset="utf-8"><link rel="stylesheet" href="../styles.css"><script src="https://unpkg.com/lucide@0.427.0/dist/umd/lucide.min.js"></script><style>body{padding:16px;display:flex;flex-direction:column;gap:14px}.grid{display:flex;gap:16px;flex-wrap:wrap}.i{display:flex;flex-direction:column;align-items:center;gap:6px;width:64px}.i span{font-size:9px;font-family:var(--font-mono);color:var(--text-subtle);text-align:center}.i i{color:var(--text-base)}.h{font-size:10px;font-family:var(--font-mono);color:var(--text-muted)}</style></head><body>
+<div class="grid" id="g"></div>
+<div class="h">20px default · 24px nav/hero · 16px inline · stroke-width 2 · never filled, never coloured except status</div>
+<script>
+const names=["sun","bar-chart-3","wallet","settings","plus","bell","refresh-cw","search","triangle-alert","gauge","mail","send","inbox","log-out","chevron-right","calendar"];
+document.getElementById("g").innerHTML=names.map(n=>'<div class="i"><i data-lucide="'+n+'"></i><span>'+n+'</span></div>').join("");
+lucide.createIcons();
+document.querySelectorAll("#g svg").forEach(s=>{s.setAttribute("width",22);s.setAttribute("height",22)});
+</script>
+</body></html>

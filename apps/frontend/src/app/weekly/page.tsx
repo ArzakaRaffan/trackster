@@ -2,7 +2,9 @@
 
 import useSWR from 'swr';
 import { api } from '@/lib/api';
-import { formatRupiah, DAY_NAMES } from '@/lib/format';
+import { formatRupiah } from '@/lib/format';
+import { StatTile } from '@/components/ui/StatTile';
+import { DayBarChart } from '@/components/ui/DayBarChart';
 
 interface DaySummary {
   date: string;
@@ -12,57 +14,113 @@ interface DaySummary {
   transactions: { id: number; amount: number; description: string; source: string }[];
 }
 
+const SHORT_DAY = ['Min', 'Sen', 'Sel', 'Rab', 'Kam', 'Jum', 'Sab'];
+
 const fetcher = (path: string) => api.get<{ days: DaySummary[] }>(path);
 
 export default function WeeklyPage() {
   const { data, error, isLoading } = useSWR('/transactions/weekly', fetcher);
 
-  if (isLoading) return <p className="text-gray-400 text-sm">Memuat...</p>;
-  if (error) return <p className="text-warn text-sm">Gagal memuat data.</p>;
+  if (isLoading) return <WeeklySkeleton />;
+  if (error)
+    return (
+      <div className="px-4 pb-navbar pt-6">
+        <p className="text-label text-status-over">Gagal memuat data.</p>
+      </div>
+    );
   if (!data) return null;
 
   const totalBudget = data.days.reduce((s, d) => s + d.budget, 0);
   const totalSpent = data.days.reduce((s, d) => s + d.totalSpent, 0);
+  const remaining = totalBudget - totalSpent;
   const isToday = (date: string) => date === new Date().toISOString().slice(0, 10);
 
+  const chartDays = data.days.map((d) => ({
+    label: SHORT_DAY[d.dayOfWeek],
+    spent: d.totalSpent,
+    budget: d.budget,
+    isOverBudget: d.totalSpent > d.budget,
+    isToday: isToday(d.date),
+  }));
+
   return (
-    <div className="space-y-4">
-      <div className="bg-white border rounded-2xl p-6">
-        <p className="text-sm text-gray-500 mb-1">Total minggu ini</p>
-        <p className={`text-2xl font-bold ${totalSpent > totalBudget ? 'text-warn' : 'text-gray-900'}`}>
-          {formatRupiah(totalSpent)}
-        </p>
-        <p className="text-sm text-gray-500">dari budget {formatRupiah(totalBudget)}</p>
+    <div className="pb-navbar">
+      <header className="sticky top-0 z-10 bg-base/[0.86] px-4 py-4 backdrop-blur-md">
+        <p className="text-small font-bold uppercase tracking-caps text-ink-muted">7 hari terakhir</p>
+        <h1 className="font-title text-title font-bold text-ink">Mingguan</h1>
+      </header>
+
+      <div className="flex flex-col gap-4 px-4">
+        <section className="rounded-medium bg-surface p-5">
+          <p className="text-small font-bold uppercase tracking-caps text-ink-muted">Total minggu ini</p>
+          <p className={`font-title text-amount font-extrabold tabular-nums ${totalSpent > totalBudget ? 'text-status-over' : 'text-ink'}`}>
+            {formatRupiah(totalSpent)}
+          </p>
+
+          <div className="mt-5">
+            <DayBarChart days={chartDays} />
+          </div>
+        </section>
+
+        <div className="grid grid-cols-3 gap-2.5">
+          <StatTile label="Budget" value={formatRupiah(totalBudget)} size="heading" />
+          <StatTile
+            label={remaining < 0 ? 'Lewat' : 'Sisa'}
+            value={formatRupiah(Math.abs(remaining))}
+            tone={remaining < 0 ? 'over' : 'under'}
+            size="heading"
+          />
+          <StatTile label="Rata-rata" value={formatRupiah(totalSpent / data.days.length)} tone="muted" size="heading" />
+        </div>
+
+        <h2 className="text-heading font-semibold text-ink">Per hari</h2>
+
+        <ul className="flex flex-col gap-2">
+          {data.days.map((d) => {
+            const over = d.totalSpent > d.budget;
+            const ratio = d.budget > 0 ? Math.min((d.totalSpent / d.budget) * 100, 100) : 0;
+            return (
+              <li
+                key={d.date}
+                className={`rounded-comfortable bg-surface p-3.5 ${isToday(d.date) ? 'shadow-[inset_0_0_0_1px_theme(colors.brand.DEFAULT)]' : ''}`}
+              >
+                <div className="flex items-baseline justify-between gap-3">
+                  <p className="text-body font-bold text-ink">
+                    {SHORT_DAY[d.dayOfWeek]}
+                    <span className="ml-2 text-small font-normal text-ink-muted">{d.date}</span>
+                  </p>
+                  <p className={`text-small font-bold tabular-nums ${over ? 'text-status-over' : 'text-ink-muted'}`}>
+                    {formatRupiah(d.totalSpent)} / {formatRupiah(d.budget)}
+                  </p>
+                </div>
+                <div className={`mt-2 h-1.5 overflow-hidden rounded-pill ${over ? 'bg-status-over-bg' : 'bg-track'}`}>
+                  <div
+                    className={`h-full rounded-pill ${over ? 'bg-status-over' : 'bg-status-under'}`}
+                    style={{ width: `${ratio}%` }}
+                  />
+                </div>
+              </li>
+            );
+          })}
+        </ul>
       </div>
+    </div>
+  );
+}
 
-      <div className="space-y-2">
-        {data.days.map((day) => {
-          const over = day.totalSpent > day.budget;
-          const percentage = day.budget > 0 ? Math.min((day.totalSpent / day.budget) * 100, 100) : 0;
-
-          return (
-            <div
-              key={day.date}
-              className={`bg-white border rounded-xl px-4 py-3 ${isToday(day.date) ? 'ring-2 ring-blue-200' : ''}`}
-            >
-              <div className="flex items-center justify-between mb-1">
-                <p className="font-medium text-sm">
-                  {DAY_NAMES[day.dayOfWeek]}
-                  <span className="text-gray-400 font-normal ml-2 text-xs">{day.date}</span>
-                </p>
-                <p className={`text-sm font-semibold ${over ? 'text-warn' : 'text-gray-700'}`}>
-                  {formatRupiah(day.totalSpent)} / {formatRupiah(day.budget)}
-                </p>
-              </div>
-              <div className="w-full bg-gray-100 rounded-full h-1.5 overflow-hidden">
-                <div
-                  className={`h-full rounded-full ${over ? 'bg-warn' : 'bg-good'}`}
-                  style={{ width: `${percentage}%` }}
-                />
-              </div>
-            </div>
-          );
-        })}
+function WeeklySkeleton() {
+  return (
+    <div className="px-4 pb-navbar pt-6">
+      <div className="flex flex-col gap-4">
+        <div className="h-40 animate-pulse rounded-medium bg-track" />
+        <div className="grid grid-cols-3 gap-2.5">
+          {[0, 1, 2].map((i) => (
+            <div key={i} className="h-16 animate-pulse rounded-comfortable bg-track" />
+          ))}
+        </div>
+        {[0, 1, 2, 3].map((i) => (
+          <div key={i} className="h-14 animate-pulse rounded-comfortable bg-track" />
+        ))}
       </div>
     </div>
   );
