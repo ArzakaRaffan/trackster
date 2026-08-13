@@ -55,7 +55,7 @@ export default function BudgetPage() {
   if (!data) return <BudgetSkeleton />;
 
   return (
-    <div className="pb-navbar">
+    <div className="pb-navbar animate-fade-in-up">
       <header className="sticky top-0 z-10 bg-base/[0.86] px-4 py-4 backdrop-blur-md">
         <p className="text-small font-bold uppercase tracking-caps text-ink-muted">Atur budget</p>
         <h1 className="font-title text-title font-bold text-ink">Budget</h1>

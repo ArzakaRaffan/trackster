@@ -25,6 +25,16 @@ async function main() {
     });
   }
   console.log('Seeded 7 daily budget rows (default Rp50.000).');
+
+  // Saldo bank awal — user koreksi manual belakangan lewat PUT /balance/:source begitu tau angka aslinya.
+  for (const source of ['BCA', 'JAGO']) {
+    await prisma.bankBalance.upsert({
+      where: { source },
+      update: {},
+      create: { source, balance: 0 },
+    });
+  }
+  console.log('Seeded 2 bank balance rows (BCA, JAGO @ Rp0).');
 }
 
 main()

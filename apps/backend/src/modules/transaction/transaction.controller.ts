@@ -3,6 +3,7 @@ import { TransactionService } from './transaction.service';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { Source } from '@prisma/client';
 import { UpdateNoteDto } from './dto/update-note.dto';
+import { UpdateCategoryDto } from './dto/update-category.dto';
 
 @UseGuards(JwtAuthGuard)
 @Controller('transactions')
@@ -31,6 +32,29 @@ export class TransactionController {
     return this.transactionService.getWeekly();
   }
 
+  @Get('monthly')
+  async getMonthly(@Query('year') year: string, @Query('month') month: string) {
+    const y = year ? parseInt(year, 10) : new Date().getFullYear();
+    const m = month ? parseInt(month, 10) : new Date().getMonth() + 1;
+    return this.transactionService.getMonthly(y, m);
+  }
+
+  @Get('summary')
+  async getSummary(@Query('range') range?: string) {
+    // Cuma 'all' yang didukung saat ini — disiapin buat range lain nanti tanpa ubah shape response.
+    return this.transactionService.getAllTimeSummary();
+  }
+
+  @Get('day/:date')
+  async getByDay(@Param('date') date: string) {
+    return this.transactionService.getByDay(date);
+  }
+
+  @Get('insights')
+  async getInsights(@Query('range') range?: string) {
+    return this.transactionService.getInsights(range === 'all' ? 'all' : '30d');
+  }
+
   @Delete(':id')
   async remove(@Param('id', ParseIntPipe) id: number) {
     return this.transactionService.remove(id);
@@ -39,5 +63,10 @@ export class TransactionController {
   @Patch(':id/note')
   async updateNote(@Param('id', ParseIntPipe) id: number, @Body() dto: UpdateNoteDto) {
     return this.transactionService.updateNote(id, dto.note);
+  }
+
+  @Patch(':id/category')
+  async updateCategory(@Param('id', ParseIntPipe) id: number, @Body() dto: UpdateCategoryDto) {
+    return this.transactionService.updateCategory(id, dto.category);
   }
 }

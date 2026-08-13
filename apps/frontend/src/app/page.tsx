@@ -12,6 +12,7 @@ interface Transaction {
   source: 'BCA' | 'JAGO' | 'GOPAY';
   occurredAt: string;
   note?: string | null;
+  category?: string;
 }
 
 interface TodaySummary {
@@ -49,7 +50,7 @@ export default function TodayPage() {
   const textColor = { over: 'text-status-over', near: 'text-status-near', under: 'text-status-under' }[status];
 
   return (
-    <div className="pb-navbar">
+    <div className="pb-navbar animate-fade-in-up">
       {/* Sticky blurred top bar */}
       <header className="sticky top-0 z-10 flex items-center gap-3 bg-base/[0.86] px-4 py-4 backdrop-blur-md">
         <div className="min-w-0 flex-1">
@@ -163,6 +164,16 @@ export default function TodayPage() {
                       current && {
                         ...current,
                         transactions: current.transactions.map((tx) => (tx.id === id ? { ...tx, note } : tx)),
+                      },
+                    { revalidate: false },
+                  )
+                }
+                onCategorySaved={(id, category) =>
+                  mutate(
+                    (current) =>
+                      current && {
+                        ...current,
+                        transactions: current.transactions.map((tx) => (tx.id === id ? { ...tx, category } : tx)),
                       },
                     { revalidate: false },
                   )
