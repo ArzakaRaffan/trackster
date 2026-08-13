@@ -3,6 +3,9 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { api } from '@/lib/api';
+import { Input } from '@/components/ui/Input';
+import { Button } from '@/components/ui/Button';
+import { Lock } from 'lucide-react';
 
 export default function LoginPage() {
   const [username, setUsername] = useState('');
@@ -27,37 +30,44 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center px-4">
-      <form onSubmit={handleSubmit} className="w-full max-w-sm bg-white p-6 rounded-xl shadow-sm border">
-        <h1 className="text-xl font-bold mb-1">Trackster</h1>
-        <p className="text-sm text-gray-500 mb-6">Masuk untuk lanjut</p>
+    <div className="flex min-h-screen items-center justify-center bg-base px-4">
+      <div className="w-full max-w-sm">
+        <div className="mb-8 text-center">
+          <p className="font-title text-title font-black tracking-[-2px] text-ink">
+            Trackster<span className="text-brand">.</span>
+          </p>
+          <p className="mt-2 text-label text-ink-muted">
+            Tau persis budget harian kamu abis di mana, otomatis dari email bank.
+          </p>
+        </div>
 
-        <label className="block text-sm mb-1">Username</label>
-        <input
-          className="w-full border rounded-lg px-3 py-2 mb-4"
-          value={username}
-          onChange={(e) => setUsername(e.target.value)}
-          autoFocus
-        />
+        <form onSubmit={handleSubmit} className="flex flex-col gap-4 rounded-medium bg-surface p-5">
+          <Input
+            label="Username"
+            value={username}
+            onChange={(e) => setUsername(e.target.value)}
+            autoFocus
+          />
+          <Input
+            label="Password"
+            type="password"
+            prefix={<Lock size={16} />}
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            invalid={!!error}
+          />
 
-        <label className="block text-sm mb-1">Password</label>
-        <input
-          type="password"
-          className="w-full border rounded-lg px-3 py-2 mb-4"
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-        />
+          {error && <p className="text-small font-bold text-status-over">{error}</p>}
 
-        {error && <p className="text-warn text-sm mb-4">{error}</p>}
+          <Button type="submit" variant="primary" size="lg" fullWidth disabled={loading}>
+            {loading ? 'Masuk...' : 'Masuk'}
+          </Button>
+        </form>
 
-        <button
-          type="submit"
-          disabled={loading}
-          className="w-full bg-blue-600 text-white rounded-lg py-2 font-medium disabled:opacity-50"
-        >
-          {loading ? 'Masuk...' : 'Masuk'}
-        </button>
-      </form>
+        <p className="mt-4 text-center text-small text-ink-subtle">
+          Session disimpan di cookie. Kamu tetap login di HP ini.
+        </p>
+      </div>
     </div>
   );
 }
