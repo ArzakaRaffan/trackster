@@ -16,6 +16,11 @@ export class SyncController {
     return this.gmailSyncService.syncEmails();
   }
 
+  @Get('next-run')
+  async nextRun() {
+    return { nextRunAt: this.gmailSyncService.getNextRun() };
+  }
+
   @Get('logs')
   async logs() {
     return this.prisma.emailSyncLog.findMany({

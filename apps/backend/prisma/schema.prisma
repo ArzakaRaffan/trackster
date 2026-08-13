@@ -22,6 +22,7 @@ model Transaction {
   emailId     String   @unique
   occurredAt  DateTime
   createdAt   DateTime @default(now())
+  note        String?
 
   @@index([occurredAt])
 }
@@ -48,11 +49,12 @@ model EmailSyncLog {
 }
 
 model TelegramConfig {
-  id        Int      @id @default(autoincrement())
-  botToken  String
-  chatId    String
-  isActive  Boolean  @default(true)
-  updatedAt DateTime @updatedAt
+  id                     Int      @id @default(autoincrement())
+  botToken               String
+  chatId                 String
+  isActive               Boolean  @default(true)
+  notifyEveryTransaction Boolean  @default(false)
+  updatedAt              DateTime @updatedAt
 }
 
 model GmailToken {
