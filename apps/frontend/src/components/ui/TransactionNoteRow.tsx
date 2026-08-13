@@ -3,7 +3,8 @@
 import { useState } from 'react';
 import { api } from '@/lib/api';
 import { Button } from './Button';
-import { StickyNote } from 'lucide-react';
+import { Input } from './Input';
+import { Pencil, StickyNote } from 'lucide-react';
 
 export interface NoteableTransaction {
   id: number;
@@ -13,6 +14,7 @@ export interface NoteableTransaction {
   occurredAt: string;
   note?: string | null;
   category?: string;
+  displayDescription?: string;
 }
 
 const rp = (n: number) => 'Rp' + Math.abs(Math.round(n)).toLocaleString('id-ID');
@@ -51,15 +53,22 @@ export function TransactionNoteRow({
   transaction,
   onSaved,
   onCategorySaved,
+  onAliasSaved,
 }: {
   transaction: NoteableTransaction;
   onSaved?: (id: number, note: string) => void;
   onCategorySaved?: (id: number, category: string) => void;
+  onAliasSaved?: (id: number, displayName: string) => void;
 }) {
+  const hasAlias = !!transaction.displayDescription && transaction.displayDescription !== transaction.description;
+  const title = transaction.displayDescription ?? transaction.description;
+
   const [open, setOpen] = useState(false);
   const [draft, setDraft] = useState(transaction.note ?? '');
+  const [aliasDraft, setAliasDraft] = useState(hasAlias ? transaction.displayDescription! : '');
   const [saving, setSaving] = useState(false);
   const [savingCategory, setSavingCategory] = useState(false);
+  const [savingAlias, setSavingAlias] = useState(false);
 
   const handleSave = async () => {
     setSaving(true);
@@ -82,6 +91,16 @@ export function TransactionNoteRow({
     }
   };
 
+  const handleAliasSave = async () => {
+    setSavingAlias(true);
+    try {
+      await api.patch(`/transactions/${transaction.id}/alias`, { displayName: aliasDraft });
+      onAliasSaved?.(transaction.id, aliasDraft);
+    } finally {
+      setSavingAlias(false);
+    }
+  };
+
   return (
     <li className="rounded-standard px-3 py-2.5 transition-colors duration-fast ease-standard hover:bg-white/[0.07]">
       <button
@@ -90,10 +109,10 @@ export function TransactionNoteRow({
         className="flex min-h-[56px] w-full items-center gap-3 text-left"
       >
         <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-surface-interactive text-label font-bold text-ink-muted">
-          {transaction.description.trim().charAt(0).toUpperCase()}
+          {title.trim().charAt(0).toUpperCase()}
         </span>
         <span className="min-w-0 flex-1">
-          <span className="block truncate text-body font-bold text-ink">{transaction.description}</span>
+          <span className="block truncate text-body font-bold text-ink">{title}</span>
           <span className="mt-0.75 flex items-center gap-2">
             <span
               className={`rounded-subtle px-1.5 py-0.5 text-micro font-bold uppercase tracking-caps ${
@@ -109,6 +128,7 @@ export function TransactionNoteRow({
               </span>
             )}
             {transaction.note && <StickyNote size={12} className="text-ink-subtle" />}
+            {hasAlias && <Pencil size={12} className="text-ink-subtle" />}
           </span>
         </span>
         <span className="shrink-0 text-body font-bold tabular-nums text-ink">−{rp(transaction.amount)}</span>
@@ -134,6 +154,21 @@ export function TransactionNoteRow({
               <span className="pointer-events-none absolute right-3.5 text-small text-ink-muted">▾</span>
             </span>
           </label>
+
+          <div className="flex items-end gap-2">
+            <div className="flex-1">
+              <Input
+                label="Ganti nama"
+                placeholder={transaction.description}
+                value={aliasDraft}
+                onChange={(e) => setAliasDraft(e.target.value)}
+              />
+            </div>
+            <Button variant="dark" size="md" onClick={handleAliasSave} disabled={savingAlias || !aliasDraft.trim()}>
+              {savingAlias ? '...' : 'Simpan'}
+            </Button>
+          </div>
+
           <textarea
             value={draft}
             onChange={(e) => setDraft(e.target.value)}

@@ -112,3 +112,13 @@ model BalanceAdjustment {
 
   @@index([source])
 }
+
+// Nama panggilan buat merchant, terikat ke Transaction.description via string match (bukan FK) —
+// jadi berlaku otomatis ke semua transaksi lama & baru yang description-nya persis sama.
+model MerchantAlias {
+  id             Int      @id @default(autoincrement())
+  rawDescription String   @unique
+  displayName    String
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+}
