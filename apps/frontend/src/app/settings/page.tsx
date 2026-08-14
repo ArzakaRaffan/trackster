@@ -3,10 +3,12 @@
 import { useEffect, useState, Suspense } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import useSWR from 'swr';
+import { useAutoAnimate } from '@formkit/auto-animate/react';
 import { api, API_URL } from '@/lib/api';
 import { Input } from '@/components/ui/Input';
 import { Button } from '@/components/ui/Button';
 import { Switch } from '@/components/ui/Switch';
+import { AnimatedAmount } from '@/components/ui/AnimatedAmount';
 import { formatRupiah } from '@/lib/format';
 import { Mail, Send, LogOut, Check, Wallet, History, Tag, Pencil, Trash2, X } from 'lucide-react';
 
@@ -89,6 +91,7 @@ function SettingsContent() {
   const countdown = useCountdown(nextRun?.nextRunAt);
   const { data: balances, mutate: mutateBalances } = useSWR('/balance', balanceFetcher);
   const { data: aliases, mutate: mutateAliases } = useSWR('/merchant-aliases', merchantAliasFetcher);
+  const [aliasListParent] = useAutoAnimate({ duration: 200, easing: 'cubic-bezier(.3,0,.4,1)' });
 
   const [botToken, setBotToken] = useState('');
   const [chatId, setChatId] = useState('');
@@ -165,7 +168,7 @@ function SettingsContent() {
         <h1 className="font-title text-title font-bold text-ink">Setting</h1>
       </header>
 
-      <div className="flex flex-col gap-4 px-4">
+      <div className="flex flex-col gap-3 px-4">
         {/* Gmail */}
         <section className="rounded-comfortable bg-surface p-5">
           <h2 className="flex items-center gap-2 text-heading font-semibold text-ink">
@@ -304,7 +307,7 @@ function SettingsContent() {
             Nama panggilan buat merchant. Berlaku otomatis ke semua transaksi dengan nama asli yang sama.
           </p>
 
-          <div className="mt-4 flex flex-col gap-2">
+          <div ref={aliasListParent} className="mt-4 flex flex-col gap-2">
             {!aliases ? (
               <p className="text-small text-ink-muted">Memuat...</p>
             ) : aliases.length === 0 ? (
@@ -380,7 +383,7 @@ function BankBalanceRow({
   };
 
   return (
-    <div className="rounded-standard bg-surface-interactive p-3.5">
+    <div className="rounded-standard bg-surface-interactive p-4">
       <div className="flex items-center justify-between gap-3">
         <div>
           <p className="text-label font-bold text-ink">{SOURCE_LABEL[source]}</p>
@@ -390,9 +393,11 @@ function BankBalanceRow({
             </p>
           )}
         </div>
-        <p className="font-title text-heading font-bold tabular-nums text-ink">
-          {data ? formatRupiah(data.balance) : '—'}
-        </p>
+        {data ? (
+          <AnimatedAmount value={data.balance} className="font-title text-heading font-bold tabular-nums text-ink" />
+        ) : (
+          <p className="font-title text-heading font-bold tabular-nums text-ink">—</p>
+        )}
       </div>
 
       <div className="mt-3 flex items-center gap-4">
@@ -482,7 +487,7 @@ function MerchantAliasRow({ alias, onChanged }: { alias: MerchantAliasData; onCh
   };
 
   return (
-    <div className="rounded-standard bg-surface-interactive p-3">
+    <div className="rounded-standard bg-surface-interactive p-4">
       {editing ? (
         <div className="flex items-end gap-2">
           <div className="flex-1">
