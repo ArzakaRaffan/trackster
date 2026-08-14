@@ -2,12 +2,14 @@
 
 import { useEffect, useState } from 'react';
 import useSWR from 'swr';
+import { useAutoAnimate } from '@formkit/auto-animate/react';
 import { Bar, BarChart, Cell, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import { api } from '@/lib/api';
 import { formatRupiah, MONTH_NAMES } from '@/lib/format';
 import { CATEGORY_COLORS, CATEGORY_LABELS, TransactionNoteRow, type NoteableTransaction } from '@/components/ui/TransactionNoteRow';
 import { Input } from '@/components/ui/Input';
 import { StatTile } from '@/components/ui/StatTile';
+import { AnimatedTabContent } from '@/components/ui/AnimatedTabContent';
 import { ChevronLeft, ChevronRight, Inbox, Search, TrendingDown, TrendingUp, X } from 'lucide-react';
 
 /** Debounce a fast-changing value (search input) so we don't fire a request per keystroke. */
@@ -112,7 +114,7 @@ export default function ReportsPage() {
         <h1 className="font-title text-title font-bold text-ink">Laporan</h1>
       </header>
 
-      <div className="flex flex-col gap-4 px-4">
+      <div className="flex flex-col gap-3 px-4">
         {/* Tab switcher */}
         <div className="flex gap-1 rounded-full-pill bg-surface p-1">
           {(['monthly', 'all'] as const).map((t) => (
@@ -128,11 +130,13 @@ export default function ReportsPage() {
           ))}
         </div>
 
-        {tab === 'monthly' ? (
-          <MonthlyTab year={year} month={month} onPrev={goPrevMonth} onNext={goNextMonth} onSelectDay={setSelectedDay} />
-        ) : (
-          <AllTimeTab />
-        )}
+        <AnimatedTabContent tabKey={tab}>
+          {tab === 'monthly' ? (
+            <MonthlyTab year={year} month={month} onPrev={goPrevMonth} onNext={goNextMonth} onSelectDay={setSelectedDay} />
+          ) : (
+            <AllTimeTab />
+          )}
+        </AnimatedTabContent>
       </div>
 
       {selectedDay && <DayDetailSheet date={selectedDay} onClose={() => setSelectedDay(null)} />}
@@ -227,6 +231,7 @@ function MonthlyTab({
 
 function AllTimeTab() {
   const { data, error, isLoading } = useSWR('/transactions/summary?range=all', summaryFetcher);
+  const [resultsParent] = useAutoAnimate({ duration: 200, easing: 'cubic-bezier(.3,0,.4,1)' });
 
   const [searchInput, setSearchInput] = useState('');
   const [category, setCategory] = useState('ALL');
@@ -303,7 +308,7 @@ function AllTimeTab() {
               <p className="text-small text-ink-muted">Tidak ada transaksi yang cocok.</p>
             </div>
           ) : (
-            <ul className="flex flex-col gap-1">
+            <ul ref={resultsParent} className="flex flex-col gap-1">
               {listData?.data.map((t) => (
                 <TransactionNoteRow
                   key={t.id}
@@ -347,7 +352,7 @@ function AllTimeTab() {
         <p className="font-title text-amount-hero font-extrabold tabular-nums text-ink">{formatRupiah(data.totalSpent)}</p>
       </section>
 
-      <div className="grid grid-cols-2 gap-2.5">
+      <div className="grid grid-cols-2 gap-3">
         <StatTile
           label="Bulan tertinggi"
           value={data.highestMonth ? formatRupiah(data.highestMonth.total) : '—'}
@@ -404,6 +409,7 @@ function CategoryBarChart({ data }: { data: (CategoryTotal & { label: string })[
 
 function DayDetailSheet({ date, onClose }: { date: string; onClose: () => void }) {
   const { data, isLoading, mutate } = useSWR(`/transactions/day/${date}`, dayFetcher);
+  const [listParent] = useAutoAnimate({ duration: 200, easing: 'cubic-bezier(.3,0,.4,1)' });
 
   return (
     <div className="fixed inset-0 z-30 flex animate-fade-in items-end justify-center bg-base/70 backdrop-blur-sm lg:items-center">
@@ -443,7 +449,7 @@ function DayDetailSheet({ date, onClose }: { date: string; onClose: () => void }
             <p className="mb-2 text-small tabular-nums text-ink-muted">
               {data.transactions.length} transaksi · {formatRupiah(data.totalSpent)}
             </p>
-            <ul className="flex flex-col gap-1">
+            <ul ref={listParent} className="flex flex-col gap-1">
               {data.transactions.map((t) => (
                 <TransactionNoteRow
                   key={t.id}
@@ -492,7 +498,7 @@ function DayDetailSheet({ date, onClose }: { date: string; onClose: () => void }
 
 function ReportSkeleton() {
   return (
-    <div className="flex flex-col gap-4">
+    <div className="flex flex-col gap-3">
       <div className="h-40 animate-pulse rounded-medium bg-track" />
       <div className="h-32 animate-pulse rounded-medium bg-track" />
     </div>

@@ -3,9 +3,10 @@
 import { useEffect, useState } from 'react';
 import useSWR from 'swr';
 import { api } from '@/lib/api';
-import { DAY_NAMES, formatRupiah } from '@/lib/format';
+import { DAY_NAMES } from '@/lib/format';
 import { Input } from '@/components/ui/Input';
 import { Button } from '@/components/ui/Button';
+import { AnimatedAmount } from '@/components/ui/AnimatedAmount';
 import { Check } from 'lucide-react';
 
 interface DailyBudget {
@@ -61,13 +62,16 @@ export default function BudgetPage() {
         <h1 className="font-title text-title font-bold text-ink">Budget</h1>
       </header>
 
-      <div className="flex flex-col gap-4 px-4">
+      <div className="flex flex-col gap-3 px-4">
         <section className="rounded-medium bg-surface p-5">
           <p className="text-small font-bold uppercase tracking-caps text-ink-muted">Total budget mingguan</p>
-          <p className="font-title text-amount-hero font-extrabold tabular-nums text-ink">{formatRupiah(weeklyTotal)}</p>
+          <AnimatedAmount
+            value={weeklyTotal}
+            className="font-title text-amount-hero font-black tracking-amount tabular-nums text-ink"
+          />
         </section>
 
-        <div className="flex flex-col gap-3 rounded-comfortable bg-surface p-3.5">
+        <div className="flex flex-col gap-3 rounded-comfortable bg-surface p-4">
           {[0, 1, 2, 3, 4, 5, 6].map((day) => (
             <Input
               key={day}
@@ -98,7 +102,7 @@ export default function BudgetPage() {
 function BudgetSkeleton() {
   return (
     <div className="px-4 pb-navbar pt-6">
-      <div className="flex flex-col gap-4">
+      <div className="flex flex-col gap-3">
         <div className="h-24 animate-pulse rounded-medium bg-track" />
         <div className="h-64 animate-pulse rounded-comfortable bg-track" />
       </div>

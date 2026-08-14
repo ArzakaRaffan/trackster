@@ -2,10 +2,14 @@
 
 import { useState } from 'react';
 import useSWR from 'swr';
+import { useAutoAnimate } from '@formkit/auto-animate/react';
+import { motion } from 'motion/react';
 import { Bar, BarChart, Cell, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import { api } from '@/lib/api';
 import { formatRupiah } from '@/lib/format';
 import { CATEGORY_COLORS, CATEGORY_LABELS } from '@/components/ui/TransactionNoteRow';
+import { AnimatedTabContent } from '@/components/ui/AnimatedTabContent';
+import { TRANSITION_SLOW } from '@/lib/motion';
 import { AlertTriangle, TrendingDown, TrendingUp } from 'lucide-react';
 
 interface TrendData {
@@ -69,7 +73,7 @@ export default function InsightsPage() {
         <h1 className="font-title text-title font-bold text-ink">Analisis</h1>
       </header>
 
-      <div className="flex flex-col gap-4 px-4">
+      <div className="flex flex-col gap-3 px-4">
         <div className="flex gap-1 rounded-full-pill bg-surface p-1">
           {(['30d', 'all'] as const).map((r) => (
             <button
@@ -89,13 +93,13 @@ export default function InsightsPage() {
         ) : error || !data ? (
           <p className="text-label text-status-over">Gagal memuat analisis.</p>
         ) : (
-          <>
+          <AnimatedTabContent tabKey={range}>
             <TrendCard trend={data.trend} />
             <BudgetAdherenceCard adherence={data.budgetAdherence} />
             <CategoryCard categories={data.categoryBreakdown} />
             <DayOfWeekCard days={data.spendByDayOfWeek} />
             <TopMerchantsCard merchants={data.topMerchants} />
-          </>
+          </AnimatedTabContent>
         )}
       </div>
     </div>
@@ -158,24 +162,28 @@ function CategoryCard({ categories }: { categories: CategoryInsight[] }) {
         <p className="mt-2 text-small text-ink-muted">Belum ada data di rentang ini.</p>
       ) : (
         <>
-          <ResponsiveContainer width="100%" height={200}>
-            <PieChart>
-              <Pie
-                data={withSpend}
-                dataKey="totalAmount"
-                nameKey="category"
-                innerRadius={50}
-                outerRadius={80}
-                paddingAngle={2}
-                strokeWidth={0}
-              >
-                {withSpend.map((c) => (
-                  <Cell key={c.category} fill={CATEGORY_COLORS[c.category] ?? '#94a3b8'} />
-                ))}
-              </Pie>
-              <Tooltip content={<ChartTooltip />} />
-            </PieChart>
-          </ResponsiveContainer>
+          {/* Entrance plays once on mount (page load or tab switch), not on every SWR refetch —
+              re-renders from data revalidation update props on the same instance, no remount. */}
+          <motion.div initial={{ opacity: 0, scale: 0.92 }} animate={{ opacity: 1, scale: 1 }} transition={TRANSITION_SLOW}>
+            <ResponsiveContainer width="100%" height={200}>
+              <PieChart>
+                <Pie
+                  data={withSpend}
+                  dataKey="totalAmount"
+                  nameKey="category"
+                  innerRadius={50}
+                  outerRadius={80}
+                  paddingAngle={2}
+                  strokeWidth={0}
+                >
+                  {withSpend.map((c) => (
+                    <Cell key={c.category} fill={CATEGORY_COLORS[c.category] ?? '#94a3b8'} />
+                  ))}
+                </Pie>
+                <Tooltip content={<ChartTooltip />} />
+              </PieChart>
+            </ResponsiveContainer>
+          </motion.div>
           <div className="mt-2 flex flex-col gap-2">
             {categories
               .slice()
@@ -225,6 +233,7 @@ function DayOfWeekCard({ days }: { days: DayOfWeekInsight[] }) {
 }
 
 function TopMerchantsCard({ merchants }: { merchants: MerchantData[] }) {
+  const [listParent] = useAutoAnimate({ duration: 200, easing: 'cubic-bezier(.3,0,.4,1)' });
   const maxAmount = Math.max(1, ...merchants.map((m) => m.totalAmount));
   return (
     <section className="rounded-comfortable bg-surface p-5">
@@ -232,7 +241,7 @@ function TopMerchantsCard({ merchants }: { merchants: MerchantData[] }) {
       {merchants.length === 0 ? (
         <p className="mt-2 text-small text-ink-muted">Belum ada data di rentang ini.</p>
       ) : (
-        <div className="mt-3 flex flex-col gap-3">
+        <div ref={listParent} className="mt-3 flex flex-col gap-3">
           {merchants.map((m, i) => (
             <div key={m.description + i}>
               <div className="flex items-baseline justify-between gap-2">
@@ -258,7 +267,7 @@ function TopMerchantsCard({ merchants }: { merchants: MerchantData[] }) {
 
 function InsightsSkeleton() {
   return (
-    <div className="flex flex-col gap-4">
+    <div className="flex flex-col gap-3">
       {[0, 1, 2, 3, 4].map((i) => (
         <div key={i} className="h-32 animate-pulse rounded-comfortable bg-track" />
       ))}
