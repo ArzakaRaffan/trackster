@@ -13,6 +13,11 @@ services:
       interval: 5s
       timeout: 5s
       retries: 5
+    networks:
+      - default
+      - shared-web-net
+    ports:
+      - '127.0.0.1:5432:5432'
 
   backend:
     build:
@@ -61,6 +66,9 @@ services:
       - ./nginx/conf.d:/etc/nginx/conf.d
       - ./nginx/certbot/conf:/etc/letsencrypt
       - ./nginx/certbot/www:/var/www/certbot
+    networks:
+      - default
+      - shared-web-net
 
   certbot:
     image: certbot/certbot
@@ -71,3 +79,6 @@ services:
 
 volumes:
   trackster_pg_data:
+networks:
+  shared-web-net:
+    external: true
