@@ -4,11 +4,11 @@ import Link from 'next/link';
 import { BarChart3, ChevronRight, PiggyBank, Settings, Sparkles, Wallet } from 'lucide-react';
 
 const LINKS = [
-  { href: '/weekly', label: 'Mingguan', description: 'Rekap pengeluaran per minggu', Icon: BarChart3 },
-  { href: '/budget', label: 'Budget', description: 'Atur budget harian', Icon: Wallet },
-  { href: '/income', label: 'Pemasukan', description: 'Catat pemasukan manual', Icon: PiggyBank },
-  { href: '/insights', label: 'Analisis', description: 'Insight pola pengeluaran', Icon: Sparkles },
-  { href: '/settings', label: 'Setting', description: 'Gmail, Telegram, akun', Icon: Settings },
+  { href: '/app/weekly', label: 'Mingguan', description: 'Rekap pengeluaran per minggu', Icon: BarChart3 },
+  { href: '/app/budget', label: 'Budget', description: 'Atur budget harian', Icon: Wallet },
+  { href: '/app/income', label: 'Pemasukan', description: 'Catat pemasukan manual', Icon: PiggyBank },
+  { href: '/app/insights', label: 'Analisis', description: 'Insight pola pengeluaran', Icon: Sparkles },
+  { href: '/app/settings', label: 'Setting', description: 'Gmail, Telegram, akun', Icon: Settings },
 ];
 
 export default function MorePage() {

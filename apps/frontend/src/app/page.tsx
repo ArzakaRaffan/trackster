@@ -1,214 +1,83 @@
-'use client';
+import Link from 'next/link';
+import { Button } from '@/components/ui/Button';
+import { Camera, CheckCheck, Receipt, Share2, Users2 } from 'lucide-react';
 
-import useSWR from 'swr';
-import { api } from '@/lib/api';
-import { AlertTriangle, Bell, Inbox, Mail, Plus, RefreshCw } from 'lucide-react';
-import { TransactionNoteRow } from '@/components/ui/TransactionNoteRow';
-import { AmountDisplay } from '@/components/ui/AmountDisplay';
-import { BudgetProgress } from '@/components/ui/BudgetProgress';
+const FEATURES = [
+  {
+    Icon: Camera,
+    title: 'Scan struk, bukan ketik manual',
+    description: 'Foto struk, item & harga langsung ke-extract otomatis lewat AI. Tinggal koreksi kalau ada yang meleset.',
+  },
+  {
+    Icon: Users2,
+    title: 'Assign menu per orang',
+    description: 'Tambah nama, centang siapa pesan apa. Pajak & service fee dibagi rata otomatis ke semua peserta.',
+  },
+  {
+    Icon: Share2,
+    title: 'Satu link buat semua',
+    description: 'Share link ke grup chat. Temen kamu buka langsung liat tagihannya masing-masing — nggak perlu install apa-apa atau bikin akun.',
+  },
+  {
+    Icon: CheckCheck,
+    title: 'Tandai lunas, beres',
+    description: 'Tiap orang tandai sendiri kalau udah transfer. Kamu tinggal pantau siapa yang belum bayar dari satu halaman.',
+  },
+];
 
-interface Transaction {
-  id: number;
-  amount: number;
-  description: string;
-  source: 'BCA' | 'JAGO' | 'GOPAY';
-  occurredAt: string;
-  note?: string | null;
-  category?: string;
-  displayDescription?: string;
-}
-
-interface TodaySummary {
-  date: string;
-  budget: number;
-  totalSpent: number;
-  remaining: number;
-  isOverBudget: boolean;
-  transactions: Transaction[];
-}
-
-const fetcher = (path: string) => api.get<TodaySummary>(path);
-
-const rp = (n: number) => 'Rp' + Math.abs(Math.round(n)).toLocaleString('id-ID');
-const dateLabel = (iso: string) =>
-  new Date(iso).toLocaleDateString('id-ID', { weekday: 'long', day: 'numeric', month: 'long' });
-
-export default function TodayPage() {
-  const { data, error, isLoading, mutate } = useSWR('/budget/today', fetcher, {
-    refreshInterval: 60_000, // auto-refresh tiap 1 menit
-  });
-
-  if (isLoading) return <TodaySkeleton />;
-  if (error)
-    return (
-      <div className="px-4 pb-navbar pt-6">
-        <p className="text-label text-status-over">Gagal memuat data. Cek koneksi ke backend.</p>
-      </div>
-    );
-  if (!data) return null;
-
-  const ratio = data.budget > 0 ? data.totalSpent / data.budget : 0;
-  const status = data.isOverBudget ? 'over' : ratio >= 0.8 ? 'near' : 'under';
-
+export default function LandingPage() {
   return (
-    <div className="pb-navbar animate-fade-in-up">
-      {/* Sticky blurred top bar */}
-      <header className="sticky top-0 z-10 flex items-center gap-3 bg-base/[0.86] px-4 py-4 backdrop-blur-md">
-        <div className="min-w-0 flex-1">
-          <p className="text-small font-bold uppercase tracking-caps text-ink-muted">{dateLabel(data.date)}</p>
-          <h1 className="font-title text-title font-bold text-ink">Hari Ini</h1>
-        </div>
-        <button
-          onClick={() => mutate()}
-          aria-label="Sinkron email"
-          className="flex h-10 w-10 items-center justify-center rounded-full text-ink-muted transition-colors duration-base ease-standard hover:text-ink"
-        >
-          <RefreshCw size={18} />
-        </button>
-        <button
-          aria-label="Notifikasi"
-          className="flex h-10 w-10 items-center justify-center rounded-full bg-surface-interactive text-ink"
-        >
-          <Bell size={18} />
-        </button>
+    <div className="min-h-screen bg-base text-ink">
+      <header className="flex items-center justify-between px-4 py-6">
+        <span className="font-title text-heading font-extrabold tracking-[-1px] text-ink">
+          Trackster<span className="text-brand">.</span>
+        </span>
+        <Link href="/app" className="text-small font-bold text-ink-muted transition-colors duration-base ease-standard hover:text-ink">
+          Masuk
+        </Link>
       </header>
 
-      <div className="flex flex-col gap-3 px-4">
-        {/* Money hero */}
-        <section className="rounded-medium bg-surface p-5">
-          <div className="flex flex-wrap items-start justify-between gap-3">
-            <AmountDisplay
-              label="Terpakai hari ini"
-              value={data.totalSpent}
-              size="hero"
-              tone={data.isOverBudget ? 'over' : 'base'}
-            />
-            <span
-              className={`shrink-0 rounded-full px-2 py-[3px] text-badge font-semibold ${
-                status === 'over'
-                  ? 'bg-status-over-bg text-status-over'
-                  : status === 'near'
-                    ? 'bg-status-near-bg text-status-near'
-                    : 'bg-status-under-bg text-status-under'
-              }`}
-            >
-              {data.isOverBudget ? 'Over budget' : 'Aman'}
-            </span>
-          </div>
-
-          <div className="mt-4">
-            <BudgetProgress spent={data.totalSpent} budget={data.budget} isOverBudget={data.isOverBudget} height={16} />
-          </div>
-
-          <div className="mt-4 flex gap-5">
-            <AmountDisplay label="Budget" value={data.budget} size="body" tone="muted" />
-            <AmountDisplay
-              label={data.isOverBudget ? 'Lewat' : 'Sisa'}
-              value={data.isOverBudget ? data.totalSpent - data.budget : data.remaining}
-              size="body"
-              tone={data.isOverBudget ? 'over' : 'under'}
-            />
-          </div>
+      <div className="px-4">
+        <section className="flex flex-col items-center gap-6 py-16 text-center lg:py-24">
+          <span className="rounded-full bg-surface-interactive px-3 py-1 text-micro font-bold uppercase tracking-caps text-ink-muted">
+            Split Bill by Trackster
+          </span>
+          <h1 className="max-w-[720px] font-title text-[36px] font-black leading-[1.1] tracking-[-1px] text-ink lg:text-[56px]">
+            Bagi tagihan makan bareng temen, <span className="text-brand">tanpa drama.</span>
+          </h1>
+          <p className="max-w-[560px] text-body leading-relaxed text-ink-muted lg:text-heading">
+            Scan struk, assign menu ke masing-masing orang, terus share satu link. Semua orang langsung tau harus
+            bayar berapa — nggak perlu ribet ngitung manual atau grup chat penuh screenshot kalkulator.
+          </p>
+          <Link href="/split-bills/new">
+            <Button variant="primary" size="lg" icon={<Receipt size={18} />}>
+              Buat Split Bill
+            </Button>
+          </Link>
         </section>
 
-        {/* Over-budget alert */}
-        {data.isOverBudget && (
-          <div className="flex items-start gap-3 rounded-comfortable bg-status-over-bg p-4 shadow-[inset_0_0_0_1px_#f3727f]">
-            <AlertTriangle size={18} className="mt-px shrink-0 text-status-over" />
-            <div className="min-w-0">
-              <p className="text-label font-bold text-status-over">Lewat budget harian</p>
-              <p className="text-small leading-relaxed text-ink-secondary">
-                Kamu {rp(data.totalSpent - data.budget)} di atas budget. Alert Telegram sudah dikirim.
-              </p>
+        <section className="grid gap-4 pb-16 sm:grid-cols-2 lg:pb-24">
+          {FEATURES.map(({ Icon, title, description }) => (
+            <div key={title} className="flex flex-col gap-3 rounded-medium bg-surface p-6">
+              <span className="flex h-11 w-11 items-center justify-center rounded-full bg-brand/[0.14] text-brand">
+                <Icon size={20} />
+              </span>
+              <h2 className="text-heading font-bold text-ink">{title}</h2>
+              <p className="text-body leading-relaxed text-ink-muted">{description}</p>
             </div>
-          </div>
-        )}
+          ))}
+        </section>
+      </div>
 
-        {/* Transactions */}
-        <div className="flex items-baseline gap-3">
-          <h2 className="flex-1 text-heading font-semibold text-ink">Transaksi</h2>
-          <span className="text-small tabular-nums text-ink-muted">{data.transactions.length} transaksi</span>
-        </div>
-
-        {data.transactions.length === 0 ? (
-          <div className="flex flex-col items-center gap-3 rounded-comfortable p-8 text-center shadow-hairline">
-            <span className="flex h-12 w-12 items-center justify-center rounded-full bg-surface-interactive text-ink-muted">
-              <Inbox size={22} />
-            </span>
-            <p className="text-body font-bold text-ink">Belum ada transaksi</p>
-            <p className="max-w-[280px] text-small leading-relaxed text-ink-muted">
-              Begitu ada email notifikasi dari BCA atau Jago, transaksinya muncul di sini otomatis.
-            </p>
-          </div>
-        ) : (
-          <ul className="rounded-comfortable bg-surface p-2">
-            {data.transactions.map((t) => (
-              <TransactionNoteRow
-                key={t.id}
-                transaction={t}
-                onSaved={(id, note) =>
-                  mutate(
-                    (current) =>
-                      current && {
-                        ...current,
-                        transactions: current.transactions.map((tx) => (tx.id === id ? { ...tx, note } : tx)),
-                      },
-                    { revalidate: false },
-                  )
-                }
-                onCategorySaved={(id, category) =>
-                  mutate(
-                    (current) =>
-                      current && {
-                        ...current,
-                        transactions: current.transactions.map((tx) => (tx.id === id ? { ...tx, category } : tx)),
-                      },
-                    { revalidate: false },
-                  )
-                }
-                onAliasSaved={(id, displayName) =>
-                  mutate(
-                    (current) =>
-                      current && {
-                        ...current,
-                        transactions: current.transactions.map((tx) =>
-                          tx.id === id ? { ...tx, displayDescription: displayName } : tx,
-                        ),
-                      },
-                    { revalidate: false },
-                  )
-                }
-              />
-            ))}
-          </ul>
-        )}
-
-        <p className="flex items-center gap-2.5 text-small text-ink-subtle">
-          <Mail size={14} /> Sinkron otomatis dari email BCA dan Jago
+      <footer className="border-t border-line-subtle px-4 py-8 text-center">
+        <p className="text-small text-ink-muted">
+          Trackster juga punya{' '}
+          <Link href="/app" className="font-bold text-ink transition-colors duration-base ease-standard hover:text-brand">
+            Finance Tracker
+          </Link>{' '}
+          pribadi — login diperlukan.
         </p>
-      </div>
-
-      {/* FAB */}
-      <button
-        aria-label="Tambah transaksi manual"
-        className="fixed bottom-[88px] right-4 flex h-14 w-14 items-center justify-center rounded-full bg-brand text-base transition-transform duration-fast ease-standard active:scale-95 lg:bottom-6"
-      >
-        <Plus size={26} />
-      </button>
-    </div>
-  );
-}
-
-function TodaySkeleton() {
-  return (
-    <div className="px-4 pb-navbar pt-6">
-      <div className="flex flex-col gap-3">
-        <div className="h-14 w-56 animate-pulse rounded-comfortable bg-track" />
-        <div className="h-4 animate-pulse rounded-pill bg-track" />
-        {[0, 1, 2].map((i) => (
-          <div key={i} className="h-14 animate-pulse rounded-standard bg-track" />
-        ))}
-      </div>
+      </footer>
     </div>
   );
 }
