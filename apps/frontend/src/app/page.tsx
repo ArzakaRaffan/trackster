@@ -1,6 +1,6 @@
 import Link from 'next/link';
 import { Button } from '@/components/ui/Button';
-import { Camera, CheckCheck, Receipt, Share2, Users2 } from 'lucide-react';
+import { ArrowRight, Camera, CheckCheck, PiggyBank, Receipt, Share2, Users2 } from 'lucide-react';
 
 const FEATURES = [
   {
@@ -66,6 +66,30 @@ export default function LandingPage() {
               <p className="text-body leading-relaxed text-ink-muted">{description}</p>
             </div>
           ))}
+        </section>
+
+        <section className="pb-16 lg:pb-24">
+          <Link
+            href="/savings-calculator"
+            className="flex flex-col items-start gap-3 rounded-medium bg-surface p-6 transition-colors duration-base ease-standard hover:bg-surface-alt sm:flex-row sm:items-center sm:justify-between"
+          >
+            <div className="flex items-start gap-4">
+              <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-brand/[0.14] text-brand">
+                <PiggyBank size={20} />
+              </span>
+              <div>
+                <p className="text-micro font-bold uppercase tracking-caps text-ink-muted">Tool publik lainnya</p>
+                <h2 className="mt-0.5 text-heading font-bold text-ink">Kalkulator Target Tabungan</h2>
+                <p className="mt-1 max-w-[420px] text-body text-ink-muted">
+                  Mau nabung buat motor, HP baru, atau DP rumah? Isi target sekali, langsung ketauan nabungnya berapa
+                  per bulan.
+                </p>
+              </div>
+            </div>
+            <span className="flex shrink-0 items-center gap-1.5 text-label font-bold text-ink">
+              Coba sekarang <ArrowRight size={16} />
+            </span>
+          </Link>
         </section>
       </div>
 

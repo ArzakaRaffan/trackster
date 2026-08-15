@@ -3,8 +3,11 @@ import type { NextRequest } from 'next/server';
 
 // '/' adalah landing page publik (marketing, deskripsi produk) — beda dari '/app' yang
 // itu dashboard privat. Exact-match, BUKAN prefix, soalnya prefix '/' bakal cocok ke semua path.
-const PUBLIC_EXACT_PATHS = ['/', '/login', '/kalkulator-tabungan'];
-const PUBLIC_PATH_PREFIXES = ['/s/'];
+// /split-bills/new sengaja publik juga — Split Bill bisa dibuat tanpa akun (lihat
+// SplitBillService.createPublic di backend). /split-bills/manage/* itu tempat pembuat
+// anonim ngelola bill-nya lewat ownerToken, pengganti login buat mereka.
+const PUBLIC_EXACT_PATHS = ['/', '/login', '/savings-calculator', '/split-bills/new'];
+const PUBLIC_PATH_PREFIXES = ['/s/', '/split-bills/manage/'];
 
 function isPublicPath(pathname: string) {
   return PUBLIC_EXACT_PATHS.includes(pathname) || PUBLIC_PATH_PREFIXES.some((p) => pathname.startsWith(p));

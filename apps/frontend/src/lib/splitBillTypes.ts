@@ -18,6 +18,9 @@ export interface SplitBillItem {
 export interface SplitBillListItem {
   id: number;
   publicSlug: string;
+  // Set HANYA buat bill yang dibuat anonim (tanpa login) — satu-satunya cara pembuatnya
+  // balik ngelola bill ini, lihat /split-bills/manage/[token].
+  ownerToken: string | null;
   restaurantName: string;
   billDate: string;
   taxAmount: number;

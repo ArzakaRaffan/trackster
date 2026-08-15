@@ -55,23 +55,37 @@ export class SplitBillService {
     });
   }
 
+  private buildCreateData(dto: CreateSplitBillDto) {
+    return {
+      publicSlug: this.generateSlug(),
+      restaurantName: dto.restaurantName,
+      billDate: new Date(dto.billDate),
+      taxAmount: dto.taxAmount ?? 0,
+      serviceFeeAmount: dto.serviceFeeAmount ?? 0,
+      payerBankName: dto.payerBankName,
+      payerAccountNumber: dto.payerAccountNumber,
+      payerAccountName: dto.payerAccountName,
+      participants: { create: dto.participants.map((p) => ({ name: p.name })) },
+      items: {
+        create: dto.items.map((i) => ({ description: i.description, amount: i.amount, quantity: i.quantity ?? 1 })),
+      },
+    };
+  }
+
   async create(userId: number, dto: CreateSplitBillDto) {
     return this.prisma.splitBill.create({
-      data: {
-        publicSlug: this.generateSlug(),
-        restaurantName: dto.restaurantName,
-        billDate: new Date(dto.billDate),
-        taxAmount: dto.taxAmount ?? 0,
-        serviceFeeAmount: dto.serviceFeeAmount ?? 0,
-        payerBankName: dto.payerBankName,
-        payerAccountNumber: dto.payerAccountNumber,
-        payerAccountName: dto.payerAccountName,
-        createdByUserId: userId,
-        participants: { create: dto.participants.map((p) => ({ name: p.name })) },
-        items: {
-          create: dto.items.map((i) => ({ description: i.description, amount: i.amount, quantity: i.quantity ?? 1 })),
-        },
-      },
+      data: { ...this.buildCreateData(dto), createdByUserId: userId },
+      include: { participants: true, items: true },
+    });
+  }
+
+  // Dipanggil dari endpoint publik tanpa auth (lihat SplitBillController) — createdByUserId
+  // sengaja null, ownerToken adalah SATU-SATUNYA cara pembuat anonim balik ngelola bill ini.
+  // Nggak ada akun/recovery kalau link ini ilang, jadi generate-nya sama unguessable-nya
+  // kayak publicSlug.
+  async createPublic(dto: CreateSplitBillDto) {
+    return this.prisma.splitBill.create({
+      data: { ...this.buildCreateData(dto), ownerToken: this.generateSlug() },
       include: { participants: true, items: true },
     });
   }
@@ -100,9 +114,7 @@ export class SplitBillService {
     return { ...bill, participantTotals: totals };
   }
 
-  async assignItem(billId: number, itemId: number, userId: number, participantId: number | null) {
-    await this.getOwnedBillOrThrow(billId, userId);
-
+  private async assignItemToBill(billId: number, itemId: number, participantId: number | null) {
     const item = await this.prisma.splitBillItem.findUnique({ where: { id: itemId } });
     if (!item || item.splitBillId !== billId) throw new NotFoundException('Item tidak ditemukan');
 
@@ -117,6 +129,31 @@ export class SplitBillService {
       where: { id: itemId },
       data: { participantId },
     });
+  }
+
+  async assignItem(billId: number, itemId: number, userId: number, participantId: number | null) {
+    await this.getOwnedBillOrThrow(billId, userId);
+    return this.assignItemToBill(billId, itemId, participantId);
+  }
+
+  private async getBillByOwnerTokenOrThrow(ownerToken: string) {
+    const bill = await this.prisma.splitBill.findUnique({
+      where: { ownerToken },
+      include: { participants: { include: { items: true } }, items: true },
+    });
+    if (!bill) throw new NotFoundException('Split bill tidak ditemukan');
+    return bill;
+  }
+
+  async findOneByOwnerToken(ownerToken: string) {
+    const bill = await this.getBillByOwnerTokenOrThrow(ownerToken);
+    const totals = this.calculateTotals(bill.participants, bill.taxAmount, bill.serviceFeeAmount);
+    return { ...bill, participantTotals: totals };
+  }
+
+  async assignItemByOwnerToken(ownerToken: string, itemId: number, participantId: number | null) {
+    const bill = await this.getBillByOwnerTokenOrThrow(ownerToken);
+    return this.assignItemToBill(bill.id, itemId, participantId);
   }
 
   async getPublicSummary(slug: string) {
