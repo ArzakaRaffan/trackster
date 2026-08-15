@@ -38,7 +38,7 @@ export class GmailSyncService {
   getNextRun(): string {
     const job = this.schedulerRegistry.getCronJob(SYNC_CRON_JOB_NAME);
     const next = job.nextDate();
-    return next.toISO() ?? next.toJSDate().toISOString();
+    return next.toJSDate().toISOString();
   }
 
   async syncEmails() {
