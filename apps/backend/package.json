@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "build": "NODE_OPTIONS=--max-old-space-size=2048 nest build",
+    "build": "NODE_OPTIONS=--max-old-space-size=4096 nest build",
     "start": "node dist/main",
     "start:dev": "nest start --watch",
     "start:prod": "node dist/main",
