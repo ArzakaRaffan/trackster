@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../../prisma.service';
 import { UpdateBudgetDto } from './dto/update-budget.dto';
 import { MerchantAliasService } from '../merchant-alias/merchant-alias.service';
+import { toDateKey } from '../../common/utils/date.util';
 
 @Injectable()
 export class BudgetService {
@@ -52,7 +53,7 @@ export class BudgetService {
     const transactionsWithDisplay = await this.merchantAliasService.attachDisplayNames(transactions);
 
     return {
-      date: startOfDay.toISOString().slice(0, 10),
+      date: toDateKey(startOfDay),
       budget,
       totalSpent,
       remaining: budget - totalSpent,

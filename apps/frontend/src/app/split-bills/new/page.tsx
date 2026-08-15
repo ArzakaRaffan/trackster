@@ -5,13 +5,14 @@ import { useRouter } from 'next/navigation';
 import { useAutoAnimate } from '@formkit/auto-animate/react';
 import { api, ApiError } from '@/lib/api';
 import { formatRupiah } from '@/lib/format';
+import { toLocalDateKey } from '@/lib/date';
 import { Input } from '@/components/ui/Input';
 import { Button } from '@/components/ui/Button';
 import { Switch } from '@/components/ui/Switch';
 import { AlertTriangle, Camera, Check, CheckCircle2, ChevronDown, ChevronLeft, Plus, Trash2, X } from 'lucide-react';
 
-const todayISO = () => new Date().toISOString().slice(0, 10);
-const genId = () => (typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : `id-${Math.random().toString(36).slice(2)}`);
+const genId = () =>
+  typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : `id-${Math.random().toString(36).slice(2)}`;
 
 interface ItemRow {
   id: string;
@@ -47,7 +48,7 @@ export default function NewSplitBillPage() {
   }, []);
 
   const [restaurantName, setRestaurantName] = useState('');
-  const [billDate, setBillDate] = useState(todayISO());
+  const [billDate, setBillDate] = useState(() => toLocalDateKey(new Date()));
   const [payerBankName, setPayerBankName] = useState('');
   const [payerAccountNumber, setPayerAccountNumber] = useState('');
   const [payerAccountName, setPayerAccountName] = useState('');

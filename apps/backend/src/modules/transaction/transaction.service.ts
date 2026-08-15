@@ -3,6 +3,7 @@ import { PrismaService } from '../../prisma.service';
 import { Category, Source } from '@prisma/client';
 import { BalanceService } from '../balance/balance.service';
 import { MerchantAliasService } from '../merchant-alias/merchant-alias.service';
+import { toDateKey, toMonthKey } from '../../common/utils/date.util';
 
 export interface ParsedTransaction {
   amount: number;
@@ -94,7 +95,7 @@ export class TransactionService {
       const totalSpent = transactions.reduce((sum, t) => sum + Number(t.amount), 0);
 
       days.push({
-        date: date.toISOString().slice(0, 10),
+        date: toDateKey(date),
         dayOfWeek: i,
         budget: budgetRow ? Number(budgetRow.amount) : 0,
         totalSpent,
@@ -183,12 +184,12 @@ export class TransactionService {
     const daysInMonth = new Date(year, month, 0).getDate();
     const byDayMap = new Map<string, number>();
     for (const t of transactions) {
-      const key = t.occurredAt.toISOString().slice(0, 10);
+      const key = toDateKey(t.occurredAt);
       byDayMap.set(key, (byDayMap.get(key) ?? 0) + Number(t.amount));
     }
     const byDay = Array.from({ length: daysInMonth }, (_, i) => {
-      const date = new Date(year, month - 1, i + 1).toISOString().slice(0, 10);
-      return { date, totalSpent: byDayMap.get(date) ?? 0 };
+      const date = new Date(year, month - 1, i + 1);
+      return { date: toDateKey(date), totalSpent: byDayMap.get(toDateKey(date)) ?? 0 };
     });
 
     const transactionsWithDisplay = await this.attachDisplayNames(transactions);
@@ -210,7 +211,7 @@ export class TransactionService {
 
     const byMonthMap = new Map<string, number>();
     for (const t of transactions) {
-      const key = t.occurredAt.toISOString().slice(0, 7); // YYYY-MM
+      const key = toMonthKey(t.occurredAt);
       byMonthMap.set(key, (byMonthMap.get(key) ?? 0) + Number(t.amount));
     }
 
@@ -327,7 +328,7 @@ export class TransactionService {
 
     const spentByDate = new Map<string, number>();
     for (const t of transactions) {
-      const key = t.occurredAt.toISOString().slice(0, 10);
+      const key = toDateKey(t.occurredAt);
       spentByDate.set(key, (spentByDate.get(key) ?? 0) + Number(t.amount));
     }
 
@@ -335,7 +336,7 @@ export class TransactionService {
     for (let i = 0; i < totalDays; i++) {
       const date = new Date(start);
       date.setDate(start.getDate() + i);
-      const spent = spentByDate.get(date.toISOString().slice(0, 10)) ?? 0;
+      const spent = spentByDate.get(toDateKey(date)) ?? 0;
       const budget = budgetByDow.get(date.getDay()) ?? 0;
       if (spent > budget) daysOverBudget++;
     }

@@ -6,6 +6,7 @@ import { useAutoAnimate } from '@formkit/auto-animate/react';
 import { AnimatePresence, motion } from 'motion/react';
 import { api } from '@/lib/api';
 import { formatRupiah } from '@/lib/format';
+import { toLocalDateKey } from '@/lib/date';
 import { Input } from '@/components/ui/Input';
 import { Button } from '@/components/ui/Button';
 import { SourceTag } from '@/components/ui/SourceTag';
@@ -23,8 +24,6 @@ interface Income {
 
 const fetcher = (path: string) => api.get<Income[]>(path);
 
-const todayISO = () => new Date().toISOString().slice(0, 10);
-
 interface FormState {
   amount: string;
   description: string;
@@ -32,7 +31,7 @@ interface FormState {
   receivedAt: string;
 }
 
-const emptyForm: FormState = { amount: '', description: '', source: 'BCA', receivedAt: todayISO() };
+const emptyForm: FormState = { amount: '', description: '', source: 'BCA', receivedAt: toLocalDateKey(new Date()) };
 
 export default function IncomePage() {
   const { data, error, isLoading, mutate } = useSWR('/income', fetcher);
@@ -46,7 +45,7 @@ export default function IncomePage() {
 
   const openCreateForm = () => {
     setEditingId(null);
-    setForm(emptyForm);
+    setForm({ ...emptyForm, receivedAt: toLocalDateKey(new Date()) });
     setFormOpen(true);
   };
 
