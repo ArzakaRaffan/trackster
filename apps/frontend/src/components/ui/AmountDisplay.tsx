@@ -38,7 +38,7 @@ export function AmountDisplay({
   caption?: string;
 }) {
   const abs = compact ? formatRupiahCompact(Math.abs(value)) : rp(value);
-  const prefix = sign ? (value < 0 ? '−' : '+') : '';
+  const prefix = value < 0 ? '−' : sign ? '+' : '';
   const formatted = prefix + abs;
 
   return (
