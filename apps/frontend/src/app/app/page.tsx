@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { api } from '@/lib/api';
 import { AmountDisplay } from '@/components/ui/AmountDisplay';
 import { BudgetProgress } from '@/components/ui/BudgetProgress';
-import { ArrowRight, LineChart, PiggyBank, Receipt, Wallet } from 'lucide-react';
+import { ArrowRight, LineChart, PiggyBank, Receipt, Target, Wallet } from 'lucide-react';
 
 interface TodaySummary {
   date: string;
@@ -23,6 +23,7 @@ const dateLabel = (iso: string) =>
 
 const QUICK_LINKS = [
   { href: '/split-bills', label: 'Split Bill', description: 'Bagi tagihan bareng temen', Icon: Receipt },
+  { href: '/kalkulator-tabungan', label: 'Target Tabungan', description: 'Hitung nabung per bulan buat goal kamu', Icon: Target },
   { href: '/app/reports', label: 'Laporan', description: 'Ringkasan bulanan & tren', Icon: LineChart },
   { href: '/app/budget', label: 'Budget', description: 'Atur budget harian', Icon: Wallet },
   { href: '/app/income', label: 'Pemasukan', description: 'Catat pemasukan manual', Icon: PiggyBank },

@@ -3,7 +3,7 @@ import type { NextRequest } from 'next/server';
 
 // '/' adalah landing page publik (marketing, deskripsi produk) — beda dari '/app' yang
 // itu dashboard privat. Exact-match, BUKAN prefix, soalnya prefix '/' bakal cocok ke semua path.
-const PUBLIC_EXACT_PATHS = ['/', '/login'];
+const PUBLIC_EXACT_PATHS = ['/', '/login', '/kalkulator-tabungan'];
 const PUBLIC_PATH_PREFIXES = ['/s/'];
 
 function isPublicPath(pathname: string) {
