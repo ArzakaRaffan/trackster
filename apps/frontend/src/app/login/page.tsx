@@ -20,7 +20,7 @@ export default function LoginPage() {
     setLoading(true);
     try {
       await api.post('/auth/login', { username, password });
-      router.push('/');
+      router.push('/app');
       router.refresh();
     } catch (err: any) {
       setError(err.message || 'Login gagal');
