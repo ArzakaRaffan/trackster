@@ -10,6 +10,7 @@ import { SyncModule } from './modules/sync/sync.module';
 import { BalanceModule } from './modules/balance/balance.module';
 import { IncomeModule } from './modules/income/income.module';
 import { MerchantAliasModule } from './modules/merchant-alias/merchant-alias.module';
+import { SplitBillModule } from './modules/split-bill/split-bill.module';
 
 @Module({
   imports: [
@@ -24,6 +25,7 @@ import { MerchantAliasModule } from './modules/merchant-alias/merchant-alias.mod
     BalanceModule,
     IncomeModule,
     MerchantAliasModule,
+    SplitBillModule,
   ],
 })
 export class AppModule {}
