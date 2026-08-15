@@ -2,20 +2,29 @@
 
 import { useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { useAutoAnimate } from '@formkit/auto-animate/react';
 import { api, ApiError } from '@/lib/api';
 import { formatRupiah } from '@/lib/format';
 import { Input } from '@/components/ui/Input';
 import { Button } from '@/components/ui/Button';
-import { Camera, ChevronLeft, Plus, Trash2, X } from 'lucide-react';
+import { Switch } from '@/components/ui/Switch';
+import { Camera, Check, ChevronLeft, Plus, Trash2, X } from 'lucide-react';
 
 const todayISO = () => new Date().toISOString().slice(0, 10);
+const genId = () => (typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : `id-${Math.random().toString(36).slice(2)}`);
 
 interface ItemRow {
+  id: string;
   description: string;
   amount: string;
 }
 
-const STEP_LABELS = ['Info Resto', 'Item', 'Peserta', 'Assign'];
+interface ParticipantRow {
+  id: string;
+  name: string;
+}
+
+const STEP_LABELS = ['Info Resto', 'Menu & Peserta', 'Pajak & Fee'];
 
 export default function NewSplitBillPage() {
   const router = useRouter();
@@ -28,22 +37,55 @@ export default function NewSplitBillPage() {
 
   const [restaurantName, setRestaurantName] = useState('');
   const [billDate, setBillDate] = useState(todayISO());
+
+  const [items, setItems] = useState<ItemRow[]>([{ id: genId(), description: '', amount: '' }]);
+  const [participants, setParticipants] = useState<ParticipantRow[]>([{ id: genId(), name: '' }]);
+  // itemId -> participantId. Satu item cuma bisa punya satu pemilik (checklist toggle
+  // otomatis mindahin kepemilikan, bukan nambah — sesuai model data participantId tunggal).
+  const [assignments, setAssignments] = useState<Record<string, string>>({});
+
+  const [hasTax, setHasTax] = useState(false);
   const [taxAmount, setTaxAmount] = useState('');
+  const [hasServiceFee, setHasServiceFee] = useState(false);
   const [serviceFeeAmount, setServiceFeeAmount] = useState('');
 
-  const [items, setItems] = useState<ItemRow[]>([{ description: '', amount: '' }]);
-  const [participants, setParticipants] = useState<string[]>(['', '']);
-  const [assignments, setAssignments] = useState<Record<number, number>>({});
+  const [itemListParent] = useAutoAnimate({ duration: 200, easing: 'cubic-bezier(.3,0,.4,1)' });
+  const [participantListParent] = useAutoAnimate({ duration: 200, easing: 'cubic-bezier(.3,0,.4,1)' });
 
-  const addItem = () => setItems((rows) => [...rows, { description: '', amount: '' }]);
-  const removeItem = (i: number) => setItems((rows) => rows.filter((_, idx) => idx !== i));
-  const updateItem = (i: number, field: keyof ItemRow, value: string) =>
-    setItems((rows) => rows.map((row, idx) => (idx === i ? { ...row, [field]: value } : row)));
+  const addItem = () => setItems((rows) => [...rows, { id: genId(), description: '', amount: '' }]);
+  const removeItem = (id: string) => {
+    setItems((rows) => rows.filter((r) => r.id !== id));
+    setAssignments((a) => {
+      const next = { ...a };
+      delete next[id];
+      return next;
+    });
+  };
+  const updateItem = (id: string, field: 'description' | 'amount', value: string) =>
+    setItems((rows) => rows.map((row) => (row.id === id ? { ...row, [field]: value } : row)));
 
-  const addParticipant = () => setParticipants((p) => [...p, '']);
-  const removeParticipant = (i: number) => setParticipants((p) => p.filter((_, idx) => idx !== i));
-  const updateParticipant = (i: number, value: string) =>
-    setParticipants((p) => p.map((name, idx) => (idx === i ? value : name)));
+  const addParticipant = () => setParticipants((p) => [...p, { id: genId(), name: '' }]);
+  const removeParticipant = (id: string) => {
+    setParticipants((p) => p.filter((row) => row.id !== id));
+    setAssignments((a) => {
+      const next = { ...a };
+      for (const itemId of Object.keys(next)) {
+        if (next[itemId] === id) delete next[itemId];
+      }
+      return next;
+    });
+  };
+  const updateParticipant = (id: string, value: string) =>
+    setParticipants((p) => p.map((row) => (row.id === id ? { ...row, name: value } : row)));
+
+  const toggleAssignment = (itemId: string, participantId: string) => {
+    setAssignments((a) => {
+      const next = { ...a };
+      if (next[itemId] === participantId) delete next[itemId];
+      else next[itemId] = participantId;
+      return next;
+    });
+  };
 
   const handleScanReceipt = async (file: File) => {
     setScanning(true);
@@ -65,7 +107,7 @@ export default function NewSplitBillPage() {
       }
       setItems((rows) => {
         const cleaned = rows.filter((r) => r.description.trim() || r.amount.trim());
-        return [...cleaned, ...scanned.map((s) => ({ description: s.description, amount: String(s.amount) }))];
+        return [...cleaned, ...scanned.map((s) => ({ id: genId(), description: s.description, amount: String(s.amount) }))];
       });
     } catch (e) {
       setErrorMsg(e instanceof ApiError ? e.message : 'Gagal scan struk.');
@@ -75,12 +117,11 @@ export default function NewSplitBillPage() {
   };
 
   const validItems = items.filter((r) => r.description.trim() && parseFloat(r.amount) > 0);
-  const validParticipants = participants.map((p) => p.trim()).filter((p) => p.length > 0);
+  const validParticipants = participants.filter((p) => p.name.trim().length > 0);
 
   const canGoStep = (target: number) => {
     if (target === 1) return restaurantName.trim().length > 0 && billDate.length > 0;
-    if (target === 2) return validItems.length > 0;
-    if (target === 3) return validParticipants.length >= 1;
+    if (target === 2) return validItems.length > 0 && validParticipants.length >= 1;
     return true;
   };
 
@@ -97,9 +138,9 @@ export default function NewSplitBillPage() {
       const body = {
         restaurantName: restaurantName.trim(),
         billDate: new Date(billDate).toISOString(),
-        taxAmount: parseFloat(taxAmount) || 0,
-        serviceFeeAmount: parseFloat(serviceFeeAmount) || 0,
-        participants: validParticipants.map((name) => ({ name })),
+        taxAmount: hasTax ? parseFloat(taxAmount) || 0 : 0,
+        serviceFeeAmount: hasServiceFee ? parseFloat(serviceFeeAmount) || 0 : 0,
+        participants: validParticipants.map((p) => ({ name: p.name.trim() })),
         items: validItems.map((r) => ({ description: r.description.trim(), amount: parseFloat(r.amount) })),
       };
       const created = await api.post<{ id: number; items: { id: number }[]; participants: { id: number }[] }>(
@@ -108,14 +149,17 @@ export default function NewSplitBillPage() {
       );
 
       // Assignment dilakukan sebagai step terpisah setelah bill dibuat, karena item & peserta
-      // baru punya id definitif setelah create — assign berdasarkan urutan index yang sama
-      // seperti array yang disubmit di body.
-      const assignPromises = created.items.map((createdItem, idx) => {
-        const participantIdx = assignments[idx];
-        if (participantIdx === undefined) return null;
-        const participantId = created.participants[participantIdx]?.id;
-        if (participantId === undefined) return null;
-        return api.patch(`/split-bills/${created.id}/items/${createdItem.id}/assign`, { participantId });
+      // baru punya id definitif setelah create — dipetakan lewat urutan array yang sama persis
+      // dengan urutan validItems/validParticipants yang disubmit di body.
+      const assignPromises = validItems.map((item, idx) => {
+        const participantClientId = assignments[item.id];
+        if (!participantClientId) return null;
+        const participantIdx = validParticipants.findIndex((p) => p.id === participantClientId);
+        if (participantIdx === -1) return null;
+        const createdItemId = created.items[idx]?.id;
+        const createdParticipantId = created.participants[participantIdx]?.id;
+        if (createdItemId === undefined || createdParticipantId === undefined) return null;
+        return api.patch(`/split-bills/${created.id}/items/${createdItemId}/assign`, { participantId: createdParticipantId });
       });
       await Promise.all(assignPromises.filter(Boolean));
 
@@ -154,133 +198,175 @@ export default function NewSplitBillPage() {
           <section className="flex flex-col gap-3 rounded-comfortable bg-surface p-4">
             <Input label="Nama Resto" value={restaurantName} onChange={(e) => setRestaurantName(e.target.value)} />
             <Input label="Tanggal" type="date" value={billDate} onChange={(e) => setBillDate(e.target.value)} />
-            <Input
-              label="Pajak"
-              type="number"
-              inputMode="numeric"
-              prefix="Rp"
-              value={taxAmount}
-              onChange={(e) => setTaxAmount(e.target.value)}
-            />
-            <Input
-              label="Service Fee"
-              type="number"
-              inputMode="numeric"
-              prefix="Rp"
-              value={serviceFeeAmount}
-              onChange={(e) => setServiceFeeAmount(e.target.value)}
-            />
           </section>
         )}
 
         {step === 1 && (
-          <section className="flex flex-col gap-3">
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept="image/*"
-              capture="environment"
-              className="hidden"
-              onChange={(e) => {
-                const file = e.target.files?.[0];
-                if (file) handleScanReceipt(file);
-                e.target.value = '';
-              }}
-            />
-            <Button variant="outlined" fullWidth icon={<Camera size={18} />} onClick={() => fileInputRef.current?.click()} disabled={scanning}>
-              {scanning ? 'Memindai struk...' : 'Scan Struk'}
-            </Button>
-
-            <div className="flex flex-col gap-2 rounded-comfortable bg-surface p-3">
-              {items.map((row, i) => (
-                <div key={i} className="flex items-center gap-2">
-                  <input
-                    placeholder="Deskripsi item"
-                    value={row.description}
-                    onChange={(e) => updateItem(i, 'description', e.target.value)}
-                    className="min-w-0 flex-1 rounded-comfortable bg-surface-interactive px-3.5 py-2.5 text-body text-ink outline-none placeholder:text-ink-subtle"
-                  />
-                  <input
-                    placeholder="0"
-                    type="number"
-                    inputMode="numeric"
-                    value={row.amount}
-                    onChange={(e) => updateItem(i, 'amount', e.target.value)}
-                    className="w-28 shrink-0 rounded-comfortable bg-surface-interactive px-3.5 py-2.5 text-right text-body tabular-nums text-ink outline-none placeholder:text-ink-subtle"
-                  />
-                  <button
-                    onClick={() => removeItem(i)}
-                    aria-label="Hapus item"
-                    className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-ink-muted hover:text-status-over"
-                  >
-                    <Trash2 size={14} />
-                  </button>
-                </div>
-              ))}
-              <Button variant="ghost" size="sm" icon={<Plus size={14} />} onClick={addItem}>
-                Tambah item
+          <section className="flex flex-col gap-4">
+            <div>
+              <h2 className="mb-2 px-1 text-heading font-semibold text-ink">Menu</h2>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/*"
+                capture="environment"
+                className="hidden"
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  if (file) handleScanReceipt(file);
+                  e.target.value = '';
+                }}
+              />
+              <Button
+                variant="outlined"
+                fullWidth
+                icon={<Camera size={18} />}
+                onClick={() => fileInputRef.current?.click()}
+                disabled={scanning}
+              >
+                {scanning ? 'Memindai struk...' : 'Scan Struk'}
               </Button>
+
+              <div ref={itemListParent} className="mt-3 flex flex-col gap-2 rounded-comfortable bg-surface p-3">
+                {items.map((row) => (
+                  <div key={row.id} className="flex items-center gap-2">
+                    <input
+                      placeholder="Deskripsi item"
+                      value={row.description}
+                      onChange={(e) => updateItem(row.id, 'description', e.target.value)}
+                      className="min-w-0 flex-1 rounded-comfortable bg-surface-interactive px-3.5 py-2.5 text-body text-ink outline-none placeholder:text-ink-subtle"
+                    />
+                    <input
+                      placeholder="0"
+                      type="number"
+                      inputMode="numeric"
+                      value={row.amount}
+                      onChange={(e) => updateItem(row.id, 'amount', e.target.value)}
+                      className="w-28 shrink-0 rounded-comfortable bg-surface-interactive px-3.5 py-2.5 text-right text-body tabular-nums text-ink outline-none placeholder:text-ink-subtle"
+                    />
+                    <button
+                      onClick={() => removeItem(row.id)}
+                      aria-label="Hapus item"
+                      className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-ink-muted hover:text-status-over"
+                    >
+                      <Trash2 size={14} />
+                    </button>
+                  </div>
+                ))}
+                <Button variant="ghost" size="sm" icon={<Plus size={14} />} onClick={addItem}>
+                  Tambah item
+                </Button>
+              </div>
+            </div>
+
+            <div>
+              <h2 className="mb-2 px-1 text-heading font-semibold text-ink">Peserta & Pesanan</h2>
+              <p className="mb-2 px-1 text-small text-ink-muted">
+                Tambah nama, lalu centang menu yang dipesan orang itu. Menu yang udah dicentang orang lain kelihatan pudar.
+              </p>
+              <div ref={participantListParent} className="flex flex-col gap-3">
+                {participants.map((participant, pIdx) => (
+                  <div key={participant.id} className="rounded-comfortable bg-surface p-3">
+                    <div className="flex items-center gap-2">
+                      <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-surface-interactive text-small font-bold text-ink-muted">
+                        {pIdx + 1}
+                      </span>
+                      <input
+                        placeholder={`Nama peserta ${pIdx + 1}`}
+                        value={participant.name}
+                        onChange={(e) => updateParticipant(participant.id, e.target.value)}
+                        className="min-w-0 flex-1 rounded-comfortable bg-surface-interactive px-3.5 py-2.5 text-body text-ink outline-none placeholder:text-ink-subtle"
+                      />
+                      {participants.length > 1 && (
+                        <button
+                          onClick={() => removeParticipant(participant.id)}
+                          aria-label="Hapus peserta"
+                          className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-ink-muted hover:text-status-over"
+                        >
+                          <X size={14} />
+                        </button>
+                      )}
+                    </div>
+
+                    {participant.name.trim() && validItems.length > 0 && (
+                      <ul className="mt-3 flex flex-col gap-1 border-t border-line-subtle pt-3">
+                        {validItems.map((item) => {
+                          const ownerId = assignments[item.id];
+                          const isMine = ownerId === participant.id;
+                          const ownerName = ownerId && !isMine ? participants.find((p) => p.id === ownerId)?.name : null;
+                          return (
+                            <li key={item.id}>
+                              <button
+                                onClick={() => toggleAssignment(item.id, participant.id)}
+                                className={`flex w-full items-center gap-3 rounded-standard px-2 py-2 text-left transition-opacity duration-base ease-standard hover:bg-white/[0.05] ${
+                                  ownerId && !isMine ? 'opacity-40' : 'opacity-100'
+                                }`}
+                              >
+                                <span
+                                  className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-subtle transition-colors duration-fast ease-standard ${
+                                    isMine ? 'bg-brand text-base' : 'shadow-[inset_0_0_0_1px_theme(colors.line.strong)] text-transparent'
+                                  }`}
+                                >
+                                  <Check size={13} strokeWidth={3} />
+                                </span>
+                                <span className="min-w-0 flex-1 truncate text-small text-ink">{item.description}</span>
+                                {ownerName && <span className="shrink-0 text-micro text-ink-subtle">{ownerName}</span>}
+                                <span className="shrink-0 text-small tabular-nums text-ink-muted">
+                                  {formatRupiah(parseFloat(item.amount) || 0)}
+                                </span>
+                              </button>
+                            </li>
+                          );
+                        })}
+                      </ul>
+                    )}
+                  </div>
+                ))}
+                <Button variant="ghost" size="sm" icon={<Plus size={14} />} onClick={addParticipant}>
+                  Tambah peserta
+                </Button>
+              </div>
             </div>
           </section>
         )}
 
         {step === 2 && (
-          <section className="flex flex-col gap-2 rounded-comfortable bg-surface p-3">
-            {participants.map((name, i) => (
-              <div key={i} className="flex items-center gap-2">
-                <input
-                  placeholder={`Nama peserta ${i + 1}`}
-                  value={name}
-                  onChange={(e) => updateParticipant(i, e.target.value)}
-                  className="min-w-0 flex-1 rounded-comfortable bg-surface-interactive px-3.5 py-2.5 text-body text-ink outline-none placeholder:text-ink-subtle"
-                />
-                {participants.length > 1 && (
-                  <button
-                    onClick={() => removeParticipant(i)}
-                    aria-label="Hapus peserta"
-                    className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-ink-muted hover:text-status-over"
-                  >
-                    <X size={14} />
-                  </button>
-                )}
-              </div>
-            ))}
-            <Button variant="ghost" size="sm" icon={<Plus size={14} />} onClick={addParticipant}>
-              Tambah peserta
-            </Button>
-          </section>
-        )}
-
-        {step === 3 && (
-          <section className="flex flex-col gap-2 rounded-comfortable bg-surface p-3">
-            <p className="px-1 text-small text-ink-muted">Pilih siapa yang pesan tiap item (opsional, bisa diubah lagi nanti).</p>
-            {validItems.map((row, i) => (
-              <div key={i} className="flex items-center gap-3 rounded-standard px-2 py-2">
-                <span className="min-w-0 flex-1">
-                  <span className="block truncate text-body text-ink">{row.description}</span>
-                  <span className="text-small tabular-nums text-ink-muted">{formatRupiah(parseFloat(row.amount) || 0)}</span>
-                </span>
-                <select
-                  value={assignments[i] ?? ''}
-                  onChange={(e) =>
-                    setAssignments((a) => {
-                      const next = { ...a };
-                      if (e.target.value === '') delete next[i];
-                      else next[i] = parseInt(e.target.value, 10);
-                      return next;
-                    })
-                  }
-                  className="shrink-0 rounded-comfortable bg-surface-interactive px-3 py-2 text-small text-ink outline-none"
-                >
-                  <option value="">Belum di-assign</option>
-                  {validParticipants.map((name, pIdx) => (
-                    <option key={pIdx} value={pIdx}>
-                      {name}
-                    </option>
-                  ))}
-                </select>
-              </div>
-            ))}
+          <section className="flex flex-col gap-3">
+            <div className="rounded-comfortable bg-surface p-4">
+              <Switch checked={hasTax} onChange={setHasTax} label="Ada pajak?" description="Dibagi rata ke semua peserta" />
+              {hasTax && (
+                <div className="mt-3">
+                  <Input
+                    label="Nominal Pajak"
+                    type="number"
+                    inputMode="numeric"
+                    prefix="Rp"
+                    value={taxAmount}
+                    onChange={(e) => setTaxAmount(e.target.value)}
+                  />
+                </div>
+              )}
+            </div>
+            <div className="rounded-comfortable bg-surface p-4">
+              <Switch
+                checked={hasServiceFee}
+                onChange={setHasServiceFee}
+                label="Ada service fee?"
+                description="Dibagi rata ke semua peserta"
+              />
+              {hasServiceFee && (
+                <div className="mt-3">
+                  <Input
+                    label="Nominal Service Fee"
+                    type="number"
+                    inputMode="numeric"
+                    prefix="Rp"
+                    value={serviceFeeAmount}
+                    onChange={(e) => setServiceFeeAmount(e.target.value)}
+                  />
+                </div>
+              )}
+            </div>
           </section>
         )}
 
