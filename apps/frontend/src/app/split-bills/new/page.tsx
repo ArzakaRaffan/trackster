@@ -1,6 +1,6 @@
 'use client';
 
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAutoAnimate } from '@formkit/auto-animate/react';
 import { api, ApiError } from '@/lib/api';
@@ -35,6 +35,16 @@ export default function NewSplitBillPage() {
   const [submitting, setSubmitting] = useState(false);
   const [scanning, setScanning] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  // null = belum ketauan. Halaman ini diakses baik oleh kamu (login) maupun temen yang bikin
+  // bill sendiri (tanpa akun) — endpoint create & redirect setelahnya beda tergantung ini.
+  const [isOwner, setIsOwner] = useState<boolean | null>(null);
+
+  useEffect(() => {
+    api
+      .get('/auth/me')
+      .then(() => setIsOwner(true))
+      .catch(() => setIsOwner(false));
+  }, []);
 
   const [restaurantName, setRestaurantName] = useState('');
   const [billDate, setBillDate] = useState(todayISO());
@@ -173,10 +183,22 @@ export default function NewSplitBillPage() {
           quantity: parseInt(r.quantity, 10) || 1,
         })),
       };
-      const created = await api.post<{ id: number; items: { id: number }[]; participants: { id: number }[] }>(
-        '/split-bills',
-        body,
-      );
+      // Cek ulang di titik submit (bukan cuma andelin state dari mount) — kalau session
+      // ternyata expired di tengah jalan ngisi form, ini yang nentuin endpoint mana yang bener.
+      const owner = await api
+        .get('/auth/me')
+        .then(() => true)
+        .catch(() => false);
+
+      const created = await api.post<{
+        id: number;
+        ownerToken?: string | null;
+        items: { id: number }[];
+        participants: { id: number }[];
+      }>(owner ? '/split-bills' : '/split-bills/public', body);
+
+      const assignUrlFor = (itemId: number) =>
+        owner ? `/split-bills/${created.id}/items/${itemId}/assign` : `/split-bills/manage/${created.ownerToken}/items/${itemId}/assign`;
 
       // Assignment dilakukan sebagai step terpisah setelah bill dibuat, karena item & peserta
       // baru punya id definitif setelah create — dipetakan lewat urutan array yang sama persis
@@ -189,11 +211,11 @@ export default function NewSplitBillPage() {
         const createdItemId = created.items[idx]?.id;
         const createdParticipantId = created.participants[participantIdx]?.id;
         if (createdItemId === undefined || createdParticipantId === undefined) return null;
-        return api.patch(`/split-bills/${created.id}/items/${createdItemId}/assign`, { participantId: createdParticipantId });
+        return api.patch(assignUrlFor(createdItemId), { participantId: createdParticipantId });
       });
       await Promise.all(assignPromises.filter(Boolean));
 
-      router.push(`/split-bills/${created.id}`);
+      router.push(owner ? `/split-bills/${created.id}` : `/split-bills/manage/${created.ownerToken}`);
     } catch (e) {
       setErrorMsg(e instanceof ApiError ? e.message : 'Gagal membuat split bill.');
     } finally {
@@ -205,7 +227,7 @@ export default function NewSplitBillPage() {
     <div className="pb-navbar animate-fade-in-up">
       <header className="sticky top-0 z-10 flex items-center gap-3 bg-base/[0.86] px-4 py-4 backdrop-blur-md">
         <button
-          onClick={() => (step === 0 ? router.push('/split-bills') : goBack())}
+          onClick={() => (step === 0 ? router.push(isOwner ? '/split-bills' : '/') : goBack())}
           aria-label="Kembali"
           className="text-ink-muted hover:text-ink"
         >
@@ -253,27 +275,35 @@ export default function NewSplitBillPage() {
           <section className="flex flex-col gap-4">
             <div>
               <h2 className="mb-2 px-1 text-heading font-semibold text-ink">Menu</h2>
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept="image/*"
-                capture="environment"
-                className="hidden"
-                onChange={(e) => {
-                  const file = e.target.files?.[0];
-                  if (file) handleScanReceipt(file);
-                  e.target.value = '';
-                }}
-              />
-              <Button
-                variant="outlined"
-                fullWidth
-                icon={<Camera size={18} />}
-                onClick={() => fileInputRef.current?.click()}
-                disabled={scanning}
-              >
-                {scanning ? 'Memindai struk...' : 'Scan Struk'}
-              </Button>
+              {isOwner === true ? (
+                <>
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept="image/*"
+                    capture="environment"
+                    className="hidden"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      if (file) handleScanReceipt(file);
+                      e.target.value = '';
+                    }}
+                  />
+                  <Button
+                    variant="outlined"
+                    fullWidth
+                    icon={<Camera size={18} />}
+                    onClick={() => fileInputRef.current?.click()}
+                    disabled={scanning}
+                  >
+                    {scanning ? 'Memindai struk...' : 'Scan Struk'}
+                  </Button>
+                </>
+              ) : isOwner === false ? (
+                <p className="rounded-comfortable bg-surface-interactive px-4 py-3 text-small text-ink-muted">
+                  Scan struk otomatis cuma buat yang login ke Trackster — masukin item manual di bawah aja, tetep bisa kok.
+                </p>
+              ) : null}
 
               <div ref={itemListParent} className="mt-3 flex flex-col gap-3 rounded-comfortable bg-surface p-3">
                 {items.map((row) => (

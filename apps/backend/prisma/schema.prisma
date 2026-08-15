@@ -133,8 +133,15 @@ model SplitBill {
   billDate          DateTime
   taxAmount         Decimal  @default(0) @db.Decimal(12, 2)
   serviceFeeAmount  Decimal  @default(0) @db.Decimal(12, 2)
-  createdByUserId   Int
+  // null = bill dibuat publik tanpa login (lihat ownerToken di bawah). Bill yang dibuat lewat
+  // akun tetap keiket ke createdByUserId seperti biasa, ownerToken-nya null.
+  createdByUserId   Int?
   createdAt         DateTime @default(now())
+
+  // Secret kedua, TERPISAH dari publicSlug — cuma dikasih ke pembuat bill anonim sekali waktu
+  // create, dipakai buat kelola (reassign item) TANPA login. publicSlug tetap cuma buat
+  // teman lihat & tandai lunas — jangan disatukan, nanti teman bisa ikut ngedit assignment.
+  ownerToken        String?  @unique
 
   // Rekening orang yang nalangin duluan — ditampilkan di halaman publik biar temen tau
   // harus transfer ke mana. Semua opsional, kosong berarti nggak ditampilkan.

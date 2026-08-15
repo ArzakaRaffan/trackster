@@ -22,7 +22,19 @@ const MORE_SUBPATHS = ['/app/weekly', '/app/budget', '/app/income', '/app/insigh
 export default function NavBar() {
   const pathname = usePathname();
 
-  if (pathname === '/' || pathname === '/login' || pathname === '/kalkulator-tabungan' || pathname.startsWith('/s/')) return null;
+  // /split-bills/new dianggap "public-style" juga sekarang — bisa dipakai baik oleh kamu
+  // (login) maupun temen yang bikin bill sendiri tanpa akun, dan buat yang anonim, nav privat
+  // ini cuma nunjukin link yang bakal mental ke /login kalau diklik. Owner tetap bisa balik
+  // ke /split-bills lewat tombol back di step pertama form.
+  if (
+    pathname === '/' ||
+    pathname === '/login' ||
+    pathname === '/savings-calculator' ||
+    pathname === '/split-bills/new' ||
+    pathname.startsWith('/s/') ||
+    pathname.startsWith('/split-bills/manage/')
+  )
+    return null;
 
   return (
     <nav className="fixed inset-x-0 bottom-0 z-20 flex bg-base/[0.92] px-2 pb-[calc(8px+env(safe-area-inset-bottom))] pt-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.10)] backdrop-blur-md lg:static lg:h-screen lg:w-60 lg:shrink-0 lg:flex-col lg:gap-1 lg:bg-base lg:p-3 lg:shadow-none">
