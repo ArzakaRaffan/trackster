@@ -1,4 +1,5 @@
 import { Injectable } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../prisma.service';
 import { BalanceService } from '../balance/balance.service';
 import { CreateIncomeDto } from './dto/create-income.dto';
@@ -13,7 +14,7 @@ export class IncomeService {
 
   async findAll(params: { startDate?: string; endDate?: string }) {
     const { startDate, endDate } = params;
-    const where: any = {};
+    const where: Prisma.IncomeWhereInput = {};
     if (startDate || endDate) {
       where.receivedAt = {};
       if (startDate) where.receivedAt.gte = new Date(startDate);

@@ -11,7 +11,18 @@ interface InputProps extends Omit<InputHTMLAttributes<HTMLInputElement>, 'prefix
   hint?: string;
 }
 
-export function Input({ label, prefix, suffix, invalid = false, pill = false, hint, className = '', ...rest }: InputProps) {
+export function Input({
+  label,
+  prefix,
+  suffix,
+  invalid = false,
+  pill = false,
+  hint,
+  className = '',
+  onFocus,
+  onBlur,
+  ...rest
+}: InputProps) {
   const [focus, setFocus] = useState(false);
   const shadow = invalid ? 'shadow-field-error' : focus ? 'shadow-field-focus' : 'shadow-field';
 
@@ -26,15 +37,15 @@ export function Input({ label, prefix, suffix, invalid = false, pill = false, hi
         {prefix && <span className="inline-flex text-ink-muted">{prefix}</span>}
         <input
           className={`min-w-0 flex-1 bg-transparent text-body font-normal text-ink outline-none tabular-nums placeholder:text-ink-subtle disabled:opacity-50 ${className}`}
+          {...rest}
           onFocus={(e) => {
             setFocus(true);
-            rest.onFocus?.(e);
+            onFocus?.(e);
           }}
           onBlur={(e) => {
             setFocus(false);
-            rest.onBlur?.(e);
+            onBlur?.(e);
           }}
-          {...rest}
         />
         {suffix && <span className="inline-flex text-ink-muted">{suffix}</span>}
       </span>
