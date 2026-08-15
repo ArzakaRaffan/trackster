@@ -1,12 +1,14 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import useSWR from 'swr';
 import { api } from '@/lib/api';
 import { formatRupiah } from '@/lib/format';
 import { SplitBillDetail } from '@/lib/splitBillTypes';
-import { Check, ChevronLeft, Copy, Link as LinkIcon } from 'lucide-react';
+import { Button } from '@/components/ui/Button';
+import { Input } from '@/components/ui/Input';
+import { Check, ChevronLeft, Copy, Link as LinkIcon, Pencil } from 'lucide-react';
 
 const fetcher = (path: string) => api.get<SplitBillDetail>(path);
 
@@ -15,6 +17,25 @@ export default function SplitBillDetailPage() {
   const router = useRouter();
   const { data, error, isLoading, mutate } = useSWR(id ? `/split-bills/${id}` : null, fetcher);
   const [copied, setCopied] = useState(false);
+  const [editPayer, setEditPayer] = useState(false);
+  const [payerForm, setPayerForm] = useState({
+    payerName: '',
+    payerBank: '',
+    payerAccountNumber: '',
+    payerContact: '',
+  });
+  const [savingPayer, setSavingPayer] = useState(false);
+
+  useEffect(() => {
+    if (data) {
+      setPayerForm({
+        payerName: data.payerName ?? '',
+        payerBank: data.payerBank ?? '',
+        payerAccountNumber: data.payerAccountNumber ?? '',
+        payerContact: data.payerContact ?? '',
+      });
+    }
+  }, [data]);
 
   const handleReassign = async (itemId: number, participantId: number | null) => {
     await api.patch(`/split-bills/${id}/items/${itemId}/assign`, { participantId });
@@ -27,6 +48,24 @@ export default function SplitBillDetailPage() {
     navigator.clipboard.writeText(url);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
+  };
+
+  const handleCopyAccountNumber = () => {
+    if (!data?.payerAccountNumber) return;
+    navigator.clipboard.writeText(data.payerAccountNumber);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
+  const handleSavePayerInfo = async () => {
+    setSavingPayer(true);
+    try {
+      await api.patch(`/split-bills/${id}/payer-info`, payerForm);
+      await mutate();
+      setEditPayer(false);
+    } finally {
+      setSavingPayer(false);
+    }
   };
 
   return (
@@ -70,28 +109,116 @@ export default function SplitBillDetailPage() {
               </div>
             </section>
 
+            <section className="rounded-comfortable bg-surface p-4">
+              <div className="flex items-center justify-between gap-2">
+                <h2 className="text-heading font-semibold text-ink">Info Rekening Penalang</h2>
+                {!editPayer && (
+                  <button
+                    onClick={() => setEditPayer(true)}
+                    className="flex h-9 w-9 items-center justify-center rounded-full text-ink-muted hover:text-ink"
+                    aria-label="Edit info rekening"
+                  >
+                    <Pencil size={16} />
+                  </button>
+                )}
+              </div>
+
+              {editPayer ? (
+                <div className="mt-3 flex flex-col gap-2.5">
+                  <Input
+                    label="Nama pemilik rekening"
+                    value={payerForm.payerName}
+                    onChange={(e) => setPayerForm((f) => ({ ...f, payerName: e.target.value }))}
+                  />
+                  <Input
+                    label="Nama bank"
+                    value={payerForm.payerBank}
+                    onChange={(e) => setPayerForm((f) => ({ ...f, payerBank: e.target.value }))}
+                  />
+                  <Input
+                    label="Nomor rekening"
+                    value={payerForm.payerAccountNumber}
+                    onChange={(e) => setPayerForm((f) => ({ ...f, payerAccountNumber: e.target.value }))}
+                  />
+                  <Input
+                    label="Nomor kontak (opsional)"
+                    value={payerForm.payerContact}
+                    onChange={(e) => setPayerForm((f) => ({ ...f, payerContact: e.target.value }))}
+                  />
+                  <div className="flex justify-end gap-2">
+                    <Button variant="ghost" size="sm" onClick={() => setEditPayer(false)}>
+                      Batal
+                    </Button>
+                    <Button variant="primary" size="sm" onClick={handleSavePayerInfo} disabled={savingPayer}>
+                      {savingPayer ? 'Menyimpan...' : 'Simpan'}
+                    </Button>
+                  </div>
+                </div>
+              ) : data.payerName || data.payerBank || data.payerAccountNumber ? (
+                <div className="mt-3 flex flex-col gap-1.5 text-small">
+                  <div className="flex justify-between gap-3">
+                    <span className="text-ink-muted">Nama</span>
+                    <span className="text-right font-bold text-ink">{data.payerName}</span>
+                  </div>
+                  <div className="flex justify-between gap-3">
+                    <span className="text-ink-muted">Bank</span>
+                    <span className="text-right font-bold text-ink">{data.payerBank}</span>
+                  </div>
+                  <div className="flex items-center justify-between gap-3">
+                    <span className="text-ink-muted">Rekening</span>
+                    <div className="flex items-center gap-2">
+                      <span className="text-right font-bold tabular-nums text-ink">{data.payerAccountNumber}</span>
+                      <button
+                        onClick={handleCopyAccountNumber}
+                        className="flex h-8 w-8 items-center justify-center rounded-full text-ink-muted hover:text-ink"
+                        aria-label="Salin nomor rekening"
+                      >
+                        {copied ? <Check size={14} /> : <Copy size={14} />}
+                      </button>
+                    </div>
+                  </div>
+                  {data.payerContact && (
+                    <div className="flex justify-between gap-3">
+                      <span className="text-ink-muted">Kontak</span>
+                      <span className="text-right font-bold text-ink">{data.payerContact}</span>
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <p className="mt-2 text-small text-ink-muted">Belum diisi.</p>
+              )}
+            </section>
+
             <h2 className="text-heading font-semibold text-ink">Item</h2>
             <ul className="flex flex-col gap-2 rounded-comfortable bg-surface p-3">
-              {data.items.map((item) => (
-                <li key={item.id} className="flex items-center gap-3">
-                  <span className="min-w-0 flex-1">
-                    <span className="block truncate text-body text-ink">{item.description}</span>
-                    <span className="text-small tabular-nums text-ink-muted">{formatRupiah(Number(item.amount))}</span>
-                  </span>
-                  <select
-                    value={item.participantId ?? ''}
-                    onChange={(e) => handleReassign(item.id, e.target.value === '' ? null : parseInt(e.target.value, 10))}
-                    className="shrink-0 rounded-comfortable bg-surface-interactive px-3 py-2 text-small text-ink outline-none"
-                  >
-                    <option value="">Belum di-assign</option>
-                    {data.participants.map((p) => (
-                      <option key={p.id} value={p.id}>
-                        {p.name}
-                      </option>
-                    ))}
-                  </select>
-                </li>
-              ))}
+              {data.items.map((item) => {
+                const qty = Number((item as any).quantity ?? 1);
+                return (
+                  <li key={item.id} className="flex items-center gap-3">
+                    <span className="min-w-0 flex-1">
+                      <span className="block truncate text-body text-ink">
+                        {item.description}
+                        {qty > 1 ? ` x${qty}` : ''}
+                      </span>
+                      <span className="text-small tabular-nums text-ink-muted">
+                        {formatRupiah(Number(item.amount) * qty)}
+                      </span>
+                    </span>
+                    <select
+                      value={item.participantId ?? ''}
+                      onChange={(e) => handleReassign(item.id, e.target.value === '' ? null : parseInt(e.target.value, 10))}
+                      className="shrink-0 rounded-comfortable bg-surface-interactive px-3 py-2 text-small text-ink outline-none"
+                    >
+                      <option value="">Belum di-assign</option>
+                      {data.participants.map((p) => (
+                        <option key={p.id} value={p.id}>
+                          {p.name}
+                        </option>
+                      ))}
+                    </select>
+                  </li>
+                );
+              })}
             </ul>
 
             <h2 className="text-heading font-semibold text-ink">Kalkulasi per orang</h2>

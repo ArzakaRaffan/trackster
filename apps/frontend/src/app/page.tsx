@@ -1,8 +1,9 @@
 'use client';
 
 import useSWR from 'swr';
+import Link from 'next/link';
 import { api } from '@/lib/api';
-import { AlertTriangle, Bell, Inbox, Mail, Plus, RefreshCw } from 'lucide-react';
+import { AlertTriangle, Bell, Inbox, Mail, Plus, Receipt, Wallet, BarChart3, PiggyBank, LineChart } from 'lucide-react';
 import { TransactionNoteRow } from '@/components/ui/TransactionNoteRow';
 import { AmountDisplay } from '@/components/ui/AmountDisplay';
 import { BudgetProgress } from '@/components/ui/BudgetProgress';
@@ -35,7 +36,7 @@ const dateLabel = (iso: string) =>
 
 export default function TodayPage() {
   const { data, error, isLoading, mutate } = useSWR('/budget/today', fetcher, {
-    refreshInterval: 60_000, // auto-refresh tiap 1 menit
+    refreshInterval: 60_000,
   });
 
   if (isLoading) return <TodaySkeleton />;
@@ -52,18 +53,20 @@ export default function TodayPage() {
 
   return (
     <div className="pb-navbar animate-fade-in-up">
-      {/* Sticky blurred top bar */}
       <header className="sticky top-0 z-10 flex items-center gap-3 bg-base/[0.86] px-4 py-4 backdrop-blur-md">
         <div className="min-w-0 flex-1">
           <p className="text-small font-bold uppercase tracking-caps text-ink-muted">{dateLabel(data.date)}</p>
-          <h1 className="font-title text-title font-bold text-ink">Hari Ini</h1>
+          <h1 className="font-title text-title font-bold text-ink">Beranda</h1>
         </div>
         <button
           onClick={() => mutate()}
           aria-label="Sinkron email"
           className="flex h-10 w-10 items-center justify-center rounded-full text-ink-muted transition-colors duration-base ease-standard hover:text-ink"
         >
-          <RefreshCw size={18} />
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M21 12a9 9 0 1 1-2.64-6.36" />
+            <polyline points="21 3 21 9 15 9" />
+          </svg>
         </button>
         <button
           aria-label="Notifikasi"
@@ -109,6 +112,45 @@ export default function TodayPage() {
               tone={data.isOverBudget ? 'over' : 'under'}
             />
           </div>
+        </section>
+
+        {/* Quick access */}
+        <section className="grid grid-cols-2 gap-3">
+          <Link
+            href="/split-bills"
+            className="flex items-center gap-3 rounded-comfortable bg-surface p-4 text-label font-bold text-ink hover:bg-surface-interactive"
+          >
+            <Receipt size={18} className="text-brand" />
+            Split Bill
+          </Link>
+          <Link
+            href="/budget"
+            className="flex items-center gap-3 rounded-comfortable bg-surface p-4 text-label font-bold text-ink hover:bg-surface-interactive"
+          >
+            <Wallet size={18} className="text-brand" />
+            Budget
+          </Link>
+          <Link
+            href="/income"
+            className="flex items-center gap-3 rounded-comfortable bg-surface p-4 text-label font-bold text-ink hover:bg-surface-interactive"
+          >
+            <PiggyBank size={18} className="text-brand" />
+            Pemasukan
+          </Link>
+          <Link
+            href="/weekly"
+            className="flex items-center gap-3 rounded-comfortable bg-surface p-4 text-label font-bold text-ink hover:bg-surface-interactive"
+          >
+            <BarChart3 size={18} className="text-brand" />
+            Mingguan
+          </Link>
+          <Link
+            href="/reports"
+            className="flex items-center gap-3 rounded-comfortable bg-surface p-4 text-label font-bold text-ink hover:bg-surface-interactive"
+          >
+            <LineChart size={18} className="text-brand" />
+            Laporan
+          </Link>
         </section>
 
         {/* Over-budget alert */}

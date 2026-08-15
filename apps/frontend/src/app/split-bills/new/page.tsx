@@ -9,6 +9,8 @@ import { Input } from '@/components/ui/Input';
 import { Button } from '@/components/ui/Button';
 import { Switch } from '@/components/ui/Switch';
 import { AlertTriangle, Camera, Check, CheckCircle2, ChevronLeft, Plus, Trash2, X } from 'lucide-react';
+import { AnimatePresence, motion } from 'motion/react';
+import { TRANSITION_BASE, TRANSITION_SLOW } from '@/lib/motion';
 
 const todayISO = () => new Date().toISOString().slice(0, 10);
 const genId = () => (typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : `id-${Math.random().toString(36).slice(2)}`);
@@ -17,6 +19,7 @@ interface ItemRow {
   id: string;
   description: string;
   amount: string;
+  quantity: string;
 }
 
 interface ParticipantRow {
@@ -38,13 +41,11 @@ export default function NewSplitBillPage() {
   const [restaurantName, setRestaurantName] = useState('');
   const [billDate, setBillDate] = useState(todayISO());
 
-  const [items, setItems] = useState<ItemRow[]>([{ id: genId(), description: '', amount: '' }]);
-  // Bukan dikirim ke backend — cuma alat bantu cross-check manual di sisi client, supaya
-  // ketauan kalau ada item yang kelewat/salah ketik SEBELUM lanjut ke pajak/service fee.
+  const [items, setItems] = useState<ItemRow[]>([
+    { id: genId(), description: '', amount: '', quantity: '1' },
+  ]);
   const [subtotalCheck, setSubtotalCheck] = useState('');
   const [participants, setParticipants] = useState<ParticipantRow[]>([{ id: genId(), name: '' }]);
-  // itemId -> participantId. Satu item cuma bisa punya satu pemilik (checklist toggle
-  // otomatis mindahin kepemilikan, bukan nambah — sesuai model data participantId tunggal).
   const [assignments, setAssignments] = useState<Record<string, string>>({});
 
   const [hasTax, setHasTax] = useState(false);
@@ -55,7 +56,12 @@ export default function NewSplitBillPage() {
   const [itemListParent] = useAutoAnimate({ duration: 200, easing: 'cubic-bezier(.3,0,.4,1)' });
   const [participantListParent] = useAutoAnimate({ duration: 200, easing: 'cubic-bezier(.3,0,.4,1)' });
 
-  const addItem = () => setItems((rows) => [...rows, { id: genId(), description: '', amount: '' }]);
+  const [showAddParticipant, setShowAddParticipant] = useState(false);
+  const [newParticipantName, setNewParticipantName] = useState('');
+
+  const addItem = () =>
+    setItems((rows) => [...rows, { id: genId(), description: '', amount: '', quantity: '1' }]);
+
   const removeItem = (id: string) => {
     setItems((rows) => rows.filter((r) => r.id !== id));
     setAssignments((a) => {
@@ -64,10 +70,18 @@ export default function NewSplitBillPage() {
       return next;
     });
   };
-  const updateItem = (id: string, field: 'description' | 'amount', value: string) =>
+
+  const updateItem = (id: string, field: 'description' | 'amount' | 'quantity', value: string) =>
     setItems((rows) => rows.map((row) => (row.id === id ? { ...row, [field]: value } : row)));
 
-  const addParticipant = () => setParticipants((p) => [...p, { id: genId(), name: '' }]);
+  const addParticipantFromInput = () => {
+    const name = newParticipantName.trim();
+    if (!name) return;
+    setParticipants((p) => [...p, { id: genId(), name }]);
+    setNewParticipantName('');
+    setShowAddParticipant(false);
+  };
+
   const removeParticipant = (id: string) => {
     setParticipants((p) => p.filter((row) => row.id !== id));
     setAssignments((a) => {
@@ -78,6 +92,7 @@ export default function NewSplitBillPage() {
       return next;
     });
   };
+
   const updateParticipant = (id: string, value: string) =>
     setParticipants((p) => p.map((row) => (row.id === id ? { ...row, name: value } : row)));
 
@@ -110,7 +125,15 @@ export default function NewSplitBillPage() {
       }
       setItems((rows) => {
         const cleaned = rows.filter((r) => r.description.trim() || r.amount.trim());
-        return [...cleaned, ...scanned.map((s) => ({ id: genId(), description: s.description, amount: String(s.amount) }))];
+        return [
+          ...cleaned,
+          ...scanned.map((s) => ({
+            id: genId(),
+            description: s.description,
+            amount: String(s.amount),
+            quantity: '1',
+          })),
+        ];
       });
     } catch (e) {
       setErrorMsg(e instanceof ApiError ? e.message : 'Gagal scan struk.');
@@ -119,13 +142,16 @@ export default function NewSplitBillPage() {
     }
   };
 
-  const validItems = items.filter((r) => r.description.trim() && parseFloat(r.amount) > 0);
+  const validItems = items.filter(
+    (r) => r.description.trim() && parseFloat(r.amount) > 0 && parseInt(r.quantity || '1') >= 1,
+  );
   const validParticipants = participants.filter((p) => p.name.trim().length > 0);
 
-  const itemsSubtotal = validItems.reduce((sum, r) => sum + (parseFloat(r.amount) || 0), 0);
+  const itemsSubtotal = validItems.reduce(
+    (sum, r) => sum + (parseFloat(r.amount) || 0) * (parseInt(r.quantity) || 1),
+    0,
+  );
   const subtotalCheckValue = parseFloat(subtotalCheck) || 0;
-  // Sengaja SEBELUM pajak/service fee (yang baru diisi di step selanjutnya) — struk biasanya
-  // nyantumin "Subtotal" sebagai baris terpisah persis buat ini, jadi tinggal dicontek.
   const subtotalDiff = subtotalCheckValue > 0 ? itemsSubtotal - subtotalCheckValue : 0;
 
   const canGoStep = (target: number) => {
@@ -150,16 +176,17 @@ export default function NewSplitBillPage() {
         taxAmount: hasTax ? parseFloat(taxAmount) || 0 : 0,
         serviceFeeAmount: hasServiceFee ? parseFloat(serviceFeeAmount) || 0 : 0,
         participants: validParticipants.map((p) => ({ name: p.name.trim() })),
-        items: validItems.map((r) => ({ description: r.description.trim(), amount: parseFloat(r.amount) })),
+        items: validItems.map((r) => ({
+          description: r.description.trim(),
+          amount: parseFloat(r.amount),
+          quantity: parseInt(r.quantity) || 1,
+        })),
       };
       const created = await api.post<{ id: number; items: { id: number }[]; participants: { id: number }[] }>(
         '/split-bills',
         body,
       );
 
-      // Assignment dilakukan sebagai step terpisah setelah bill dibuat, karena item & peserta
-      // baru punya id definitif setelah create — dipetakan lewat urutan array yang sama persis
-      // dengan urutan validItems/validParticipants yang disubmit di body.
       const assignPromises = validItems.map((item, idx) => {
         const participantClientId = assignments[item.id];
         if (!participantClientId) return null;
@@ -168,7 +195,9 @@ export default function NewSplitBillPage() {
         const createdItemId = created.items[idx]?.id;
         const createdParticipantId = created.participants[participantIdx]?.id;
         if (createdItemId === undefined || createdParticipantId === undefined) return null;
-        return api.patch(`/split-bills/${created.id}/items/${createdItemId}/assign`, { participantId: createdParticipantId });
+        return api.patch(`/split-bills/${created.id}/items/${createdItemId}/assign`, {
+          participantId: createdParticipantId,
+        });
       });
       await Promise.all(assignPromises.filter(Boolean));
 
@@ -251,7 +280,17 @@ export default function NewSplitBillPage() {
                       inputMode="numeric"
                       value={row.amount}
                       onChange={(e) => updateItem(row.id, 'amount', e.target.value)}
-                      className="w-28 shrink-0 rounded-comfortable bg-surface-interactive px-3.5 py-2.5 text-right text-body tabular-nums text-ink outline-none placeholder:text-ink-subtle"
+                      className="w-24 shrink-0 rounded-comfortable bg-surface-interactive px-3.5 py-2.5 text-right text-body tabular-nums text-ink outline-none placeholder:text-ink-subtle"
+                    />
+                    <input
+                      aria-label="Quantity"
+                      type="number"
+                      inputMode="numeric"
+                      min="1"
+                      value={row.quantity}
+                      onChange={(e) => updateItem(row.id, 'quantity', e.target.value)}
+                      className="w-14 shrink-0 rounded-comfortable bg-surface-interactive px-2 py-2.5 text-center text-body tabular-nums text-ink outline-none placeholder:text-ink-subtle"
+                      placeholder="1"
                     />
                     <button
                       onClick={() => removeItem(row.id)}
@@ -309,6 +348,49 @@ export default function NewSplitBillPage() {
               <p className="mb-2 px-1 text-small text-ink-muted">
                 Tambah nama, lalu centang menu yang dipesan orang itu. Menu yang udah dicentang orang lain kelihatan pudar.
               </p>
+
+              <Button
+                variant="ghost"
+                size="sm"
+                icon={<Plus size={14} />}
+                onClick={() => setShowAddParticipant((v) => !v)}
+                className="mb-2"
+              >
+                {showAddParticipant ? 'Batal tambah' : 'Tambah Orang'}
+              </Button>
+
+              <AnimatePresence initial={false}>
+                {showAddParticipant && (
+                  <motion.div
+                    key="add-participant"
+                    initial={{ opacity: 0, height: 0 }}
+                    animate={{ opacity: 1, height: 'auto' }}
+                    exit={{ opacity: 0, height: 0 }}
+                    transition={TRANSITION_BASE}
+                    className="overflow-hidden"
+                  >
+                    <div className="mb-3 flex items-end gap-2 rounded-comfortable bg-surface p-3">
+                      <div className="flex-1">
+                        <Input
+                          label="Nama peserta"
+                          value={newParticipantName}
+                          onChange={(e) => setNewParticipantName(e.target.value)}
+                          autoFocus
+                        />
+                      </div>
+                      <Button
+                        variant="primary"
+                        size="md"
+                        onClick={addParticipantFromInput}
+                        disabled={!newParticipantName.trim()}
+                      >
+                        Tambah
+                      </Button>
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+
               <div ref={participantListParent} className="flex flex-col gap-3">
                 {participants.map((participant, pIdx) => (
                   <div key={participant.id} className="rounded-comfortable bg-surface p-3">
@@ -349,15 +431,20 @@ export default function NewSplitBillPage() {
                               >
                                 <span
                                   className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-subtle transition-colors duration-fast ease-standard ${
-                                    isMine ? 'bg-brand text-base' : 'shadow-[inset_0_0_0_1px_theme(colors.line.strong)] text-transparent'
+                                    isMine
+                                      ? 'bg-brand text-base'
+                                      : 'shadow-[inset_0_0_0_1px_theme(colors.line.strong)] text-transparent'
                                   }`}
                                 >
                                   <Check size={13} strokeWidth={3} />
                                 </span>
-                                <span className="min-w-0 flex-1 truncate text-small text-ink">{item.description}</span>
+                                <span className="min-w-0 flex-1 truncate text-small text-ink">
+                                  {item.description}
+                                  {parseInt(item.quantity) > 1 ? ` x${item.quantity}` : ''}
+                                </span>
                                 {ownerName && <span className="shrink-0 text-micro text-ink-subtle">{ownerName}</span>}
                                 <span className="shrink-0 text-small tabular-nums text-ink-muted">
-                                  {formatRupiah(parseFloat(item.amount) || 0)}
+                                  {formatRupiah(parseFloat(item.amount) * (parseInt(item.quantity) || 1))}
                                 </span>
                               </button>
                             </li>
@@ -367,9 +454,6 @@ export default function NewSplitBillPage() {
                     )}
                   </div>
                 ))}
-                <Button variant="ghost" size="sm" icon={<Plus size={14} />} onClick={addParticipant}>
-                  Tambah peserta
-                </Button>
               </div>
             </div>
           </section>

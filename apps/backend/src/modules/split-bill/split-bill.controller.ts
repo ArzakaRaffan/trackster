@@ -6,6 +6,7 @@ import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { CreateSplitBillDto } from './dto/create-split-bill.dto';
 import { AssignItemDto } from './dto/assign-item.dto';
 import { ScanReceiptDto } from './dto/scan-receipt.dto';
+import { UpdatePayerInfoDto } from './dto/update-payer-info.dto';
 
 @Controller('split-bills')
 export class SplitBillController {
@@ -45,6 +46,17 @@ export class SplitBillController {
   ) {
     const userId = (req as any).user.sub;
     return this.splitBillService.assignItem(id, itemId, userId, dto.participantId ?? null);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Patch(':id/payer-info')
+  async updatePayerInfo(
+    @Req() req: Request,
+    @Param('id', ParseIntPipe) id: number,
+    @Body() dto: UpdatePayerInfoDto,
+  ) {
+    const userId = (req as any).user.sub;
+    return this.splitBillService.updatePayerInfo(id, userId, dto);
   }
 
   @UseGuards(JwtAuthGuard)

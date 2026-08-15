@@ -1,8 +1,9 @@
-import { Injectable, ForbiddenException, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { randomBytes } from 'crypto';
 import { Prisma, SplitBillItem, SplitBillParticipant } from '@prisma/client';
 import { PrismaService } from '../../prisma.service';
 import { CreateSplitBillDto } from './dto/create-split-bill.dto';
+import { UpdatePayerInfoDto } from './dto/update-payer-info.dto';
 
 type ParticipantWithItems = SplitBillParticipant & { items: SplitBillItem[] };
 
@@ -41,7 +42,10 @@ export class SplitBillService {
     const serviceFeeShare = serviceFee / participantCount;
 
     return participants.map((p) => {
-      const itemsTotal = p.items.reduce((sum, item) => sum + Number(item.amount), 0);
+      const itemsTotal = p.items.reduce((sum, item) => {
+        const qty = Number((item as any).quantity ?? 1);
+        return sum + Number(item.amount) * qty;
+      }, 0);
       return {
         id: p.id,
         name: p.name,
@@ -65,7 +69,13 @@ export class SplitBillService {
         serviceFeeAmount: dto.serviceFeeAmount ?? 0,
         createdByUserId: userId,
         participants: { create: dto.participants.map((p) => ({ name: p.name })) },
-        items: { create: dto.items.map((i) => ({ description: i.description, amount: i.amount })) },
+        items: {
+          create: dto.items.map((i) => ({
+            description: i.description,
+            amount: i.amount,
+            quantity: i.quantity ?? 1,
+          })),
+        },
       },
       include: { participants: true, items: true },
     });
@@ -114,6 +124,32 @@ export class SplitBillService {
     });
   }
 
+  async updatePayerInfo(id: number, userId: number, dto: UpdatePayerInfoDto) {
+    await this.getOwnedBillOrThrow(id, userId);
+
+    const hasPayerName = dto.payerName !== undefined && dto.payerName !== '';
+    const hasBank = dto.payerBank !== undefined && dto.payerBank !== '';
+    const hasAccountNumber = dto.payerAccountNumber !== undefined && dto.payerAccountNumber !== '';
+
+    if (hasPayerName || hasBank || hasAccountNumber) {
+      if (!hasPayerName || !hasBank || !hasAccountNumber) {
+        throw new BadRequestException(
+          'Nama pemilik rekening, nama bank, dan nomor rekening wajib diisi lengkap',
+        );
+      }
+    }
+
+    return this.prisma.splitBill.update({
+      where: { id },
+      data: {
+        ...(dto.payerName !== undefined && { payerName: dto.payerName }),
+        ...(dto.payerBank !== undefined && { payerBank: dto.payerBank }),
+        ...(dto.payerAccountNumber !== undefined && { payerAccountNumber: dto.payerAccountNumber }),
+        ...(dto.payerContact !== undefined && { payerContact: dto.payerContact }),
+      },
+    });
+  }
+
   async getPublicSummary(slug: string) {
     const bill = await this.prisma.splitBill.findUnique({
       where: { publicSlug: slug },
@@ -128,10 +164,15 @@ export class SplitBillService {
       billDate: bill.billDate,
       taxAmount: bill.taxAmount,
       serviceFeeAmount: bill.serviceFeeAmount,
+      payerName: (bill as any).payerName,
+      payerBank: (bill as any).payerBank,
+      payerAccountNumber: (bill as any).payerAccountNumber,
+      payerContact: (bill as any).payerContact,
       items: bill.items.map((i) => ({
         id: i.id,
         description: i.description,
         amount: i.amount,
+        quantity: (i as any).quantity ?? 1,
         participantId: i.participantId,
         participantName: bill.participants.find((p) => p.id === i.participantId)?.name ?? null,
       })),

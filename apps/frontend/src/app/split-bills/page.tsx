@@ -55,7 +55,10 @@ export default function SplitBillsPage() {
           <ul ref={listParent} className="rounded-comfortable bg-surface p-2">
             {data.map((bill) => {
               const total =
-                bill.items.reduce((sum, i) => sum + Number(i.amount), 0) +
+                bill.items.reduce((sum, i) => {
+                  const qty = Number(i.quantity ?? 1);
+                  return sum + Number(i.amount) * qty;
+                }, 0) +
                 Number(bill.taxAmount) +
                 Number(bill.serviceFeeAmount);
               return (
