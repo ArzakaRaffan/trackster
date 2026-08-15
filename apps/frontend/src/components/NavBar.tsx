@@ -2,13 +2,14 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { BarChart3, LineChart, PiggyBank, Settings, Sparkles, Sun, Wallet } from 'lucide-react';
+import { BarChart3, LineChart, PiggyBank, Receipt, Settings, Sparkles, Sun, Wallet } from 'lucide-react';
 
 const LINKS = [
   { href: '/', label: 'Hari Ini', Icon: Sun },
   { href: '/weekly', label: 'Mingguan', Icon: BarChart3 },
   { href: '/budget', label: 'Budget', Icon: Wallet },
   { href: '/income', label: 'Pemasukan', Icon: PiggyBank },
+  { href: '/split-bills', label: 'Split Bill', Icon: Receipt },
   { href: '/reports', label: 'Laporan', Icon: LineChart },
   { href: '/insights', label: 'Analisis', Icon: Sparkles },
   { href: '/settings', label: 'Setting', Icon: Settings },
@@ -17,7 +18,7 @@ const LINKS = [
 export default function NavBar() {
   const pathname = usePathname();
 
-  if (pathname === '/login') return null;
+  if (pathname === '/login' || pathname.startsWith('/s/')) return null;
 
   return (
     <nav className="fixed inset-x-0 bottom-0 z-20 flex bg-base/[0.92] px-2 pb-[calc(8px+env(safe-area-inset-bottom))] pt-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.10)] backdrop-blur-md lg:static lg:h-screen lg:w-60 lg:shrink-0 lg:flex-col lg:gap-1 lg:bg-base lg:p-3 lg:shadow-none">
