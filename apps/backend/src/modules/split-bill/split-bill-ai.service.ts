@@ -1,15 +1,16 @@
 import { Injectable, Logger, BadRequestException, InternalServerErrorException } from '@nestjs/common';
 
-const SCAN_SYSTEM_PROMPT = `Kamu membaca foto struk belanja/makan restoran. Ekstrak SEMUA baris item yang dibeli (nama item + harga), JANGAN sertakan baris subtotal/pajak/service charge/total/diskon sebagai item.
+const SCAN_SYSTEM_PROMPT = `Kamu membaca foto struk belanja/makan restoran. Ekstrak SEMUA baris item yang dibeli (nama item + harga satuan + jumlah), JANGAN sertakan baris subtotal/pajak/service charge/total/diskon sebagai item.
 
 Jawab HANYA dengan JSON array valid, tanpa teks lain, tanpa markdown code fence, format persis:
-[{"description": "Nama Item", "amount": 25000}, ...]
+[{"description": "Nama Item", "amount": 25000, "quantity": 1}, ...]
 
-amount harus angka (bukan string), dalam Rupiah tanpa titik/koma pemisah ribuan. Kalau foto tidak terbaca/bukan struk, jawab dengan array kosong [].`;
+amount harus angka HARGA SATUAN (bukan total baris), dalam Rupiah tanpa titik/koma pemisah ribuan. quantity harus angka bulat jumlah item (kalau struk cuma nunjukin total baris tanpa quantity eksplisit, quantity = 1 dan amount = total baris itu). Kalau foto tidak terbaca/bukan struk, jawab dengan array kosong [].`;
 
 interface ScannedItem {
   description: string;
   amount: number;
+  quantity: number;
 }
 
 @Injectable()
@@ -85,8 +86,12 @@ export class SplitBillAiService {
     }
 
     return parsed
-      .filter((it): it is { description: unknown; amount: unknown } => typeof it === 'object' && it !== null)
-      .map((it) => ({ description: String((it as any).description ?? '').trim(), amount: Number((it as any).amount) }))
+      .filter((it): it is Record<string, unknown> => typeof it === 'object' && it !== null)
+      .map((it) => ({
+        description: String(it.description ?? '').trim(),
+        amount: Number(it.amount),
+        quantity: Number.isInteger(Number(it.quantity)) && Number(it.quantity) > 0 ? Number(it.quantity) : 1,
+      }))
       .filter((it) => it.description.length > 0 && Number.isFinite(it.amount) && it.amount > 0);
   }
 }

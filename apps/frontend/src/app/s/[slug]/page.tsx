@@ -1,5 +1,6 @@
 'use client';
 
+import { useState } from 'react';
 import { useParams } from 'next/navigation';
 import useSWR from 'swr';
 import { useAutoAnimate } from '@formkit/auto-animate/react';
@@ -10,7 +11,7 @@ import { AmountDisplay } from '@/components/ui/AmountDisplay';
 import { Button } from '@/components/ui/Button';
 import { TRANSITION_SLOW } from '@/lib/motion';
 import { PublicSplitBillSummary } from '@/lib/splitBillTypes';
-import { Check, PartyPopper, Receipt } from 'lucide-react';
+import { Check, Copy, Landmark, PartyPopper, Receipt } from 'lucide-react';
 
 const fetcher = (path: string) => api.get<PublicSplitBillSummary>(path);
 
@@ -37,6 +38,13 @@ export default function PublicSplitBillPage() {
   const { slug } = useParams<{ slug: string }>();
   const { data, error, isLoading, mutate } = useSWR(slug ? `/split-bills/public/${slug}` : null, fetcher);
   const [participantListParent] = useAutoAnimate({ duration: 320, easing: 'cubic-bezier(.16,1,.3,1)' });
+  const [copiedAccount, setCopiedAccount] = useState(false);
+
+  const handleCopyAccount = (accountNumber: string) => {
+    navigator.clipboard.writeText(accountNumber);
+    setCopiedAccount(true);
+    setTimeout(() => setCopiedAccount(false), 2000);
+  };
 
   const handleMarkPaid = async (participantId: number) => {
     await api.patch(`/split-bills/public/${slug}/participants/${participantId}/mark-paid`);
@@ -64,9 +72,10 @@ export default function PublicSplitBillPage() {
   }
 
   const grandTotal =
-    data.items.reduce((sum, i) => sum + Number(i.amount), 0) + Number(data.taxAmount) + Number(data.serviceFeeAmount);
+    data.items.reduce((sum, i) => sum + Number(i.amount) * i.quantity, 0) + Number(data.taxAmount) + Number(data.serviceFeeAmount);
   const paidCount = data.participants.filter((p) => p.isPaid).length;
   const allPaid = data.participants.length > 0 && paidCount === data.participants.length;
+  const hasPayerInfo = data.payerBankName || data.payerAccountNumber || data.payerAccountName;
 
   return (
     <div className="min-h-screen bg-base pb-16">
@@ -123,6 +132,30 @@ export default function PublicSplitBillPage() {
           )}
         </AnimatePresence>
 
+        {hasPayerInfo && (
+          <div className="mt-3 flex items-center gap-3 rounded-comfortable bg-surface p-4">
+            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-status-info-bg text-status-info">
+              <Landmark size={18} />
+            </span>
+            <span className="min-w-0 flex-1">
+              <span className="block text-small text-ink-muted">
+                Transfer ke {data.payerBankName}
+                {data.payerAccountName ? ` · a.n ${data.payerAccountName}` : ''}
+              </span>
+              <span className="block text-body font-bold tabular-nums text-ink">{data.payerAccountNumber}</span>
+            </span>
+            {data.payerAccountNumber && (
+              <button
+                onClick={() => handleCopyAccount(data.payerAccountNumber!)}
+                aria-label="Salin nomor rekening"
+                className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-ink-muted hover:text-ink"
+              >
+                {copiedAccount ? <Check size={16} className="text-status-under" /> : <Copy size={16} />}
+              </button>
+            )}
+          </div>
+        )}
+
         <section className="mt-6">
           <h2 className="mb-2 px-1 text-heading font-semibold text-ink">Menu</h2>
           <ul className="flex flex-col gap-1 rounded-comfortable bg-surface p-2">
@@ -142,10 +175,13 @@ export default function PublicSplitBillPage() {
                   </span>
                 )}
                 <span className="min-w-0 flex-1">
-                  <span className="block truncate text-body text-ink">{item.description}</span>
+                  <span className="block truncate text-body text-ink">
+                    {item.description}
+                    {item.quantity > 1 && <span className="text-ink-subtle"> ×{item.quantity}</span>}
+                  </span>
                   <span className="text-small text-ink-muted">{item.participantName ?? 'Belum di-assign'}</span>
                 </span>
-                <span className="shrink-0 text-body tabular-nums text-ink">{formatRupiah(Number(item.amount))}</span>
+                <span className="shrink-0 text-body tabular-nums text-ink">{formatRupiah(Number(item.amount) * item.quantity)}</span>
               </li>
             ))}
           </ul>

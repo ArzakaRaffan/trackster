@@ -75,8 +75,15 @@ export default function SplitBillDetailPage() {
               {data.items.map((item) => (
                 <li key={item.id} className="flex items-center gap-3">
                   <span className="min-w-0 flex-1">
-                    <span className="block truncate text-body text-ink">{item.description}</span>
-                    <span className="text-small tabular-nums text-ink-muted">{formatRupiah(Number(item.amount))}</span>
+                    <span className="block truncate text-body text-ink">
+                      {item.description}
+                      {item.quantity > 1 && <span className="text-ink-subtle"> ×{item.quantity}</span>}
+                    </span>
+                    <span className="text-small tabular-nums text-ink-muted">
+                      {item.quantity > 1
+                        ? `${formatRupiah(Number(item.amount))} × ${item.quantity} = ${formatRupiah(Number(item.amount) * item.quantity)}`
+                        : formatRupiah(Number(item.amount))}
+                    </span>
                   </span>
                   <select
                     value={item.participantId ?? ''}

@@ -41,7 +41,7 @@ export class SplitBillService {
     const serviceFeeShare = serviceFee / participantCount;
 
     return participants.map((p) => {
-      const itemsTotal = p.items.reduce((sum, item) => sum + Number(item.amount), 0);
+      const itemsTotal = p.items.reduce((sum, item) => sum + Number(item.amount) * item.quantity, 0);
       return {
         id: p.id,
         name: p.name,
@@ -63,9 +63,14 @@ export class SplitBillService {
         billDate: new Date(dto.billDate),
         taxAmount: dto.taxAmount ?? 0,
         serviceFeeAmount: dto.serviceFeeAmount ?? 0,
+        payerBankName: dto.payerBankName,
+        payerAccountNumber: dto.payerAccountNumber,
+        payerAccountName: dto.payerAccountName,
         createdByUserId: userId,
         participants: { create: dto.participants.map((p) => ({ name: p.name })) },
-        items: { create: dto.items.map((i) => ({ description: i.description, amount: i.amount })) },
+        items: {
+          create: dto.items.map((i) => ({ description: i.description, amount: i.amount, quantity: i.quantity ?? 1 })),
+        },
       },
       include: { participants: true, items: true },
     });
@@ -128,10 +133,14 @@ export class SplitBillService {
       billDate: bill.billDate,
       taxAmount: bill.taxAmount,
       serviceFeeAmount: bill.serviceFeeAmount,
+      payerBankName: bill.payerBankName,
+      payerAccountNumber: bill.payerAccountNumber,
+      payerAccountName: bill.payerAccountName,
       items: bill.items.map((i) => ({
         id: i.id,
         description: i.description,
         amount: i.amount,
+        quantity: i.quantity,
         participantId: i.participantId,
         participantName: bill.participants.find((p) => p.id === i.participantId)?.name ?? null,
       })),

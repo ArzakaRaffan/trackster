@@ -2,18 +2,21 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { BarChart3, LineChart, PiggyBank, Receipt, Settings, Sparkles, Sun, Wallet } from 'lucide-react';
+import { LineChart, MoreHorizontal, Receipt, Sun } from 'lucide-react';
 
+// Nav disederhanakan jadi 4 item utama — sisanya (Mingguan/Budget/Pemasukan/Analisis/Setting)
+// dipindah ke /more biar sidebar/bottom-bar nggak penuh. Hari Ini tetap jadi "dashboard"
+// pertama yang keliatan begitu login.
 const LINKS = [
   { href: '/', label: 'Hari Ini', Icon: Sun },
-  { href: '/weekly', label: 'Mingguan', Icon: BarChart3 },
-  { href: '/budget', label: 'Budget', Icon: Wallet },
-  { href: '/income', label: 'Pemasukan', Icon: PiggyBank },
   { href: '/split-bills', label: 'Split Bill', Icon: Receipt },
   { href: '/reports', label: 'Laporan', Icon: LineChart },
-  { href: '/insights', label: 'Analisis', Icon: Sparkles },
-  { href: '/settings', label: 'Setting', Icon: Settings },
+  { href: '/more', label: 'Lainnya', Icon: MoreHorizontal },
 ];
+
+// Sub-halaman yang sekarang tinggal di menu "Lainnya" — biar tab itu tetap keliatan aktif
+// pas user lagi di salah satu sub-halamannya, bukan cuma pas persis di /more.
+const MORE_SUBPATHS = ['/weekly', '/budget', '/income', '/insights', '/settings'];
 
 export default function NavBar() {
   const pathname = usePathname();
@@ -26,7 +29,7 @@ export default function NavBar() {
         Trackster
       </span>
       {LINKS.map(({ href, label, Icon }) => {
-        const active = pathname === href;
+        const active = href === '/more' ? pathname === '/more' || MORE_SUBPATHS.includes(pathname) : pathname === href;
         return (
           <Link
             key={href}
