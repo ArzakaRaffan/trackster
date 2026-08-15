@@ -22,7 +22,7 @@ const MORE_SUBPATHS = ['/app/weekly', '/app/budget', '/app/income', '/app/insigh
 export default function NavBar() {
   const pathname = usePathname();
 
-  if (pathname === '/' || pathname === '/login' || pathname.startsWith('/s/')) return null;
+  if (pathname === '/' || pathname === '/login' || pathname === '/kalkulator-tabungan' || pathname.startsWith('/s/')) return null;
 
   return (
     <nav className="fixed inset-x-0 bottom-0 z-20 flex bg-base/[0.92] px-2 pb-[calc(8px+env(safe-area-inset-bottom))] pt-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.10)] backdrop-blur-md lg:static lg:h-screen lg:w-60 lg:shrink-0 lg:flex-col lg:gap-1 lg:bg-base lg:p-3 lg:shadow-none">
