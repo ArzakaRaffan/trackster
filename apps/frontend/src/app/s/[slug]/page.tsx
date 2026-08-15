@@ -1,6 +1,7 @@
 'use client';
 
 import { useParams } from 'next/navigation';
+import { useState } from 'react';
 import useSWR from 'swr';
 import { useAutoAnimate } from '@formkit/auto-animate/react';
 import { motion, AnimatePresence } from 'motion/react';
@@ -10,7 +11,7 @@ import { AmountDisplay } from '@/components/ui/AmountDisplay';
 import { Button } from '@/components/ui/Button';
 import { TRANSITION_SLOW } from '@/lib/motion';
 import { PublicSplitBillSummary } from '@/lib/splitBillTypes';
-import { Check, PartyPopper, Receipt } from 'lucide-react';
+import { Check, PartyPopper, Receipt, Link as LinkIcon } from 'lucide-react';
 
 const fetcher = (path: string) => api.get<PublicSplitBillSummary>(path);
 

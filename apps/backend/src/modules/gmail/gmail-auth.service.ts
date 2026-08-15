@@ -1,6 +1,9 @@
 import { Injectable } from '@nestjs/common';
-import { google } from 'googleapis';
 import { PrismaService } from '../../prisma.service';
+
+// Import googleapis via require dan jadikan `any` supaya TypeScript tidak memuat seluruh
+// type definitions Google APIs client pada saat build (ini yang menyebabkan heap out of memory).
+const google = require('googleapis').google as any;
 
 const SCOPES = [
   'https://www.googleapis.com/auth/gmail.readonly',
