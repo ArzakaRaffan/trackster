@@ -8,7 +8,7 @@ import { formatRupiah } from '@/lib/format';
 import { Input } from '@/components/ui/Input';
 import { Button } from '@/components/ui/Button';
 import { Switch } from '@/components/ui/Switch';
-import { Camera, Check, ChevronLeft, Plus, Trash2, X } from 'lucide-react';
+import { AlertTriangle, Camera, Check, CheckCircle2, ChevronLeft, Plus, Trash2, X } from 'lucide-react';
 
 const todayISO = () => new Date().toISOString().slice(0, 10);
 const genId = () => (typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : `id-${Math.random().toString(36).slice(2)}`);
@@ -39,6 +39,9 @@ export default function NewSplitBillPage() {
   const [billDate, setBillDate] = useState(todayISO());
 
   const [items, setItems] = useState<ItemRow[]>([{ id: genId(), description: '', amount: '' }]);
+  // Bukan dikirim ke backend — cuma alat bantu cross-check manual di sisi client, supaya
+  // ketauan kalau ada item yang kelewat/salah ketik SEBELUM lanjut ke pajak/service fee.
+  const [subtotalCheck, setSubtotalCheck] = useState('');
   const [participants, setParticipants] = useState<ParticipantRow[]>([{ id: genId(), name: '' }]);
   // itemId -> participantId. Satu item cuma bisa punya satu pemilik (checklist toggle
   // otomatis mindahin kepemilikan, bukan nambah — sesuai model data participantId tunggal).
@@ -118,6 +121,12 @@ export default function NewSplitBillPage() {
 
   const validItems = items.filter((r) => r.description.trim() && parseFloat(r.amount) > 0);
   const validParticipants = participants.filter((p) => p.name.trim().length > 0);
+
+  const itemsSubtotal = validItems.reduce((sum, r) => sum + (parseFloat(r.amount) || 0), 0);
+  const subtotalCheckValue = parseFloat(subtotalCheck) || 0;
+  // Sengaja SEBELUM pajak/service fee (yang baru diisi di step selanjutnya) — struk biasanya
+  // nyantumin "Subtotal" sebagai baris terpisah persis buat ini, jadi tinggal dicontek.
+  const subtotalDiff = subtotalCheckValue > 0 ? itemsSubtotal - subtotalCheckValue : 0;
 
   const canGoStep = (target: number) => {
     if (target === 1) return restaurantName.trim().length > 0 && billDate.length > 0;
@@ -256,6 +265,42 @@ export default function NewSplitBillPage() {
                 <Button variant="ghost" size="sm" icon={<Plus size={14} />} onClick={addItem}>
                   Tambah item
                 </Button>
+
+                <div className="mt-1 flex flex-col gap-2 border-t border-line-subtle pt-3">
+                  <div className="flex items-center justify-between px-1">
+                    <span className="text-small text-ink-muted">Total menu</span>
+                    <span className="text-body font-bold tabular-nums text-ink">{formatRupiah(itemsSubtotal)}</span>
+                  </div>
+                  <Input
+                    label="Subtotal di Struk (opsional)"
+                    hint="Sebelum pajak/service fee — buat cross-check biar gak ada item yang kelewat/salah ketik."
+                    type="number"
+                    inputMode="numeric"
+                    prefix="Rp"
+                    value={subtotalCheck}
+                    onChange={(e) => setSubtotalCheck(e.target.value)}
+                  />
+                  {subtotalCheckValue > 0 && (
+                    <p
+                      className={`flex items-center gap-1.5 px-1 text-small ${
+                        subtotalDiff === 0 ? 'text-status-under' : 'text-status-over'
+                      }`}
+                    >
+                      {subtotalDiff === 0 ? (
+                        <>
+                          <CheckCircle2 size={14} /> Cocok sama struk
+                        </>
+                      ) : (
+                        <>
+                          <AlertTriangle size={14} />
+                          {subtotalDiff > 0
+                            ? `Total menu lebih Rp${subtotalDiff.toLocaleString('id-ID')} dari struk`
+                            : `Total menu kurang Rp${Math.abs(subtotalDiff).toLocaleString('id-ID')} dari struk`}
+                        </>
+                      )}
+                    </p>
+                  )}
+                </div>
               </div>
             </div>
 
