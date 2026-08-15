@@ -1,5 +1,5 @@
 import { Type } from 'class-transformer';
-import { ArrayMinSize, IsArray, IsISO8601, IsNumber, IsOptional, IsString, Min, MinLength, ValidateNested } from 'class-validator';
+import { ArrayMinSize, IsArray, IsInt, IsISO8601, IsNumber, IsOptional, IsString, Min, MinLength, ValidateNested } from 'class-validator';
 
 class ParticipantInputDto {
   @IsString()
@@ -15,6 +15,11 @@ class ItemInputDto {
   @IsNumber()
   @Min(0)
   amount: number;
+
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  quantity?: number;
 }
 
 export class CreateSplitBillDto {
@@ -34,6 +39,18 @@ export class CreateSplitBillDto {
   @IsNumber()
   @Min(0)
   serviceFeeAmount?: number;
+
+  @IsOptional()
+  @IsString()
+  payerBankName?: string;
+
+  @IsOptional()
+  @IsString()
+  payerAccountNumber?: string;
+
+  @IsOptional()
+  @IsString()
+  payerAccountName?: string;
 
   @IsArray()
   @ArrayMinSize(1)

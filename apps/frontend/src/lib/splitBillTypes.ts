@@ -11,6 +11,7 @@ export interface SplitBillItem {
   splitBillId: number;
   description: string;
   amount: number;
+  quantity: number;
   participantId: number | null;
 }
 
@@ -21,6 +22,9 @@ export interface SplitBillListItem {
   billDate: string;
   taxAmount: number;
   serviceFeeAmount: number;
+  payerBankName: string | null;
+  payerAccountNumber: string | null;
+  payerAccountName: string | null;
   createdAt: string;
   participants: SplitBillParticipant[];
   items: SplitBillItem[];
@@ -46,10 +50,14 @@ export interface PublicSplitBillSummary {
   billDate: string;
   taxAmount: number;
   serviceFeeAmount: number;
+  payerBankName: string | null;
+  payerAccountNumber: string | null;
+  payerAccountName: string | null;
   items: {
     id: number;
     description: string;
     amount: number;
+    quantity: number;
     participantId: number | null;
     participantName: string | null;
   }[];
