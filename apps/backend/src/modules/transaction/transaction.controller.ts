@@ -1,10 +1,11 @@
-import { Body, Controller, Delete, Get, Param, ParseIntPipe, Patch, Query, UseGuards } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, ParseIntPipe, Patch, Post, Query, UseGuards } from '@nestjs/common';
 import { TransactionService } from './transaction.service';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { Category, Source } from '@prisma/client';
 import { UpdateNoteDto } from './dto/update-note.dto';
 import { UpdateCategoryDto } from './dto/update-category.dto';
 import { SetAliasDto } from './dto/set-alias.dto';
+import { CreateTransactionDto } from './dto/create-transaction.dto';
 
 @UseGuards(JwtAuthGuard)
 @Controller('transactions')
@@ -58,6 +59,11 @@ export class TransactionController {
   @Get('insights')
   async getInsights(@Query('range') range?: string) {
     return this.transactionService.getInsights(range === 'all' ? 'all' : '30d');
+  }
+
+  @Post()
+  async create(@Body() dto: CreateTransactionDto) {
+    return this.transactionService.create(dto);
   }
 
   @Delete(':id')

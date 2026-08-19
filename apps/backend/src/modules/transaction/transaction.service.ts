@@ -1,8 +1,10 @@
+import { randomUUID } from 'crypto';
 import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../../prisma.service';
 import { Category, Source } from '@prisma/client';
 import { BalanceService } from '../balance/balance.service';
 import { MerchantAliasService } from '../merchant-alias/merchant-alias.service';
+import { CreateTransactionDto } from './dto/create-transaction.dto';
 
 export interface ParsedTransaction {
   amount: number;
@@ -356,6 +358,26 @@ export class TransactionService {
       cur.setDate(cur.getDate() + 1);
     }
     return counts;
+  }
+
+  /** Input manual dari user (bukan hasil parse email) — dipakai buat pengeluaran yang nggak
+   * kena notifikasi bank (tunai, dll). emailId disintesis karena kolomnya unique non-null. */
+  async create(dto: CreateTransactionDto) {
+    return this.prisma.$transaction(async (tx) => {
+      const created = await tx.transaction.create({
+        data: {
+          amount: dto.amount,
+          description: dto.description,
+          source: dto.source,
+          category: dto.category,
+          occurredAt: new Date(dto.occurredAt),
+          emailId: `manual:${randomUUID()}`,
+          isManual: true,
+        },
+      });
+      await this.balanceService.adjustBalance(tx, created.source, -Number(created.amount));
+      return created;
+    });
   }
 
   /** Dipanggil oleh Gmail sync service. Return null kalau sudah ada (deduplicated). Saldo bank

@@ -19,11 +19,14 @@ model Transaction {
   amount      Decimal  @db.Decimal(12, 2)
   description String
   source      Source
+  // Buat transaksi dari sync email, ini Gmail message ID (dedup key asli). Buat transaksi manual,
+  // di-generate sintetis ("manual:<uuid>") karena kolomnya unique non-null — tidak dipakai buat dedup.
   emailId     String   @unique
   occurredAt  DateTime
   createdAt   DateTime @default(now())
   note        String?
   category    Category @default(LAINNYA)
+  isManual    Boolean  @default(false)
 
   @@index([occurredAt])
 }

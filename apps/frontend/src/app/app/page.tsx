@@ -13,6 +13,9 @@ interface TodaySummary {
   totalSpent: number;
   remaining: number;
   isOverBudget: boolean;
+  totalIncome: number;
+  netAmount: number;
+  isNetPositive: boolean;
   transactions: unknown[];
 }
 
@@ -93,6 +96,33 @@ export default function DashboardPage() {
             Lihat detail transaksi <ArrowRight size={14} />
           </p>
         </Link>
+
+        {/* Net hari ini — pemasukan manual dikurangi pengeluaran, biar keliatan hari ini
+            sebenarnya + atau - meski sudah over budget belanja. */}
+        {data && (
+          <div className="rounded-medium bg-surface p-5">
+            <div className="flex items-start justify-between gap-3">
+              <AmountDisplay
+                label="Net hari ini"
+                value={data.netAmount}
+                size="title"
+                tone={data.isNetPositive ? 'under' : 'over'}
+                sign
+              />
+              <span
+                className={`shrink-0 rounded-full px-2 py-[3px] text-badge font-semibold ${
+                  data.isNetPositive ? 'bg-status-under-bg text-status-under' : 'bg-status-over-bg text-status-over'
+                }`}
+              >
+                {data.isNetPositive ? 'Surplus' : 'Defisit'}
+              </span>
+            </div>
+            <div className="mt-4 flex gap-5">
+              <AmountDisplay label="Pemasukan" value={data.totalIncome} size="body" tone="muted" />
+              <AmountDisplay label="Pengeluaran" value={data.totalSpent} size="body" tone="muted" />
+            </div>
+          </div>
+        )}
 
         <h2 className="mt-2 px-1 text-heading font-semibold text-ink">Menu</h2>
         <div className="grid grid-cols-2 gap-3">
