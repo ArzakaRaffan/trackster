@@ -97,7 +97,7 @@ export function SavingsCalculator() {
       <div className="mx-auto max-w-content px-4 pt-8">
         <header className="mb-6 text-center">
           <Link href="/" className="inline-block">
-            <Image src="/trackster-logo.png" alt="Trackster" width={513} height={206} className="h-8 w-auto" />
+            <Image src="/trackster-logo.png" alt="Trackster" width={509} height={198} className="h-10 w-auto" />
           </Link>
           <h1 className="mt-4 font-title text-title font-bold text-ink">Kalkulator Target Tabungan</h1>
           <p className="mt-1 text-body text-ink-muted">Pilih goal, isi target, langsung ketauan nabungnya berapa per bulan.</p>

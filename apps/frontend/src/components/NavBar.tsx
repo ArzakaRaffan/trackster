@@ -42,9 +42,9 @@ export default function NavBar() {
       <Image
         src="/trackster-logo.png"
         alt="Trackster"
-        width={513}
-        height={206}
-        className="hidden h-7 w-auto lg:mb-4 lg:block lg:px-3 lg:pt-2"
+        width={509}
+        height={198}
+        className="hidden h-9 w-auto lg:mb-5 lg:block lg:px-3 lg:pt-2"
       />
       {LINKS.map(({ href, label, Icon }) => {
         const active =
