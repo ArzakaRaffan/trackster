@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import Image from 'next/image';
 import { usePathname } from 'next/navigation';
 import { LayoutDashboard, LineChart, MoreHorizontal, Receipt } from 'lucide-react';
 
@@ -38,9 +39,13 @@ export default function NavBar() {
 
   return (
     <nav className="fixed inset-x-0 bottom-0 z-20 flex bg-base/[0.92] px-2 pb-[calc(8px+env(safe-area-inset-bottom))] pt-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.10)] backdrop-blur-md lg:static lg:h-screen lg:w-60 lg:shrink-0 lg:flex-col lg:gap-1 lg:bg-base lg:p-3 lg:shadow-none">
-      <span className="hidden font-title text-heading font-extrabold tracking-[-1px] text-ink lg:mb-4 lg:block lg:px-3 lg:pt-2">
-        Trackster
-      </span>
+      <Image
+        src="/trackster-logo.png"
+        alt="Trackster"
+        width={513}
+        height={206}
+        className="hidden h-7 w-auto lg:mb-4 lg:block lg:px-3 lg:pt-2"
+      />
       {LINKS.map(({ href, label, Icon }) => {
         const active =
           href === '/app/more'
