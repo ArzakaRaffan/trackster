@@ -1,12 +1,36 @@
 'use client';
 
+import { useState } from 'react';
 import Link from 'next/link';
 import useSWR from 'swr';
+import { AnimatePresence, motion } from 'motion/react';
 import { api } from '@/lib/api';
-import { AlertTriangle, Bell, ChevronLeft, Inbox, Mail, Plus, RefreshCw } from 'lucide-react';
+import { AlertTriangle, Bell, ChevronLeft, Inbox, Mail, Plus, RefreshCw, X } from 'lucide-react';
 import { TransactionNoteRow } from '@/components/ui/TransactionNoteRow';
 import { AmountDisplay } from '@/components/ui/AmountDisplay';
 import { BudgetProgress } from '@/components/ui/BudgetProgress';
+import { Input } from '@/components/ui/Input';
+import { Button } from '@/components/ui/Button';
+import { TRANSITION_BASE, TRANSITION_SLOW } from '@/lib/motion';
+
+const CATEGORIES = ['MAKANAN', 'TRANSPORT', 'BELANJA', 'TAGIHAN', 'HIBURAN', 'KESEHATAN', 'LAINNYA'] as const;
+
+interface ExpenseFormState {
+  amount: string;
+  description: string;
+  category: (typeof CATEGORIES)[number];
+  source: 'BCA' | 'JAGO';
+  occurredAt: string;
+}
+
+const todayISO = () => new Date().toISOString().slice(0, 10);
+const emptyExpenseForm: ExpenseFormState = {
+  amount: '',
+  description: '',
+  category: 'LAINNYA',
+  source: 'BCA',
+  occurredAt: todayISO(),
+};
 
 interface Transaction {
   id: number;
@@ -25,6 +49,9 @@ interface TodaySummary {
   totalSpent: number;
   remaining: number;
   isOverBudget: boolean;
+  totalIncome: number;
+  netAmount: number;
+  isNetPositive: boolean;
   transactions: Transaction[];
 }
 
@@ -38,6 +65,32 @@ export default function TodayPage() {
   const { data, error, isLoading, mutate } = useSWR('/budget/today', fetcher, {
     refreshInterval: 60_000, // auto-refresh tiap 1 menit
   });
+
+  const [formOpen, setFormOpen] = useState(false);
+  const [form, setForm] = useState<ExpenseFormState>(emptyExpenseForm);
+  const [saving, setSaving] = useState(false);
+
+  const openForm = () => {
+    setForm(emptyExpenseForm);
+    setFormOpen(true);
+  };
+
+  const handleSubmit = async () => {
+    setSaving(true);
+    try {
+      await api.post('/transactions', {
+        amount: parseFloat(form.amount) || 0,
+        description: form.description,
+        category: form.category,
+        source: form.source,
+        occurredAt: new Date(form.occurredAt).toISOString(),
+      });
+      await mutate();
+      setFormOpen(false);
+    } finally {
+      setSaving(false);
+    }
+  };
 
   if (isLoading) return <TodaySkeleton />;
   if (error)
@@ -194,11 +247,103 @@ export default function TodayPage() {
 
       {/* FAB */}
       <button
+        onClick={openForm}
         aria-label="Tambah transaksi manual"
         className="fixed bottom-[88px] right-4 flex h-14 w-14 items-center justify-center rounded-full bg-brand text-base transition-transform duration-fast ease-standard active:scale-95 lg:bottom-6"
       >
         <Plus size={26} />
       </button>
+
+      {/* Manual expense bottom sheet */}
+      <AnimatePresence>
+        {formOpen && (
+          <>
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={TRANSITION_BASE}
+              onClick={() => setFormOpen(false)}
+              className="fixed inset-0 z-20 bg-black/50"
+            />
+            <motion.section
+              initial={{ y: '100%' }}
+              animate={{ y: 0 }}
+              exit={{ y: '100%' }}
+              transition={TRANSITION_SLOW}
+              className="fixed inset-x-0 bottom-0 z-30 max-h-[85vh] overflow-y-auto rounded-t-medium bg-surface p-4 pb-8"
+            >
+              <div className="flex items-center justify-between">
+                <h2 className="text-label font-bold text-ink">Tambah pengeluaran manual</h2>
+                <button onClick={() => setFormOpen(false)} aria-label="Tutup" className="text-ink-muted hover:text-ink">
+                  <X size={18} />
+                </button>
+              </div>
+              <div className="mt-3 flex flex-col gap-3">
+                <Input
+                  label="Nominal"
+                  type="number"
+                  inputMode="numeric"
+                  prefix="Rp"
+                  value={form.amount}
+                  onChange={(e) => setForm((f) => ({ ...f, amount: e.target.value }))}
+                />
+                <Input
+                  label="Deskripsi"
+                  placeholder="Jajan, parkir, dll"
+                  value={form.description}
+                  onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))}
+                />
+                <label className="flex flex-col gap-2">
+                  <span className="text-small font-bold uppercase tracking-caps text-ink-muted">Kategori</span>
+                  <span className="relative flex items-center">
+                    <select
+                      value={form.category}
+                      onChange={(e) => setForm((f) => ({ ...f, category: e.target.value as ExpenseFormState['category'] }))}
+                      className="w-full appearance-none rounded-comfortable bg-surface-interactive px-3.5 py-3 pr-9 text-body text-ink shadow-field outline-none transition-shadow duration-base ease-standard focus:shadow-field-focus"
+                    >
+                      {CATEGORIES.map((c) => (
+                        <option key={c} value={c}>
+                          {c}
+                        </option>
+                      ))}
+                    </select>
+                    <span className="pointer-events-none absolute right-3.5 text-small text-ink-muted">▾</span>
+                  </span>
+                </label>
+                <label className="flex flex-col gap-2">
+                  <span className="text-small font-bold uppercase tracking-caps text-ink-muted">Sumber</span>
+                  <span className="relative flex items-center">
+                    <select
+                      value={form.source}
+                      onChange={(e) => setForm((f) => ({ ...f, source: e.target.value as 'BCA' | 'JAGO' }))}
+                      className="w-full appearance-none rounded-comfortable bg-surface-interactive px-3.5 py-3 pr-9 text-body text-ink shadow-field outline-none transition-shadow duration-base ease-standard focus:shadow-field-focus"
+                    >
+                      <option value="BCA">BCA</option>
+                      <option value="JAGO">Jago</option>
+                    </select>
+                    <span className="pointer-events-none absolute right-3.5 text-small text-ink-muted">▾</span>
+                  </span>
+                </label>
+                <Input
+                  label="Tanggal"
+                  type="date"
+                  value={form.occurredAt}
+                  onChange={(e) => setForm((f) => ({ ...f, occurredAt: e.target.value }))}
+                />
+                <Button
+                  variant="primary"
+                  fullWidth
+                  onClick={handleSubmit}
+                  disabled={saving || !form.amount || !form.description}
+                >
+                  {saving ? 'Menyimpan...' : 'Tambah pengeluaran'}
+                </Button>
+              </div>
+            </motion.section>
+          </>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

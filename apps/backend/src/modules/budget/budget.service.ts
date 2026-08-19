@@ -43,12 +43,19 @@ export class BudgetService {
     const endOfDay = new Date(now);
     endOfDay.setHours(23, 59, 59, 999);
 
-    const transactions = await this.prisma.transaction.findMany({
-      where: { occurredAt: { gte: startOfDay, lte: endOfDay } },
-      orderBy: { occurredAt: 'desc' },
-    });
+    const [transactions, incomes] = await Promise.all([
+      this.prisma.transaction.findMany({
+        where: { occurredAt: { gte: startOfDay, lte: endOfDay } },
+        orderBy: { occurredAt: 'desc' },
+      }),
+      this.prisma.income.findMany({
+        where: { receivedAt: { gte: startOfDay, lte: endOfDay } },
+        orderBy: { receivedAt: 'desc' },
+      }),
+    ]);
 
     const totalSpent = transactions.reduce((sum, t) => sum + Number(t.amount), 0);
+    const totalIncome = incomes.reduce((sum, i) => sum + Number(i.amount), 0);
     const transactionsWithDisplay = await this.merchantAliasService.attachDisplayNames(transactions);
 
     return {
@@ -57,7 +64,11 @@ export class BudgetService {
       totalSpent,
       remaining: budget - totalSpent,
       isOverBudget: totalSpent > budget,
+      totalIncome,
+      netAmount: totalIncome - totalSpent,
+      isNetPositive: totalIncome - totalSpent >= 0,
       transactions: transactionsWithDisplay,
+      incomes,
     };
   }
 }
