@@ -31,5 +31,8 @@ export function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ['/((?!_next/static|_next/image|favicon.ico).*)'],
+  // Exclude any path with a file extension (icon.png, apple-icon.png, trackster-logo.png,
+  // robots.txt, dll) selain _next/* — kalau nggak, request asset publik ikut ke-redirect ke
+  // /login buat visitor yang belum login, jadi logo/favicon rusak di landing & login page.
+  matcher: ['/((?!_next/static|_next/image|favicon.ico|.*\\..*).*)'],
 };

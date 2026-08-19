@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import Image from 'next/image';
 import { motion } from 'motion/react';
 import { Button } from '@/components/ui/Button';
 import { TRANSITION_SLOW } from '@/lib/motion';
@@ -88,9 +89,7 @@ export default function LandingPage() {
   return (
     <div className="min-h-screen bg-base text-ink">
       <header className="flex items-center justify-between px-4 py-6">
-        <span className="font-title text-heading font-extrabold tracking-[-1px] text-ink">
-          Trackster<span className="text-brand">.</span>
-        </span>
+        <Image src="/trackster-logo.png" alt="Trackster" width={513} height={206} className="h-8 w-auto" priority />
         <Link href="/app" className="text-small font-bold text-ink-muted transition-colors duration-base ease-standard hover:text-ink">
           Masuk
         </Link>

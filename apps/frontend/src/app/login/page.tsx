@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import Image from 'next/image';
 import { useRouter } from 'next/navigation';
 import { api } from '@/lib/api';
 import { Input } from '@/components/ui/Input';
@@ -33,9 +34,7 @@ export default function LoginPage() {
     <div className="flex min-h-screen items-center justify-center bg-base px-4">
       <div className="w-full max-w-sm animate-fade-in-up">
         <div className="mb-8 text-center">
-          <p className="font-title text-title font-black tracking-[-2px] text-ink">
-            Trackster<span className="text-brand">.</span>
-          </p>
+          <Image src="/trackster-logo.png" alt="Trackster" width={513} height={206} className="mx-auto h-12 w-auto" priority />
           <p className="mt-2 text-label text-ink-muted">
             Tau persis budget harian kamu abis di mana, otomatis dari email bank.
           </p>

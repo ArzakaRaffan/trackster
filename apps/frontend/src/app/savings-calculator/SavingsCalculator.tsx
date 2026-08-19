@@ -2,6 +2,7 @@
 
 import { useRef, useState } from 'react';
 import Link from 'next/link';
+import Image from 'next/image';
 import { toPng } from 'html-to-image';
 import { Input } from '@/components/ui/Input';
 import { AmountDisplay } from '@/components/ui/AmountDisplay';
@@ -95,8 +96,8 @@ export function SavingsCalculator() {
     <div className="min-h-screen bg-base pb-16 text-ink">
       <div className="mx-auto max-w-content px-4 pt-8">
         <header className="mb-6 text-center">
-          <Link href="/" className="font-title text-heading font-extrabold tracking-[-1px] text-ink">
-            Trackster<span className="text-brand">.</span>
+          <Link href="/" className="inline-block">
+            <Image src="/trackster-logo.png" alt="Trackster" width={513} height={206} className="h-8 w-auto" />
           </Link>
           <h1 className="mt-4 font-title text-title font-bold text-ink">Kalkulator Target Tabungan</h1>
           <p className="mt-1 text-body text-ink-muted">Pilih goal, isi target, langsung ketauan nabungnya berapa per bulan.</p>
