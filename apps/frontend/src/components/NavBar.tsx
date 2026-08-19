@@ -44,7 +44,7 @@ export default function NavBar() {
         alt="Trackster"
         width={509}
         height={198}
-        className="hidden h-9 w-auto lg:mb-5 lg:block lg:px-3 lg:pt-2"
+        className="hidden h-11 w-auto lg:mb-5 lg:block lg:px-3 lg:pt-2"
       />
       {LINKS.map(({ href, label, Icon }) => {
         const active =
