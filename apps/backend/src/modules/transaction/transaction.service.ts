@@ -402,4 +402,73 @@ export class TransactionService {
       return created;
     });
   }
+
+  /** Deteksi langganan berulang (Subscription Detector).
+   *  Heuristic: group transaksi 90 hari terakhir by description, variance amount <= 10%,
+   *  gap antar occurredAt berurutan 27-33 hari. */
+  async getSubscriptions() {
+    const now = new Date();
+    const ninetyDaysAgo = new Date(now.getTime() - 90 * 24 * 60 * 60 * 1000);
+
+    const transactions = await this.prisma.transaction.findMany({
+      where: { occurredAt: { gte: ninetyDaysAgo, lte: now } },
+      orderBy: { occurredAt: 'asc' },
+      select: { description: true, amount: true, occurredAt: true },
+    });
+
+    const groups = new Map<string, Array<{ amount: number; occurredAt: Date; rawDesc: string }>>();
+    for (const tx of transactions) {
+      const key = tx.description.trim().toLowerCase();
+      if (!groups.has(key)) {
+        groups.set(key, []);
+      }
+      groups.get(key)!.push({
+        amount: Number(tx.amount),
+        occurredAt: tx.occurredAt,
+        rawDesc: tx.description,
+      });
+    }
+
+    const subscriptions: Array<{
+      description: string;
+      averageAmount: number;
+      occurrenceCount: number;
+      estimatedMonthlyBurn: number;
+      lastSeenAt: string;
+    }> = [];
+
+    for (const [, items] of groups) {
+      if (items.length < 2) continue;
+
+      const totalAmount = items.reduce((sum, item) => sum + item.amount, 0);
+      const avgAmount = totalAmount / items.length;
+
+      const amountMatches = items.every((item) => Math.abs(item.amount - avgAmount) <= 0.1 * avgAmount);
+      if (!amountMatches) continue;
+
+      let intervalsMatch = true;
+      for (let i = 1; i < items.length; i++) {
+        const diffMs = items[i].occurredAt.getTime() - items[i - 1].occurredAt.getTime();
+        const diffDays = diffMs / (1000 * 60 * 60 * 24);
+        if (diffDays < 27 || diffDays > 34) {
+          intervalsMatch = false;
+          break;
+        }
+      }
+
+      if (intervalsMatch) {
+        const lastSeen = items[items.length - 1];
+        subscriptions.push({
+          description: lastSeen.rawDesc,
+          averageAmount: Math.round(avgAmount),
+          occurrenceCount: items.length,
+          estimatedMonthlyBurn: Math.round(avgAmount),
+          lastSeenAt: lastSeen.occurredAt.toISOString(),
+        });
+      }
+    }
+
+    return this.attachDisplayNames(subscriptions);
+  }
+
 }

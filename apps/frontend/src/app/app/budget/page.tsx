@@ -7,7 +7,17 @@ import { DAY_NAMES } from '@/lib/format';
 import { Input } from '@/components/ui/Input';
 import { Button } from '@/components/ui/Button';
 import { AnimatedAmount } from '@/components/ui/AnimatedAmount';
-import { Check } from 'lucide-react';
+import { Check, Sparkles } from 'lucide-react';
+import { formatRupiah } from '@/lib/format';
+
+
+interface AllowanceSuggestion {
+  windowDays: number;
+  totalIncome: number;
+  averageDailyIncome: number;
+  suggestedDailyAllowance: number;
+  savingsFactor: number;
+}
 
 interface DailyBudget {
   dayOfWeek: number;
@@ -18,6 +28,7 @@ const fetcher = (path: string) => api.get<DailyBudget[]>(path);
 
 export default function BudgetPage() {
   const { data, mutate } = useSWR('/budget', fetcher);
+  const { data: suggestion } = useSWR<AllowanceSuggestion>('/income/allowance-suggestion', (url: string) => api.get<AllowanceSuggestion>(url));
   const [values, setValues] = useState<Record<number, string>>({});
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
@@ -70,6 +81,20 @@ export default function BudgetPage() {
             className="font-title text-amount-hero font-black tracking-amount tabular-nums text-ink"
           />
         </section>
+
+        {suggestion && suggestion.suggestedDailyAllowance > 0 && (
+          <div className="flex items-start gap-3 rounded-comfortable bg-surface-interactive p-4 border border-white/[0.04]">
+            <Sparkles size={18} className="mt-0.5 shrink-0 text-brand" />
+            <div>
+              <p className="text-label font-bold text-ink">
+                Saran Budget Harian: {formatRupiah(suggestion.suggestedDailyAllowance)}
+              </p>
+              <p className="text-small text-ink-muted leading-relaxed mt-0.5">
+                Berdasarkan rata-rata pemasukan Rp {Math.round(suggestion.averageDailyIncome).toLocaleString('id-ID')}/hari dalam {suggestion.windowDays} hari terakhir (disisihkan 30% untuk tabungan).
+              </p>
+            </div>
+          </div>
+        )}
 
         <div className="flex flex-col gap-3 rounded-comfortable bg-surface p-4">
           {[0, 1, 2, 3, 4, 5, 6].map((day) => (

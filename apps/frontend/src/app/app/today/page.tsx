@@ -12,6 +12,7 @@ import { BudgetProgress } from '@/components/ui/BudgetProgress';
 import { Input } from '@/components/ui/Input';
 import { Button } from '@/components/ui/Button';
 import { TRANSITION_BASE, TRANSITION_SLOW } from '@/lib/motion';
+import { formatRupiah } from '@/lib/format';
 
 const CATEGORIES = ['MAKANAN', 'TRANSPORT', 'BELANJA', 'TAGIHAN', 'HIBURAN', 'KESEHATAN', 'LAINNYA'] as const;
 
@@ -43,6 +44,15 @@ interface Transaction {
   displayDescription?: string;
 }
 
+
+interface RunwayForecast {
+  burnRatePerDay: number;
+  currentBalance: number;
+  remainingDays: number;
+  projectedEndOfMonthBalance: number;
+  isProjectedShortfall: boolean;
+}
+
 interface TodaySummary {
   date: string;
   budget: number;
@@ -64,6 +74,9 @@ const dateLabel = (iso: string) =>
 export default function TodayPage() {
   const { data, error, isLoading, mutate } = useSWR('/budget/today', fetcher, {
     refreshInterval: 60_000, // auto-refresh tiap 1 menit
+  });
+  const { data: runway } = useSWR<RunwayForecast>('/budget/runway', (url: string) => api.get<RunwayForecast>(url), {
+    refreshInterval: 60_000,
   });
 
   const [formOpen, setFormOpen] = useState(false);
@@ -167,6 +180,39 @@ export default function TodayPage() {
             />
           </div>
         </section>
+
+        {/* Runway Forecast Card */}
+        {runway && (
+          <section className="rounded-medium bg-surface p-5 border border-white/[0.06]">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-small font-bold uppercase tracking-caps text-ink-muted">Runway Akhir Bulan</p>
+                <p className={`font-title text-amount font-extrabold tabular-nums ${runway.isProjectedShortfall ? 'text-status-over' : 'text-ink'}`}>
+                  {formatRupiah(runway.projectedEndOfMonthBalance)}
+                </p>
+              </div>
+              <span
+                className={`rounded-full px-2.5 py-1 text-micro font-bold ${
+                  runway.isProjectedShortfall
+                    ? 'bg-status-over-bg text-status-over'
+                    : 'bg-status-under-bg text-status-under'
+                }`}
+              >
+                {runway.isProjectedShortfall ? 'Defisit Terproyeksi' : 'Aman'}
+              </span>
+            </div>
+            <div className="mt-4 grid grid-cols-2 gap-3 pt-3 border-t border-white/[0.06] text-small">
+              <div>
+                <p className="text-micro text-ink-muted">Burn Rate (7 Hari)</p>
+                <p className="font-bold text-ink">{formatRupiah(runway.burnRatePerDay)}/hari</p>
+              </div>
+              <div>
+                <p className="text-micro text-ink-muted">Sisa Hari Bulan Ini</p>
+                <p className="font-bold text-ink">{runway.remainingDays} hari</p>
+              </div>
+            </div>
+          </section>
+        )}
 
         {/* Over-budget alert */}
         {data.isOverBudget && (

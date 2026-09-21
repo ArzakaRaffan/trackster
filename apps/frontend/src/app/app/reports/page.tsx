@@ -219,6 +219,8 @@ function MonthlyTab({
         </ResponsiveContainer>
       </section>
 
+      <SubscriptionsSection />
+
       {categoryData.length > 0 && (
         <section className="rounded-medium bg-surface p-5">
           <p className="text-small font-bold uppercase tracking-caps text-ink-muted">Per kategori</p>
@@ -373,6 +375,8 @@ function AllTimeTab() {
         </p>
       </div>
 
+      <SubscriptionsSection />
+
       {categoryData.length > 0 && (
         <section className="rounded-medium bg-surface p-5">
           <p className="text-small font-bold uppercase tracking-caps text-ink-muted">Per kategori</p>
@@ -502,5 +506,55 @@ function ReportSkeleton() {
       <div className="h-40 animate-pulse rounded-medium bg-track" />
       <div className="h-32 animate-pulse rounded-medium bg-track" />
     </div>
+  );
+}
+
+
+interface SubscriptionItem {
+  description: string;
+  averageAmount: number;
+  occurrenceCount: number;
+  estimatedMonthlyBurn: number;
+  lastSeenAt: string;
+  displayDescription?: string;
+}
+
+function SubscriptionsSection() {
+  const { data: subs, isLoading } = useSWR<SubscriptionItem[]>('/transactions/subscriptions', (url: string) => api.get<SubscriptionItem[]>(url));
+
+  if (isLoading || !subs || subs.length === 0) return null;
+
+  const totalMonthlyBurn = subs.reduce((sum, s) => sum + s.estimatedMonthlyBurn, 0);
+
+  return (
+    <section className="rounded-medium bg-surface p-5 border border-white/[0.06]">
+      <div className="flex items-center justify-between">
+        <div>
+          <p className="text-small font-bold uppercase tracking-caps text-ink-muted">Langganan Terdeteksi</p>
+          <p className="font-title text-amount font-extrabold tabular-nums text-ink">
+            {formatRupiah(totalMonthlyBurn)}
+            <span className="text-small font-normal text-ink-muted">/bln</span>
+          </p>
+        </div>
+        <span className="rounded-full bg-surface-interactive px-2.5 py-1 text-micro font-bold text-ink-muted">
+          {subs.length} Layanan
+        </span>
+      </div>
+
+      <ul className="mt-4 divide-y divide-white/[0.06] border-t border-white/[0.06]">
+        {subs.map((s, idx) => (
+          <li key={idx} className="flex items-center justify-between py-3">
+            <div className="min-w-0 flex-1 pr-3">
+              <p className="font-bold text-ink truncate">{s.displayDescription || s.description}</p>
+              <p className="text-micro text-ink-muted">
+                {s.occurrenceCount}x transaksi (~30 hari) · Terakhir:{' '}
+                {new Date(s.lastSeenAt).toLocaleDateString('id-ID', { day: 'numeric', month: 'short' })}
+              </p>
+            </div>
+            <p className="font-bold text-ink tabular-nums shrink-0">{formatRupiah(s.averageAmount)}</p>
+          </li>
+        ))}
+      </ul>
+    </section>
   );
 }

@@ -33,6 +33,11 @@ export class TransactionController {
     });
   }
 
+  @Get('subscriptions')
+  async getSubscriptions() {
+    return this.transactionService.getSubscriptions();
+  }
+
   @Get('weekly')
   async getWeekly() {
     return this.transactionService.getWeekly();

@@ -22,4 +22,9 @@ export class BudgetController {
   async getToday() {
     return this.budgetService.getTodaySummary();
   }
+
+  @Get('runway')
+  async getRunway() {
+    return this.budgetService.getRunwayForecast();
+  }
 }

@@ -12,6 +12,7 @@ import { IncomeModule } from './modules/income/income.module';
 import { MerchantAliasModule } from './modules/merchant-alias/merchant-alias.module';
 import { SplitBillModule } from './modules/split-bill/split-bill.module';
 import { AiModule } from './modules/ai/ai.module';
+import { GoalModule } from './modules/goal/goal.module';
 
 @Module({
   imports: [
@@ -28,6 +29,7 @@ import { AiModule } from './modules/ai/ai.module';
     MerchantAliasModule,
     SplitBillModule,
     AiModule,
+    GoalModule,
   ],
 })
 export class AppModule {}

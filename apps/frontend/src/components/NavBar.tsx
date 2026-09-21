@@ -5,7 +5,7 @@ import Image from 'next/image';
 import { usePathname } from 'next/navigation';
 import { LayoutDashboard, LineChart, MoreHorizontal, Receipt } from 'lucide-react';
 
-// Nav disederhanakan jadi 4 item utama — sisanya (Mingguan/Budget/Pemasukan/Analisis/Setting)
+// Nav disederhanakan jadi 4 item utama — sisanya (Mingguan/Budget/Pemasukan/Analisis/Setting/Chat/Goals)
 // dipindah ke /app/more biar sidebar/bottom-bar nggak penuh. '/app' sekarang dashboard
 // ringkas (bukan detail "Hari Ini" langsung) — itu yang jadi landing pertama begitu login.
 const LINKS = [
@@ -18,7 +18,15 @@ const LINKS = [
 // Sub-halaman yang keliatan aktif di tab "Dashboard"/"Lainnya" walau URL persisnya beda
 // dari href tab itu sendiri (drill-down dari dashboard, atau isi menu Lainnya).
 const DASHBOARD_SUBPATHS = ['/app/today'];
-const MORE_SUBPATHS = ['/app/weekly', '/app/budget', '/app/income', '/app/insights', '/app/settings'];
+const MORE_SUBPATHS = [
+  '/app/weekly',
+  '/app/budget',
+  '/app/income',
+  '/app/insights',
+  '/app/settings',
+  '/app/chat',
+  '/app/goals',
+];
 
 export default function NavBar() {
   const pathname = usePathname();
