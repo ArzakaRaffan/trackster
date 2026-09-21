@@ -1,10 +1,13 @@
 import { Controller, Post, Body, Get, UseGuards } from '@nestjs/common';
+import { IsString, MinLength } from 'class-validator';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { AiChatService } from './ai-chat.service';
 import { AiReportsService } from './ai-reports.service';
 import { PrismaService } from '../../prisma.service';
 
 class ChatDto {
+  @IsString()
+  @MinLength(1)
   message: string;
 }
 
