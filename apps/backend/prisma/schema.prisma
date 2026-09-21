@@ -182,3 +182,34 @@ model SplitBillItem {
   @@index([splitBillId])
   @@index([participantId])
 }
+
+model HealthScoreLog {
+  id                 Int      @id @default(autoincrement())
+  weekStart          DateTime @db.Date @unique
+  score              Int      // 0-100, dihitung algoritmik (bukan dari LLM)
+  budgetAdherencePct Decimal  @db.Decimal(5, 2)
+  savingsRatePct     Decimal  @db.Decimal(5, 2)
+  aiCommentary       String?  // 1 kalimat dari LLM, opsional — kalau call gagal skor tetap tersimpan
+  createdAt          DateTime @default(now())
+}
+
+model Goal {
+  id            Int               @id @default(autoincrement())
+  name          String
+  targetAmount  Decimal           @db.Decimal(12, 2)
+  targetDate    DateTime?         @db.Date
+  archivedAt    DateTime?
+  createdAt     DateTime          @default(now())
+  contributions GoalContribution[]
+}
+
+model GoalContribution {
+  id        Int      @id @default(autoincrement())
+  goalId    Int
+  goal      Goal     @relation(fields: [goalId], references: [id], onDelete: Cascade)
+  amount    Decimal  @db.Decimal(12, 2) // positif = nambah, negatif = tarik (koreksi)
+  note      String?
+  createdAt DateTime @default(now())
+
+  @@index([goalId])
+}
