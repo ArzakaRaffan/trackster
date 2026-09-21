@@ -20,6 +20,11 @@ export class IncomeController {
     return this.incomeService.getSmoothedDailyAllowance(days);
   }
 
+  @Get('allocation')
+  async getAllocation() {
+    return this.incomeService.getAllocationRecommendation();
+  }
+
   @Post()
   async create(@Body() dto: CreateIncomeDto) {
     return this.incomeService.create(dto);

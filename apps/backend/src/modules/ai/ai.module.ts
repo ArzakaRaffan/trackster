@@ -3,6 +3,7 @@ import { AiService } from './ai.service';
 import { AiFinanceToolsService } from './ai-finance-tools.service';
 import { AiChatService } from './ai-chat.service';
 import { AiReportsService } from './ai-reports.service';
+import { AiMascotService } from './ai-mascot.service';
 import { AiController } from './ai.controller';
 import { BudgetModule } from '../budget/budget.module';
 import { TransactionModule } from '../transaction/transaction.module';
@@ -19,8 +20,8 @@ import { PrismaService } from '../../prisma.service';
     AuthModule,
     forwardRef(() => TelegramModule),
   ],
-  providers: [AiService, AiFinanceToolsService, AiChatService, AiReportsService, PrismaService],
+  providers: [AiService, AiFinanceToolsService, AiChatService, AiReportsService, AiMascotService, PrismaService],
   controllers: [AiController],
-  exports: [AiService, AiFinanceToolsService, AiChatService, AiReportsService],
+  exports: [AiService, AiFinanceToolsService, AiChatService, AiReportsService, AiMascotService],
 })
 export class AiModule {}
