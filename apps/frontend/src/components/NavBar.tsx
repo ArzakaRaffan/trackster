@@ -50,8 +50,8 @@ export default function NavBar() {
       <Image
         src="/trackster-logo.png"
         alt="Trackster"
-        width={509}
-        height={198}
+        width={560}
+        height={260}
         className="hidden h-14 w-auto lg:mb-5 lg:block lg:px-3 lg:pt-2"
       />
       {LINKS.map(({ href, label, Icon }) => {
