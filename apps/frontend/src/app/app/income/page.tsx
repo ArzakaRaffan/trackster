@@ -26,6 +26,7 @@ interface AllocationRecommendation {
   weeklyIncome: number;
   weeklyBudgetTarget: number;
   leftover: number;
+  isFallback: boolean;
   allocation: { save: number; invest: number; spend: number };
 }
 
@@ -123,20 +124,30 @@ export default function IncomePage() {
         </section>
 
         {allocation && (
-          <section className="flex flex-col gap-3 rounded-medium bg-surface p-5">
+          <section className="flex flex-col gap-3 rounded-medium bg-surface p-5 border border-white/[0.06]">
             <div>
               <p className="text-small font-bold uppercase tracking-caps text-ink-muted">Rekomendasi alokasi mingguan</p>
-              <p className="mt-1 text-small leading-relaxed text-ink-muted">
-                Rata-rata pemasukan {formatRupiah(allocation.weeklyIncome)}/minggu dikurangi target budget{' '}
-                {formatRupiah(allocation.weeklyBudgetTarget)}/minggu, sisa {formatRupiah(allocation.leftover)} bisa
-                dialokasikan begini:
-              </p>
+              {allocation.weeklyIncome === 0 ? (
+                <p className="mt-1 text-small leading-relaxed text-ink-muted">
+                  Belum ada pemasukan tercatat buat dihitung. Tambah pemasukan mingguan kamu di bawah biar muncul
+                  rekomendasinya.
+                </p>
+              ) : (
+                <p className="mt-1 text-small leading-relaxed text-ink-muted">
+                  Rata-rata pemasukan {formatRupiah(allocation.weeklyIncome)}/minggu
+                  {allocation.isFallback ? ' (dihitung dari semua riwayat, belum ada entry baru dalam 4 minggu terakhir)' : ''}{' '}
+                  dikurangi target budget {formatRupiah(allocation.weeklyBudgetTarget)}/minggu, sisa{' '}
+                  {formatRupiah(allocation.leftover)} bisa dialokasikan begini:
+                </p>
+              )}
             </div>
-            <div className="grid grid-cols-3 gap-2">
-              <StatTile label="Tabung" value={formatRupiah(allocation.allocation.save)} tone="under" size="body" />
-              <StatTile label="Invest" value={formatRupiah(allocation.allocation.invest)} tone="near" size="body" />
-              <StatTile label="Bebas" value={formatRupiah(allocation.allocation.spend)} tone="base" size="body" />
-            </div>
+            {allocation.weeklyIncome > 0 && (
+              <div className="grid grid-cols-3 gap-2">
+                <StatTile label="Tabung" value={formatRupiah(allocation.allocation.save)} tone="under" size="body" />
+                <StatTile label="Invest" value={formatRupiah(allocation.allocation.invest)} tone="near" size="body" />
+                <StatTile label="Bebas" value={formatRupiah(allocation.allocation.spend)} tone="base" size="body" />
+              </div>
+            )}
           </section>
         )}
 

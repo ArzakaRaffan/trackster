@@ -522,7 +522,24 @@ interface SubscriptionItem {
 function SubscriptionsSection() {
   const { data: subs, isLoading } = useSWR<SubscriptionItem[]>('/transactions/subscriptions', (url: string) => api.get<SubscriptionItem[]>(url));
 
-  if (isLoading || !subs || subs.length === 0) return null;
+  if (isLoading) {
+    return <div className="h-24 animate-pulse rounded-medium bg-track" />;
+  }
+
+  if (!subs || subs.length === 0) {
+    return (
+      <section className="flex flex-col items-center gap-2 rounded-medium bg-surface p-5 text-center border border-white/[0.06]">
+        <span className="flex h-10 w-10 items-center justify-center rounded-full bg-surface-interactive text-ink-muted">
+          <Inbox size={18} />
+        </span>
+        <p className="text-small font-bold text-ink">Langganan Terdeteksi</p>
+        <p className="max-w-[280px] text-micro leading-relaxed text-ink-muted">
+          Belum ada pola transaksi berulang bulanan yang terdeteksi. Butuh minimal 2x transaksi dengan nominal &amp;
+          jarak waktu mirip (~30 hari) buat dikenali otomatis.
+        </p>
+      </section>
+    );
+  }
 
   const totalMonthlyBurn = subs.reduce((sum, s) => sum + s.estimatedMonthlyBurn, 0);
 
