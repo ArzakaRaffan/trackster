@@ -11,6 +11,7 @@ import { BalanceModule } from './modules/balance/balance.module';
 import { IncomeModule } from './modules/income/income.module';
 import { MerchantAliasModule } from './modules/merchant-alias/merchant-alias.module';
 import { SplitBillModule } from './modules/split-bill/split-bill.module';
+import { AiModule } from './modules/ai/ai.module';
 
 @Module({
   imports: [
@@ -26,6 +27,7 @@ import { SplitBillModule } from './modules/split-bill/split-bill.module';
     IncomeModule,
     MerchantAliasModule,
     SplitBillModule,
+    AiModule,
   ],
 })
 export class AppModule {}
