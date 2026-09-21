@@ -8,10 +8,7 @@ import {
   ForbiddenException,
 } from '@nestjs/common';
 import { TelegramService } from './telegram.service';
-
-// AiChatService di-inject lazy lewat forwardRef nanti di Phase 1.
-// Untuk Phase 0, controller ini sudah berdiri dan siap menerima webhook —
-// handleMessage akan di-wire setelah AiChatService ada.
+import { AiChatService } from '../ai/ai-chat.service';
 
 @Controller('telegram')
 export class TelegramWebhookController {
@@ -19,6 +16,7 @@ export class TelegramWebhookController {
 
   constructor(
     private telegramService: TelegramService,
+    private aiChatService: AiChatService,
   ) {}
 
   /** Public endpoint — TANPA JWT guard.
@@ -49,14 +47,27 @@ export class TelegramWebhookController {
 
     if (!config || incomingChatId !== config.chatId) {
       this.logger.warn(
-        Webhook dari chat ID tidak dikenal:  — diabaikan.,
+        `Webhook dari chat ID tidak dikenal: ${incomingChatId} — diabaikan.`,
       );
-      // Return 200 tanpa info apapun — jangan beri clue ke caller
+      // Return 200 tanpa info — jangan beri clue ke caller
       return { ok: true };
     }
 
-    // 4. Log untuk verifikasi Phase 0 (Phase 1 akan replace ini dengan AiChatService.handleMessage)
-    this.logger.log(Pesan masuk dari Telegram (chatId ): );
+    // 4. Dispatch ke AI chat dan kirim balasan ke Telegram
+    const text: string = message.text;
+    this.logger.log(`Pesan masuk dari Telegram (chatId ${incomingChatId}): ${text.slice(0, 100)}`);
+
+    // Proses async — langsung return 200 ke Telegram, jawaban dikirim terpisah
+    // (Telegram timeout 5 detik kalau webhook tidak segera respond)
+    setImmediate(async () => {
+      try {
+        const reply = await this.aiChatService.handleMessage(text, { channel: 'telegram' });
+        await this.telegramService.sendMessage(reply);
+      } catch (err: any) {
+        this.logger.error(`Error handle telegram message: ${err?.message}`);
+        await this.telegramService.sendMessage('Maaf, ada gangguan teknis. Coba lagi ya!');
+      }
+    });
 
     return { ok: true };
   }

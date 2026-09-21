@@ -12,6 +12,7 @@ export interface ParsedTransaction {
   source: Source;
   emailId: string;
   occurredAt: Date;
+  category?: Category;
 }
 
 @Injectable()
@@ -394,6 +395,7 @@ export class TransactionService {
           source: parsed.source,
           emailId: parsed.emailId,
           occurredAt: parsed.occurredAt,
+          ...(parsed.category ? { category: parsed.category } : {}),
         },
       });
       await this.balanceService.adjustBalance(tx, created.source, -Number(created.amount));

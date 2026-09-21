@@ -7,6 +7,8 @@ import { TransactionService } from '../transaction/transaction.service';
 import { BudgetService } from '../budget/budget.service';
 import { TelegramService } from '../telegram/telegram.service';
 import { PrismaService } from '../../prisma.service';
+import { AiChatService } from '../ai/ai-chat.service';
+import { Category } from '@prisma/client';
 
 // TODO: konfirmasi & lengkapi query sender begitu domain email asli BCA/Jago diketahui dari header.
 // Sementara pakai keyword umum yang sudah terbukti match nama tampilan sender.
@@ -27,6 +29,7 @@ export class GmailSyncService {
     private telegramService: TelegramService,
     private prisma: PrismaService,
     private schedulerRegistry: SchedulerRegistry,
+    private aiChatService: AiChatService,
   ) {}
 
   @Cron(CronExpression.EVERY_5_MINUTES, { name: SYNC_CRON_JOB_NAME })
@@ -75,12 +78,17 @@ export class GmailSyncService {
           continue;
         }
 
+        // Auto-kategorisasi via AI — TIDAK throw, fallback ke LAINNYA kalau gagal
+        const categoryStr = await this.aiChatService.categorize(parsed.description, parsed.amount);
+        const category = categoryStr as Category;
+
         const created = await this.transactionService.createFromParsed({
           amount: parsed.amount,
           description: parsed.description,
           source: parsed.source,
           emailId: rawEmail.id,
           occurredAt: parsed.occurredAt,
+          category,
         });
 
         if (created) {
