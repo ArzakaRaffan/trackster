@@ -64,6 +64,11 @@ export class TelegramService {
     }
   }
 
+  /** Return config row mentah — hanya untuk keperluan internal (validasi webhook), JANGAN expose ke endpoint publik). */
+  async getConfigRaw() {
+    return this.prisma.telegramConfig.findFirst({ where: { isActive: true } });
+  }
+
   async sendTest() {
     const success = await this.sendMessage('✅ Test notifikasi dari Trackster berhasil!');
     return { success };
