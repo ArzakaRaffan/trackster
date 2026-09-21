@@ -65,4 +65,32 @@ export class IncomeService {
       return deleted;
     });
   }
+
+  /** Smoothed daily allowance: rata-rata pemasukan harian dalam windowDays terakhir * faktor tabungan.
+   *  Faktor 0.7 = asumsi 30% income disisihkan untuk tabungan/darurat — bisa di-tuning. */
+  async getSmoothedDailyAllowance(windowDays = 30) {
+    const since = new Date(Date.now() - windowDays * 24 * 60 * 60 * 1000);
+
+    const agg = await this.prisma.income.aggregate({
+      _sum: { amount: true },
+      where: { receivedAt: { gte: since } },
+    });
+
+    const totalIncome = Number(agg._sum.amount ?? 0);
+    const averageDailyIncome = totalIncome / windowDays;
+
+    // 0.7 = faktor tabungan. Asumsi: 30% income disisihkan untuk tabungan/darurat.
+    // Angka ini keputusan produk sederhana — dokumentasikan di sini biar tidak jadi magic number.
+    const SAVINGS_FACTOR = 0.7;
+    const suggestedDailyAllowance = averageDailyIncome * SAVINGS_FACTOR;
+
+    return {
+      windowDays,
+      totalIncome: Math.round(totalIncome),
+      averageDailyIncome: Math.round(averageDailyIncome),
+      suggestedDailyAllowance: Math.round(suggestedDailyAllowance),
+      savingsFactor: SAVINGS_FACTOR,
+    };
+  }
+
 }

@@ -94,6 +94,7 @@ export default function InsightsPage() {
           <p className="text-label text-status-over">Gagal memuat analisis.</p>
         ) : (
           <AnimatedTabContent tabKey={range}>
+            <HealthScoreCard />
             <TrendCard trend={data.trend} />
             <BudgetAdherenceCard adherence={data.budgetAdherence} />
             <CategoryCard categories={data.categoryBreakdown} />
@@ -272,5 +273,62 @@ function InsightsSkeleton() {
         <div key={i} className="h-32 animate-pulse rounded-comfortable bg-track" />
       ))}
     </div>
+  );
+}
+
+
+interface HealthScoreItem {
+  id: number;
+  weekStart: string;
+  score: number;
+  budgetAdherencePct: number;
+  savingsRatePct: number;
+  aiCommentary: string | null;
+  createdAt: string;
+}
+
+function HealthScoreCard() {
+  const { data: history, isLoading } = useSWR<HealthScoreItem[]>('/ai/health-score/history', api.get);
+
+  if (isLoading || !history || history.length === 0) return null;
+
+  const latest = history[0];
+  const score = latest.score;
+  const tone = score >= 80 ? 'text-status-under' : score >= 60 ? 'text-status-near' : 'text-status-over';
+  const badgeBg =
+    score >= 80 ? 'bg-status-under-bg text-status-under' : score >= 60 ? 'bg-status-near-bg text-status-near' : 'bg-status-over-bg text-status-over';
+
+  return (
+    <section className="rounded-medium bg-surface p-5 border border-white/[0.06]">
+      <div className="flex items-start justify-between">
+        <div>
+          <p className="text-small font-bold uppercase tracking-caps text-ink-muted">Financial Health Score</p>
+          <div className="mt-1 flex items-baseline gap-2">
+            <span className={`font-title text-amount-hero font-black tabular-nums ${tone}`}>{score}</span>
+            <span className="text-small text-ink-muted">/ 100</span>
+          </div>
+        </div>
+        <span className={`rounded-full px-2.5 py-1 text-micro font-bold ${badgeBg}`}>
+          {score >= 80 ? 'Sangat Sehat' : score >= 60 ? 'Cukup Baik' : 'Perlu Perhatian'}
+        </span>
+      </div>
+
+      {latest.aiCommentary && (
+        <p className="mt-3 text-small text-ink italic leading-relaxed bg-surface-interactive p-3 rounded-standard border border-white/[0.04]">
+          &ldquo;{latest.aiCommentary}&rdquo;
+        </p>
+      )}
+
+      <div className="mt-4 grid grid-cols-2 gap-3 pt-3 border-t border-white/[0.06] text-small">
+        <div>
+          <p className="text-micro text-ink-muted">Disiplin Budget</p>
+          <p className="font-bold text-ink">{Number(latest.budgetAdherencePct).toFixed(0)}%</p>
+        </div>
+        <div>
+          <p className="text-micro text-ink-muted">Tingkat Tabungan</p>
+          <p className="font-bold text-ink">{Number(latest.savingsRatePct).toFixed(0)}%</p>
+        </div>
+      </div>
+    </section>
   );
 }

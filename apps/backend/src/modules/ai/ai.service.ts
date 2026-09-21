@@ -80,7 +80,7 @@ export class AiService {
       body.tool_choice = 'auto';
     }
 
-    const res = await fetch(${this.baseUrl}/v1/chat/completions, {
+    const res = await fetch(`${this.baseUrl}/v1/chat/completions`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -91,8 +91,8 @@ export class AiService {
 
     if (!res.ok) {
       const errText = await res.text().catch(() => '');
-      this.logger.error(AI API error : );
-      throw new InternalServerErrorException(AI API gagal (HTTP ));
+      this.logger.error(`AI API error ${res.status}: ${errText}`);
+      throw new InternalServerErrorException(`AI API gagal (HTTP ${res.status})`);
     }
 
     const data = await res.json();
@@ -133,8 +133,8 @@ export class AiService {
         let toolContent: string;
 
         if (!tool) {
-          this.logger.warn(Tool tidak ditemukan: );
-          toolContent = JSON.stringify({ error: Tool  tidak tersedia });
+          this.logger.warn(`Tool tidak ditemukan: ${toolCall.function.name}`);
+          toolContent = JSON.stringify({ error: `Tool ${toolCall.function.name} tidak tersedia` });
         } else {
           try {
             let input: any;
@@ -146,7 +146,7 @@ export class AiService {
             const result = await tool.handler(input);
             toolContent = JSON.stringify(result);
           } catch (err: any) {
-            this.logger.error(Tool  error: );
+            this.logger.error(`Tool ${toolCall.function.name} error: ${err?.message}`);
             toolContent = JSON.stringify({ error: err?.message ?? 'Tool error' });
           }
         }
@@ -160,7 +160,7 @@ export class AiService {
       }
     }
 
-    this.logger.warn(unToolLoop mencapai maxIterations ());
+    this.logger.warn(`runToolLoop mencapai maxIterations (${maxIterations})`);
     // Return teks dari assistant message terakhir
     for (let i = messages.length - 1; i >= 0; i--) {
       const msg = messages[i];

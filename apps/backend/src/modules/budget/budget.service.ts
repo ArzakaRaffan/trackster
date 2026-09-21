@@ -71,4 +71,39 @@ export class BudgetService {
       incomes,
     };
   }
+
+  /** Runway forecast: estimasi kondisi keuangan akhir bulan berdasarkan burn rate 7 hari terakhir.
+   *  Tidak butuh LLM — murni kalkulasi deterministik. */
+  async getRunwayForecast() {
+    const now = new Date();
+    const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+
+    // Burn rate: rata-rata pengeluaran per hari dalam 7 hari terakhir
+    const spentAgg = await this.prisma.transaction.aggregate({
+      _sum: { amount: true },
+      where: { occurredAt: { gte: sevenDaysAgo, lte: now } },
+    });
+    const totalSpent7d = Number(spentAgg._sum.amount ?? 0);
+    const burnRatePerDay = totalSpent7d / 7;
+
+    // Sisa hari di bulan ini
+    const daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
+    const remainingDays = daysInMonth - now.getDate();
+
+    // Saldo BCA + Jago saat ini
+    const balances = await this.prisma.bankBalance.findMany();
+    const currentBalance = balances.reduce((sum, b) => sum + Number(b.balance), 0);
+
+    const projectedEndOfMonthBalance = currentBalance - burnRatePerDay * remainingDays;
+    const isProjectedShortfall = projectedEndOfMonthBalance < 0;
+
+    return {
+      burnRatePerDay: Math.round(burnRatePerDay),
+      currentBalance: Math.round(currentBalance),
+      remainingDays,
+      projectedEndOfMonthBalance: Math.round(projectedEndOfMonthBalance),
+      isProjectedShortfall,
+    };
+  }
+
 }

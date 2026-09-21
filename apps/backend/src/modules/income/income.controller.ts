@@ -14,6 +14,12 @@ export class IncomeController {
     return this.incomeService.findAll({ startDate, endDate });
   }
 
+  @Get('allowance-suggestion')
+  async getAllowanceSuggestion(@Query('windowDays') windowDays?: string) {
+    const days = windowDays ? parseInt(windowDays, 10) : 30;
+    return this.incomeService.getSmoothedDailyAllowance(days);
+  }
+
   @Post()
   async create(@Body() dto: CreateIncomeDto) {
     return this.incomeService.create(dto);
