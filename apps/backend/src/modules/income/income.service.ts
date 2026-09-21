@@ -96,7 +96,10 @@ export class IncomeService {
   /** Rekomendasi alokasi mingguan: rata-rata income mingguan (windowDays terakhir) dikurangi
    *  target budget mingguan (jumlah 7 DailyBudget) = leftover, lalu leftover dibagi tabung/invest/
    *  jajan-bebas. Rasio 50/30/20 keputusan produk sederhana (sama semangatnya dengan SAVINGS_FACTOR
-   *  di atas) — tuning kalau prioritas finansial berubah. */
+   *  di atas) — tuning kalau prioritas finansial berubah.
+   *  Kalau nggak ada income tercatat dalam windowDays terakhir (user nyatet nggak rutin tiap minggu
+   *  — kasus nyata: gap 28 hari pas kena boundary window default), fallback ke rata-rata ALL-TIME
+   *  (total income / rentang minggu sejak entry pertama) biar nggak nampilin Rp0 yang menyesatkan. */
   async getAllocationRecommendation(windowDays = 28) {
     const since = new Date(Date.now() - windowDays * 24 * 60 * 60 * 1000);
 
@@ -105,8 +108,26 @@ export class IncomeService {
       this.prisma.dailyBudget.findMany(),
     ]);
 
-    const weeks = windowDays / 7;
-    const weeklyIncome = Number(incomeAgg._sum.amount ?? 0) / weeks;
+    let totalIncome = Number(incomeAgg._sum.amount ?? 0);
+    let weeks = windowDays / 7;
+    let usedWindowDays = windowDays;
+    let isFallback = false;
+
+    if (totalIncome === 0) {
+      const [allAgg, oldest] = await Promise.all([
+        this.prisma.income.aggregate({ _sum: { amount: true } }),
+        this.prisma.income.findFirst({ orderBy: { receivedAt: 'asc' } }),
+      ]);
+      totalIncome = Number(allAgg._sum.amount ?? 0);
+      if (oldest && totalIncome > 0) {
+        const spanDays = Math.max(7, (Date.now() - oldest.receivedAt.getTime()) / (24 * 60 * 60 * 1000));
+        weeks = spanDays / 7;
+        usedWindowDays = Math.round(spanDays);
+        isFallback = true;
+      }
+    }
+
+    const weeklyIncome = weeks > 0 ? totalIncome / weeks : 0;
     const weeklyBudgetTarget = budgets.reduce((sum, b) => sum + Number(b.amount), 0);
     const leftover = Math.max(0, weeklyIncome - weeklyBudgetTarget);
 
@@ -115,7 +136,8 @@ export class IncomeService {
     const SPEND_RATIO = 0.2;
 
     return {
-      windowDays,
+      windowDays: usedWindowDays,
+      isFallback,
       weeklyIncome: Math.round(weeklyIncome),
       weeklyBudgetTarget: Math.round(weeklyBudgetTarget),
       leftover: Math.round(leftover),
