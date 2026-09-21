@@ -93,4 +93,38 @@ export class IncomeService {
     };
   }
 
+  /** Rekomendasi alokasi mingguan: rata-rata income mingguan (windowDays terakhir) dikurangi
+   *  target budget mingguan (jumlah 7 DailyBudget) = leftover, lalu leftover dibagi tabung/invest/
+   *  jajan-bebas. Rasio 50/30/20 keputusan produk sederhana (sama semangatnya dengan SAVINGS_FACTOR
+   *  di atas) — tuning kalau prioritas finansial berubah. */
+  async getAllocationRecommendation(windowDays = 28) {
+    const since = new Date(Date.now() - windowDays * 24 * 60 * 60 * 1000);
+
+    const [incomeAgg, budgets] = await Promise.all([
+      this.prisma.income.aggregate({ _sum: { amount: true }, where: { receivedAt: { gte: since } } }),
+      this.prisma.dailyBudget.findMany(),
+    ]);
+
+    const weeks = windowDays / 7;
+    const weeklyIncome = Number(incomeAgg._sum.amount ?? 0) / weeks;
+    const weeklyBudgetTarget = budgets.reduce((sum, b) => sum + Number(b.amount), 0);
+    const leftover = Math.max(0, weeklyIncome - weeklyBudgetTarget);
+
+    const SAVE_RATIO = 0.5;
+    const INVEST_RATIO = 0.3;
+    const SPEND_RATIO = 0.2;
+
+    return {
+      windowDays,
+      weeklyIncome: Math.round(weeklyIncome),
+      weeklyBudgetTarget: Math.round(weeklyBudgetTarget),
+      leftover: Math.round(leftover),
+      allocation: {
+        save: Math.round(leftover * SAVE_RATIO),
+        invest: Math.round(leftover * INVEST_RATIO),
+        spend: Math.round(leftover * SPEND_RATIO),
+      },
+      ratios: { save: SAVE_RATIO, invest: INVEST_RATIO, spend: SPEND_RATIO },
+    };
+  }
 }

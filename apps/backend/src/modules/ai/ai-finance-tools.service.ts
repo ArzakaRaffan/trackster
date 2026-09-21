@@ -77,6 +77,16 @@ export class AiFinanceToolsService {
         handler: async () => this.transactionService.getAllTimeSummary(),
       },
       {
+        name: 'getIncomeAllocation',
+        description: 'Ambil rekomendasi alokasi mingguan: berapa yang sebaiknya ditabung, diinvestasikan, dan boleh dihabiskan bebas, dihitung dari rata-rata pemasukan mingguan dikurangi target budget mingguan.',
+        input_schema: {
+          type: 'object',
+          properties: {},
+          required: [],
+        },
+        handler: async () => this.incomeService.getAllocationRecommendation(),
+      },
+      {
         name: 'logExpense',
         description: 'Catat pengeluaran manual (tunai atau non-email) yang disebutkan user di chat. Gunakan tool ini kalau user bilang sudah beli/bayar/ngeluarin sesuatu.',
         input_schema: {

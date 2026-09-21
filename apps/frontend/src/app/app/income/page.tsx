@@ -10,6 +10,7 @@ import { Input } from '@/components/ui/Input';
 import { Button } from '@/components/ui/Button';
 import { SourceTag } from '@/components/ui/SourceTag';
 import { AnimatedAmount } from '@/components/ui/AnimatedAmount';
+import { StatTile } from '@/components/ui/StatTile';
 import { TRANSITION_BASE, TRANSITION_SLOW } from '@/lib/motion';
 import { Inbox, Pencil, Plus, Trash2, X } from 'lucide-react';
 
@@ -21,7 +22,15 @@ interface Income {
   receivedAt: string;
 }
 
+interface AllocationRecommendation {
+  weeklyIncome: number;
+  weeklyBudgetTarget: number;
+  leftover: number;
+  allocation: { save: number; invest: number; spend: number };
+}
+
 const fetcher = (path: string) => api.get<Income[]>(path);
+const allocationFetcher = (path: string) => api.get<AllocationRecommendation>(path);
 
 const todayISO = () => new Date().toISOString().slice(0, 10);
 
@@ -36,6 +45,7 @@ const emptyForm: FormState = { amount: '', description: '', source: 'BCA', recei
 
 export default function IncomePage() {
   const { data, error, isLoading, mutate } = useSWR('/income', fetcher);
+  const { data: allocation } = useSWR('/income/allocation', allocationFetcher);
   // duration/easing match the fade-in token (200ms, ease-standard) used everywhere else in the app.
   const [listParent] = useAutoAnimate({ duration: 200, easing: 'cubic-bezier(.3,0,.4,1)' });
 
@@ -111,6 +121,24 @@ export default function IncomePage() {
             className="font-title text-amount font-black tracking-[-1px] tabular-nums text-status-under"
           />
         </section>
+
+        {allocation && (
+          <section className="flex flex-col gap-3 rounded-medium bg-surface p-5">
+            <div>
+              <p className="text-small font-bold uppercase tracking-caps text-ink-muted">Rekomendasi alokasi mingguan</p>
+              <p className="mt-1 text-small leading-relaxed text-ink-muted">
+                Rata-rata pemasukan {formatRupiah(allocation.weeklyIncome)}/minggu dikurangi target budget{' '}
+                {formatRupiah(allocation.weeklyBudgetTarget)}/minggu, sisa {formatRupiah(allocation.leftover)} bisa
+                dialokasikan begini:
+              </p>
+            </div>
+            <div className="grid grid-cols-3 gap-2">
+              <StatTile label="Tabung" value={formatRupiah(allocation.allocation.save)} tone="under" size="body" />
+              <StatTile label="Invest" value={formatRupiah(allocation.allocation.invest)} tone="near" size="body" />
+              <StatTile label="Bebas" value={formatRupiah(allocation.allocation.spend)} tone="base" size="body" />
+            </div>
+          </section>
+        )}
 
         <AnimatePresence initial={false}>
           {formOpen ? (

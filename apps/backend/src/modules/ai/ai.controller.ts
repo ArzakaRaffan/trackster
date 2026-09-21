@@ -3,6 +3,7 @@ import { IsString, MinLength } from 'class-validator';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { AiChatService } from './ai-chat.service';
 import { AiReportsService } from './ai-reports.service';
+import { AiMascotService } from './ai-mascot.service';
 import { PrismaService } from '../../prisma.service';
 
 class ChatDto {
@@ -17,8 +18,14 @@ export class AiController {
   constructor(
     private aiChatService: AiChatService,
     private aiReportsService: AiReportsService,
+    private aiMascotService: AiMascotService,
     private prisma: PrismaService,
   ) {}
+
+  @Get('mascot-tip')
+  async mascotTip() {
+    return this.aiMascotService.getTip();
+  }
 
   @Post('chat')
   async chat(@Body() body: ChatDto) {
