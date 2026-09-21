@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { Module, forwardRef } from '@nestjs/common';
 import { GmailController } from './gmail.controller';
 import { GmailAuthService } from './gmail-auth.service';
 import { GmailSyncService } from './gmail-sync.service';
@@ -10,9 +10,10 @@ import { AuthModule } from '../auth/auth.module';
 import { TransactionModule } from '../transaction/transaction.module';
 import { BudgetModule } from '../budget/budget.module';
 import { TelegramModule } from '../telegram/telegram.module';
+import { AiModule } from '../ai/ai.module';
 
 @Module({
-  imports: [AuthModule, TransactionModule, BudgetModule, TelegramModule],
+  imports: [AuthModule, TransactionModule, BudgetModule, TelegramModule, forwardRef(() => AiModule)],
   controllers: [GmailController],
   providers: [
     GmailAuthService,
