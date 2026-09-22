@@ -24,9 +24,10 @@ Personal finance expense tracker untuk Arzaka. Otomatis mencatat pengeluaran dar
 
 - Email BCA & Jago itu **HTML**, bukan plain text, dan strukturnya **3 kolom tabel** (label / separator ":" / value) — BUKAN format "Label: Value" satu baris. `extractField()` di `parser.interface.ts` sudah handle dua pola sekaligus (colon-inline dan label-lalu-baris-berikutnya, skip baris separator murni).
 - **Exclusion rules** (transaksi yang TIDAK dihitung sebagai expense):
-  - BCA transfer ke beneficiary yang mengandung "FLIPTECH" = top-up mingguan BCA→Jago via Flip (internal transfer)
-  - Jago transfer ke nama yang match `OWNER_FULL_NAME` (env var) = transfer ke rekening sendiri (internal)
-  - GoPay sengaja TIDAK diproses sama sekali (out of scope, topup selalu dari BCA yang sudah tercatat)
+  - BCA transfer ke FLIPTECH = SoF funding ke Flip (bukan expense akhir; tujuan final dari email Flip). Transfer BCA ke rekening di `OWNER_ACCOUNT_NUMBERS` juga exclude.
+  - Email Flip: exclude **hanya** kalau beneficiary account/nama = rekening sendiri (`OWNER_ACCOUNT_NUMBERS` / `OWNER_FULL_NAME`). Transfer Flip ke merchant, orang lain, atau VA e-commerce **dicatat** sebagai expense (source mengikuti SoF, biasanya BCA).
+  - Jago transfer ke rekening/nama sendiri = internal
+  - Email GoPay sengaja TIDAK diproses (out of scope). Top-up GoPay via **VA BCA** tetap tercatat dari email BCA.
 - BCA TIDAK PERNAH mengirim email notifikasi dana masuk/setor tunai (sudah diverifikasi langsung, bukan asumsi) — makanya Income untuk BCA murni manual entry, tidak ada parser buat itu.
 - Deduplikasi transaksi pakai `emailId` (Gmail message ID) sebagai unique constraint.
 
@@ -77,3 +78,4 @@ Sebelum melakukan apapun, baca dulu:
 Jangan scan seluruh codebase di awal sesi kecuali task eksplisit membutuhkannya (catatan di atas ini sudah cukup detail untuk sebagian besar task).
 
 Di akhir sesi, kalau ada keputusan teknis baru atau perubahan arsitektur signifikan, update note yang relevan di vault (bukan cuma di kepala kamu).
+

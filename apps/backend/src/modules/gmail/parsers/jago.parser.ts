@@ -1,13 +1,9 @@
 import { Injectable } from '@nestjs/common';
 import { Source } from '@prisma/client';
 import { EmailParser, RawEmail, ParseResult, extractField, parseRupiah, parseEmailDate } from './parser.interface';
+import { isInternalDestination } from './own-accounts';
 
-// TODO: konfirmasi domain email pengirim Jago yang sebenarnya, sementara deteksi pakai nama tampilan "Jago".
 const JAGO_SENDER_HINTS = ['jago'];
-
-// Nama pemilik akun, dipakai untuk deteksi self-transfer (transfer ke rekening sendiri = bukan pengeluaran).
-// Diambil dari env var supaya tidak hardcoded dan mudah diubah kalau nama berubah/typo.
-const OWNER_NAME = (process.env.OWNER_FULL_NAME || 'ARZAKA RAFFAN MAWARDI').toUpperCase();
 
 @Injectable()
 export class JagoParser implements EmailParser {
@@ -28,14 +24,17 @@ export class JagoParser implements EmailParser {
       return this.parseQrisPayment(body, email);
     }
 
-    // Sub-format lain yang belum kita punya contohnya (misal terima dana masuk, tarik tunai)
-    // TODO: tambahkan handling begitu ada contoh email barunya
     return null;
   }
 
   private parseTransfer(body: string, email: RawEmail): ParseResult | null {
     const jumlahRaw = extractField(body, 'Jumlah');
-    const ke = extractField(body, 'Ke'); // baris pertama setelah "Ke" = nama penerima
+    const ke = extractField(body, 'Ke');
+    const rekening =
+      extractField(body, 'Nomor rekening') ||
+      extractField(body, 'No. rekening') ||
+      extractField(body, 'Rekening tujuan') ||
+      extractField(body, 'Account number');
     const tanggalRaw = extractField(body, 'Tanggal transaksi') || extractField(body, 'Tanggal Transaksi');
 
     if (!jumlahRaw || !ke) return null;
@@ -43,7 +42,7 @@ export class JagoParser implements EmailParser {
     const amount = parseRupiah(jumlahRaw);
     const occurredAt = (tanggalRaw && parseEmailDate(tanggalRaw)) || new Date(parseInt(email.internalDate, 10));
 
-    const isSelfTransfer = ke.toUpperCase().includes(OWNER_NAME);
+    const isSelfTransfer = isInternalDestination({ accountNumber: rekening, beneficiaryName: ke });
 
     return {
       amount,
@@ -57,7 +56,7 @@ export class JagoParser implements EmailParser {
 
   private parseQrisPayment(body: string, email: RawEmail): ParseResult | null {
     const jumlahRaw = extractField(body, 'Jumlah');
-    const ke = extractField(body, 'Ke'); // nama merchant
+    const ke = extractField(body, 'Ke');
     const tanggalRaw = extractField(body, 'Tanggal Transaksi') || extractField(body, 'Tanggal transaksi');
 
     if (!jumlahRaw || !ke) return null;
@@ -65,7 +64,6 @@ export class JagoParser implements EmailParser {
     const amount = parseRupiah(jumlahRaw);
     const occurredAt = (tanggalRaw && parseEmailDate(tanggalRaw)) || new Date(parseInt(email.internalDate, 10));
 
-    // Pembayaran ke merchant selalu dihitung sebagai expense, tidak perlu exclusion check
     return {
       amount,
       description: ke,
