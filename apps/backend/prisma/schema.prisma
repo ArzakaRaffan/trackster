@@ -213,3 +213,28 @@ model GoalContribution {
 
   @@index([goalId])
 }
+
+enum BillingCycle {
+  MONTHLY
+  YEARLY
+}
+
+// Langganan dikelola manual (bukan auto-detect dari transaksi).
+// Reminder lewat Google Calendar event berulang; googleCalendarEventId diisi setelah sync sukses.
+model Subscription {
+  id                    Int          @id @default(autoincrement())
+  name                  String
+  amount                Decimal      @db.Decimal(12, 2)
+  cycle                 BillingCycle @default(MONTHLY)
+  nextDueDate           DateTime     @db.Date
+  source                Source?
+  notes                 String?
+  reminderDaysBefore    Int          @default(3)
+  isActive              Boolean      @default(true)
+  googleCalendarEventId String?
+  createdAt             DateTime     @default(now())
+  updatedAt             DateTime     @updatedAt
+
+  @@index([nextDueDate])
+  @@index([isActive])
+}

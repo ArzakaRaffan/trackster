@@ -10,6 +10,7 @@ import { TransactionModule } from '../transaction/transaction.module';
 import { IncomeModule } from '../income/income.module';
 import { AuthModule } from '../auth/auth.module';
 import { TelegramModule } from '../telegram/telegram.module';
+import { SubscriptionModule } from '../subscription/subscription.module';
 import { PrismaService } from '../../prisma.service';
 
 @Module({
@@ -18,6 +19,7 @@ import { PrismaService } from '../../prisma.service';
     TransactionModule,
     IncomeModule,
     AuthModule,
+    forwardRef(() => SubscriptionModule),
     forwardRef(() => TelegramModule),
   ],
   providers: [AiService, AiFinanceToolsService, AiChatService, AiReportsService, AiMascotService, PrismaService],

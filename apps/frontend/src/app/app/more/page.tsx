@@ -6,7 +6,7 @@ import { BarChart3, ChevronRight, PiggyBank, Settings, Sparkles, Wallet, Bot, Ta
 const LINKS = [
   { href: '/app/chat', label: 'Tanya Track', description: 'Ngobrol sama AI financial buddy', Icon: Bot },
   { href: '/app/goals', label: 'Target Tabungan (Kantong)', description: 'Target & simulasi tabungan', Icon: Target },
-  { href: '/app/subscriptions', label: 'Langganan', description: 'Biaya berulang, burn bulanan & jatuh tempo', Icon: Repeat },
+  { href: '/app/subscriptions', label: 'Langganan', description: 'Kelola manual + reminder Google Calendar', Icon: Repeat },
   { href: '/app/weekly', label: 'Mingguan', description: 'Rekap pengeluaran per minggu', Icon: BarChart3 },
   { href: '/app/budget', label: 'Budget', description: 'Atur budget harian', Icon: Wallet },
   { href: '/app/income', label: 'Pemasukan', description: 'Kelola pemasukan, tren & alokasi', Icon: PiggyBank },

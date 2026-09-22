@@ -31,12 +31,13 @@ interface TodaySummary {
 }
 
 interface SubscriptionItem {
-  description: string;
-  averageAmount: number;
-  occurrenceCount: number;
-  estimatedMonthlyBurn: number;
-  lastSeenAt: string;
-  displayDescription?: string;
+  id: number;
+  name: string;
+  amount: number;
+  cycle: 'MONTHLY' | 'YEARLY';
+  nextDueDate: string;
+  reminderDaysBefore: number;
+  isActive: boolean;
 }
 
 const todayFetcher = (path: string) => api.get<TodaySummary>(path);
@@ -47,7 +48,7 @@ const dateLabel = (iso: string) =>
 
 const QUICK_LINKS = [
   { href: '/app/chat', label: 'Tanya Track', description: 'Ngobrol sama AI financial buddy', Icon: MessageCircle },
-  { href: '/app/subscriptions', label: 'Langganan', description: 'Biaya berulang & jatuh tempo', Icon: Repeat },
+  { href: '/app/subscriptions', label: 'Langganan', description: 'Kelola manual + reminder Calendar', Icon: Repeat },
   { href: '/app/income', label: 'Pemasukan', description: 'Catat & kelola pemasukan', Icon: PiggyBank },
   { href: '/split-bills', label: 'Split Bill', description: 'Bagi tagihan bareng temen', Icon: Receipt },
   { href: '/app/reports', label: 'Laporan', description: 'Ringkasan bulanan & tren', Icon: LineChart },
@@ -57,14 +58,18 @@ const QUICK_LINKS = [
 
 export default function DashboardPage() {
   const { data, isLoading } = useSWR('/budget/today', todayFetcher);
-  const { data: subs } = useSWR('/transactions/subscriptions', subsFetcher);
+  const { data: subs } = useSWR('/subscriptions', subsFetcher);
 
   const ratio = data && data.budget > 0 ? data.totalSpent / data.budget : 0;
   const status = data?.isOverBudget ? 'over' : ratio >= 0.8 ? 'near' : 'under';
-  const monthlyBurn = (subs ?? []).reduce((sum, s) => sum + s.estimatedMonthlyBurn, 0);
-  const dueSoon = (subs ?? []).filter((s) => {
-    const days = Math.ceil((new Date(s.lastSeenAt).getTime() + 30 * 86400000 - Date.now()) / 86400000);
-    return days >= 0 && days <= 3;
+  const activeSubs = (subs ?? []).filter((s) => s.isActive);
+  const monthlyBurn = activeSubs.reduce(
+    (sum, s) => sum + (s.cycle === 'YEARLY' ? s.amount / 12 : s.amount),
+    0,
+  );
+  const dueSoon = activeSubs.filter((s) => {
+    const days = Math.ceil((new Date(s.nextDueDate).getTime() - Date.now()) / 86400000);
+    return days >= 0 && days <= (s.reminderDaysBefore ?? 3);
   }).length;
 
   return (
@@ -163,7 +168,7 @@ export default function DashboardPage() {
             <div>
               <p className="text-small font-bold uppercase tracking-caps text-ink-muted">Langganan aktif</p>
               <p className="mt-1 font-title text-amount font-black tracking-[-1px] tabular-nums text-ink">
-                {formatRupiah(monthlyBurn)}
+                {formatRupiah(Math.round(monthlyBurn))}
                 <span className="ml-1 text-body font-normal text-ink-muted">/bln</span>
               </p>
             </div>
@@ -173,10 +178,12 @@ export default function DashboardPage() {
           </div>
           <p className="mt-3 text-small text-ink-muted">
             {subs == null
-              ? 'Memuat deteksi langganan…'
-              : subs.length === 0
-                ? 'Belum ada yang terdeteksi — transaksi berulang akan muncul otomatis.'
-                : `${subs.length} layanan terdeteksi${dueSoon > 0 ? ` · ${dueSoon} jatuh tempo ≤3 hari` : ''}`}
+              ? 'Memuat langganan...'
+              : activeSubs.length === 0
+                ? 'Belum ada langganan aktif. Tambah manual, reminder lewat Google Calendar.'
+                : dueSoon > 0
+                  ? `${activeSubs.length} aktif · ${dueSoon} jatuh tempo dekat`
+                  : `${activeSubs.length} aktif`}
           </p>
           <p className="mt-2 flex items-center gap-1.5 text-small font-bold text-brand">
             Kelola langganan <ArrowRight size={14} />

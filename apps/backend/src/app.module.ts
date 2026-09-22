@@ -13,6 +13,7 @@ import { MerchantAliasModule } from './modules/merchant-alias/merchant-alias.mod
 import { SplitBillModule } from './modules/split-bill/split-bill.module';
 import { AiModule } from './modules/ai/ai.module';
 import { GoalModule } from './modules/goal/goal.module';
+import { SubscriptionModule } from './modules/subscription/subscription.module';
 
 @Module({
   imports: [
@@ -30,6 +31,7 @@ import { GoalModule } from './modules/goal/goal.module';
     SplitBillModule,
     AiModule,
     GoalModule,
+    SubscriptionModule,
   ],
 })
 export class AppModule {}

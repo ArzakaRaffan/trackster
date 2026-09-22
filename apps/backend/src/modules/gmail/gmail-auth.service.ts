@@ -4,6 +4,7 @@ import { PrismaService } from '../../prisma.service';
 
 const SCOPES = [
   'https://www.googleapis.com/auth/gmail.readonly',
+  'https://www.googleapis.com/auth/calendar.events',
   'https://www.googleapis.com/auth/userinfo.email',
   'openid',
 ];
@@ -68,13 +69,26 @@ export class GmailAuthService {
     return { success: true };
   }
 
-  /** Return authenticated Gmail API client, atau null kalau belum connect */
-  async getGmailClient() {
+  private async getAuthedOAuth2Client() {
     const tokenRow = await this.prisma.gmailToken.findFirst();
     if (!tokenRow) return null;
 
     const client = this.getOAuth2Client();
     client.setCredentials({ refresh_token: tokenRow.refreshToken });
+    return client;
+  }
+
+  /** Return authenticated Gmail API client, atau null kalau belum connect */
+  async getGmailClient() {
+    const client = await this.getAuthedOAuth2Client();
+    if (!client) return null;
     return google.gmail({ version: 'v1', auth: client });
+  }
+
+  /** Return authenticated Calendar API client, atau null kalau belum connect */
+  async getCalendarClient() {
+    const client = await this.getAuthedOAuth2Client();
+    if (!client) return null;
+    return google.calendar({ version: 'v3', auth: client });
   }
 }

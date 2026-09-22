@@ -3,6 +3,7 @@ import { AiService } from './ai.service';
 import { BudgetService } from '../budget/budget.service';
 import { TransactionService } from '../transaction/transaction.service';
 import { IncomeService } from '../income/income.service';
+import { SubscriptionService } from '../subscription/subscription.service';
 
 const MASCOT_SYSTEM_PROMPT = `Kamu adalah maskot kecil imut aplikasi finance tracker Trackster, muncul di pojok layar buat nemenin user.
 Tugasmu: kasih SATU kalimat pendek (maks 25 kata), santai dan lucu, dalam Bahasa Indonesia, berisi fun fact
@@ -25,11 +26,12 @@ export class AiMascotService {
     private budgetService: BudgetService,
     private transactionService: TransactionService,
     private incomeService: IncomeService,
+    private subscriptionService: SubscriptionService,
   ) {}
 
   async getTip(): Promise<MascotTip> {
-    // Reminder subscription jatuh tempo dihitung deterministik (bukan lewat AI) supaya
-    // tanggal & nominalnya selalu akurat, tidak bisa "dikarang" model — didahulukan dari fun fact.
+    // Reminder langganan jatuh tempo dihitung deterministik dari data manual,
+    // didahulukan dari fun fact.
     const reminder = await this.getUpcomingSubscriptionReminder();
     if (reminder) return { kind: 'reminder', message: reminder };
 
@@ -37,25 +39,14 @@ export class AiMascotService {
   }
 
   private async getUpcomingSubscriptionReminder(): Promise<string | null> {
-    const subscriptions = await this.transactionService.getSubscriptions();
-    const now = Date.now();
-    const DAY_MS = 24 * 60 * 60 * 1000;
+    const upcoming = await this.subscriptionService.getUpcomingReminders(3);
+    if (!upcoming.length) return null;
 
-    for (const sub of subscriptions as Array<{
-      displayDescription: string;
-      averageAmount: number;
-      lastSeenAt: string;
-    }>) {
-      const nextDue = new Date(sub.lastSeenAt).getTime() + 30 * DAY_MS;
-      const daysLeft = Math.ceil((nextDue - now) / DAY_MS);
-      if (daysLeft < 0 || daysLeft > 3) continue;
-
-      const amount = `Rp${sub.averageAmount.toLocaleString('id-ID')}`;
-      return daysLeft === 0
-        ? `Langganan "${sub.displayDescription}" (${amount}) kayaknya jatuh tempo hari ini!`
-        : `Heads up, langganan "${sub.displayDescription}" (${amount}) sepertinya jatuh tempo ${daysLeft} hari lagi.`;
-    }
-    return null;
+    const sub = upcoming[0];
+    const amount = `Rp${sub.amount.toLocaleString('id-ID')}`;
+    return sub.daysLeft === 0
+      ? `Langganan "${sub.name}" (${amount}) jatuh tempo hari ini — cek Calendar kamu ya.`
+      : `Heads up, langganan "${sub.name}" (${amount}) jatuh tempo ${sub.daysLeft} hari lagi.`;
   }
 
   private async generateFunFact(): Promise<string> {
