@@ -175,7 +175,7 @@ function SettingsContent() {
             <Mail size={18} /> Gmail
           </h2>
           <p className="mt-1 text-small leading-relaxed text-ink-muted">
-            Hubungkan akun Gmail untuk membaca notifikasi transaksi otomatis.
+            Hubungkan akun Google untuk baca notifikasi Gmail dan bikin reminder langganan di Calendar. Setelah update scope Calendar, disconnect lalu connect ulang.
           </p>
 
           {gmailStatus?.connected ? (
@@ -190,7 +190,7 @@ function SettingsContent() {
             </div>
           ) : (
             <Button variant="dark" fullWidth className="mt-4" onClick={handleConnectGmail}>
-              Hubungkan Gmail
+              Hubungkan Google
             </Button>
           )}
 

@@ -510,47 +510,55 @@ function ReportSkeleton() {
   );
 }
 
-
 interface SubscriptionItem {
-  description: string;
-  averageAmount: number;
-  occurrenceCount: number;
-  estimatedMonthlyBurn: number;
-  lastSeenAt: string;
-  displayDescription?: string;
+  id: number;
+  name: string;
+  amount: number;
+  cycle: 'MONTHLY' | 'YEARLY';
+  nextDueDate: string;
+  isActive: boolean;
 }
 
 function SubscriptionsSection() {
-  const { data: subs, isLoading } = useSWR<SubscriptionItem[]>('/transactions/subscriptions', (url: string) => api.get<SubscriptionItem[]>(url));
+  const { data: subs, isLoading } = useSWR<SubscriptionItem[]>('/subscriptions', (url: string) =>
+    api.get<SubscriptionItem[]>(url),
+  );
 
   if (isLoading) {
     return <div className="h-24 animate-pulse rounded-medium bg-track" />;
   }
 
-  if (!subs || subs.length === 0) {
+  const active = (subs ?? []).filter((s) => s.isActive);
+
+  if (active.length === 0) {
     return (
       <section className="flex flex-col items-center gap-2 rounded-medium bg-surface p-5 text-center">
         <span className="flex h-10 w-10 items-center justify-center rounded-full bg-surface-interactive text-ink-muted">
           <Inbox size={18} />
         </span>
-        <p className="text-small font-bold text-ink">Langganan terdeteksi</p>
+        <p className="text-small font-bold text-ink">Langganan</p>
         <p className="max-w-[280px] text-micro leading-relaxed text-ink-muted">
-          Belum ada pola transaksi berulang bulanan yang terdeteksi. Butuh minimal 2x transaksi dengan nominal &amp;
-          jarak waktu mirip (~30 hari) buat dikenali otomatis.
+          Belum ada langganan aktif. Tambah manual di halaman Langganan; reminder jalan lewat Google Calendar.
         </p>
+        <Link href="/app/subscriptions" className="mt-1 text-micro font-bold text-brand">
+          Kelola langganan
+        </Link>
       </section>
     );
   }
 
-  const totalMonthlyBurn = subs.reduce((sum, s) => sum + s.estimatedMonthlyBurn, 0);
+  const totalMonthlyBurn = active.reduce(
+    (sum, s) => sum + (s.cycle === 'YEARLY' ? s.amount / 12 : s.amount),
+    0,
+  );
 
   return (
     <section className="rounded-medium bg-surface p-5">
       <div className="flex items-start justify-between">
         <div>
-          <p className="text-small font-bold uppercase tracking-caps text-ink-muted">Langganan terdeteksi</p>
+          <p className="text-small font-bold uppercase tracking-caps text-ink-muted">Langganan aktif</p>
           <p className="font-title text-amount font-extrabold tabular-nums text-ink">
-            {formatRupiah(totalMonthlyBurn)}
+            {formatRupiah(Math.round(totalMonthlyBurn))}
             <span className="text-small font-normal text-ink-muted">/bln</span>
           </p>
         </div>
@@ -558,22 +566,22 @@ function SubscriptionsSection() {
           href="/app/subscriptions"
           className="flex items-center gap-1 rounded-full-pill bg-surface-interactive px-3 py-1.5 text-micro font-bold text-ink-muted transition-colors hover:text-ink hover:bg-surface-alt"
         >
-          <span>Kelola ({subs.length})</span>
+          <span>Kelola ({active.length})</span>
           <ArrowRight size={12} />
         </Link>
       </div>
 
       <ul className="mt-4 divide-y divide-line-subtle border-t border-line-subtle">
-        {subs.map((s, idx) => (
-          <li key={idx} className="flex items-center justify-between py-3">
+        {active.map((s) => (
+          <li key={s.id} className="flex items-center justify-between py-3">
             <div className="min-w-0 flex-1 pr-3">
-              <p className="font-bold text-ink truncate">{s.displayDescription || s.description}</p>
+              <p className="font-bold text-ink truncate">{s.name}</p>
               <p className="text-micro text-ink-muted">
-                {s.occurrenceCount}x transaksi (~30 hari) · Terakhir:{' '}
-                {new Date(s.lastSeenAt).toLocaleDateString('id-ID', { day: 'numeric', month: 'short' })}
+                {s.cycle === 'YEARLY' ? 'Tahunan' : 'Bulanan'} · Jatuh tempo{' '}
+                {new Date(s.nextDueDate).toLocaleDateString('id-ID', { day: 'numeric', month: 'short' })}
               </p>
             </div>
-            <p className="font-bold text-ink tabular-nums shrink-0">{formatRupiah(s.averageAmount)}</p>
+            <p className="font-bold text-ink tabular-nums shrink-0">{formatRupiah(s.amount)}</p>
           </li>
         ))}
       </ul>
