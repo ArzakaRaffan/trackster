@@ -99,6 +99,10 @@ function SettingsContent() {
   const [testResult, setTestResult] = useState<string | null>(null);
   const [syncing, setSyncing] = useState(false);
   const [syncResult, setSyncResult] = useState<string | null>(null);
+  const [backfillAfter, setBackfillAfter] = useState('2026-09-05');
+  const [backfillBefore, setBackfillBefore] = useState('2026-09-18');
+  const [backfilling, setBackfilling] = useState(false);
+  const [backfillResult, setBackfillResult] = useState<string | null>(null);
   const [notifyingEveryTx, setNotifyingEveryTx] = useState(false);
 
   const gmailParam = searchParams.get('gmail');
@@ -132,6 +136,29 @@ function SettingsContent() {
     setTestResult(null);
     const res = await api.post<{ success: boolean }>('/telegram/test');
     setTestResult(res.success ? 'Terkirim! Cek Telegram kamu.' : 'Gagal kirim. Cek konfigurasi.');
+  };
+
+const handleBackfill = async () => {
+    setBackfilling(true);
+    setBackfillResult(null);
+    try {
+      const res = await api.post<{
+        synced: number;
+        scanned?: number;
+        skippedDuplicate?: number;
+        error?: string;
+        query?: string;
+      }>('/sync/backfill', { after: backfillAfter, before: backfillBefore });
+      if (res.error) {
+        setBackfillResult(`Error: ${res.error}`);
+      } else {
+        setBackfillResult(
+          `${res.synced} transaksi baru dari ${res.scanned ?? 0} email (duplikat dilewati: ${res.skippedDuplicate ?? 0}).`,
+        );
+      }
+    } finally {
+      setBackfilling(false);
+    }
   };
 
   const handleManualSync = async () => {
@@ -213,6 +240,38 @@ function SettingsContent() {
           {countdown && (
             <p className="mt-2 text-small text-ink-subtle">Sync otomatis berikutnya dalam {countdown}</p>
           )}
+
+          <div className="mt-5 border-t border-line-subtle pt-4">
+            <p className="text-label font-bold text-ink">Backfill rentang tanggal</p>
+            <p className="mt-1 text-small leading-relaxed text-ink-muted">
+              Sync biasa cuma 7 hari terakhir. Pakai ini buat tarik ulang email bank di rentang yang kosong
+              (tanggal akhir bersifat exclusive, jadi 18 = sampai 17).
+            </p>
+            <div className="mt-3 grid grid-cols-2 gap-2">
+              <Input
+                label="Dari (inclusive)"
+                type="date"
+                value={backfillAfter}
+                onChange={(e) => setBackfillAfter(e.target.value)}
+              />
+              <Input
+                label="Sampai sebelum"
+                type="date"
+                value={backfillBefore}
+                onChange={(e) => setBackfillBefore(e.target.value)}
+              />
+            </div>
+            <Button
+              variant="outlined"
+              fullWidth
+              className="mt-3"
+              onClick={handleBackfill}
+              disabled={backfilling || !gmailStatus?.connected || !backfillAfter || !backfillBefore}
+            >
+              {backfilling ? 'Backfill...' : 'Backfill rentang ini'}
+            </Button>
+            {backfillResult && <p className="mt-2 text-small text-ink-muted">{backfillResult}</p>}
+          </div>
         </section>
 
         {/* Saldo bank */}

@@ -10,12 +10,19 @@ import { PrismaService } from '../../prisma.service';
 import { AiChatService } from '../ai/ai-chat.service';
 import { Category } from '@prisma/client';
 
-// TODO: konfirmasi & lengkapi query sender begitu domain email asli BCA/Jago diketahui dari header.
-// Sementara pakai keyword umum yang sudah terbukti match nama tampilan sender.
-const GMAIL_QUERY = 'from:(bca OR jago) newer_than:7d';
+// Cron window tetap pendek biar ringan. Historical gap pakai syncEmails({ after, before }).
+const GMAIL_QUERY_RECENT = 'from:(bca OR jago) newer_than:7d';
 
-// Nama job di SchedulerRegistry — dibutuhkan biar next-run bisa di-query dari luar (lihat getNextRun()).
 const SYNC_CRON_JOB_NAME = 'gmail-sync';
+
+export type SyncOptions = {
+  /** Inclusive start date YYYY-MM-DD (Asia/Jakarta intent; Gmail after: uses date) */
+  after?: string;
+  /** Exclusive end date YYYY-MM-DD for Gmail before: */
+  before?: string;
+  /** Skip Telegram notifications (default true for backfill) */
+  quiet?: boolean;
+};
 
 @Injectable()
 export class GmailSyncService {
@@ -37,48 +44,78 @@ export class GmailSyncService {
     await this.syncEmails();
   }
 
-  /** Kapan sync otomatis berikutnya bakal jalan, buat ditampilin sebagai countdown di frontend. */
   getNextRun(): string {
     const job = this.schedulerRegistry.getCronJob(SYNC_CRON_JOB_NAME);
     const next = job.nextDate();
     return next.toISO() ?? next.toJSDate().toISOString();
   }
 
-  async syncEmails() {
+  private buildQuery(options?: SyncOptions): string {
+    if (options?.after || options?.before) {
+      const parts = ['from:(bca OR jago)'];
+      if (options.after) parts.push(`after:${options.after.replace(/-/g, '/')}`);
+      if (options.before) parts.push(`before:${options.before.replace(/-/g, '/')}`);
+      return parts.join(' ');
+    }
+    return GMAIL_QUERY_RECENT;
+  }
+
+  async syncEmails(options?: SyncOptions) {
     const gmail = await this.gmailAuthService.getGmailClient();
     if (!gmail) {
       this.logger.debug('Gmail belum terhubung, skip sync.');
-      return { synced: 0 };
+      return { synced: 0, scanned: 0, query: 'Gmail belum terhubung' };
     }
 
+    const query = this.buildQuery(options);
+    const quiet = options?.quiet ?? !!(options?.after || options?.before);
+
     try {
-      const listRes = await gmail.users.messages.list({
-        userId: 'me',
-        q: GMAIL_QUERY,
-        maxResults: 20,
-      });
+      const messageIds: string[] = [];
+      let pageToken: string | undefined;
+      do {
+        const listRes = await gmail.users.messages.list({
+          userId: 'me',
+          q: query,
+          maxResults: 100,
+          pageToken,
+        });
+        for (const msg of listRes.data.messages || []) {
+          if (msg.id) messageIds.push(msg.id);
+        }
+        pageToken = listRes.data.nextPageToken || undefined;
+      } while (pageToken);
 
-      const messages = listRes.data.messages || [];
+      this.logger.log(`Gmail sync query="${query}" candidates=${messageIds.length}`);
+
       let syncedCount = 0;
+      let skippedExcluded = 0;
+      let skippedUnparsed = 0;
+      let skippedDuplicate = 0;
       let newestTransaction: { source: string; description: string; amount: number } | null = null;
-      const notifyEveryTransaction = await this.telegramService.isNotifyEveryTransactionEnabled();
+      const notifyEveryTransaction =
+        !quiet && (await this.telegramService.isNotifyEveryTransactionEnabled());
 
-      for (const msg of messages) {
-        if (!msg.id) continue;
-
-        const full = await gmail.users.messages.get({ userId: 'me', id: msg.id, format: 'full' });
+      for (const id of messageIds) {
+        const full = await gmail.users.messages.get({ userId: 'me', id, format: 'full' });
         const rawEmail = this.extractRawEmail(full.data);
-        if (!rawEmail) continue;
-
-        const parsed = this.parserRegistry.parseEmail(rawEmail);
-        if (!parsed) continue; // bukan notifikasi transaksi yang dikenali, atau bukan dari BCA/Jago
-
-        if (parsed.excluded) {
-          this.logger.debug(`Skip (excluded): ${parsed.excludeReason}`);
+        if (!rawEmail) {
+          skippedUnparsed++;
           continue;
         }
 
-        // Auto-kategorisasi via AI — TIDAK throw, fallback ke LAINNYA kalau gagal
+        const parsed = this.parserRegistry.parseEmail(rawEmail);
+        if (!parsed) {
+          skippedUnparsed++;
+          continue;
+        }
+
+        if (parsed.excluded) {
+          this.logger.debug(`Skip (excluded): ${parsed.excludeReason}`);
+          skippedExcluded++;
+          continue;
+        }
+
         const categoryStr = await this.aiChatService.categorize(parsed.description, parsed.amount);
         const category = categoryStr as Category;
 
@@ -107,35 +144,48 @@ export class GmailSyncService {
               occurredAt: parsed.occurredAt,
             });
           }
+        } else {
+          skippedDuplicate++;
         }
       }
 
+      const summary = `${syncedCount} baru · ${messageIds.length} discan · dup=${skippedDuplicate} skip=${skippedUnparsed} excl=${skippedExcluded}`;
       await this.prisma.emailSyncLog.create({
-        data: { lastSyncAt: new Date(), status: 'SUCCESS', message: `${syncedCount} transaksi baru` },
+        data: { lastSyncAt: new Date(), status: 'SUCCESS', message: summary },
       });
 
-      if (syncedCount > 0 && newestTransaction) {
+      if (!quiet && syncedCount > 0 && newestTransaction) {
         await this.checkAndAlertIfOverBudget(newestTransaction);
       }
 
-      return { synced: syncedCount };
+      return {
+        synced: syncedCount,
+        scanned: messageIds.length,
+        skippedDuplicate,
+        skippedUnparsed,
+        skippedExcluded,
+        query,
+      };
     } catch (err) {
       this.logger.error(`Gmail sync gagal: ${err.message}`);
       await this.prisma.emailSyncLog.create({
         data: { lastSyncAt: new Date(), status: 'ERROR', message: err.message },
       });
-      return { synced: 0, error: err.message };
+      return { synced: 0, scanned: 0, error: err.message, query };
     }
   }
 
-  /** Kirim alert Telegram maksimal 1x per hari (dicek via AlertLog) begitu budget hari ini terlampaui. */
-  private async checkAndAlertIfOverBudget(lastTransaction: { source: string; description: string; amount: number }) {
+  private async checkAndAlertIfOverBudget(lastTransaction: {
+    source: string;
+    description: string;
+    amount: number;
+  }) {
     const summary = await this.budgetService.getTodaySummary();
     if (!summary.isOverBudget) return;
 
     const todayDateOnly = new Date(summary.date);
     const alreadyAlerted = await this.prisma.alertLog.findUnique({ where: { date: todayDateOnly } });
-    if (alreadyAlerted) return; // sudah kirim alert hari ini, jangan spam
+    if (alreadyAlerted) return;
 
     const sent = await this.telegramService.sendBudgetAlert({
       totalSpent: summary.totalSpent,
@@ -167,7 +217,6 @@ export class GmailSyncService {
     };
   }
 
-  /** Gmail body bisa nested multipart, cari bagian text/plain (fallback text/html kalau tidak ada) */
   private extractBody(payload: any): string | null {
     const plainRaw = this.findPartByMimeType(payload, 'text/plain');
     if (plainRaw) return this.decodeBase64(plainRaw);
@@ -178,7 +227,6 @@ export class GmailSyncService {
     return null;
   }
 
-  /** Cari rekursif bagian pertama yang match mimeType tertentu, return raw base64 body data-nya (belum di-decode) */
   private findPartByMimeType(payload: any, mimeType: string): string | null {
     if (!payload) return null;
 
@@ -200,10 +248,6 @@ export class GmailSyncService {
     return Buffer.from(data, 'base64').toString('utf-8');
   }
 
-  /**
-   * Konversi HTML jadi teks per-baris supaya extractField (yang berbasis split '\n') tetap bekerja.
-   * Ganti tag block-level jadi newline dulu SEBELUM strip tag sisanya, biar tidak jadi satu baris raksasa.
-   */
   private htmlToText(html: string): string {
     return html
       .replace(/<\/(td|tr|p|div|br|table|li)>/gi, '\n')
