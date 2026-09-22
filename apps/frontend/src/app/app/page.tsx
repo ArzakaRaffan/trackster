@@ -5,7 +5,18 @@ import Link from 'next/link';
 import { api } from '@/lib/api';
 import { AmountDisplay } from '@/components/ui/AmountDisplay';
 import { BudgetProgress } from '@/components/ui/BudgetProgress';
-import { ArrowRight, LineChart, PiggyBank, Receipt, Target, Wallet } from 'lucide-react';
+import { formatRupiah } from '@/lib/format';
+import { TracksterMascot } from '@/components/TracksterMascot';
+import {
+  ArrowRight,
+  LineChart,
+  MessageCircle,
+  PiggyBank,
+  Receipt,
+  Repeat,
+  Target,
+  Wallet,
+} from 'lucide-react';
 
 interface TodaySummary {
   date: string;
@@ -19,24 +30,42 @@ interface TodaySummary {
   transactions: unknown[];
 }
 
-const fetcher = (path: string) => api.get<TodaySummary>(path);
+interface SubscriptionItem {
+  description: string;
+  averageAmount: number;
+  occurrenceCount: number;
+  estimatedMonthlyBurn: number;
+  lastSeenAt: string;
+  displayDescription?: string;
+}
+
+const todayFetcher = (path: string) => api.get<TodaySummary>(path);
+const subsFetcher = (path: string) => api.get<SubscriptionItem[]>(path);
 
 const dateLabel = (iso: string) =>
   new Date(iso).toLocaleDateString('id-ID', { weekday: 'long', day: 'numeric', month: 'long' });
 
 const QUICK_LINKS = [
+  { href: '/app/chat', label: 'Tanya Track', description: 'Ngobrol sama AI financial buddy', Icon: MessageCircle },
+  { href: '/app/subscriptions', label: 'Langganan', description: 'Biaya berulang & jatuh tempo', Icon: Repeat },
+  { href: '/app/income', label: 'Pemasukan', description: 'Catat & kelola pemasukan', Icon: PiggyBank },
   { href: '/split-bills', label: 'Split Bill', description: 'Bagi tagihan bareng temen', Icon: Receipt },
-  { href: '/savings-calculator', label: 'Target Tabungan', description: 'Hitung nabung per bulan buat goal kamu', Icon: Target },
   { href: '/app/reports', label: 'Laporan', description: 'Ringkasan bulanan & tren', Icon: LineChart },
   { href: '/app/budget', label: 'Budget', description: 'Atur budget harian', Icon: Wallet },
-  { href: '/app/income', label: 'Pemasukan', description: 'Catat pemasukan manual', Icon: PiggyBank },
+  { href: '/savings-calculator', label: 'Target Tabungan', description: 'Hitung nabung per bulan', Icon: Target },
 ];
 
 export default function DashboardPage() {
-  const { data, isLoading } = useSWR('/budget/today', fetcher);
+  const { data, isLoading } = useSWR('/budget/today', todayFetcher);
+  const { data: subs } = useSWR('/transactions/subscriptions', subsFetcher);
 
   const ratio = data && data.budget > 0 ? data.totalSpent / data.budget : 0;
   const status = data?.isOverBudget ? 'over' : ratio >= 0.8 ? 'near' : 'under';
+  const monthlyBurn = (subs ?? []).reduce((sum, s) => sum + s.estimatedMonthlyBurn, 0);
+  const dueSoon = (subs ?? []).filter((s) => {
+    const days = Math.ceil((new Date(s.lastSeenAt).getTime() + 30 * 86400000 - Date.now()) / 86400000);
+    return days >= 0 && days <= 3;
+  }).length;
 
   return (
     <div className="pb-navbar animate-fade-in-up">
@@ -45,12 +74,16 @@ export default function DashboardPage() {
           <p className="text-small font-bold uppercase tracking-caps text-ink-muted">Trackster</p>
           <h1 className="font-title text-title font-bold text-ink">Dashboard</h1>
         </div>
+        <Link
+          href="/app/chat"
+          aria-label="Tanya Track"
+          className="flex h-11 w-11 items-center justify-center rounded-full bg-surface-interactive ring-1 ring-white/[0.08] transition-colors hover:bg-surface-alt"
+        >
+          <TracksterMascot mood="idle" size="sm" />
+        </Link>
       </header>
 
       <div className="flex flex-col gap-3 px-4">
-        {/* Ringkasan hari ini — kompak, cuma buat cross-check sekilas. Detail transaksi
-            lengkap (list, tambah manual, sync) sengaja dipindah ke /app/today biar dashboard
-            nggak langsung menuh-menuhin begitu login. */}
         <Link
           href="/app/today"
           className="block rounded-medium bg-surface p-5 transition-colors duration-base ease-standard hover:bg-surface-alt"
@@ -97,8 +130,6 @@ export default function DashboardPage() {
           </p>
         </Link>
 
-        {/* Net hari ini — pemasukan manual dikurangi pengeluaran, biar keliatan hari ini
-            sebenarnya + atau - meski sudah over budget belanja. */}
         {data && (
           <div className="rounded-medium bg-surface p-5">
             <div className="flex items-start justify-between gap-3">
@@ -123,6 +154,34 @@ export default function DashboardPage() {
             </div>
           </div>
         )}
+
+        <Link
+          href="/app/subscriptions"
+          className="block rounded-medium bg-surface p-5 transition-colors duration-base ease-standard hover:bg-surface-alt"
+        >
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <p className="text-small font-bold uppercase tracking-caps text-ink-muted">Langganan aktif</p>
+              <p className="mt-1 font-title text-amount font-black tracking-[-1px] tabular-nums text-ink">
+                {formatRupiah(monthlyBurn)}
+                <span className="ml-1 text-body font-normal text-ink-muted">/bln</span>
+              </p>
+            </div>
+            <span className="flex h-10 w-10 items-center justify-center rounded-full bg-surface-interactive text-ink-muted">
+              <Repeat size={18} />
+            </span>
+          </div>
+          <p className="mt-3 text-small text-ink-muted">
+            {subs == null
+              ? 'Memuat deteksi langganan…'
+              : subs.length === 0
+                ? 'Belum ada yang terdeteksi — transaksi berulang akan muncul otomatis.'
+                : `${subs.length} layanan terdeteksi${dueSoon > 0 ? ` · ${dueSoon} jatuh tempo ≤3 hari` : ''}`}
+          </p>
+          <p className="mt-2 flex items-center gap-1.5 text-small font-bold text-brand">
+            Kelola langganan <ArrowRight size={14} />
+          </p>
+        </Link>
 
         <h2 className="mt-2 px-1 text-heading font-semibold text-ink">Menu</h2>
         <div className="grid grid-cols-2 gap-3">

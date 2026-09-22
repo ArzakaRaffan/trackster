@@ -66,3 +66,14 @@ Personal finance expense tracker untuk Arzaka. Otomatis mencatat pengeluaran dar
 - Ada di folder `design-system/` (dari Claude Design), dengan `handoff/README.md` sebagai instruksi urutan kerja resmi buat apply ke codebase.
 - Token: spacing scale 8px base, mobile gutter 16px, card gap 12px, radius/warna/tipografi custom — semua harus ditrace ke `design-system/tokens/`, jangan pakai magic number Tailwind sembarangan.
 - Motion: pakai library `motion` (Framer Motion baru) + `@formkit/auto-animate`, token durasi 320ms dengan easing "ease-expressive" — konsisten dipakai di semua halaman, jangan re-invent angka baru per halaman.
+
+## Second Brain Vault
+
+Sebelum melakukan apapun, baca dulu:
+- C:\Users\arzak\OneDrive\Pictures\Documents\Second Brain\01-Projects\Trackster\_Overview.md
+- C:\Users\arzak\OneDrive\Pictures\Documents\Second Brain\01-Projects\Trackster\Architecture.md
+- C:\Users\arzak\OneDrive\Pictures\Documents\Second Brain\01-Projects\Trackster\Decisions.md
+
+Jangan scan seluruh codebase di awal sesi kecuali task eksplisit membutuhkannya (catatan di atas ini sudah cukup detail untuk sebagian besar task).
+
+Di akhir sesi, kalau ada keputusan teknis baru atau perubahan arsitektur signifikan, update note yang relevan di vault (bukan cuma di kepala kamu).

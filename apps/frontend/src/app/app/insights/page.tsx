@@ -299,7 +299,7 @@ function HealthScoreCard() {
     score >= 80 ? 'bg-status-under-bg text-status-under' : score >= 60 ? 'bg-status-near-bg text-status-near' : 'bg-status-over-bg text-status-over';
 
   return (
-    <section className="rounded-medium bg-surface p-5 border border-white/[0.06]">
+    <section className="rounded-medium bg-surface p-5">
       <div className="flex items-start justify-between">
         <div>
           <p className="text-small font-bold uppercase tracking-caps text-ink-muted">Financial Health Score</p>
@@ -314,12 +314,12 @@ function HealthScoreCard() {
       </div>
 
       {latest.aiCommentary && (
-        <p className="mt-3 text-small text-ink italic leading-relaxed bg-surface-interactive p-3 rounded-standard border border-white/[0.04]">
+        <p className="mt-3 text-small text-ink-secondary italic leading-relaxed bg-surface-interactive p-3.5 rounded-comfortable">
           &ldquo;{latest.aiCommentary}&rdquo;
         </p>
       )}
 
-      <div className="mt-4 grid grid-cols-2 gap-3 pt-3 border-t border-white/[0.06] text-small">
+      <div className="mt-4 grid grid-cols-2 gap-3 pt-3 border-t border-line-subtle text-small">
         <div>
           <p className="text-micro text-ink-muted">Disiplin Budget</p>
           <p className="font-bold text-ink">{Number(latest.budgetAdherencePct).toFixed(0)}%</p>

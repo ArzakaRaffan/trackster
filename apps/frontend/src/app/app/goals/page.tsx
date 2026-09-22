@@ -176,7 +176,7 @@ export default function GoalsPage() {
               const isFinished = goal.progress >= 100;
 
               return (
-                <section key={goal.id} className="rounded-medium bg-surface p-5 border border-white/[0.06]">
+                <section key={goal.id} className="rounded-medium bg-surface p-5">
                   <div className="flex items-start justify-between gap-3">
                     <div>
                       <h2 className="font-title text-title font-bold text-ink">{goal.name}</h2>
@@ -219,20 +219,20 @@ export default function GoalsPage() {
                     <div className="text-right">
                       <p className="text-micro text-ink-muted">{isFinished ? 'Status' : 'Sisa Target'}</p>
                       <p className={`font-bold ${isFinished ? 'text-status-under' : 'text-ink-secondary'}`}>
-                        {isFinished ? 'Tercapai! 🎉' : formatRupiah(remaining)}
+                        {isFinished ? 'Tercapai' : formatRupiah(remaining)}
                       </p>
                     </div>
                   </div>
 
                   {/* Actions */}
-                  <div className="mt-4 flex flex-wrap gap-2 pt-3 border-t border-white/[0.06]">
+                  <div className="mt-4 flex flex-wrap gap-2 pt-3 border-t border-line-subtle">
                     <button
                       onClick={() => {
                         setContributeModalOpen(goal);
                         setContributeAmount('');
                         setContributeNote('');
                       }}
-                      className="inline-flex items-center gap-1.5 rounded-standard bg-brand/10 text-brand px-3 py-1.5 text-small font-bold hover:bg-brand/20 transition-colors"
+                      className="inline-flex items-center gap-1.5 rounded-full-pill bg-brand text-base px-3.5 py-1.5 text-small font-bold hover:brightness-108 transition-all active:scale-[.97]"
                     >
                       <PiggyBank size={15} /> Nabung
                     </button>
@@ -242,13 +242,13 @@ export default function GoalsPage() {
                         setCutPercent(20);
                         runSimulation(goal.id, 20);
                       }}
-                      className="inline-flex items-center gap-1.5 rounded-standard bg-surface-interactive text-ink-muted px-3 py-1.5 text-small hover:text-ink hover:bg-white/[0.08] transition-colors"
+                      className="inline-flex items-center gap-1.5 rounded-full-pill bg-surface-interactive text-ink-muted px-3.5 py-1.5 text-small font-bold hover:text-ink hover:bg-surface-alt transition-colors"
                     >
                       <Calculator size={15} /> Simulasi Cepat
                     </button>
                     <button
                       onClick={() => handleArchive(goal.id)}
-                      className="ml-auto inline-flex items-center gap-1 rounded-standard text-ink-subtle p-1.5 text-small hover:text-status-over transition-colors"
+                      className="ml-auto inline-flex items-center gap-1 rounded-full text-ink-subtle p-1.5 text-small hover:text-status-over transition-colors"
                       title="Arsipkan"
                     >
                       <Archive size={15} />
@@ -263,62 +263,66 @@ export default function GoalsPage() {
 
       {/* Modal Tambah Goal */}
       {createModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
-          <div className="w-full max-w-md rounded-medium bg-surface p-5 shadow-2xl border border-white/[0.08]">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-base/70 backdrop-blur-sm p-4 animate-fade-in">
+          <div className="w-full max-w-md rounded-panel bg-surface p-5 shadow-heavy animate-slide-up">
             <div className="flex items-center justify-between mb-4">
-              <h3 className="font-title text-title font-bold text-ink">Target Tabungan Baru</h3>
+              <div>
+                <p className="text-small font-bold uppercase tracking-caps text-ink-muted">Target baru</p>
+                <h3 className="font-title text-heading font-bold text-ink">Target Tabungan</h3>
+              </div>
               <button
                 onClick={() => setCreateModalOpen(false)}
-                className="text-ink-muted hover:text-ink"
+                className="flex h-8 w-8 items-center justify-center rounded-full bg-surface-interactive text-ink-muted hover:text-ink"
+                aria-label="Tutup"
               >
-                <X size={20} />
+                <X size={16} />
               </button>
             </div>
             <form onSubmit={handleCreateGoal} className="space-y-4">
               <div>
-                <label className="block text-small font-bold text-ink-muted mb-1">Nama Target</label>
+                <label className="block text-small font-bold uppercase tracking-caps text-ink-muted mb-1.5">Nama Target</label>
                 <input
                   type="text"
-                  placeholder="Misal: Beli Laptop, Liburan Jogja"
+                  placeholder="Misal: Laptop Baru, Liburan"
                   value={name}
                   onChange={(e) => setName(e.target.value)}
                   required
-                  className="w-full rounded-comfortable bg-surface-interactive px-3.5 py-2.5 text-body text-ink outline-none border border-white/[0.06] focus:border-brand/50"
+                  className="w-full rounded-comfortable bg-surface-interactive px-3.5 py-2.5 text-body text-ink shadow-field outline-none transition-shadow duration-base ease-standard focus:shadow-field-focus placeholder:text-ink-subtle"
                 />
               </div>
               <div>
-                <label className="block text-small font-bold text-ink-muted mb-1">Target Nominal (Rp)</label>
+                <label className="block text-small font-bold uppercase tracking-caps text-ink-muted mb-1.5">Target Nominal (Rp)</label>
                 <input
                   type="number"
-                  placeholder="Misal: 5000000"
+                  placeholder="5000000"
                   value={targetAmount}
                   onChange={(e) => setTargetAmount(e.target.value)}
                   required
                   min="1"
-                  className="w-full rounded-comfortable bg-surface-interactive px-3.5 py-2.5 text-body text-ink outline-none border border-white/[0.06] focus:border-brand/50"
+                  className="w-full rounded-comfortable bg-surface-interactive px-3.5 py-2.5 text-body tabular-nums text-ink shadow-field outline-none transition-shadow duration-base ease-standard focus:shadow-field-focus placeholder:text-ink-subtle"
                 />
               </div>
               <div>
-                <label className="block text-small font-bold text-ink-muted mb-1">Target Tanggal (Opsional)</label>
+                <label className="block text-small font-bold uppercase tracking-caps text-ink-muted mb-1.5">Target Tanggal (Opsional)</label>
                 <input
                   type="date"
                   value={targetDate}
                   onChange={(e) => setTargetDate(e.target.value)}
-                  className="w-full rounded-comfortable bg-surface-interactive px-3.5 py-2.5 text-body text-ink outline-none border border-white/[0.06] focus:border-brand/50"
+                  className="w-full rounded-comfortable bg-surface-interactive px-3.5 py-2.5 text-body text-ink shadow-field outline-none transition-shadow duration-base ease-standard focus:shadow-field-focus"
                 />
               </div>
               <div className="flex justify-end gap-2 pt-2">
                 <button
                   type="button"
                   onClick={() => setCreateModalOpen(false)}
-                  className="rounded-standard px-4 py-2 text-small text-ink-muted hover:text-ink"
+                  className="rounded-full-pill px-4 py-2 text-small text-ink-muted hover:text-ink transition-colors"
                 >
                   Batal
                 </button>
                 <button
                   type="submit"
                   disabled={savingGoal}
-                  className="rounded-standard bg-brand px-4 py-2 text-small font-bold text-base hover:bg-brand-hover disabled:opacity-50 transition-colors"
+                  className="rounded-full-pill bg-brand px-5 py-2 text-small font-bold text-base hover:brightness-108 disabled:opacity-50 transition-all active:scale-[.97]"
                 >
                   {savingGoal ? 'Menyimpan...' : 'Simpan Target'}
                 </button>
@@ -330,54 +334,55 @@ export default function GoalsPage() {
 
       {/* Modal Catat Tabungan (Contribute) */}
       {contributeModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
-          <div className="w-full max-w-md rounded-medium bg-surface p-5 shadow-2xl border border-white/[0.08]">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-base/70 backdrop-blur-sm p-4 animate-fade-in">
+          <div className="w-full max-w-md rounded-panel bg-surface p-5 shadow-heavy animate-slide-up">
             <div className="flex items-center justify-between mb-4">
               <div>
-                <h3 className="font-title text-title font-bold text-ink">Catat Tabungan</h3>
-                <p className="text-small text-ink-muted">{contributeModalOpen.name}</p>
+                <p className="text-small font-bold uppercase tracking-caps text-ink-muted">Setor / Tarik</p>
+                <h3 className="font-title text-heading font-bold text-ink">{contributeModalOpen.name}</h3>
               </div>
               <button
                 onClick={() => setContributeModalOpen(null)}
-                className="text-ink-muted hover:text-ink"
+                className="flex h-8 w-8 items-center justify-center rounded-full bg-surface-interactive text-ink-muted hover:text-ink"
+                aria-label="Tutup"
               >
-                <X size={20} />
+                <X size={16} />
               </button>
             </div>
             <form onSubmit={handleContribute} className="space-y-4">
               <div>
-                <label className="block text-small font-bold text-ink-muted mb-1">Jumlah (Rp)</label>
+                <label className="block text-small font-bold uppercase tracking-caps text-ink-muted mb-1.5">Jumlah (Rp)</label>
                 <input
                   type="number"
-                  placeholder="Nominal (positif = nabung, negatif = tarik)"
+                  placeholder="Positif = nabung, negatif = tarik"
                   value={contributeAmount}
                   onChange={(e) => setContributeAmount(e.target.value)}
                   required
-                  className="w-full rounded-comfortable bg-surface-interactive px-3.5 py-2.5 text-body text-ink outline-none border border-white/[0.06] focus:border-brand/50"
+                  className="w-full rounded-comfortable bg-surface-interactive px-3.5 py-2.5 text-body tabular-nums text-ink shadow-field outline-none transition-shadow duration-base ease-standard focus:shadow-field-focus placeholder:text-ink-subtle"
                 />
               </div>
               <div>
-                <label className="block text-small font-bold text-ink-muted mb-1">Catatan (Opsional)</label>
+                <label className="block text-small font-bold uppercase tracking-caps text-ink-muted mb-1.5">Catatan (Opsional)</label>
                 <input
                   type="text"
-                  placeholder="Misal: Sisihan gaji, bonus project"
+                  placeholder="Misal: Sisihan gaji, bonus"
                   value={contributeNote}
                   onChange={(e) => setContributeNote(e.target.value)}
-                  className="w-full rounded-comfortable bg-surface-interactive px-3.5 py-2.5 text-body text-ink outline-none border border-white/[0.06] focus:border-brand/50"
+                  className="w-full rounded-comfortable bg-surface-interactive px-3.5 py-2.5 text-body text-ink shadow-field outline-none transition-shadow duration-base ease-standard focus:shadow-field-focus placeholder:text-ink-subtle"
                 />
               </div>
               <div className="flex justify-end gap-2 pt-2">
                 <button
                   type="button"
                   onClick={() => setContributeModalOpen(null)}
-                  className="rounded-standard px-4 py-2 text-small text-ink-muted hover:text-ink"
+                  className="rounded-full-pill px-4 py-2 text-small text-ink-muted hover:text-ink transition-colors"
                 >
                   Batal
                 </button>
                 <button
                   type="submit"
                   disabled={savingContribution}
-                  className="rounded-standard bg-brand px-4 py-2 text-small font-bold text-base hover:bg-brand-hover disabled:opacity-50 transition-colors"
+                  className="rounded-full-pill bg-brand px-5 py-2 text-small font-bold text-base hover:brightness-108 disabled:opacity-50 transition-all active:scale-[.97]"
                 >
                   {savingContribution ? 'Menyimpan...' : 'Catat'}
                 </button>
@@ -387,20 +392,21 @@ export default function GoalsPage() {
         </div>
       )}
 
-      {/* Modal / Sheet What-if Simulator */}
+      {/* Modal What-if Simulator */}
       {simulatingGoal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
-          <div className="w-full max-w-lg rounded-medium bg-surface p-5 shadow-2xl border border-white/[0.08]">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-base/70 backdrop-blur-sm p-4 animate-fade-in">
+          <div className="w-full max-w-lg rounded-panel bg-surface p-5 shadow-heavy animate-slide-up">
             <div className="flex items-center justify-between mb-4">
               <div>
-                <h3 className="font-title text-title font-bold text-ink">What-If Simulator</h3>
-                <p className="text-small text-ink-muted">{simulatingGoal.name}</p>
+                <p className="text-small font-bold uppercase tracking-caps text-ink-muted">Simulasi target</p>
+                <h3 className="font-title text-heading font-bold text-ink">{simulatingGoal.name}</h3>
               </div>
               <button
                 onClick={() => setSimulatingGoal(null)}
-                className="text-ink-muted hover:text-ink"
+                className="flex h-8 w-8 items-center justify-center rounded-full bg-surface-interactive text-ink-muted hover:text-ink"
+                aria-label="Tutup"
               >
-                <X size={20} />
+                <X size={16} />
               </button>
             </div>
 
@@ -440,12 +446,12 @@ export default function GoalsPage() {
                     <Sparkles size={18} />
                     <span>
                       {simResult.monthsSaved > 0
-                        ? `Tercapai ${simResult.monthsSaved} bulan lebih cepat!`
+                        ? `Tercapai ${simResult.monthsSaved} bulan lebih cepat`
                         : 'Simulasi waktu capaian'}
                     </span>
                   </div>
 
-                  <div className="grid grid-cols-2 gap-3 pt-2 text-small">
+                  <div className="grid grid-cols-2 gap-3 pt-2 text-small border-t border-line-subtle">
                     <div>
                       <p className="text-micro text-ink-muted">Estimasi Saat Ini</p>
                       <p className="font-bold text-ink">
@@ -465,7 +471,7 @@ export default function GoalsPage() {
                   </div>
 
                   <p className="text-micro text-ink-subtle pt-1">
-                    * Berdasarkan rata-rata pengeluaran dan pemasukan 30 hari terakhir. Murni kalkulasi deterministik.
+                    Berdasarkan rata-rata pengeluaran dan pemasukan 30 hari terakhir.
                   </p>
                 </div>
               ) : null}
@@ -474,7 +480,7 @@ export default function GoalsPage() {
                 <button
                   type="button"
                   onClick={() => setSimulatingGoal(null)}
-                  className="rounded-standard bg-surface-interactive px-4 py-2 text-small font-bold text-ink hover:bg-white/[0.08]"
+                  className="rounded-full-pill bg-surface-interactive px-4 py-2 text-small font-bold text-ink hover:bg-surface-alt transition-colors"
                 >
                   Tutup
                 </button>
