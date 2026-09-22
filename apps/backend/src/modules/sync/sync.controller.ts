@@ -1,7 +1,18 @@
-import { Controller, Get, Post, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Post, UseGuards } from '@nestjs/common';
+import { Matches } from 'class-validator';
 import { GmailSyncService } from '../gmail/gmail-sync.service';
 import { PrismaService } from '../../prisma.service';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
+
+class BackfillDto {
+  /** Inclusive start YYYY-MM-DD */
+  @Matches(/^\d{4}-\d{2}-\d{2}$/)
+  after: string;
+
+  /** Exclusive end YYYY-MM-DD (Gmail before:) */
+  @Matches(/^\d{4}-\d{2}-\d{2}$/)
+  before: string;
+}
 
 @UseGuards(JwtAuthGuard)
 @Controller('sync')
@@ -14,6 +25,16 @@ export class SyncController {
   @Post('trigger')
   async trigger() {
     return this.gmailSyncService.syncEmails();
+  }
+
+  /** Tarik ulang email bank untuk rentang tanggal (isi gap yang terlewat window newer_than:7d). */
+  @Post('backfill')
+  async backfill(@Body() dto: BackfillDto) {
+    return this.gmailSyncService.syncEmails({
+      after: dto.after,
+      before: dto.before,
+      quiet: true,
+    });
   }
 
   @Get('next-run')
