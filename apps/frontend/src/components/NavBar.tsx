@@ -26,6 +26,7 @@ const MORE_SUBPATHS = [
   '/app/settings',
   '/app/chat',
   '/app/goals',
+  '/app/subscriptions',
 ];
 
 export default function NavBar() {

@@ -83,7 +83,7 @@ export default function BudgetPage() {
         </section>
 
         {suggestion && suggestion.suggestedDailyAllowance > 0 && (
-          <div className="flex items-start gap-3 rounded-comfortable bg-surface-interactive p-4 border border-white/[0.04]">
+          <div className="flex items-start gap-3 rounded-comfortable bg-surface-interactive p-4">
             <Sparkles size={18} className="mt-0.5 shrink-0 text-brand" />
             <div>
               <p className="text-label font-bold text-ink">

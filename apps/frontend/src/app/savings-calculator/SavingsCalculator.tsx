@@ -226,18 +226,18 @@ export function SavingsCalculator() {
         )}
 
         {/* Funnel — link ke fitur Target Tabungan (Kantong) */}
-        <div className="mt-8 flex flex-wrap items-center justify-between gap-3 rounded-comfortable bg-surface-interactive p-4 border border-white/[0.06]">
+        <div className="mt-8 flex flex-wrap items-center justify-between gap-3 rounded-comfortable bg-surface-interactive p-4">
           <div className="flex items-center gap-3">
             <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-surface-alt text-brand">
               <Sparkles size={16} />
             </span>
             <p className="text-small text-ink-muted">
-              <span className="font-bold text-ink">Target Tabungan (Kantong)</span> sekarang sudah aktif di Trackster!
+              <span className="font-bold text-ink">Target Tabungan (Kantong)</span> sudah aktif di Trackster.
             </p>
           </div>
           <Link
             href="/app/goals"
-            className="shrink-0 rounded-standard bg-brand px-3 py-1.5 text-small font-bold text-base transition-colors hover:bg-brand-hover"
+            className="shrink-0 rounded-full-pill bg-brand px-3.5 py-1.5 text-small font-bold text-base transition-all hover:brightness-108 active:scale-[.97]"
           >
             Buka Goals
           </Link>

@@ -183,7 +183,7 @@ export default function TodayPage() {
 
         {/* Runway Forecast Card */}
         {runway && (
-          <section className="rounded-medium bg-surface p-5 border border-white/[0.06]">
+          <section className="rounded-medium bg-surface p-5">
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-small font-bold uppercase tracking-caps text-ink-muted">Runway Akhir Bulan</p>
@@ -201,7 +201,7 @@ export default function TodayPage() {
                 {runway.isProjectedShortfall ? 'Defisit Terproyeksi' : 'Aman'}
               </span>
             </div>
-            <div className="mt-4 grid grid-cols-2 gap-3 pt-3 border-t border-white/[0.06] text-small">
+            <div className="mt-4 grid grid-cols-2 gap-3 pt-3 border-t border-line-subtle text-small">
               <div>
                 <p className="text-micro text-ink-muted">Burn Rate (7 Hari)</p>
                 <p className="font-bold text-ink">{formatRupiah(runway.burnRatePerDay)}/hari</p>
