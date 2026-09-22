@@ -11,7 +11,7 @@ import { AiChatService } from '../ai/ai-chat.service';
 import { Category } from '@prisma/client';
 
 // Cron window tetap pendek biar ringan. Historical gap pakai syncEmails({ after, before }).
-const GMAIL_QUERY_RECENT = 'from:(bca OR jago) newer_than:7d';
+const GMAIL_QUERY_RECENT = 'from:(bca OR jago OR flip) newer_than:7d';
 
 const SYNC_CRON_JOB_NAME = 'gmail-sync';
 
@@ -52,7 +52,7 @@ export class GmailSyncService {
 
   private buildQuery(options?: SyncOptions): string {
     if (options?.after || options?.before) {
-      const parts = ['from:(bca OR jago)'];
+      const parts = ['from:(bca OR jago OR flip)'];
       if (options.after) parts.push(`after:${options.after.replace(/-/g, '/')}`);
       if (options.before) parts.push(`before:${options.before.replace(/-/g, '/')}`);
       return parts.join(' ');

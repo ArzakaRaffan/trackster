@@ -1,15 +1,16 @@
 import { Injectable } from '@nestjs/common';
 import { BcaParser } from './bca.parser';
 import { JagoParser } from './jago.parser';
+import { FlipParser } from './flip.parser';
 import { EmailParser, RawEmail, ParseResult } from './parser.interface';
 
 @Injectable()
 export class ParserRegistryService {
   private parsers: EmailParser[];
 
-  constructor(bcaParser: BcaParser, jagoParser: JagoParser) {
-    this.parsers = [bcaParser, jagoParser];
-    // GoPay sengaja tidak didaftarkan (out of scope, lihat build plan)
+  constructor(bcaParser: BcaParser, jagoParser: JagoParser, flipParser: FlipParser) {
+    // Flip dulu: email Flip jangan ke-handle BCA/Jago by accident
+    this.parsers = [flipParser, bcaParser, jagoParser];
   }
 
   parseEmail(email: RawEmail): ParseResult | null {

@@ -5,6 +5,7 @@ import { GmailSyncService } from './gmail-sync.service';
 import { ParserRegistryService } from './parsers/parser-registry.service';
 import { BcaParser } from './parsers/bca.parser';
 import { JagoParser } from './parsers/jago.parser';
+import { FlipParser } from './parsers/flip.parser';
 import { PrismaService } from '../../prisma.service';
 import { AuthModule } from '../auth/auth.module';
 import { TransactionModule } from '../transaction/transaction.module';
@@ -21,6 +22,7 @@ import { AiModule } from '../ai/ai.module';
     ParserRegistryService,
     BcaParser,
     JagoParser,
+    FlipParser,
     PrismaService,
   ],
   exports: [GmailSyncService, GmailAuthService],
