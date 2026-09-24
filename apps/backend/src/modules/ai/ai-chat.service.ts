@@ -58,6 +58,7 @@ export class AiChatService {
   ): Promise<string> {
     const validCategories = [
       'MAKANAN', 'TRANSPORT', 'BELANJA', 'TAGIHAN', 'HIBURAN', 'KESEHATAN', 'LAINNYA',
+      'TRANSFER', 'TOPUP', 'PENDIDIKAN', 'PERAWATAN', 'INVESTASI', 'ROKOK',
     ];
 
     const systemPrompt = `Kamu adalah kategorisasi otomatis transaksi keuangan.
@@ -67,6 +68,7 @@ Jawab HANYA dengan nama kategori (huruf kapital semua), tanpa teks lain apapun.`
     try {
       const response = await this.aiService.chat({
         system: systemPrompt,
+        model: 'fast',
         messages: [
           {
             role: 'user',

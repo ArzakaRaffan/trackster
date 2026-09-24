@@ -1,5 +1,5 @@
 import { Controller, Post, Body, Get, UseGuards } from '@nestjs/common';
-import { IsString, MinLength } from 'class-validator';
+import { IsNumber, IsString, MinLength } from 'class-validator';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { AiChatService } from './ai-chat.service';
 import { AiReportsService } from './ai-reports.service';
@@ -10,6 +10,15 @@ class ChatDto {
   @IsString()
   @MinLength(1)
   message: string;
+}
+
+class SuggestCategoryDto {
+  @IsString()
+  @MinLength(1)
+  description: string;
+
+  @IsNumber()
+  amount: number;
 }
 
 @UseGuards(JwtAuthGuard)
@@ -31,6 +40,15 @@ export class AiController {
   async chat(@Body() body: ChatDto) {
     const reply = await this.aiChatService.handleMessage(body.message, { channel: 'web' });
     return { reply };
+  }
+
+  /** Dipakai halaman "Rapikan kategori" — saran kategori AI buat merchant yang masih LAINNYA.
+   * Nggak nyimpen rule, cuma saran; rule baru kesimpen pas user beneran apply lewat
+   * PATCH /transactions/:id/category?applyToAll. */
+  @Post('suggest-category')
+  async suggestCategory(@Body() body: SuggestCategoryDto) {
+    const category = await this.aiChatService.categorize(body.description, body.amount);
+    return { category };
   }
 
   /** Return 12 data HealthScoreLog terakhir untuk chart trend di frontend */

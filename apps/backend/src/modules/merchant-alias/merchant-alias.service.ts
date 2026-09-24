@@ -1,12 +1,44 @@
 import { Injectable } from '@nestjs/common';
+import { Category } from '@prisma/client';
 import { PrismaService } from '../../prisma.service';
+import { merchantKey } from '../../common/merchant-key';
 
 @Injectable()
 export class MerchantAliasService {
   constructor(private prisma: PrismaService) {}
 
+  /** Cuma alias yang punya displayName (rule kategori murni tanpa nama tampilan disembunyikan
+   * dari halaman ini — nggak relevan buat "ganti nama merchant"). */
   async findAll() {
-    return this.prisma.merchantAlias.findMany({ orderBy: { displayName: 'asc' } });
+    return this.prisma.merchantAlias.findMany({
+      where: { displayName: { not: null } },
+      orderBy: { displayName: 'asc' },
+    });
+  }
+
+  /** Rule kategori by merchantKey (bukan rawDescription exact) — biar "Kopi Kenangan 1320" dan
+   * "Kopi Kenangan QR BRI 1 1" kena rule yang sama. Tabelnya kecil, jadi cek in-memory per
+   * description cukup murah, gak perlu kolom merchantKey terpisah di MerchantAlias. */
+  async findCategoryForDescription(description: string): Promise<Category | null> {
+    const key = merchantKey(description);
+    if (!key) return null;
+
+    const rules = await this.prisma.merchantAlias.findMany({
+      where: { category: { not: null } },
+      select: { rawDescription: true, category: true },
+    });
+    const match = rules.find((r) => merchantKey(r.rawDescription) === key);
+    return match?.category ?? null;
+  }
+
+  /** Simpan/perbarui rule kategori untuk merchant ini (dipakai AI-learn & koreksi manual user).
+   * Tidak menyentuh displayName yang mungkin sudah ada. */
+  async upsertCategory(rawDescription: string, category: Category) {
+    return this.prisma.merchantAlias.upsert({
+      where: { rawDescription },
+      update: { category },
+      create: { rawDescription, category },
+    });
   }
 
   /** rawDescription unique — kalau sudah ada alias buat description itu, update displayName-nya

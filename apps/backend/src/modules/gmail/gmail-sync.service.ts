@@ -8,6 +8,7 @@ import { BudgetService } from '../budget/budget.service';
 import { TelegramService } from '../telegram/telegram.service';
 import { PrismaService } from '../../prisma.service';
 import { AiChatService } from '../ai/ai-chat.service';
+import { MerchantAliasService } from '../merchant-alias/merchant-alias.service';
 import { Category, ParseStatus } from '@prisma/client';
 import { shouldSkipLogUpsert } from './parsers/email-parse-log.util';
 
@@ -38,6 +39,7 @@ export class GmailSyncService {
     private prisma: PrismaService,
     private schedulerRegistry: SchedulerRegistry,
     private aiChatService: AiChatService,
+    private merchantAliasService: MerchantAliasService,
   ) {}
 
   @Cron(CronExpression.EVERY_5_MINUTES, { name: SYNC_CRON_JOB_NAME })
@@ -193,8 +195,7 @@ export class GmailSyncService {
       return;
     }
 
-    const categoryStr = await this.aiChatService.categorize(parsed.description, parsed.amount);
-    const category = categoryStr as Category;
+    const category = await this.resolveCategory(parsed.description, parsed.amount, parsed.categoryHint);
 
     const created = await this.transactionService.createFromParsed({
       amount: parsed.amount,
@@ -232,6 +233,26 @@ export class GmailSyncService {
         parser,
       });
     }
+  }
+
+  /** Pipeline kategorisasi (E00-S3): rule merchant (by merchantKey) → heuristik parser
+   * (`categoryHint`) → AI fast, lalu hasil AI disimpan sebagai rule baru biar merchant yang sama
+   * ke depannya konsisten tanpa panggil AI lagi. */
+  private async resolveCategory(
+    description: string,
+    amount: number,
+    categoryHint?: Category,
+  ): Promise<Category> {
+    const rule = await this.merchantAliasService.findCategoryForDescription(description);
+    if (rule) return rule;
+
+    if (categoryHint) return categoryHint;
+
+    const aiResult = (await this.aiChatService.categorize(description, amount)) as Category;
+    if (aiResult !== Category.LAINNYA) {
+      await this.merchantAliasService.upsertCategory(description, aiResult);
+    }
+    return aiResult;
   }
 
   private async checkAndAlertIfOverBudget(lastTransaction: {

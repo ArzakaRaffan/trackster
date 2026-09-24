@@ -28,6 +28,7 @@ export class AiService {
   private readonly apiKey: string;
   private readonly authHeader: string;
   private readonly model: string;
+  private readonly fastModel: string;
 
   constructor() {
     this.baseUrl =
@@ -40,6 +41,8 @@ export class AiService {
       process.env.AI_AUTH_HEADER ?? 'x-bf-vk';
     this.model =
       process.env.AI_MODEL ?? process.env.SPLITBILL_AI_MODEL ?? 'ghrocx/sonnet-5';
+    // Model murah/cepat buat tugas pendek (kategorisasi, ekstraksi) — lihat 02-conventions.md §3.
+    this.fastModel = process.env.AI_MODEL_FAST ?? 'ghrocx/haiku-4.5';
 
     if (!this.apiKey) {
       this.logger.warn('AI_API_KEY belum di-set — fitur AI tidak akan berjalan.');
@@ -52,6 +55,8 @@ export class AiService {
     messages: ChatMessage[];
     tools?: AiTool[];
     maxTokens?: number;
+    /** 'fast' = AI_MODEL_FAST (kategorisasi dll), atau nama model eksplisit. Default AI_MODEL. */
+    model?: 'fast' | string;
   }): Promise<any> {
     if (!this.apiKey) {
       throw new InternalServerErrorException('AI_API_KEY belum dikonfigurasi di environment.');
@@ -62,8 +67,10 @@ export class AiService {
       ...params.messages,
     ];
 
+    const model = params.model === 'fast' ? this.fastModel : (params.model ?? this.model);
+
     const body: Record<string, any> = {
-      model: this.model,
+      model,
       max_tokens: params.maxTokens ?? 2048,
       messages: allMessages,
     };
