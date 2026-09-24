@@ -143,14 +143,9 @@ export class BcaParser implements EmailParser {
     return 'Virtual Account (VA)';
   }
 
-  /**
-   * Inferensi categoryHint dari nama produk VA.
-   * Sementara hanya LAINNYA karena enum TOPUP belum ada (ditambahkan di E00-S3).
-   */
+  /** Inferensi categoryHint dari nama produk VA — top-up e-wallet selalu TOPUP. */
   private inferVaCategoryHint(companyProduct: string | null, _vaName: string | null): Category {
-    // TODO E00-S3: ganti LAINNYA dengan TOPUP setelah enum Category diperluas
-    // if (companyProduct && /GOPAY|SHOPEEPAY|AIRPAY|OVO|DANA|LINKAJA/i.test(companyProduct)) return Category.TOPUP;
-    void companyProduct; // suppress unused warning sampai E00-S3
+    if (companyProduct && /GOPAY|SHOPEEPAY|AIRPAY|OVO|DANA|LINKAJA/i.test(companyProduct)) return Category.TOPUP;
     return Category.LAINNYA;
   }
 

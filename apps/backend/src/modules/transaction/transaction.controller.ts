@@ -85,7 +85,22 @@ export class TransactionController {
 
   @Patch(':id/category')
   async updateCategory(@Param('id', ParseIntPipe) id: number, @Body() dto: UpdateCategoryDto) {
+    if (dto.applyToAll) {
+      return this.transactionService.updateCategoryForAll(id, dto.category);
+    }
     return this.transactionService.updateCategory(id, dto.category);
+  }
+
+  /** Berapa transaksi merchant yang sama bakal ikut kalau user pilih "terapkan ke semua". */
+  @Get(':id/same-merchant-count')
+  async sameMerchantCount(@Param('id', ParseIntPipe) id: number) {
+    return { count: await this.transactionService.countSameMerchant(id) };
+  }
+
+  /** Halaman "Rapikan kategori" — merchant LAINNYA dikelompokkan, diurut nominal terbesar. */
+  @Get('uncategorized-merchants')
+  async uncategorizedMerchants() {
+    return this.transactionService.getUncategorizedMerchants();
   }
 
   @Patch(':id/alias')

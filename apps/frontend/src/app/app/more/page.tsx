@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { BarChart3, ChevronRight, PiggyBank, Settings, Sparkles, Wallet, Bot, Target, Repeat } from 'lucide-react';
+import { BarChart3, ChevronRight, PiggyBank, Settings, Sparkles, Wallet, Bot, Target, Repeat, ListChecks } from 'lucide-react';
 
 const LINKS = [
   { href: '/app/chat', label: 'Tanya Track', description: 'Ngobrol sama AI financial buddy', Icon: Bot },
@@ -11,6 +11,7 @@ const LINKS = [
   { href: '/app/budget', label: 'Budget', description: 'Atur budget harian', Icon: Wallet },
   { href: '/app/income', label: 'Pemasukan', description: 'Kelola pemasukan, tren & alokasi', Icon: PiggyBank },
   { href: '/app/insights', label: 'Analisis', description: 'Insight pola pengeluaran & skor', Icon: Sparkles },
+  { href: '/app/categorize', label: 'Rapikan Kategori', description: 'Bereskan merchant yang masih "Lainnya"', Icon: ListChecks },
   { href: '/app/settings', label: 'Setting', description: 'Gmail, Telegram, akun', Icon: Settings },
 ];
 

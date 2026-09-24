@@ -27,8 +27,13 @@ model Transaction {
   note        String?
   category    Category @default(LAINNYA)
   isManual    Boolean  @default(false)
+  // Kunci normalisasi merchant (lowercase, tanpa digit/tanda baca/"qr", ≤3 kata pertama) —
+  // dipakai groupBy merchant di analisis & lookup rule kategori. Lihat merchantKey() di
+  // merchant-key.util.ts. Nullable karena transaksi lama di-backfill terpisah (bukan migration).
+  merchantKey String?
 
   @@index([occurredAt])
+  @@index([merchantKey])
 }
 
 enum Source {
@@ -45,6 +50,12 @@ enum Category {
   HIBURAN
   KESEHATAN
   LAINNYA
+  TRANSFER
+  TOPUP
+  PENDIDIKAN
+  PERAWATAN
+  INVESTASI
+  ROKOK
 }
 
 model DailyBudget {
@@ -147,11 +158,15 @@ model BalanceAdjustment {
 // Nama panggilan buat merchant, terikat ke Transaction.description via string match (bukan FK) —
 // jadi berlaku otomatis ke semua transaksi lama & baru yang description-nya persis sama.
 model MerchantAlias {
-  id             Int      @id @default(autoincrement())
-  rawDescription String   @unique
-  displayName    String
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
+  id             Int       @id @default(autoincrement())
+  rawDescription String    @unique
+  // Nullable: alias bisa dibuat cuma buat nyimpen rule kategori tanpa ganti nama tampilan.
+  displayName    String?
+  // Kategori tetap untuk merchant ini — dipakai pipeline kategorisasi sync (rule dulu,
+  // sebelum heuristik/AI) dan "terapkan ke semua" saat user koreksi kategori.
+  category       Category?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
 }
 
 // Split Bill: fitur berdiri sendiri buat bagi tagihan makan bareng teman, SENGAJA tidak

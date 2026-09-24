@@ -6,7 +6,7 @@ import useSWR from 'swr';
 import { AnimatePresence, motion } from 'motion/react';
 import { api } from '@/lib/api';
 import { AlertTriangle, Bell, ChevronLeft, Inbox, Mail, Plus, RefreshCw, X } from 'lucide-react';
-import { TransactionNoteRow } from '@/components/ui/TransactionNoteRow';
+import { TransactionNoteRow, CATEGORY_LABELS } from '@/components/ui/TransactionNoteRow';
 import { AmountDisplay } from '@/components/ui/AmountDisplay';
 import { BudgetProgress } from '@/components/ui/BudgetProgress';
 import { Input } from '@/components/ui/Input';
@@ -14,7 +14,10 @@ import { Button } from '@/components/ui/Button';
 import { TRANSITION_BASE, TRANSITION_SLOW } from '@/lib/motion';
 import { formatRupiah } from '@/lib/format';
 
-const CATEGORIES = ['MAKANAN', 'TRANSPORT', 'BELANJA', 'TAGIHAN', 'HIBURAN', 'KESEHATAN', 'LAINNYA'] as const;
+const CATEGORIES = [
+  'MAKANAN', 'TRANSPORT', 'BELANJA', 'TAGIHAN', 'HIBURAN', 'KESEHATAN',
+  'TRANSFER', 'TOPUP', 'PENDIDIKAN', 'PERAWATAN', 'INVESTASI', 'ROKOK', 'LAINNYA',
+] as const;
 
 interface ExpenseFormState {
   amount: string;
@@ -351,7 +354,7 @@ export default function TodayPage() {
                     >
                       {CATEGORIES.map((c) => (
                         <option key={c} value={c}>
-                          {c}
+                          {CATEGORY_LABELS[c]}
                         </option>
                       ))}
                     </select>

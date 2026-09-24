@@ -12,9 +12,17 @@ import { TransactionModule } from '../transaction/transaction.module';
 import { BudgetModule } from '../budget/budget.module';
 import { TelegramModule } from '../telegram/telegram.module';
 import { AiModule } from '../ai/ai.module';
+import { MerchantAliasModule } from '../merchant-alias/merchant-alias.module';
 
 @Module({
-  imports: [AuthModule, TransactionModule, BudgetModule, TelegramModule, forwardRef(() => AiModule)],
+  imports: [
+    AuthModule,
+    TransactionModule,
+    BudgetModule,
+    TelegramModule,
+    MerchantAliasModule,
+    forwardRef(() => AiModule),
+  ],
   controllers: [GmailController],
   providers: [
     GmailAuthService,

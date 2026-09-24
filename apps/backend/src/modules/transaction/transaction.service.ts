@@ -6,6 +6,7 @@ import { BalanceService, shouldAdjustBalance } from '../balance/balance.service'
 import { MerchantAliasService } from '../merchant-alias/merchant-alias.service';
 import { CreateTransactionDto } from './dto/create-transaction.dto';
 import { addWibDays, startOfWibDay, startOfWibMonth, startOfWibWeek, wibDateKey, wibDayOfWeek } from '../../common/wib';
+import { merchantKey } from '../../common/merchant-key';
 
 export interface ParsedTransaction {
   amount: number;
@@ -141,6 +142,54 @@ export class TransactionService {
 
   async updateCategory(id: number, category: Category) {
     return this.prisma.transaction.update({ where: { id }, data: { category } });
+  }
+
+  /** "Terapkan ke semua transaksi <merchant>?" — simpan rule kategori (MerchantAlias, dipakai
+   * sync berikutnya) DAN update semua transaksi lama dengan merchantKey yang sama sekarang juga. */
+  async updateCategoryForAll(id: number, category: Category) {
+    const transaction = await this.prisma.transaction.findUniqueOrThrow({ where: { id } });
+    const key = merchantKey(transaction.description);
+
+    await this.merchantAliasService.upsertCategory(transaction.description, category);
+    const result = await this.prisma.transaction.updateMany({ where: { merchantKey: key }, data: { category } });
+    return { updated: result.count };
+  }
+
+  /** Berapa transaksi lain yang bakal ikut ke-update kalau user pilih "terapkan ke semua". */
+  async countSameMerchant(id: number): Promise<number> {
+    const transaction = await this.prisma.transaction.findUniqueOrThrow({ where: { id } });
+    const key = merchantKey(transaction.description);
+    return this.prisma.transaction.count({ where: { merchantKey: key } });
+  }
+
+  /** Halaman "Rapikan kategori": semua transaksi LAINNYA dikelompokkan per merchantKey, diurut
+   * dari nominal terbesar. `representativeId` dipakai frontend buat manggil
+   * PATCH /transactions/:id/category?applyToAll kalau user terima saran. */
+  async getUncategorizedMerchants() {
+    const transactions = await this.prisma.transaction.findMany({
+      where: { category: Category.LAINNYA },
+      select: { id: true, description: true, amount: true, merchantKey: true },
+      orderBy: { occurredAt: 'desc' },
+    });
+
+    const groups = new Map<
+      string,
+      { representativeId: number; description: string; count: number; totalAmount: number }
+    >();
+    for (const t of transactions) {
+      const key = t.merchantKey || merchantKey(t.description);
+      const existing = groups.get(key);
+      if (existing) {
+        existing.count++;
+        existing.totalAmount += Number(t.amount);
+      } else {
+        groups.set(key, { representativeId: t.id, description: t.description, count: 1, totalAmount: Number(t.amount) });
+      }
+    }
+
+    return Array.from(groups.entries())
+      .map(([merchantKeyValue, g]) => ({ merchantKey: merchantKeyValue, ...g }))
+      .sort((a, b) => b.totalAmount - a.totalAmount);
   }
 
   /** Shortcut buat set alias langsung dari baris transaksi: ambil description transaksi itu,
@@ -366,6 +415,7 @@ export class TransactionService {
           occurredAt: new Date(dto.occurredAt),
           emailId: `manual:${randomUUID()}`,
           isManual: true,
+          merchantKey: merchantKey(dto.description),
         },
       });
       await this.balanceService.adjustBalance(tx, created.source, -Number(created.amount));
@@ -390,6 +440,7 @@ export class TransactionService {
           source: parsed.source,
           emailId: parsed.emailId,
           occurredAt: parsed.occurredAt,
+          merchantKey: merchantKey(parsed.description),
           ...(parsed.category ? { category: parsed.category } : {}),
         },
       });

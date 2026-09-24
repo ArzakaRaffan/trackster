@@ -29,6 +29,12 @@ export const CATEGORY_LABELS: Record<string, string> = {
   HIBURAN: 'Hiburan',
   KESEHATAN: 'Kesehatan',
   LAINNYA: 'Lainnya',
+  TRANSFER: 'Transfer',
+  TOPUP: 'Top-up',
+  PENDIDIKAN: 'Pendidikan',
+  PERAWATAN: 'Perawatan',
+  INVESTASI: 'Investasi',
+  ROKOK: 'Rokok/Vape',
 };
 
 // Palet kategori sengaja beda dari warna reserved (brand hijau, status triad, source biru/oranye)
@@ -41,6 +47,12 @@ export const CATEGORY_COLORS: Record<string, string> = {
   HIBURAN: '#f472b6',
   KESEHATAN: '#22d3ee',
   LAINNYA: '#94a3b8',
+  TRANSFER: '#818cf8',
+  TOPUP: '#38bdf8',
+  PENDIDIKAN: '#facc15',
+  PERAWATAN: '#f9a8d4',
+  INVESTASI: '#4ade80',
+  ROKOK: '#a8a29e',
 };
 const CATEGORY_OPTIONS = Object.keys(CATEGORY_LABELS);
 
@@ -82,7 +94,12 @@ export function TransactionNoteRow({
   const handleCategoryChange = async (category: string) => {
     setSavingCategory(true);
     try {
-      await api.patch(`/transactions/${transaction.id}/category`, { category });
+      const { count } = await api.get<{ count: number }>(`/transactions/${transaction.id}/same-merchant-count`);
+      const applyToAll =
+        count > 1 &&
+        window.confirm(`Terapkan ke semua transaksi "${title}" (${count})? Transaksi lama ikut ke-update.`);
+
+      await api.patch(`/transactions/${transaction.id}/category`, { category, applyToAll });
       onCategorySaved?.(transaction.id, category);
     } finally {
       setSavingCategory(false);
