@@ -47,7 +47,7 @@ Legend: ⬜ belum · 🟨 jalan · ✅ selesai (sudah diverifikasi di browser & 
 |---|---|---|---|---|
 | E00-S1 | Helper waktu WIB + ganti semua boundary hari/minggu/bulan | 0 | — | ✅ |
 | E00-S2 | Log hasil parse email (EmailParseLog) + halaman riwayat sync | 0 | — | 🟨 (kode selesai & diverifikasi endpoint; backfill nyata nunggu sync jalan di prod) |
-| E00-S3 | Kategori konsisten: merchant rule + kategori baru + "Rapikan kategori" | 0 | E00-S1 | ⬜ |
+| E00-S3 | Kategori konsisten: merchant rule + kategori baru + "Rapikan kategori" | 0 | E00-S1 | 🟨 (kode selesai & diverifikasi endpoint; belum dijalankan di prod) |
 | E01-S1 | Parser BCA Virtual Account (GoPay top-up & VA lain) | 0 | — (E00-S2 disarankan) | ✅ |
 | E01-S2 | Parser Flip: buang CSS, skip email instruksi, label baru | 0 | — (E00-S2 disarankan) | ✅ |
 | E01-S3 | Aturan saldo vs baseline + perbaikan data + backfill | 0 | E01-S1, E01-S2 | ✅ |

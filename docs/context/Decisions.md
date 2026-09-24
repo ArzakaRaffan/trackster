@@ -28,6 +28,14 @@
 
 ---
 
+## 2026-09-24 — E00-S3: kategori final + MOBI = investasi/crypto
+**Konteks:** Audit nemu `MOBI` (Rp2,62jt, 7 transaksi) nyasar ke `LAINNYA`, nggak jelas itu apa. Kategori enum sekarang cuma MAKANAN/TRANSPORT/BELANJA/TAGIHAN/HIBURAN/KESEHATAN/LAINNYA — nggak ada tempat buat transfer, top-up, atau pengeluaran sekali-jalan yang gede.
+**Keputusan:** `MOBI` = investasi/crypto (dikonfirmasi Arzaka). Kategori baru yang ditambah ke enum `Category` di E00-S3: `TRANSFER`, `TOPUP` (sudah direncanakan sejak E01), `PENDIDIKAN`, `PERAWATAN`, `INVESTASI`, `ROKOK` (vape/rokok, sebelumnya default ke `HIBURAN` di draf epic — Arzaka minta kategori sendiri).
+**Alasan:** Vape & investasi punya pola belanja beda (rutin kecil vs sekali gede) dari hiburan/lainnya biasa — nyampur bikin analisis pengeluaran salah baca kebiasaan.
+**Konsekuensi:** `merchant-alias.category` dipakai buat rule MOBI → INVESTASI, Sigma Vape/Animo Vape → ROKOK. Semua tempat frontend yang nge-hardcode daftar kategori (label, warna, filter) perlu diupdate ikut 6 kategori baru ini.
+
+---
+
 ## YYYY-MM-DD — <judul>
 **Konteks:**
 **Keputusan:**

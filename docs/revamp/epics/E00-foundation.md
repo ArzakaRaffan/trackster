@@ -107,13 +107,14 @@ model EmailParseLog {
 
 **Desain**
 
-1. **Kategori baru** (tambah ke enum, jangan hapus yang lama):
+1. **Kategori baru** (tambah ke enum, jangan hapus yang lama) — dikonfirmasi Arzaka
+   2026-09-24 (lihat [Decisions.md](../../context/Decisions.md)):
    - `TRANSFER` — kirim uang ke orang (nama orang, bukan merchant)
    - `TOPUP` — top-up e-wallet (GoPay, OVO, ShopeePay…) — uangnya dipakai di luar pantauan
    - `PENDIDIKAN` — kuliah, kursus, buku, print
-   - (opsional) `PERAWATAN` — skincare, barbershop, parfum
-   Konfirmasi daftar final ke Arzaka di awal sesi (pakai AskUserQuestion), default = 3 pertama.
-   Tanya juga: vape (Sigma Vape, Animo Vape) mau masuk kategori apa (default `HIBURAN`).
+   - `PERAWATAN` — skincare, barbershop, parfum
+   - `INVESTASI` — crypto/saham/reksadana. `MOBI` (Rp2,62jt, 7x, top `LAINNYA`) = investasi/crypto → masuk sini.
+   - `ROKOK` — vape & rokok (Sigma Vape, Animo Vape, dll) — kategori sendiri, BUKAN `HIBURAN` (beda pola belanja).
 2. **Merchant rule** — perluas `MerchantAlias` (sudah ada, match by `rawDescription`), jangan bikin tabel baru:
    ```prisma
    model MerchantAlias {
@@ -136,14 +137,41 @@ model EmailParseLog {
    per `merchantKey`, dengan saran kategori dari AI, tombol terima/ganti massal. Target: `LAINNYA` < 10%.
 
 **Tasks**
-- [ ] Tanya Arzaka: daftar kategori final + `MOBI` itu apa
-- [ ] Migration: enum baru, `MerchantAlias.category`, `displayName` nullable, `Transaction.merchantKey` + backfill kolom
-- [ ] `merchantKey()` + `merchant-key.check.ts`
-- [ ] Pipeline kategorisasi baru di sync (rule → heuristik → AI fast → simpan rule)
-- [ ] Endpoint update kategori + "terapkan ke semua"
-- [ ] Halaman Rapikan kategori (di menu Lainnya)
-- [ ] Update label/warna kategori di semua tempat frontend (grep `MAKANAN`)
-- [ ] `AI_MODEL_FAST` di `AiService` (param `model?` opsional di `chat()`), `.env.example`
+- [x] Tanya Arzaka: daftar kategori final + `MOBI` itu apa — lihat [Decisions.md](../../context/Decisions.md)
+- [x] Migration: enum baru (`TRANSFER`/`TOPUP`/`PENDIDIKAN`/`PERAWATAN`/`INVESTASI`/`ROKOK`), `MerchantAlias.category`,
+      `displayName` nullable, `Transaction.merchantKey` (+indexed) — dijalankan di DB dev, migration
+      `20260924144111_expand_category_and_merchant_key`. Backfill kolom lama: script terpisah
+      `prisma/data-fixes/2026-09-backfill-merchant-key.ts` (idempotent, belum dijalankan di prod — nunggu
+      migration jalan di prod dulu lewat `migrate deploy` otomatis pas restart)
+- [x] `merchantKey()` di `src/common/merchant-key.ts` + `merchant-key.check.ts` (5 assertion) — algoritma:
+      ambil 3 token PERTAMA dari deskripsi asli dulu, baru buang token "qr"/non-huruf dari situ (bukan
+      filter dulu baru ambil 3), biar sisipan kode bank di tengah nama toko (`Kopi Kenangan QR BRI 1 1`)
+      ikut kepotong kalau posisinya masih di jendela 3 kata pertama
+- [x] Pipeline kategorisasi baru di sync (`GmailSyncService.resolveCategory`): rule
+      (`MerchantAliasService.findCategoryForDescription`, cek merchantKey) → heuristik (`parsed.categoryHint`
+      dari parser — VA GoPay/e-wallet → TOPUP, transfer Flip ke orang → TRANSFER) → AI fast
+      (`model: 'fast'` → `AI_MODEL_FAST`), hasil AI disimpan sebagai rule baru KECUALI hasilnya LAINNYA
+      (biar nggak nge-calcify kegagalan kategorisasi jadi rule permanen)
+- [x] Endpoint `PATCH /transactions/:id/category` terima `applyToAll?: boolean` (update rule + semua
+      transaksi merchantKey sama) + `GET /transactions/:id/same-merchant-count` (buat dialog konfirmasi
+      di frontend, pakai `window.confirm` sesuai pola yang sudah ada di codebase)
+- [x] Halaman Rapikan kategori: `/app/categorize`, linked dari menu Lainnya. `GET
+      /transactions/uncategorized-merchants` (group in-memory by merchantKey, mirip pola `getSubscriptions()`)
+      + `POST /ai/suggest-category` (saran on-demand per merchant, TIDAK auto-jalan buat semua grup biar
+      nggak boros call AI) → user terima/ubah saran → apply lewat endpoint applyToAll yang sama
+- [x] Update label/warna kategori: `CATEGORY_LABELS`/`CATEGORY_COLORS` di `TransactionNoteRow.tsx` (dipakai
+      insights & reports secara dinamis, nggak perlu diubah terpisah) + `CATEGORIES` array di `today/page.tsx`
+      (form tambah pengeluaran manual)
+- [x] `AI_MODEL_FAST` — `AiService.chat({ model: 'fast' | string })`, default `ghrocx/haiku-4.5`, dipakai
+      `AiChatService.categorize()`. Didaftarkan di `.env.example` (root, bukan di `apps/backend/`)
 
-**Acceptance:** di data salinan prod, setelah "Rapikan": Kopi Kenangan/Fore/Indomaret masing-masing satu
-kategori; `LAINNYA` < 10% nominal; transaksi baru dari merchant yang sudah punya rule tidak memanggil AI.
+**Verifikasi yang sudah dilakukan** (server dev + data manual, VPS 2GB RAM nggak aman buat browser check
+langsung — lihat gotcha di `Gotchas.md`): merchantKey backfill idempotent & benar (2 varian "Kopi Kenangan"
+dapat key sama), `same-merchant-count` + `PATCH .../category?applyToAll` update semua baris + simpan rule
+`MerchantAlias`, `GET /transactions/uncategorized-merchants` group & hilang dari list setelah di-apply
+(dites pakai data "MOBI" 2x transaksi → INVESTASI). `tsc --noEmit` bersih backend & frontend.
+
+**Acceptance (belum diverifikasi terhadap data prod asli):** di data salinan prod, setelah "Rapikan": Kopi
+Kenangan/Fore/Indomaret masing-masing satu kategori; `LAINNYA` < 10% nominal; transaksi baru dari merchant
+yang sudah punya rule tidak memanggil AI. Ini nunggu sesi berikutnya jalanin migration + backfill di prod
+(butuh oke Arzaka buat push) baru bisa dicek beneran pakai data asli.
