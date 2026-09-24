@@ -28,6 +28,7 @@ Konteks tambahan: `docs/context/Product.md` (kenapa & alur uang nyata) dan `docs
 - **Exclusion rules** (transaksi yang TIDAK dihitung sebagai expense):
   - BCA transfer ke FLIPTECH = SoF funding ke Flip (bukan expense akhir; tujuan final dari email Flip). Transfer BCA ke rekening di `OWNER_ACCOUNT_NUMBERS` juga exclude.
   - Email Flip: exclude **hanya** kalau beneficiary account/nama = rekening sendiri (`OWNER_ACCOUNT_NUMBERS` / `OWNER_FULL_NAME`). Transfer Flip ke merchant, orang lain, atau VA e-commerce **dicatat** sebagai expense (source mengikuti SoF, biasanya BCA).
+  - Email Flip subject "Transaction information to multiple destinations" = instruksi bayar ke rekening Flip (belum expense final, uangnya baru keluar saat SoF BCA kepotong) — **diabaikan** (`parse()` return `null`), bukan dicatat sebagai transaksi terpisah dari receipt-nya.
   - Jago transfer ke rekening/nama sendiri = internal
   - Email GoPay sengaja TIDAK diproses (out of scope). Top-up GoPay via **VA BCA** tetap tercatat dari email BCA.
 - BCA TIDAK PERNAH mengirim email notifikasi dana masuk/setor tunai (sudah diverifikasi langsung, bukan asumsi) — makanya Income untuk BCA murni manual entry, tidak ada parser buat itu.
@@ -42,6 +43,7 @@ Konteks tambahan: `docs/context/Product.md` (kenapa & alur uang nyata) dan `docs
   - Income diedit/dihapus → saldo disesuaikan selisihnya
   - Koreksi manual → catat delta ke `BalanceAdjustment` (dengan note opsional)
 - Semua operasi ubah saldo harus dalam Prisma transaction bareng operasi utamanya (hindari race condition saldo nggak sinkron).
+- **Aturan baseline vs backfill:** transaksi/income yang `occurredAt`-nya lebih lama dari koreksi manual (`BalanceAdjustment`) terakhir untuk source yang sama TIDAK menggerakkan saldo — koreksi manual = snapshot saldo asli bank yang sudah mencakup transaksi itu. Dicek via `BalanceService.getLastManualAdjustmentAt()` + `shouldAdjustBalance()`, dipakai di `TransactionService.createFromParsed()`. Berlaku juga nanti buat income otomatis (E02).
 - `BalanceAdjustment` log HANYA untuk koreksi manual, bukan buat tiap transaksi otomatis (itu sudah keliatan di halaman transaksi biasa).
 
 ## Gotcha Infrastruktur (jangan diulang!)

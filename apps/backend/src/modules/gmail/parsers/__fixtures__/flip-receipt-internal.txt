@@ -1,0 +1,21 @@
+TRANSFER RECEIPT
+Hello, Arzaka Raffan Mawardi.
+Yay, your transaction has been successfully processed. Here are the transaction details:
+Transaction ID
+#FT846070926
+Time
+07 September 2026 02:41 WIB
+Destination Name
+ARZAKA RAFFAN MAWARDI
+Destination Bank
+Blu/BCA Digital
+Destination Account Number
+006751400577
+Amount
+Rp390.000
+If you have any questions, you can reach us through the app (go to Help menu and click Chat Flip Team ) or click this link: flip.id/bantuan .
+Thanks for using Flip!
+Warm regards,
+Flip Team
+If you didn't make this request, reach us through the app (go to Help menu and click Chat Tim Flip ) or click this link: flip.id/bantuan .
+Copyright &copy; 2025 PT. Fliptech Lentera Inspirasi Pertiwi. All Rights Reserved.

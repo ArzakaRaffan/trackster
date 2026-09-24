@@ -12,6 +12,14 @@
 
 ---
 
+## 2026-09-24 — E01-S2: Flip parser — receipt vs instruksi, guard deskripsi
+**Konteks:** Email Flip ada 2 bentuk: "Transaction information..." (instruksi bayar ke rekening Flip, belum expense final — uangnya baru keluar saat SoF BCA kepotong, sudah di-exclude dari sisi BCA lewat FLIPTECH) dan "Successful transfer to \<Nama\>..." (receipt = expense final, label `Destination Name`/`Destination Bank`/`Destination Account Number`/`Time`). Parser lama pakai label tebakan (`Beneficiary Name`, dll) yang tidak pernah cocok dengan email Flip asli — 3 varian dicek by ID (`ST...`/`CS...`/`FT...`, subject "BUKTI TRANSFER"/"TRANSFER RECEIPT") semua pakai label yang sama.
+**Keputusan:** (1) `parse()` return `null` kalau subject match `/transaction information/i`. (2) Ganti seluruh field ke label asli dengan `exact: true`. (3) `source` selalu `BCA` (SoF cuma ada di email instruksi yang di-skip, bukan di receipt). (4) Guard deskripsi >80 char atau mengandung `{`/`}` → `null` (lebih baik UNPARSED daripada sampah). (5) `categoryHint` untuk transfer ke orang lain: enum `Category` belum punya `TRANSFER` — dipakai `LAINNYA` sementara (sama pola dengan VA GoPay di E01-S1), enum baru ditunda ke E00-S3 biar sekalian.
+**Alasan:** Label tebakan tidak pernah match email nyata → semua transfer Flip selama ini UNPARSED (atau jatuh ke path lain). Ambil dari email production langsung lebih murah daripada terus nebak.
+**Konsekuensi:** Fixture `flip-receipt.txt`, `flip-instruction.txt`, `flip-receipt-internal.txt` diambil dari email Gmail asli (id `1a0bf2c74c1d60d7`, `1a0bf2bbf135bd29`, `1a0783de07ac4214`). Backfill live + dedupe data lama ditunda ke E01-S3 (satu putaran bareng BCA).
+
+---
+
 ## 2026-09-24 — Revamp v2: rencana 10 permintaan, data benar dulu
 **Konteks:** Arzaka minta 10 perubahan besar (VA GoPay, pemasukan otomatis, AI advisor + RAG, model pemasukan, fitur publik, analisis, laporan, Tanya Track, saran budget, mascot). Audit menemukan data belum bisa dipercaya: VA tidak ter-parse, Flip dobel, container UTC, 39% `LAINNYA`, pemasukan tidak dicatat sejak 24 Agu.
 **Keputusan:** Rencana lengkap di `docs/revamp/` (README = index + status). Urutan: Fase 0 data benar (E00, E01) → Fase 1 pemasukan (E03, E02) → Fase 2 AI core (E04) → Fase 3 insight (E06, E07, E05) → Fase 4 mascot & publik (paralel). Angka selalu dari kode deterministik; LLM hanya memilih/menjelaskan. RAG = snapshot + memory terstruktur + Postgres FTS `indonesian` (proxy tidak punya embeddings). Pemasukan otomatis via email Jago + check-in mingguan + eksperimen iOS 27 Notification automation; Moota ditolak (biaya).

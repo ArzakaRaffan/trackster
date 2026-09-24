@@ -1,0 +1,21 @@
+BUKTI TRANSFER
+Hello, Arzaka Raffan Mawardi.
+Yay, your transaction has been successfully processed. Here are the transaction details:
+Transaction ID
+#ST260920211554466HW6K5
+Time
+20 Sep 2026 21:15 WIB
+Destination Name
+Ahmad Dzulfikar As Shavy
+Destination Bank
+BNI
+Destination Account Number
+312500567
+Amount
+Rp64.000
+If you have any questions, you can reach us through the app (go to Help menu and click Chat Flip Team ) or click this link: flip.id/bantuan .
+Thanks for using Flip!
+Warm regards,
+Flip Team
+If you didn't make this request, reach us through the app (go to Help menu and click Chat Tim Flip ) or click this link: flip.id/bantuan .
+Copyright &copy; 2025 PT. Fliptech Lentera Inspirasi Pertiwi. All Rights Reserved.

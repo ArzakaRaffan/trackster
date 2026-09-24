@@ -1,0 +1,29 @@
+Transaction Information
+Hey there, Arzaka Raffan Mawardi!
+You just created a transaction to multiple destinations via Flip. Here are the details:
+Transaction ID
+#CS260920211509420155FUM
+Destinations Number
+2
+Nominal
+Rp64.650
+Admin Fee
+Rp0
+Unique Code
+Rp327
+Flip Coin
+-650
+So we can go process your transaction, please transfer the amount below to Flip's account:
+Transfer Amount
+Rp64.327
+⚠️ Double-check the amount up to the last digit
+Transfer to Bank
+BCA
+Account Number
+5465220225
+Recipient Name
+PT Fliptech Lentera IP
+If you have any questions, please contact us on the app via the Help menu (click Chat Flip team ) or click flip.id/bantuan .
+Thank you for using Flip!
+Warm regards,
+Team Flip

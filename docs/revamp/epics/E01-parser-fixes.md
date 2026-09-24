@@ -74,14 +74,15 @@ Reference No.            : 9527120260923140126797TVA4029520300
    Label ini tidak dikenal parser sekarang.
 
 **Tasks**
-- [ ] `htmlToText`: buang `<style>…</style>`, `<script>…</script>`, `<head>…</head>` (non-greedy, case-insensitive) sebelum proses lain
-- [ ] Flip: skip subject/body "Transaction information"
-- [ ] Flip: label `Destination Name`, `Destination Account Number`, `Destination Bank`, `Time` (dengan `exact`)
-- [ ] Deskripsi: `"<Destination Name> · <Bank> …<4 digit>"`; guard: deskripsi > 80 karakter atau berisi `{`/`}` → `return null` (lebih baik UNPARSED daripada sampah)
-- [ ] Fixture `flip-instruction.txt`, `flip-receipt.txt` + assert di `parsers.check.ts`
-- [ ] Kategori default transfer Flip ke nama orang → `TRANSFER` (via `categoryHint`)
+- [x] `htmlToText`: buang `<style>…</style>`, `<script>…</script>`, `<head>…</head>` (non-greedy, case-insensitive) sebelum proses lain — sudah dikerjakan di E01-S1
+- [x] Flip: skip subject/body "Transaction information"
+- [x] Flip: label `Destination Name`, `Destination Account Number`, `Destination Bank`, `Time` (dengan `exact`)
+- [x] Deskripsi: `"<Destination Name> · <Bank> …<4 digit>"`; guard: deskripsi > 80 karakter atau berisi `{`/`}` → `return null` (lebih baik UNPARSED daripada sampah)
+- [x] Fixture `flip-instruction.txt`, `flip-receipt.txt` + assert di `parsers.check.ts` — plus `flip-receipt-internal.txt` (transfer Flip ke rekening Blu sendiri, dari email asli 06 Sep, buat nutup kasus `isInternalDestination`)
+- [ ] Kategori default transfer Flip ke nama orang → `TRANSFER` (via `categoryHint`) — **TRANSFER belum ada di enum Category** (baru MAKANAN/TRANSPORT/BELANJA/TAGIHAN/HIBURAN/KESEHATAN/LAINNYA). Sementara pakai `LAINNYA`, sama seperti pola VA GoPay di E01-S1. Nambah enum baru ditunda ke E00-S3 (biar sekalian dengan kategori lain, bukan tambal satu-satu).
+- [ ] Di dev: backfill 19–21 Sep, cek 2 transaksi (Rp64.000, Rp37.500) muncul bukan 4 (dilakukan di E01-S3 bareng backfill BCA)
 
-**Acceptance:** di dev, backfill 19–21 Sep menghasilkan 2 transaksi (Rp64.000, Rp37.500) dengan nama penerima, bukan 4.
+**Acceptance:** `parsers.check.ts` 45 assertion lulus (8 baru untuk FlipParser); backfill live di dev ditunda ke E01-S3 (satu putaran backfill buat BCA+Flip sekalian, sesuai desain S3).
 
 ---
 
@@ -97,15 +98,12 @@ dibuat **tanpa** `adjustBalance`.
   log debug. Sama untuk jalur income otomatis nanti (E02).
 - Script data repair `apps/backend/prisma/data-fixes/2026-09-flip-dedupe.sql` (bukan migration Prisma —
   dijalankan manual sekali, disimpan buat jejak):
-  ```sql
-  -- id 162 & 164: email instruksi Flip, bukan transaksi. Saldo BCA sudah di-rebaseline 2026-09-22,
-  -- jadi hapus TANPA mengembalikan saldo.
-  DELETE FROM "Transaction" WHERE id IN (162, 164) AND "emailId" IN ('1a0bf2bbf135bd29','1a0b9eddb3b43bf1');
-  -- id 161 & 163: receipt asli, perbaiki deskripsi dari email (isi nama penerima setelah cek Gmail).
-  UPDATE "Transaction" SET description = 'Ahmad Dzulfikar As Shavy · BNI …0567' WHERE id = 161 AND "emailId" = '1a0bf2c74c1d60d7';
-  -- id 163: ambil nama dari email 1a0b9eeadc20846a dulu
-  ```
-  Guard `emailId` di WHERE supaya script tidak menghapus hal lain kalau id berubah.
+  Isi final ada di `apps/backend/prisma/data-fixes/2026-09-flip-dedupe.sql`: DELETE id 162 & 164 (email
+  instruksi Flip, saldo BCA sudah di-rebaseline 2026-09-22 03:20:34 UTC jadi hapus TANPA mengembalikan
+  saldo) + UPDATE deskripsi id 161 ("Ahmad Dzulfikar As Shavy · BNI …0567") & 163 ("REYHANI INTAN SABRIN ·
+  Mandiri …2442", diambil dari email `1a0b9eeadc20846a` sendiri). Semua 4 baris divalidasi read-only ke
+  prod (`SELECT ... WHERE "emailId" IN (...)`) sebelum ditulis final. Guard `emailId` di WHERE supaya
+  script tidak menghapus hal lain kalau id berubah.
 
 **Langkah prod (urutan penting, minta oke Arzaka di tiap langkah):**
 1. Backup: `docker exec trackster-postgres-1 pg_dump -U trackster trackster > ~/backup-$(date +%F-%H%M).sql`
@@ -117,9 +115,9 @@ dibuat **tanpa** `adjustBalance`.
 6. Laporkan ke Arzaka: daftar transaksi yang baru masuk + selisih saldo, minta dia bandingkan dengan saldo asli di myBCA.
 
 **Tasks**
-- [ ] `getLastManualAdjustmentAt` + pakai di `createFromParsed` (+ self-check logika tanggal)
-- [ ] Script data-fix + lengkapi deskripsi id 163 dari Gmail
-- [ ] Eksekusi 6 langkah prod di atas bersama Arzaka
-- [ ] Update `CLAUDE.md` bagian exclusion rules: tambah "email Flip 'Transaction information' = instruksi, diabaikan" dan aturan baseline saldo
+- [x] `getLastManualAdjustmentAt` + pakai di `createFromParsed` (+ self-check logika tanggal) — logic keputusan diekstrak jadi fungsi murni `shouldAdjustBalance()` di `balance.service.ts`, self-check di `balance.check.ts` (4 assertion: null/setelah/sebelum/tepat-sama)
+- [x] Script data-fix + lengkapi deskripsi id 163 dari Gmail — dicek read-only ke prod dulu (`SELECT` by emailId), 4 baris cocok persis dengan prediksi epic. Deskripsi 163 dari email `1a0b9eeadc20846a` sendiri (bukan dari 1a0b9eddb3b43bf1 seperti draf awal — itu email instruksi 164, bukan sumber nama): "REYHANI INTAN SABRIN · Mandiri …2442"
+- [ ] Eksekusi 6 langkah prod di atas bersama Arzaka — **menunggu konfirmasi, belum dijalankan**
+- [x] Update `CLAUDE.md` bagian exclusion rules: tambah "email Flip 'Transaction information' = instruksi, diabaikan" dan aturan baseline saldo
 
 **Acceptance:** saldo BCA di Trackster = saldo asli myBCA (dicek Arzaka); tidak ada deskripsi CSS; tidak ada transaksi Flip dobel.

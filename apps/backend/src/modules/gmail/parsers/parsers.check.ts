@@ -11,6 +11,7 @@ import * as assert from 'assert';
 // ─── Impor fungsi & tipe yang akan diuji ────────────────────────────────────
 import { extractField, parseRupiah, parseEmailDate, htmlToText } from './parser.interface';
 import { BcaParser } from './bca.parser';
+import { FlipParser } from './flip.parser';
 import { Source, Category } from '@prisma/client';
 
 // ─── Helper ──────────────────────────────────────────────────────────────────
@@ -282,6 +283,75 @@ check('Transfer Fliptech: excludeReason mengandung "FLIPTECH"', () => {
 check('Email bukan transaksi BCA → null', () => {
   const result = parser.parse(fakeEmail('Promo BCA: Dapatkan cashback 10%!'));
   assert.strictEqual(result, null);
+});
+
+// ─── 5b. Integrasi: FlipParser dengan fixture ─────────────────────────────────
+
+console.log('\n── FlipParser fixtures ──');
+
+const flipParser = new FlipParser();
+
+function fakeFlipEmail(body: string, subject: string, id = 'test-id'): { id: string; from: string; subject: string; body: string; internalDate: string } {
+  return {
+    id,
+    from: 'no-reply@flip.id',
+    subject,
+    body,
+    internalDate: String(new Date('2026-09-24T06:00:00Z').getTime()),
+  };
+}
+
+// --- Instruksi bayar (belum expense final) → null ---
+check('Flip instruksi "Transaction information...": return null', () => {
+  const body = loadFixture('flip-instruction.txt');
+  const result = flipParser.parse(fakeFlipEmail(body, 'Transaction information to multiple destinations'));
+  assert.strictEqual(result, null);
+});
+
+// --- Receipt ke orang lain → expense final ---
+check('Flip receipt eksternal: amount = 64000', () => {
+  const body = loadFixture('flip-receipt.txt');
+  const result = flipParser.parse(fakeFlipEmail(body, 'Successful transfer to Ahmad Dzulfikar As Shavy. Here is the receipt.'));
+  assert.ok(result !== null, 'parse harusnya return ParseResult, bukan null');
+  assert.strictEqual(result!.amount, 64000);
+});
+
+check('Flip receipt eksternal: description = "Ahmad Dzulfikar As Shavy · BNI …0567"', () => {
+  const body = loadFixture('flip-receipt.txt');
+  const result = flipParser.parse(fakeFlipEmail(body, 'Successful transfer to Ahmad Dzulfikar As Shavy. Here is the receipt.'));
+  assert.strictEqual(result!.description, 'Ahmad Dzulfikar As Shavy · BNI …0567');
+});
+
+check('Flip receipt eksternal: excluded = false', () => {
+  const body = loadFixture('flip-receipt.txt');
+  const result = flipParser.parse(fakeFlipEmail(body, 'Successful transfer to Ahmad Dzulfikar As Shavy. Here is the receipt.'));
+  assert.strictEqual(result!.excluded, false);
+});
+
+check('Flip receipt eksternal: occurredAt = 2026-09-20T14:15:00.000Z (WIB 21:15)', () => {
+  const body = loadFixture('flip-receipt.txt');
+  const result = flipParser.parse(fakeFlipEmail(body, 'Successful transfer to Ahmad Dzulfikar As Shavy. Here is the receipt.'));
+  assert.strictEqual(result!.occurredAt.toISOString(), '2026-09-20T14:15:00.000Z');
+});
+
+check('Flip receipt eksternal: source = BCA', () => {
+  const body = loadFixture('flip-receipt.txt');
+  const result = flipParser.parse(fakeFlipEmail(body, 'Successful transfer to Ahmad Dzulfikar As Shavy. Here is the receipt.'));
+  assert.strictEqual(result!.source, Source.BCA);
+});
+
+// --- Receipt ke rekening sendiri → internal, excluded ---
+check('Flip receipt internal (Destination = rekening Blu sendiri): excluded = true', () => {
+  const body = loadFixture('flip-receipt-internal.txt');
+  const result = flipParser.parse(fakeFlipEmail(body, 'Successful transfer to ARZAKA RAFFAN MAWARDI. Here is the receipt.'));
+  assert.ok(result !== null);
+  assert.strictEqual(result!.excluded, true);
+});
+
+check('Flip receipt internal: excludeReason mengandung "internal"', () => {
+  const body = loadFixture('flip-receipt-internal.txt');
+  const result = flipParser.parse(fakeFlipEmail(body, 'Successful transfer to ARZAKA RAFFAN MAWARDI. Here is the receipt.'));
+  assert.ok(result!.excludeReason?.includes('internal'));
 });
 
 // ─── 6. Ringkasan ────────────────────────────────────────────────────────────
