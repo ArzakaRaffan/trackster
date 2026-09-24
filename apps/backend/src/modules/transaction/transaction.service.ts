@@ -115,11 +115,21 @@ export class TransactionService {
     return { days };
   }
 
-  /** Hapus transaksi expense dan balikin efeknya ke saldo bank dalam satu db transaction. */
+  /** Hapus transaksi expense dan balikin efeknya ke saldo bank dalam satu db transaction —
+   * kecuali transaksi ini lebih lama dari koreksi manual terakhir untuk source yang sama, karena
+   * saldo koreksi manual itu sudah "menyerap" pengeluaran ini (sama aturannya dengan
+   * createFromParsed). */
   async remove(id: number) {
     return this.prisma.$transaction(async (tx) => {
       const deleted = await tx.transaction.delete({ where: { id } });
-      await this.balanceService.adjustBalance(tx, deleted.source, Number(deleted.amount));
+      const lastAdjustmentAt = await this.balanceService.getLastManualAdjustmentAt(tx, deleted.source);
+      if (shouldAdjustBalance(deleted.occurredAt, lastAdjustmentAt)) {
+        await this.balanceService.adjustBalance(tx, deleted.source, Number(deleted.amount));
+      } else {
+        this.logger.debug(
+          `Skip adjustBalance saat hapus transaksi ${deleted.id} (occurredAt ${deleted.occurredAt.toISOString()} < koreksi manual terakhir ${lastAdjustmentAt?.toISOString()})`,
+        );
+      }
       return deleted;
     });
   }
