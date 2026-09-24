@@ -8,7 +8,8 @@ import { BudgetService } from '../budget/budget.service';
 import { TelegramService } from '../telegram/telegram.service';
 import { PrismaService } from '../../prisma.service';
 import { AiChatService } from '../ai/ai-chat.service';
-import { Category } from '@prisma/client';
+import { Category, ParseStatus } from '@prisma/client';
+import { shouldSkipLogUpsert } from './parsers/email-parse-log.util';
 
 // Cron window tetap pendek biar ringan. Historical gap pakai syncEmails({ after, before }).
 const GMAIL_QUERY_RECENT = 'from:(bca OR jago OR flip) newer_than:7d';
@@ -98,54 +99,24 @@ export class GmailSyncService {
 
       for (const id of messageIds) {
         const full = await gmail.users.messages.get({ userId: 'me', id, format: 'full' });
-        const rawEmail = this.extractRawEmail(full.data);
-        if (!rawEmail) {
-          skippedUnparsed++;
-          continue;
-        }
+        const { from, subject, receivedAt } = this.extractHeaders(full.data);
 
-        const parsed = this.parserRegistry.parseEmail(rawEmail);
-        if (!parsed) {
-          skippedUnparsed++;
-          continue;
-        }
-
-        if (parsed.excluded) {
-          this.logger.debug(`Skip (excluded): ${parsed.excludeReason}`);
-          skippedExcluded++;
-          continue;
-        }
-
-        const categoryStr = await this.aiChatService.categorize(parsed.description, parsed.amount);
-        const category = categoryStr as Category;
-
-        const created = await this.transactionService.createFromParsed({
-          amount: parsed.amount,
-          description: parsed.description,
-          source: parsed.source,
-          emailId: rawEmail.id,
-          occurredAt: parsed.occurredAt,
-          category,
-        });
-
-        if (created) {
-          syncedCount++;
-          newestTransaction = {
-            source: parsed.source,
-            description: parsed.description,
-            amount: parsed.amount,
-          };
-
-          if (notifyEveryTransaction) {
-            await this.telegramService.sendTransactionNotif({
-              source: parsed.source,
-              description: parsed.description,
-              amount: parsed.amount,
-              occurredAt: parsed.occurredAt,
-            });
-          }
-        } else {
-          skippedDuplicate++;
+        try {
+          await this.processMessage(id, full.data, from, subject, receivedAt, notifyEveryTransaction, {
+            onRecorded: (t) => {
+              syncedCount++;
+              newestTransaction = t;
+            },
+            onDuplicate: () => skippedDuplicate++,
+            onExcluded: () => skippedExcluded++,
+            onUnparsed: () => skippedUnparsed++,
+          });
+        } catch (err: any) {
+          this.logger.error(`Gagal proses email ${id}: ${err.message}`);
+          await this.logParseResult(id, from, subject, receivedAt, {
+            status: ParseStatus.ERROR,
+            reason: err.message,
+          });
         }
       }
 
@@ -175,6 +146,94 @@ export class GmailSyncService {
     }
   }
 
+  private async processMessage(
+    id: string,
+    message: any,
+    from: string,
+    subject: string,
+    receivedAt: Date,
+    notifyEveryTransaction: boolean,
+    callbacks: {
+      onRecorded: (t: { source: string; description: string; amount: number }) => void;
+      onDuplicate: () => void;
+      onExcluded: () => void;
+      onUnparsed: () => void;
+    },
+  ) {
+    const rawEmail = this.extractRawEmail(message);
+    if (!rawEmail) {
+      callbacks.onUnparsed();
+      await this.logParseResult(id, from, subject, receivedAt, {
+        status: ParseStatus.UNPARSED,
+        reason: 'body kosong / tidak bisa didekode',
+      });
+      return;
+    }
+
+    const { parser, result: parsed } = this.parserRegistry.parseEmailWithSource(rawEmail);
+    if (!parsed) {
+      callbacks.onUnparsed();
+      await this.logParseResult(id, from, subject, receivedAt, {
+        status: ParseStatus.UNPARSED,
+        reason: 'no parser matched / parser return null',
+        parser,
+      });
+      return;
+    }
+
+    if (parsed.excluded) {
+      this.logger.debug(`Skip (excluded): ${parsed.excludeReason}`);
+      callbacks.onExcluded();
+      await this.logParseResult(id, from, subject, receivedAt, {
+        status: ParseStatus.EXCLUDED,
+        reason: parsed.excludeReason,
+        amount: parsed.amount,
+        parser,
+      });
+      return;
+    }
+
+    const categoryStr = await this.aiChatService.categorize(parsed.description, parsed.amount);
+    const category = categoryStr as Category;
+
+    const created = await this.transactionService.createFromParsed({
+      amount: parsed.amount,
+      description: parsed.description,
+      source: parsed.source,
+      emailId: rawEmail.id,
+      occurredAt: parsed.occurredAt,
+      category,
+    });
+
+    if (created) {
+      callbacks.onRecorded({ source: parsed.source, description: parsed.description, amount: parsed.amount });
+
+      await this.logParseResult(id, from, subject, receivedAt, {
+        status: ParseStatus.RECORDED,
+        amount: parsed.amount,
+        counterparty: parsed.description,
+        kind: 'EXPENSE',
+        parser,
+      });
+
+      if (notifyEveryTransaction) {
+        await this.telegramService.sendTransactionNotif({
+          source: parsed.source,
+          description: parsed.description,
+          amount: parsed.amount,
+          occurredAt: parsed.occurredAt,
+        });
+      }
+    } else {
+      callbacks.onDuplicate();
+      await this.logParseResult(id, from, subject, receivedAt, {
+        status: ParseStatus.DUPLICATE,
+        amount: parsed.amount,
+        parser,
+      });
+    }
+  }
+
   private async checkAndAlertIfOverBudget(lastTransaction: {
     source: string;
     description: string;
@@ -196,6 +255,50 @@ export class GmailSyncService {
     if (sent) {
       await this.prisma.alertLog.create({ data: { date: todayDateOnly } });
     }
+  }
+
+  private extractHeaders(message: any): { from: string; subject: string; receivedAt: Date } {
+    const headers = message?.payload?.headers || [];
+    const from = headers.find((h: any) => h.name === 'From')?.value || '';
+    const subject = headers.find((h: any) => h.name === 'Subject')?.value || '';
+    const internalDate = message?.internalDate ? Number(message.internalDate) : Date.now();
+    return { from, subject, receivedAt: new Date(internalDate) };
+  }
+
+  /** Upsert EmailParseLog per message — lihat shouldSkipLogUpsert utk kenapa RECORDED nggak boleh ketimpa. */
+  private async logParseResult(
+    emailId: string,
+    from: string,
+    subject: string,
+    receivedAt: Date,
+    entry: {
+      status: ParseStatus;
+      reason?: string;
+      amount?: number;
+      counterparty?: string;
+      kind?: string;
+      parser?: string | null;
+    },
+  ) {
+    const existing = await this.prisma.emailParseLog.findUnique({ where: { emailId } });
+    if (shouldSkipLogUpsert(existing?.status ?? null)) return;
+
+    const data = {
+      from,
+      subject,
+      receivedAt,
+      status: entry.status,
+      reason: entry.reason,
+      amount: entry.amount,
+      counterparty: entry.counterparty,
+      kind: entry.kind,
+      parser: entry.parser ?? undefined,
+    };
+    await this.prisma.emailParseLog.upsert({
+      where: { emailId },
+      create: { emailId, ...data },
+      update: data,
+    });
   }
 
   private extractRawEmail(message: any): RawEmail | null {

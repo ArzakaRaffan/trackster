@@ -62,6 +62,34 @@ model EmailSyncLog {
   createdAt  DateTime @default(now())
 }
 
+enum ParseStatus {
+  RECORDED
+  EXCLUDED
+  UNPARSED
+  DUPLICATE
+  ERROR
+}
+
+// Hasil parse tiap email yang discan sync, satu baris per emailId — biar email yang gagal
+// parse (mis. format baru yang belum dikenal) kelihatan by name, bukan cuma angka skip=N.
+model EmailParseLog {
+  id           Int         @id @default(autoincrement())
+  emailId      String      @unique
+  from         String
+  subject      String
+  receivedAt   DateTime
+  status       ParseStatus
+  reason       String?
+  amount       Decimal?    @db.Decimal(12, 2)
+  counterparty String?
+  kind         String? // 'EXPENSE' | 'INCOME' (E02)
+  parser       String? // 'bca' | 'jago' | 'flip'
+  createdAt    DateTime    @default(now())
+
+  @@index([status])
+  @@index([receivedAt])
+}
+
 model TelegramConfig {
   id                     Int      @id @default(autoincrement())
   botToken               String
