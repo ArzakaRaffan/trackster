@@ -1,5 +1,7 @@
 # trackster — Gotchas
 
+- **`TransactionService.remove()` tidak punya guard baseline saldo** (beda dari `createFromParsed()` yang sudah dibenerin di E01-S3) — hapus transaksi APAPUN selalu `adjustBalance(+amount)` tanpa cek apakah `occurredAt` lebih tua dari koreksi manual terakhir. Kejadian nyata 2026-09-24: user coba tombol Hapus baru (fitur yang baru di-ship) di 2 transaksi VA Tokopedia lama (occurredAt 4 Sep, sebelum baseline 22 Sep) lewat UI — saldo BCA lompat +Rp3.072.020 jadi salah, padahal transaksinya beneran ke-hapus (bukan cuma coba-coba). Root cause: baseline rule cuma diterapkan di jalur create, bukan delete, padahal keduanya sama-sama butuh (lihat `docs/revamp/02-conventions.md` §4). Fix: `remove()` harus pakai `shouldAdjustBalance()` yang sama (skip restore kalau `occurredAt < lastManualAdjustmentAt`), sama seperti raw-SQL dedupe script E01-S3. (`apps/backend/src/modules/transaction/transaction.service.ts`)
+
 - **`tsconfig.tsbuildinfo` stale bikin `nest build` (backend) silent no-op**: exit code 0, tanpa error,
   tapi folder `dist/` nggak keisi sama sekali (bukan cuma stale — kosong total). Kejadian pas `.tsbuildinfo`
   ketinggalan dari run sebelumnya (beda absolute path/environment) lalu `tsc --incremental` mikir semua

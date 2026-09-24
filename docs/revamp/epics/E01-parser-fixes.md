@@ -80,9 +80,9 @@ Reference No.            : 9527120260923140126797TVA4029520300
 - [x] Deskripsi: `"<Destination Name> · <Bank> …<4 digit>"`; guard: deskripsi > 80 karakter atau berisi `{`/`}` → `return null` (lebih baik UNPARSED daripada sampah)
 - [x] Fixture `flip-instruction.txt`, `flip-receipt.txt` + assert di `parsers.check.ts` — plus `flip-receipt-internal.txt` (transfer Flip ke rekening Blu sendiri, dari email asli 06 Sep, buat nutup kasus `isInternalDestination`)
 - [ ] Kategori default transfer Flip ke nama orang → `TRANSFER` (via `categoryHint`) — **TRANSFER belum ada di enum Category** (baru MAKANAN/TRANSPORT/BELANJA/TAGIHAN/HIBURAN/KESEHATAN/LAINNYA). Sementara pakai `LAINNYA`, sama seperti pola VA GoPay di E01-S1. Nambah enum baru ditunda ke E00-S3 (biar sekalian dengan kategori lain, bukan tambal satu-satu).
-- [ ] Di dev: backfill 19–21 Sep, cek 2 transaksi (Rp64.000, Rp37.500) muncul bukan 4 (dilakukan di E01-S3 bareng backfill BCA)
+- [x] Backfill prod 19–21 Sep: id 161 (Ahmad Dzulfikar As Shavy, Rp64.000) & 163 (REYHANI INTAN SABRIN, Rp37.500) sudah bersih, id 162/164 (instruksi dobel) sudah dihapus — dieksekusi bareng backfill BCA di E01-S3
 
-**Acceptance:** `parsers.check.ts` 45 assertion lulus (8 baru untuk FlipParser); backfill live di dev ditunda ke E01-S3 (satu putaran backfill buat BCA+Flip sekalian, sesuai desain S3).
+**Acceptance:** ✅ `parsers.check.ts` 45 assertion lulus; backfill prod selesai, hasil sesuai ekspektasi.
 
 ---
 
@@ -117,7 +117,9 @@ dibuat **tanpa** `adjustBalance`.
 **Tasks**
 - [x] `getLastManualAdjustmentAt` + pakai di `createFromParsed` (+ self-check logika tanggal) — logic keputusan diekstrak jadi fungsi murni `shouldAdjustBalance()` di `balance.service.ts`, self-check di `balance.check.ts` (4 assertion: null/setelah/sebelum/tepat-sama)
 - [x] Script data-fix + lengkapi deskripsi id 163 dari Gmail — dicek read-only ke prod dulu (`SELECT` by emailId), 4 baris cocok persis dengan prediksi epic. Deskripsi 163 dari email `1a0b9eeadc20846a` sendiri (bukan dari 1a0b9eddb3b43bf1 seperti draf awal — itu email instruksi 164, bukan sumber nama): "REYHANI INTAN SABRIN · Mandiri …2442"
-- [ ] Eksekusi 6 langkah prod di atas bersama Arzaka — **menunggu konfirmasi, belum dijalankan**
+- [x] Eksekusi 6 langkah prod — backup ✅, deploy ✅, data-fix ✅, backfill ✅ (36 transaksi baru, 327 discan, saldo BCA nggak berubah sesuai desain), sanity check bersih (0 CSS, 0 duplikat instruksi Flip) ✅
 - [x] Update `CLAUDE.md` bagian exclusion rules: tambah "email Flip 'Transaction information' = instruksi, diabaikan" dan aturan baseline saldo
 
-**Acceptance:** saldo BCA di Trackster = saldo asli myBCA (dicek Arzaka); tidak ada deskripsi CSS; tidak ada transaksi Flip dobel.
+**Acceptance:** ✅ backfill bersih, 0 deskripsi CSS, 0 transaksi Flip dobel. **Belum dikonfirmasi user**: saldo BCA final (lihat catatan bug di bawah) vs myBCA asli — user perlu cek ulang setelah bug `remove()` diperbaiki.
+
+**⚠️ Bug ditemukan setelah S3 "selesai" (2026-09-24, sesi yang sama):** `TransactionService.remove()` (dipakai tombol Hapus UI yang baru di-ship) TIDAK punya guard baseline saldo seperti `createFromParsed()` — selalu `adjustBalance(+amount)` unconditional. User pakai tombol Hapus di 2 transaksi VA Tokopedia lama (id 194 Rp1.616.620, id 196 Rp1.455.400, occurredAt 4 Sep — sebelum baseline 22 Sep), saldo BCA jadi salah +Rp3.072.020 (sekarang Rp3.262.822, padahal seharusnya tetap Rp190.802 kalau transaksinya beneran mau dihapus permanen). Detail lengkap di [Gotchas.md](../../context/Gotchas.md). **Perlu diputuskan sesi berikutnya:** apakah 2 transaksi itu memang mau dihapus permanen (kalau ya: koreksi saldo balik manual via `correctBalance` API) atau salah pencet (kalau ya: insert ulang dari data yang sudah diketahui + saldo otomatis benar lagi). Lalu fix `remove()` supaya pakai `shouldAdjustBalance()` yang sama.
