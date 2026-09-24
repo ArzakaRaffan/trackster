@@ -48,7 +48,7 @@ Legend: ⬜ belum · 🟨 jalan · ✅ selesai (sudah diverifikasi di browser & 
 | E00-S1 | Helper waktu WIB + ganti semua boundary hari/minggu/bulan | 0 | — | ✅ |
 | E00-S2 | Log hasil parse email (EmailParseLog) + halaman riwayat sync | 0 | — | ⬜ |
 | E00-S3 | Kategori konsisten: merchant rule + kategori baru + "Rapikan kategori" | 0 | E00-S1 | ⬜ |
-| E01-S1 | Parser BCA Virtual Account (GoPay top-up & VA lain) | 0 | — (E00-S2 disarankan) | ⬜ |
+| E01-S1 | Parser BCA Virtual Account (GoPay top-up & VA lain) | 0 | — (E00-S2 disarankan) | 🟨 kode selesai, belum push |
 | E01-S2 | Parser Flip: buang CSS, skip email instruksi, label baru | 0 | — (E00-S2 disarankan) | ⬜ |
 | E01-S3 | Aturan saldo vs baseline + perbaikan data + backfill | 0 | E01-S1, E01-S2 | ⬜ |
 | E03-S1 | Data model IncomeStream + seed 5 sumber pemasukan | 1 | E00-S1 | ⬜ |

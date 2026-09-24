@@ -1,0 +1,8 @@
+Here are the details of your transaction
+Transfer Type            : Online Transfer
+Source of Fund           : 6611xxxx89
+Beneficiary Name         : PT FLIPTECH LENTERA IP
+Beneficiary Account      : 5465220225
+Transfer Amount          : IDR 100,000.00
+Transaction Date         : 20 Sep 2026 21:10:00
+Reference No.            : FLIPREF20260920001

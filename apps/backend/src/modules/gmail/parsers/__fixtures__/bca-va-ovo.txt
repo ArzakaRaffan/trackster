@@ -1,0 +1,22 @@
+Hello ARZAKA RAFFAN MAWARDI,
+
+You just made a transaction through myBCA.
+Here are the details of your transaction :
+
+Status	:	Successful
+Transaction Date	:	14 Sep 2026 12:35:44
+Transfer Type	:	Transfer to BCA Virtual Account
+Source of Fund	:	6611xxxx89
+BCA Virtual Account No.	:	39358082210950202
+Name	:	ARZAKA RAFFAN MAWARDI
+Company/Product Name	:	PT VISIONET INTERNASIONAL / OVO
+Pay Amount	:	IDR 36,000.00
+Total Payment	:	IDR 36,000.00
+Description	:	
+Reference No.	:	9527120260914123544902TVA1977522600
+
+Note(s):
+Fees Include VAT (if any)
+PT BANK CENTRAL ASIA TBK.
+MENARA BCA - JAKARTA PUSAT
+NPWP: 0013084496091000

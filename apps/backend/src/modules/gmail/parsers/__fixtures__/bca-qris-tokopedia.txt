@@ -1,0 +1,17 @@
+Hello ARZAKA RAFFAN MAWARDI,
+You just made a transaction through myBCA.
+Here are the details of your transaction :
+
+Status	:	Successful
+Transaction Date	:	15 Sep 2026 14:11:37
+Transaction Type	:	QRIS Payment
+Payment to	:	PT Tokopedia
+Merchant Location	:	Jakarta Selat, 12190, ID
+Acquirer	:	DOKU
+Merchant PAN	:	9360089900000594006
+Terminal ID	:	A01
+Source of Fund	:	TAHAPAN - 6611****89
+Customer PAN	:	9360001410155723256
+Total Payment	:	IDR 117,492.00
+RRN	:	457565057
+Reference No.	:	9527120260915141134856QRS1162702097

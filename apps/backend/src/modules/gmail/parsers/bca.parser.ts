@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { Source } from '@prisma/client';
+import { Source, Category } from '@prisma/client';
 import { EmailParser, RawEmail, ParseResult, extractField, parseRupiah, parseEmailDate } from './parser.interface';
 import { isInternalDestination } from './own-accounts';
 
@@ -30,10 +30,20 @@ export class BcaParser implements EmailParser {
       return this.parseQrisPayment(body, email);
     }
     if (transferType) {
+      // Cek Virtual Account lebih dulu sebelum fallback ke transfer biasa
+      if (/virtual\s*account/i.test(transferType)) {
+        return this.parseVirtualAccount(body, email);
+      }
       return this.parseTransfer(body, email, transferType);
     }
 
-    // Beberapa notifikasi VA / payment tidak pakai label Transfer Type persis — coba fallback.
+    // Beberapa notifikasi pakai "Type of Transaction" (QRIS Transfer) — fallback ke QRIS kalau ada Payment to
+    const typeOfTransaction = extractField(body, 'Type of Transaction');
+    if (typeOfTransaction) {
+      return this.parseQrisPayment(body, email);
+    }
+
+    // Fallback: beberapa notifikasi VA / payment tidak pakai label Transfer Type persis
     if (
       extractField(body, 'Transfer Amount') ||
       extractField(body, 'Transaction Amount') ||
@@ -43,6 +53,109 @@ export class BcaParser implements EmailParser {
     }
 
     return null;
+  }
+
+  /**
+   * Format VA BCA:
+   *   Transfer Type            : Transfer to BCA Virtual Account
+   *   Company/Product Name     : PT DOMPET ANAK BANGSA / GOPAY TOPUP
+   *   Pay Amount               : IDR 10,000.00
+   *   Admin Fee                : IDR 1,000.00
+   *   Total Payment            : IDR 11,000.00
+   *
+   * amount = Total Payment (semua uang keluar dari BCA, termasuk admin fee)
+   * description dibentuk dari Company/Product Name
+   */
+  private parseVirtualAccount(body: string, email: RawEmail): ParseResult | null {
+    const totalPaymentRaw = extractField(body, 'Total Payment');
+    const payAmountRaw = extractField(body, 'Pay Amount');
+    const companyProduct = extractField(body, 'Company/Product Name');
+    // "Name" adalah nama VA atau nama registrasi user di e-wallet — pakai exact supaya tidak nyangkut di Company/Product Name.
+    // JANGAN gunakan Name untuk isInternalDestination: e-wallet (OVO, ShopeePay) menaruh nama owner di sini,
+    // bukan kode VA, sehingga pencocokan nama akan false-positive.
+    const vaName = extractField(body, 'Name', { exact: true });
+    // "BCA Virtual Account No." adalah nomor VA tujuan — ini yang aman dicek vs own accounts
+    const vaNumber = extractField(body, 'BCA Virtual Account No.');
+    const dateRaw = extractField(body, 'Transaction Date');
+
+    const amountRaw = totalPaymentRaw || payAmountRaw;
+    if (!amountRaw) return null;
+
+    const amount = parseRupiah(amountRaw);
+    const occurredAt = (dateRaw && parseEmailDate(dateRaw)) || new Date(parseInt(email.internalDate, 10));
+
+    const description = this.buildVaDescription(companyProduct, vaName);
+
+    // categoryHint berdasarkan nama produk
+    const categoryHint = this.inferVaCategoryHint(companyProduct, vaName);
+
+    // Cek apakah VA number ini adalah rekening sendiri (mis. top-up Jago via VA BCA).
+    // Hanya cek accountNumber — JANGAN cek beneficiaryName karena e-wallet isi dengan nama owner.
+    const isOwnDestination = isInternalDestination({ accountNumber: vaNumber });
+
+    if (isOwnDestination) {
+      return {
+        amount,
+        description,
+        source: Source.BCA,
+        occurredAt,
+        excluded: true,
+        excludeReason: 'VA ke rekening sendiri (internal top-up)',
+        categoryHint,
+      };
+    }
+
+    return {
+      amount,
+      description,
+      source: Source.BCA,
+      occurredAt,
+      excluded: false,
+      categoryHint,
+    };
+  }
+
+  /**
+   * Bentuk deskripsi dari Company/Product Name:
+   * - Mengandung "GOPAY" → "GoPay Top-up (VA)"
+   * - Ada " / " → ambil bagian setelah " / ", title-case, tambah " (VA)"
+   * - Tidak ada " / " → pakai seluruh company name atau vaName, tambah " (VA)"
+   */
+  private buildVaDescription(companyProduct: string | null, vaName: string | null): string {
+    if (companyProduct) {
+      const upper = companyProduct.toUpperCase();
+
+      if (upper.includes('GOPAY')) return 'GoPay Top-up (VA)';
+      if (upper.includes('SHOPEEPAY') || upper.includes('AIRPAY')) return 'ShopeePay Top-up (VA)';
+      if (upper.includes('OVO')) return 'OVO Top-up (VA)';
+      if (upper.includes('DANA')) return 'DANA Top-up (VA)';
+      if (upper.includes('LINKAJA')) return 'LinkAja Top-up (VA)';
+
+      const slashIdx = companyProduct.indexOf(' / ');
+      if (slashIdx !== -1) {
+        const productPart = companyProduct.slice(slashIdx + 3).trim();
+        if (productPart) return `${this.toTitleCase(productPart)} (VA)`;
+      }
+      return `${this.toTitleCase(companyProduct)} (VA)`;
+    }
+
+    if (vaName) return `${vaName} (VA)`;
+    return 'Virtual Account (VA)';
+  }
+
+  /**
+   * Inferensi categoryHint dari nama produk VA.
+   * Sementara hanya LAINNYA karena enum TOPUP belum ada (ditambahkan di E00-S3).
+   */
+  private inferVaCategoryHint(companyProduct: string | null, _vaName: string | null): Category {
+    // TODO E00-S3: ganti LAINNYA dengan TOPUP setelah enum Category diperluas
+    // if (companyProduct && /GOPAY|SHOPEEPAY|AIRPAY|OVO|DANA|LINKAJA/i.test(companyProduct)) return Category.TOPUP;
+    void companyProduct; // suppress unused warning sampai E00-S3
+    return Category.LAINNYA;
+  }
+
+  private toTitleCase(str: string): string {
+    return str.toLowerCase().replace(/\b\w/g, (c) => c.toUpperCase());
   }
 
   private parseQrisPayment(body: string, email: RawEmail): ParseResult | null {
@@ -73,13 +186,13 @@ export class BcaParser implements EmailParser {
       extractField(body, 'Beneficiary Name') ||
       extractField(body, 'Beneficiary') ||
       extractField(body, 'Payment to') ||
-      extractField(body, 'To');
+      extractField(body, 'To', { exact: true });
     const beneficiaryAccount =
       extractField(body, 'Beneficiary Account') ||
       extractField(body, 'Beneficiary Account Number') ||
       extractField(body, 'Account Number') ||
       extractField(body, 'To Account');
-    const dateRaw = extractField(body, 'Transaction Date') || extractField(body, 'Date');
+    const dateRaw = extractField(body, 'Transaction Date') || extractField(body, 'Date', { exact: true });
 
     if (!transferAmountRaw || !beneficiaryName) return null;
 

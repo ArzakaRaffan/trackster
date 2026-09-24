@@ -1,0 +1,23 @@
+Hello ARZAKA RAFFAN MAWARDI,
+
+You just made a transaction through myBCA.
+Here are the details of your transaction :
+
+Status	:	Successful
+Transaction Date	:	23 Sep 2026 14:01:00
+Transfer Type	:	Transfer to BCA Virtual Account
+Source of Fund	:	6611xxxx89
+BCA Virtual Account No.	:	70001081284917833
+Name	:	GP-081284917833
+Company/Product Name	:	PT DOMPET ANAK BANGSA / GOPAY TOPUP
+Pay Amount	:	IDR 10,000.00
+Admin Fee	:	IDR 1,000.00
+Total Payment	:	IDR 11,000.00
+Description	:	
+Reference No.	:	9527120260923140126797TVA4029520300
+
+Note(s):
+Fees Include VAT (if any)
+PT BANK CENTRAL ASIA TBK.
+MENARA BCA - JAKARTA PUSAT
+NPWP: 0013084496091000

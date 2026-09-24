@@ -1,0 +1,22 @@
+Hello ARZAKA RAFFAN MAWARDI,
+
+You just made a transaction through myBCA.
+Here are the details of your transaction :
+
+Status	:	Successful
+Transaction Date	:	24 Sep 2026 12:52:18
+Transfer Type	:	Transfer to BCA Virtual Account
+Source of Fund	:	6611xxxx89
+BCA Virtual Account No.	:	122082210950202
+Name	:	ARZXXX RAFXXX MAWXXXX
+Company/Product Name	:	PT AIRPAY INTERNATIONAL INDONE / SHOPEEPAY
+Pay Amount	:	IDR 60,000.00
+Total Payment	:	IDR 60,000.00
+Description	:	ARZXXX RAFXXX MAWXXXX
+Reference No.	:	9527120260924125218811TVA4229615200
+
+Note(s):
+Fees Include VAT (if any)
+PT BANK CENTRAL ASIA TBK.
+MENARA BCA - JAKARTA PUSAT
+NPWP: 0013084496091000

@@ -45,13 +45,11 @@ Reference No.            : 9527120260923140126797TVA4029520300
   (masuk fallback, sudah OK — jangan sampai rusak), sapaan `Hi` vs `Hello`.
 
 **Tasks**
-- [ ] Simpan fixture: `parsers/__fixtures__/bca-va-gopay.txt`, `bca-qris.txt`, `bca-qris-transfer.txt` (Type of Transaction),
-      `bca-transfer-fliptech.txt` (ambil dari Gmail lewat MCP Gmail, jalankan lewat `htmlToText` — ekspor `htmlToText`
-      jadi fungsi murni di `parser.interface.ts` supaya bisa dipakai check script)
-- [ ] `parsers/parsers.check.ts`: assert tiap fixture → amount/description/excluded yang benar
-- [ ] `parseVirtualAccount()` + `categoryHint`
-- [ ] Opsi `exact` di `extractField`
-- [ ] Di dev: backfill 2026-08-10 → hari ini, cek berapa transaksi VA muncul (bandingkan dengan EmailParseLog UNPARSED sebelumnya)
+- [x] Simpan fixture: `parsers/__fixtures__/bca-va-gopay.txt`, `bca-va-shopeepay.txt`, `bca-va-ovo.txt`, `bca-qris.txt`, `bca-qris-tokopedia.txt`, `bca-qris-shopee.txt`, `bca-qris-transfer.txt`, `bca-transfer-fliptech.txt`
+- [x] `parsers/parsers.check.ts`: assert tiap fixture → amount/description/excluded yang benar (37 assertion, semua lulus)
+- [x] `parseVirtualAccount()` + `categoryHint` (sementara `LAINNYA` sampai E00-S3)
+- [x] Opsi `exact` di `extractField`
+- [ ] Di dev: backfill 2026-08-10 → hari ini, cek berapa transaksi VA muncul (dilakukan di E01-S3)
 
 **Acceptance:** `GoPay Top-up −Rp11.000` tanggal 23 Sep 14:01 WIB muncul di dev; fixture lain tetap lolos.
 

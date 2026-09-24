@@ -1,4 +1,4 @@
-import { Source } from '@prisma/client';
+import { Source, Category } from '@prisma/client';
 
 export interface RawEmail {
   id: string; // Gmail message ID, dipakai untuk deduplication (emailId)
@@ -15,6 +15,11 @@ export interface ParseResult {
   occurredAt: Date;
   excluded: boolean; // true = internal transfer, jangan disimpan sebagai expense
   excludeReason?: string;
+  /**
+   * Hint kategori dari parser — dipakai pipeline kategorisasi (E00-S3) sebelum rule/AI.
+   * Kalau E00-S3 belum jalan, caller boleh ignore dan pakai AI biasa.
+   */
+  categoryHint?: Category;
 }
 
 export interface EmailParser {
@@ -25,23 +30,61 @@ export interface EmailParser {
 }
 
 /**
+ * Konversi HTML ke plain text — fungsi murni, bisa dipakai di check script tanpa NestJS context.
+ * Buang <style>, <script>, <head> dulu sebelum strip tag lain supaya CSS/JS noise tidak ikut.
+ */
+export function htmlToText(html: string): string {
+  return html
+    .replace(/<head[\s\S]*?<\/head>/gi, '')
+    .replace(/<style[\s\S]*?<\/style>/gi, '')
+    .replace(/<script[\s\S]*?<\/script>/gi, '')
+    .replace(/<\/(td|tr|p|div|br|table|li)>/gi, '\n')
+    .replace(/<br\s*\/?>/gi, '\n')
+    .replace(/<[^>]+>/g, ' ')
+    .replace(/&nbsp;/gi, ' ')
+    .replace(/&amp;/gi, '&')
+    .replace(/&lt;/gi, '<')
+    .replace(/&gt;/gi, '>')
+    .replace(/[ \t]+/g, ' ')
+    .split('\n')
+    .map((line) => line.trim())
+    .filter((line) => line.length > 0)
+    .join('\n');
+}
+
+/**
  * Ambil value untuk sebuah label dari body email yang sudah dipecah per baris.
  * Mendukung dua pola:
  * 1. "Label : Value" atau "Label: Value" dalam satu baris (format teks polos)
  * 2. Label berdiri sendiri di satu baris, value-nya di baris berikutnya (struktur tabel HTML title/content
  *    seperti pada email BCA & Jago asli, yang secara visual di Gmail terlihat sejajar tapi di HTML source-nya terpisah baris)
+ *
+ * Opsi `exact`: kalau true, label harus cocok persis dengan bagian awal baris (bukan substring).
+ * Pakai untuk label pendek seperti "Name", "Amount", "To" yang bisa false-positive di label lain
+ * (contoh: "Name" nyangkut di "Company/Product Name" tanpa opsi ini).
  */
-export function extractField(body: string, label: string): string | null {
+export function extractField(body: string, label: string, opts?: { exact?: boolean }): string | null {
   const lines = body
     .split('\n')
     .map((l) => l.trim())
     .filter((l) => l.length > 0);
   const labelLower = label.toLowerCase();
+  const exact = opts?.exact ?? false;
 
   // Strategi 1: cari "Label: Value" dalam satu baris
   for (const line of lines) {
-    const idx = line.toLowerCase().indexOf(labelLower);
-    if (idx === -1) continue;
+    const lineLower = line.toLowerCase();
+    let idx: number;
+
+    if (exact) {
+      // Label harus di awal baris (boleh ada spasi/titik dua setelahnya)
+      if (!lineLower.startsWith(labelLower)) continue;
+      idx = 0;
+    } else {
+      idx = lineLower.indexOf(labelLower);
+      if (idx === -1) continue;
+    }
+
     const afterLabel = line.slice(idx + label.length);
     const colonIdx = afterLabel.indexOf(':');
     if (colonIdx === -1) continue;
@@ -114,4 +157,3 @@ export function parseRupiah(raw: string): number {
   }
   return parseInt(cleaned, 10) || 0;
 }
-
