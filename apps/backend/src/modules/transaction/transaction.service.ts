@@ -2,7 +2,7 @@ import { randomUUID } from 'crypto';
 import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../../prisma.service';
 import { Category, Source } from '@prisma/client';
-import { BalanceService } from '../balance/balance.service';
+import { BalanceService, shouldAdjustBalance } from '../balance/balance.service';
 import { MerchantAliasService } from '../merchant-alias/merchant-alias.service';
 import { CreateTransactionDto } from './dto/create-transaction.dto';
 import { addWibDays, startOfWibDay, startOfWibMonth, startOfWibWeek, wibDateKey, wibDayOfWeek } from '../../common/wib';
@@ -364,7 +364,10 @@ export class TransactionService {
   }
 
   /** Dipanggil oleh Gmail sync service. Return null kalau sudah ada (deduplicated). Saldo bank
-   * turun sebesar amount transaksi, dalam db transaction yang sama dengan create-nya. */
+   * turun sebesar amount transaksi, dalam db transaction yang sama dengan create-nya — kecuali
+   * transaksi ini lebih lama dari koreksi manual terakhir untuk source yang sama, karena koreksi
+   * manual = snapshot saldo asli bank yang sudah mencakup transaksi itu (backfill tidak boleh
+   * double-count). */
   async createFromParsed(parsed: ParsedTransaction) {
     const existing = await this.prisma.transaction.findUnique({ where: { emailId: parsed.emailId } });
     if (existing) return null;
@@ -380,7 +383,14 @@ export class TransactionService {
           ...(parsed.category ? { category: parsed.category } : {}),
         },
       });
-      await this.balanceService.adjustBalance(tx, created.source, -Number(created.amount));
+      const lastAdjustmentAt = await this.balanceService.getLastManualAdjustmentAt(tx, created.source);
+      if (shouldAdjustBalance(created.occurredAt, lastAdjustmentAt)) {
+        await this.balanceService.adjustBalance(tx, created.source, -Number(created.amount));
+      } else {
+        this.logger.debug(
+          `Skip adjustBalance utk transaksi ${created.id} (occurredAt ${created.occurredAt.toISOString()} < koreksi manual terakhir ${lastAdjustmentAt?.toISOString()})`,
+        );
+      }
       return created;
     });
   }

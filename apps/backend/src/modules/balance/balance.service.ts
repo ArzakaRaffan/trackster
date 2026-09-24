@@ -2,6 +2,16 @@ import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../../prisma.service';
 import { Prisma, Source } from '@prisma/client';
 
+/**
+ * Fungsi murni (bisa dites tanpa DB): apakah sebuah transaksi/income masih boleh menggerakkan
+ * saldo, atau sudah tercakup di koreksi manual terakhir dan harus di-skip (hindari double-count
+ * saat backfill/sync mundur ke tanggal sebelum baseline).
+ */
+export function shouldAdjustBalance(occurredAt: Date, lastAdjustmentAt: Date | null): boolean {
+  if (!lastAdjustmentAt) return true;
+  return occurredAt >= lastAdjustmentAt;
+}
+
 @Injectable()
 export class BalanceService {
   constructor(private prisma: PrismaService) {}
@@ -49,5 +59,20 @@ export class BalanceService {
       where: { source },
       orderBy: { createdAt: 'desc' },
     });
+  }
+
+  /**
+   * Waktu koreksi manual (BalanceAdjustment) terakhir untuk sebuah source, atau null kalau belum
+   * pernah dikoreksi. Dipakai buat aturan baseline: transaksi/income yang occurredAt-nya lebih lama
+   * dari ini sudah tercakup di angka saldo hasil koreksi manual, jadi tidak boleh menggerakkan saldo
+   * lagi (double-count).
+   */
+  async getLastManualAdjustmentAt(tx: Prisma.TransactionClient, source: Source): Promise<Date | null> {
+    const last = await tx.balanceAdjustment.findFirst({
+      where: { source },
+      orderBy: { createdAt: 'desc' },
+      select: { createdAt: true },
+    });
+    return last?.createdAt ?? null;
   }
 }

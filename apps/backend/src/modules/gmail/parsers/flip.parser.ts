@@ -1,15 +1,17 @@
 import { Injectable } from '@nestjs/common';
-import { Source } from '@prisma/client';
+import { Category, Source } from '@prisma/client';
 import { EmailParser, RawEmail, ParseResult, extractField, parseRupiah, parseEmailDate } from './parser.interface';
-import { isInternalDestination, isOwnAccountNumber } from './own-accounts';
+import { isInternalDestination } from './own-accounts';
 
 const FLIP_SENDER_HINTS = ['flip.id', 'fliptech', 'flip '];
 
 /**
  * Parser email Flip.
- * - Transfer ke rekening sendiri (BCA/Jago/Blu owner) → excluded (internal).
- * - Transfer ke beneficiary lain (merchant / orang lain / VA e-commerce) → dicatat sebagai expense.
- * Source of Fund (SoF) biasanya rekening BCA owner; SoF sendiri bukan alasan exclude.
+ * - Subject "Transaction information..." = instruksi bayar ke rekening Flip (belum expense final,
+ *   uangnya baru dianggap keluar begitu SoF BCA memotong saldo → diabaikan di sini, sudah tercatat
+ *   dari sisi BCA lewat exclusion FLIPTECH).
+ * - Subject "Successful transfer to <Nama>..." = expense final. Transfer ke rekening sendiri
+ *   (BCA/Jago/Blu owner) → excluded (internal). Ke orang/merchant lain → dicatat sebagai expense.
  */
 @Injectable()
 export class FlipParser implements EmailParser {
@@ -25,75 +27,43 @@ export class FlipParser implements EmailParser {
   }
 
   parse(email: RawEmail): ParseResult | null {
+    if (/transaction information/i.test(email.subject)) return null;
+
     const body = email.body;
 
-    const amountRaw =
-      extractField(body, 'Amount') ||
-      extractField(body, 'Jumlah') ||
-      extractField(body, 'Nominal') ||
-      extractField(body, 'Transfer Amount');
-    const beneficiaryName =
-      extractField(body, 'Beneficiary Name') ||
-      extractField(body, 'Beneficiary') ||
-      extractField(body, 'Nama Penerima') ||
-      extractField(body, 'Penerima') ||
-      extractField(body, 'To');
-    const beneficiaryAccount =
-      extractField(body, 'Beneficiary Account') ||
-      extractField(body, 'Beneficiary Account Number') ||
-      extractField(body, 'Nomor Rekening') ||
-      extractField(body, 'No. Rekening') ||
-      extractField(body, 'Account Number') ||
-      extractField(body, 'Rekening Tujuan');
-    const sof =
-      extractField(body, 'Source of Fund') ||
-      extractField(body, 'SoF') ||
-      extractField(body, 'Sumber Dana');
-    const dateRaw =
-      extractField(body, 'Transaction Date') ||
-      extractField(body, 'Tanggal') ||
-      extractField(body, 'Date') ||
-      extractField(body, 'Completed At');
+    const destinationName = extractField(body, 'Destination Name', { exact: true });
+    const destinationBank = extractField(body, 'Destination Bank', { exact: true });
+    const destinationAccount = extractField(body, 'Destination Account Number', { exact: true });
+    const timeRaw = extractField(body, 'Time', { exact: true });
+    const amountRaw = extractField(body, 'Amount');
 
     if (!amountRaw) return null;
-    // Minimal harus ada nama atau nomor tujuan
-    if (!beneficiaryName && !beneficiaryAccount) return null;
+    if (!destinationName && !destinationAccount) return null;
 
     const amount = parseRupiah(amountRaw);
     if (!amount || amount <= 0) return null;
 
-    const occurredAt = (dateRaw && parseEmailDate(dateRaw)) || new Date(parseInt(email.internalDate, 10));
+    const occurredAt = (timeRaw && parseEmailDate(timeRaw)) || new Date(parseInt(email.internalDate, 10));
 
     const excluded = isInternalDestination({
-      accountNumber: beneficiaryAccount,
-      beneficiaryName,
+      accountNumber: destinationAccount,
+      beneficiaryName: destinationName,
     });
 
-    // Deskripsi: prioritaskan nama; sisipkan bank/account pendek biar beda di list
-    const accountDigits = (beneficiaryAccount || '').replace(/\D/g, '');
-    const tail = accountDigits ? ` · …${accountDigits.slice(-4)}` : '';
-    const description = `${beneficiaryName || 'Flip transfer'}${tail}`;
-
-    // Source accounting: Flip dibiayai dari BCA owner SoF → catat sebagai BCA
-    // (konsisten dengan saldo BCA yang berkurang saat SoF). Kalau SoF jelas Jago, pakai JAGO.
-    let source: Source = Source.BCA;
-    if (sof) {
-      const sofUpper = sof.toUpperCase();
-      if (sofUpper.includes('JAGO')) source = Source.JAGO;
-      else if (isOwnAccountNumber(sof) || sofUpper.includes('BCA') || sof.replace(/\D/g, '').startsWith('6611')) {
-        source = Source.BCA;
-      }
-    }
+    // Deskripsi: "<Nama> · <Bank> …<4 digit rekening>"
+    const accountDigits = (destinationAccount || '').replace(/\D/g, '');
+    const tail = [destinationBank, accountDigits ? `…${accountDigits.slice(-4)}` : null].filter(Boolean).join(' ');
+    const description = [destinationName || 'Flip transfer', tail].filter(Boolean).join(' · ');
+    if (description.length > 80 || /[{}]/.test(description)) return null;
 
     return {
       amount,
       description,
-      source,
+      source: Source.BCA, // Flip selalu dibiayai dari SoF BCA owner
       occurredAt,
       excluded,
-      excludeReason: excluded
-        ? 'Transfer Flip ke rekening sendiri (internal)'
-        : undefined,
+      excludeReason: excluded ? 'Transfer Flip ke rekening sendiri (internal)' : undefined,
+      categoryHint: excluded ? undefined : Category.LAINNYA, // TRANSFER belum ada di enum, nunggu E00-S3
     };
   }
 }
