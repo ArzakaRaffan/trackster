@@ -4,6 +4,7 @@ import { PrismaService } from '../../prisma.service';
 import { GmailAuthService } from '../gmail/gmail-auth.service';
 import { CreateSubscriptionDto } from './dto/create-subscription.dto';
 import { UpdateSubscriptionDto } from './dto/update-subscription.dto';
+import { startOfWibDay } from '../../common/wib';
 
 type SubRow = {
   id: number;
@@ -99,15 +100,14 @@ export class SubscriptionService {
       where: { isActive: true },
       orderBy: { nextDueDate: 'asc' },
     });
-    const now = new Date();
-    now.setHours(0, 0, 0, 0);
+    const now = startOfWibDay(new Date());
     const DAY_MS = 24 * 60 * 60 * 1000;
 
     return rows
       .map((s) => {
-        const due = new Date(s.nextDueDate);
-        due.setHours(0, 0, 0, 0);
-        const daysLeft = Math.ceil((due.getTime() - now.getTime()) / DAY_MS);
+        // nextDueDate: kolom @db.Date, sudah tengah malam UTC untuk tanggal itu — tidak perlu konversi WIB.
+        const due = s.nextDueDate;
+        const daysLeft = Math.round((due.getTime() - now.getTime()) / DAY_MS);
         return { ...this.serialize(s as SubRow), daysLeft };
       })
       .filter((s) => s.daysLeft >= 0 && s.daysLeft <= withinDays);

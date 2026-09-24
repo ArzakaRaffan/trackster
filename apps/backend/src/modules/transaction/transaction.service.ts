@@ -5,6 +5,7 @@ import { Category, Source } from '@prisma/client';
 import { BalanceService } from '../balance/balance.service';
 import { MerchantAliasService } from '../merchant-alias/merchant-alias.service';
 import { CreateTransactionDto } from './dto/create-transaction.dto';
+import { addWibDays, startOfWibDay, startOfWibMonth, startOfWibWeek, wibDateKey, wibDayOfWeek } from '../../common/wib';
 
 export interface ParsedTransaction {
   amount: number;
@@ -44,8 +45,8 @@ export class TransactionService {
     const where: any = {};
     if (startDate || endDate) {
       where.occurredAt = {};
-      if (startDate) where.occurredAt.gte = new Date(startDate);
-      if (endDate) where.occurredAt.lte = new Date(endDate);
+      if (startDate) where.occurredAt.gte = startOfWibDay(startDate);
+      if (endDate) where.occurredAt.lt = addWibDays(startOfWibDay(endDate), 1);
     }
     if (source) where.source = source;
     if (category) where.category = category;
@@ -77,17 +78,13 @@ export class TransactionService {
 
   async getWeekly() {
     const now = new Date();
-    const currentDay = now.getDay(); // 0=Minggu
-    const startOfWeek = new Date(now);
-    startOfWeek.setDate(now.getDate() - currentDay);
-    startOfWeek.setHours(0, 0, 0, 0);
+    const currentDay = wibDayOfWeek(now); // 0=Minggu
+    const startOfWeek = addWibDays(startOfWibDay(now), -currentDay);
 
     const days: any[] = [];
     for (let i = 0; i < 7; i++) {
-      const date = new Date(startOfWeek);
-      date.setDate(startOfWeek.getDate() + i);
-      const nextDate = new Date(date);
-      nextDate.setDate(date.getDate() + 1);
+      const date = addWibDays(startOfWeek, i);
+      const nextDate = addWibDays(date, 1);
 
       const budgetRow = await this.prisma.dailyBudget.findUnique({ where: { dayOfWeek: i } });
       const transactions = await this.prisma.transaction.findMany({
@@ -97,7 +94,7 @@ export class TransactionService {
       const totalSpent = transactions.reduce((sum, t) => sum + Number(t.amount), 0);
 
       days.push({
-        date: date.toISOString().slice(0, 10),
+        date: wibDateKey(date),
         dayOfWeek: i,
         budget: budgetRow ? Number(budgetRow.amount) : 0,
         totalSpent,
@@ -146,9 +143,8 @@ export class TransactionService {
 
   /** Semua transaksi di satu tanggal (YYYY-MM-DD) — buat drill-down dari chart bulanan/mingguan. */
   async getByDay(date: string) {
-    const start = new Date(`${date}T00:00:00`);
-    const end = new Date(`${date}T00:00:00`);
-    end.setDate(end.getDate() + 1);
+    const start = startOfWibDay(date);
+    const end = addWibDays(start, 1);
 
     const transactions = await this.prisma.transaction.findMany({
       where: { occurredAt: { gte: start, lt: end } },
@@ -162,8 +158,8 @@ export class TransactionService {
 
   /** Total, breakdown per kategori, dan breakdown per hari (buat chart) dalam satu bulan. */
   async getMonthly(year: number, month: number) {
-    const start = new Date(year, month - 1, 1);
-    const end = new Date(year, month, 1);
+    const start = startOfWibMonth(year, month);
+    const end = month === 12 ? startOfWibMonth(year + 1, 1) : startOfWibMonth(year, month + 1);
 
     const [transactions, byCategoryRaw] = await Promise.all([
       this.prisma.transaction.findMany({
@@ -183,14 +179,14 @@ export class TransactionService {
       .map((row) => ({ category: row.category, total: Number(row._sum.amount ?? 0) }))
       .sort((a, b) => b.total - a.total);
 
-    const daysInMonth = new Date(year, month, 0).getDate();
+    const daysInMonth = Math.round((end.getTime() - start.getTime()) / 86_400_000);
     const byDayMap = new Map<string, number>();
     for (const t of transactions) {
-      const key = t.occurredAt.toISOString().slice(0, 10);
+      const key = wibDateKey(t.occurredAt);
       byDayMap.set(key, (byDayMap.get(key) ?? 0) + Number(t.amount));
     }
     const byDay = Array.from({ length: daysInMonth }, (_, i) => {
-      const date = new Date(year, month - 1, i + 1).toISOString().slice(0, 10);
+      const date = wibDateKey(addWibDays(start, i));
       return { date, totalSpent: byDayMap.get(date) ?? 0 };
     });
 
@@ -213,7 +209,7 @@ export class TransactionService {
 
     const byMonthMap = new Map<string, number>();
     for (const t of transactions) {
-      const key = t.occurredAt.toISOString().slice(0, 7); // YYYY-MM
+      const key = wibDateKey(t.occurredAt).slice(0, 7); // YYYY-MM (WIB)
       byMonthMap.set(key, (byMonthMap.get(key) ?? 0) + Number(t.amount));
     }
 
@@ -235,12 +231,7 @@ export class TransactionService {
     const rangeStart =
       range === 'all'
         ? (await this.prisma.transaction.aggregate({ _min: { occurredAt: true } }))._min.occurredAt ?? now
-        : (() => {
-            const d = new Date(now);
-            d.setDate(now.getDate() - 29);
-            d.setHours(0, 0, 0, 0);
-            return d;
-          })();
+        : addWibDays(startOfWibDay(now), -29);
     const rangeWhere = { occurredAt: { gte: rangeStart, lte: now } };
 
     const [trend, topMerchantsRaw, categoryRaw, dayOfWeekTx, budgetAdherence] = await Promise.all([
@@ -272,7 +263,7 @@ export class TransactionService {
     });
 
     const weekdaySums = Array(7).fill(0);
-    for (const t of dayOfWeekTx) weekdaySums[t.occurredAt.getDay()] += Number(t.amount);
+    for (const t of dayOfWeekTx) weekdaySums[wibDayOfWeek(t.occurredAt)] += Number(t.amount);
     const weekdayCounts = this.countWeekdaysInRange(rangeStart, now);
     const spendByDayOfWeek = weekdaySums.map((sum, dayOfWeek) => ({
       dayOfWeek,
@@ -285,12 +276,8 @@ export class TransactionService {
   /** Total spend minggu berjalan (Senin-hari ini) vs minggu lalu penuh (Senin-Minggu). */
   private async getWeekOverWeekTrend() {
     const now = new Date();
-    const daysSinceMonday = (now.getDay() + 6) % 7; // getDay(): 0=Minggu ... jadikan 0=Senin
-    const thisWeekStart = new Date(now);
-    thisWeekStart.setDate(now.getDate() - daysSinceMonday);
-    thisWeekStart.setHours(0, 0, 0, 0);
-    const lastWeekStart = new Date(thisWeekStart);
-    lastWeekStart.setDate(thisWeekStart.getDate() - 7);
+    const thisWeekStart = startOfWibWeek(now);
+    const lastWeekStart = addWibDays(thisWeekStart, -7);
 
     const [thisWeekTx, lastWeekTx] = await Promise.all([
       this.prisma.transaction.findMany({
@@ -315,9 +302,7 @@ export class TransactionService {
   private async getBudgetAdherence() {
     const totalDays = 30;
     const now = new Date();
-    const start = new Date(now);
-    start.setDate(now.getDate() - (totalDays - 1));
-    start.setHours(0, 0, 0, 0);
+    const start = addWibDays(startOfWibDay(now), -(totalDays - 1));
 
     const [transactions, budgetRows] = await Promise.all([
       this.prisma.transaction.findMany({
@@ -330,16 +315,15 @@ export class TransactionService {
 
     const spentByDate = new Map<string, number>();
     for (const t of transactions) {
-      const key = t.occurredAt.toISOString().slice(0, 10);
+      const key = wibDateKey(t.occurredAt);
       spentByDate.set(key, (spentByDate.get(key) ?? 0) + Number(t.amount));
     }
 
     let daysOverBudget = 0;
     for (let i = 0; i < totalDays; i++) {
-      const date = new Date(start);
-      date.setDate(start.getDate() + i);
-      const spent = spentByDate.get(date.toISOString().slice(0, 10)) ?? 0;
-      const budget = budgetByDow.get(date.getDay()) ?? 0;
+      const date = addWibDays(start, i);
+      const spent = spentByDate.get(wibDateKey(date)) ?? 0;
+      const budget = budgetByDow.get(wibDayOfWeek(date)) ?? 0;
       if (spent > budget) daysOverBudget++;
     }
 
@@ -350,13 +334,11 @@ export class TransactionService {
    * sebagai pembagi buat rata-rata spendByDayOfWeek (bukan cuma dibagi jumlah transaksi). */
   private countWeekdaysInRange(start: Date, end: Date): number[] {
     const counts = Array(7).fill(0);
-    const cur = new Date(start);
-    cur.setHours(0, 0, 0, 0);
-    const endDay = new Date(end);
-    endDay.setHours(0, 0, 0, 0);
+    let cur = startOfWibDay(start);
+    const endDay = startOfWibDay(end);
     while (cur <= endDay) {
-      counts[cur.getDay()]++;
-      cur.setDate(cur.getDate() + 1);
+      counts[wibDayOfWeek(cur)]++;
+      cur = addWibDays(cur, 1);
     }
     return counts;
   }

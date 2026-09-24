@@ -3,6 +3,7 @@ import { PrismaService } from '../../prisma.service';
 import { BalanceService } from '../balance/balance.service';
 import { CreateIncomeDto } from './dto/create-income.dto';
 import { UpdateIncomeDto } from './dto/update-income.dto';
+import { addWibDays, startOfWibDay } from '../../common/wib';
 
 @Injectable()
 export class IncomeService {
@@ -16,8 +17,8 @@ export class IncomeService {
     const where: any = {};
     if (startDate || endDate) {
       where.receivedAt = {};
-      if (startDate) where.receivedAt.gte = new Date(startDate);
-      if (endDate) where.receivedAt.lte = new Date(endDate);
+      if (startDate) where.receivedAt.gte = startOfWibDay(startDate);
+      if (endDate) where.receivedAt.lt = addWibDays(startOfWibDay(endDate), 1);
     }
     return this.prisma.income.findMany({ where, orderBy: { receivedAt: 'desc' } });
   }
