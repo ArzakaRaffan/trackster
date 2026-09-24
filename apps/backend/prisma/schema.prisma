@@ -133,7 +133,66 @@ model Income {
   receivedAt  DateTime
   createdAt   DateTime @default(now())
 
+  streamId    Int?
+  stream      IncomeStream? @relation(fields: [streamId], references: [id])
+  periodStart DateTime?     @db.Date // minggu (Senin) / bulan yang "dibayar" oleh income ini
+  units       Decimal?      @db.Decimal(4, 1) // SESSION: sesi; DEDUCTION: hari absen
+  extraUnits  Decimal?      @db.Decimal(4, 1) // SESSION: sesi offline (dapat transport)
+  status      IncomeStatus  @default(CONFIRMED)
+  origin      IncomeOrigin  @default(MANUAL)
+  externalId  String?       @unique // Gmail message ID / hash notifikasi -> dedup auto-capture (E02)
+
   @@index([receivedAt])
+  @@index([streamId, periodStart])
+}
+
+enum IncomeKind {
+  FIXED // nominal tetap (uang mingguan)
+  SESSION // per sesi + ekstra per sesi offline (les privat)
+  DEDUCTION // nominal maks dikurangi per unit absen (magang)
+  VARIABLE // nominal berubah, rutin (Ruangguru bulanan)
+  IRREGULAR // tak tentu (project) - tidak masuk forecast dasar
+}
+
+enum IncomeCadence {
+  WEEKLY
+  MONTHLY
+  NONE
+}
+
+// PENDING = auto-capture perlu dicek; INTERNAL = uang masuk dari rekening sendiri (E02).
+// Statistik cuma hitung CONFIRMED.
+enum IncomeStatus {
+  CONFIRMED
+  PENDING
+  INTERNAL
+}
+
+enum IncomeOrigin {
+  MANUAL
+  CHECKIN
+  EMAIL
+  NOTIFICATION
+}
+
+model IncomeStream {
+  id               Int           @id @default(autoincrement())
+  name             String
+  kind             IncomeKind
+  cadence          IncomeCadence
+  source           Source // rekening tujuan default
+  payDayOfWeek     Int? // WEEKLY: 0=Min..6=Sab, hari biasanya diterima
+  payDayOfMonth    Int? // MONTHLY: mis. 25
+  amount           Decimal?      @db.Decimal(12, 2) // FIXED: nominal; DEDUCTION: maks; VARIABLE: estimasi awal
+  sessionRate      Decimal?      @db.Decimal(12, 2) // SESSION: rate per sesi
+  sessionExtra     Decimal?      @db.Decimal(12, 2) // SESSION: transport per sesi offline
+  maxUnits         Int? // SESSION: maks sesi/minggu; DEDUCTION: hari kerja/minggu
+  deductionPerUnit Decimal?      @db.Decimal(12, 2) // DEDUCTION: nominal dipotong per hari absen
+  typicalUnits     Decimal?      @db.Decimal(4, 1) // tebakan awal sebelum ada histori
+  matchKeywords    String[] // nama pengirim buat auto-link (E02)
+  isActive         Boolean       @default(true)
+  createdAt        DateTime      @default(now())
+  incomes          Income[]
 }
 
 model BankBalance {
