@@ -2,7 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { Cron, CronExpression, SchedulerRegistry } from '@nestjs/schedule';
 import { GmailAuthService } from './gmail-auth.service';
 import { ParserRegistryService } from './parsers/parser-registry.service';
-import { RawEmail } from './parsers/parser.interface';
+import { RawEmail, htmlToText } from './parsers/parser.interface';
 import { TransactionService } from '../transaction/transaction.service';
 import { BudgetService } from '../budget/budget.service';
 import { TelegramService } from '../telegram/telegram.service';
@@ -249,18 +249,6 @@ export class GmailSyncService {
   }
 
   private htmlToText(html: string): string {
-    return html
-      .replace(/<\/(td|tr|p|div|br|table|li)>/gi, '\n')
-      .replace(/<br\s*\/?>/gi, '\n')
-      .replace(/<[^>]+>/g, ' ')
-      .replace(/&nbsp;/gi, ' ')
-      .replace(/&amp;/gi, '&')
-      .replace(/&lt;/gi, '<')
-      .replace(/&gt;/gi, '>')
-      .replace(/[ \t]+/g, ' ')
-      .split('\n')
-      .map((line) => line.trim())
-      .filter((line) => line.length > 0)
-      .join('\n');
+    return htmlToText(html);
   }
-}
+}

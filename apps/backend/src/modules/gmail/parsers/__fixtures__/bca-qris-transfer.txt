@@ -1,0 +1,6 @@
+Here are the details of your transaction
+Type of Transaction      : QRIS Transfer
+Payment to               : GOJEK INDONESIA
+Total Payment            : IDR 25,000.00
+Transaction Date         : 22 Sep 2026 10:15:00
+Reference No.            : QRISTRANSFER987654

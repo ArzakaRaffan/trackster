@@ -4,6 +4,8 @@ Personal finance expense tracker untuk Arzaka. Otomatis mencatat pengeluaran dar
 
 **Single-user app.** Nggak ada multi-tenant, nggak ada signup flow. Semua fitur didesain buat satu orang (Arzaka), bukan produk publik.
 
+Konteks tambahan: `docs/context/Product.md` (kenapa & alur uang nyata) dan `docs/context/Codemap.md` (peta module/route/cron + drift yang diketahui).
+
 ## Tech Stack
 
 - Backend: NestJS + Prisma + PostgreSQL, di `apps/backend`

@@ -1,0 +1,6 @@
+Here are the details of your transaction
+Transaction Type         : QRIS Payment
+Payment to               : Warung Makan Bu Sari
+Total Payment            : IDR 15,000.00
+Transaction Date         : 23 Sep 2026 12:30:00
+Reference No.            : QRIS123456789

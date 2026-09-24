@@ -1,0 +1,22 @@
+Hello ANDI WIJAYA PUTRA,
+
+You just made a transaction through myBCA.
+Here are the details of your transaction :
+
+Status	:	Successful
+Transaction Date	:	24 Sep 2026 12:52:18
+Transfer Type	:	Transfer to BCA Virtual Account
+Source of Fund	:	1234xxxx90
+BCA Virtual Account No.	:	122081200003333
+Name	:	ANDXXX WIJXXX PUTXXXX
+Company/Product Name	:	PT AIRPAY INTERNATIONAL INDONE / SHOPEEPAY
+Pay Amount	:	IDR 60,000.00
+Total Payment	:	IDR 60,000.00
+Description	:	ANDXXX WIJXXX PUTXXXX
+Reference No.	:	9527120260924125218811TVA4229615200
+
+Note(s):
+Fees Include VAT (if any)
+PT BANK CENTRAL ASIA TBK.
+MENARA BCA - JAKARTA PUSAT
+NPWP: 0013084496091000
