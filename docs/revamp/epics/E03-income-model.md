@@ -111,7 +111,7 @@ Per stream per minggu, tiga angka:
       source BCA.
 - [x] Migration `add_income_streams` (enum + `IncomeStream` + kolom baru `Income`)
 - [x] Modul baru `apps/backend/src/modules/income-stream/` (CRUD, JwtAuthGuard)
-- [x] Seed/insert 5 stream sesuai jawaban (script sekali jalan `prisma/seed-income-streams.ts`, idempotent by name)
+- [x] Seed/insert 5 stream sesuai jawaban (script sekali jalan `prisma/seed-income-streams.js`, idempotent by name)
 - [ ] Link income lama ke stream (dialog sekali: "Mingguan" → Uang mingguan, dst.) — boleh manual lewat UI edit
       (belum ada UI edit income yang expose `streamId`; deferred ke E03-S2 saat halaman Pemasukan v2 dibuat)
 

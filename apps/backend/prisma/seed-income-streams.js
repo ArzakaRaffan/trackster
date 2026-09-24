@@ -1,25 +1,13 @@
 /**
  * Script sekali-jalan E03-S1: seed 5 IncomeStream Arzaka. Idempotent (skip kalau nama sudah ada).
- * Jalan: npx ts-node prisma/seed-income-streams.ts
+ * Plain JS (bukan ts-node) karena prod exclude devDependencies — lihat docs/context/Gotchas.md.
+ * Jalan: node prisma/seed-income-streams.js
  */
-import { PrismaClient, IncomeKind, IncomeCadence, Source } from '@prisma/client';
+const { PrismaClient } = require('@prisma/client');
 
 const prisma = new PrismaClient();
 
-const streams: Array<{
-  name: string;
-  kind: IncomeKind;
-  cadence: IncomeCadence;
-  source: Source;
-  payDayOfMonth?: number;
-  amount?: number;
-  sessionRate?: number;
-  sessionExtra?: number;
-  maxUnits?: number;
-  deductionPerUnit?: number;
-  typicalUnits?: number;
-  matchKeywords?: string[];
-}> = [
+const streams = [
   {
     name: 'Les Privat',
     kind: 'SESSION',
