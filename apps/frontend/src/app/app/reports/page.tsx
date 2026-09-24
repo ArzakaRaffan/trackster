@@ -343,6 +343,7 @@ function AllTimeTab() {
                       { revalidate: false },
                     )
                   }
+                  onDeleted={() => mutateList()}
                 />
               ))}
             </ul>
@@ -491,6 +492,7 @@ function DayDetailSheet({ date, onClose }: { date: string; onClose: () => void }
                       { revalidate: false },
                     )
                   }
+                  onDeleted={() => mutate()}
                 />
               ))}
             </ul>

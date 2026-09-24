@@ -5,7 +5,7 @@ import { api } from '@/lib/api';
 import { Button } from './Button';
 import { Input } from './Input';
 import { SourceTag } from './SourceTag';
-import { Pencil, StickyNote } from 'lucide-react';
+import { Pencil, StickyNote, Trash2 } from 'lucide-react';
 
 export interface NoteableTransaction {
   id: number;
@@ -49,11 +49,13 @@ export function TransactionNoteRow({
   onSaved,
   onCategorySaved,
   onAliasSaved,
+  onDeleted,
 }: {
   transaction: NoteableTransaction;
   onSaved?: (id: number, note: string) => void;
   onCategorySaved?: (id: number, category: string) => void;
   onAliasSaved?: (id: number, displayName: string) => void;
+  onDeleted?: (id: number) => void;
 }) {
   const hasAlias = !!transaction.displayDescription && transaction.displayDescription !== transaction.description;
   const title = transaction.displayDescription ?? transaction.description;
@@ -64,6 +66,7 @@ export function TransactionNoteRow({
   const [saving, setSaving] = useState(false);
   const [savingCategory, setSavingCategory] = useState(false);
   const [savingAlias, setSavingAlias] = useState(false);
+  const [deleting, setDeleting] = useState(false);
 
   const handleSave = async () => {
     setSaving(true);
@@ -93,6 +96,17 @@ export function TransactionNoteRow({
       onAliasSaved?.(transaction.id, aliasDraft);
     } finally {
       setSavingAlias(false);
+    }
+  };
+
+  const handleDelete = async () => {
+    if (!window.confirm(`Hapus transaksi "${title}" (${rp(transaction.amount)})? Saldo bank akan disesuaikan balik.`)) return;
+    setDeleting(true);
+    try {
+      await api.delete(`/transactions/${transaction.id}`);
+      onDeleted?.(transaction.id);
+    } finally {
+      setDeleting(false);
     }
   };
 
@@ -166,13 +180,18 @@ export function TransactionNoteRow({
             maxLength={500}
             className="min-w-0 flex-1 resize-none rounded-comfortable bg-surface-interactive px-3.5 py-3 text-small text-ink shadow-field outline-none transition-shadow duration-base ease-standard placeholder:text-ink-subtle focus:shadow-field-focus"
           />
-          <div className="flex justify-end gap-2">
-            <Button variant="ghost" size="sm" onClick={() => setOpen(false)}>
-              Batal
+          <div className="flex items-center justify-between gap-2">
+            <Button variant="danger" size="sm" icon={<Trash2 size={14} />} onClick={handleDelete} disabled={deleting}>
+              {deleting ? 'Menghapus...' : 'Hapus'}
             </Button>
-            <Button variant="primary" size="sm" onClick={handleSave} disabled={saving}>
-              {saving ? 'Menyimpan...' : 'Simpan catatan'}
-            </Button>
+            <div className="flex gap-2">
+              <Button variant="ghost" size="sm" onClick={() => setOpen(false)}>
+                Batal
+              </Button>
+              <Button variant="primary" size="sm" onClick={handleSave} disabled={saving}>
+                {saving ? 'Menyimpan...' : 'Simpan catatan'}
+              </Button>
+            </div>
           </div>
         </div>
       )}

@@ -281,6 +281,7 @@ export default function TodayPage() {
                     { revalidate: false },
                   )
                 }
+                onDeleted={() => mutate()}
               />
             ))}
           </ul>
