@@ -10,6 +10,13 @@
   (lihat catatan lain di bawah), tapi kalau ada sisa file lokal dari sesi sebelumnya tetap bisa kena.
   (`apps/backend/nest-cli.json`, `apps/backend/tsconfig.json`)
 
+- **`npx prisma migrate dev` selalu gagal di shell non-interactive** (termasuk sesi Claude Code ini) dengan
+  "Prisma Migrate has detected that the environment is non-interactive" — `--create-only` pun tetap gagal.
+  Workaround: generate SQL manual dengan `npx prisma migrate diff --from-schema-datasource prisma/schema.prisma
+  --to-schema-datamodel prisma/schema.prisma --script > prisma/migrations/<timestamp>_<nama>/migration.sql`
+  (folder dibuat manual dulu), lalu `npx prisma migrate deploy` buat apply ke DB dev. Baca dulu SQL yang
+  dihasilkan sebelum apply. (`apps/backend/prisma/`)
+
 > Jebakan & hal non-obvious. Tiap bug yang makan > 15 menit -> tulis di sini. Terbaru di atas.
 > Lihat juga bagian "Gotcha Infrastruktur" di `CLAUDE.md` (Prisma+Alpine openssl, urutan `NODE_ENV`,
 > OOM build 2GB RAM, `rootDir` tsconfig, seed plain JS, `useSearchParams` + Suspense, dll).

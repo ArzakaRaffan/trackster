@@ -104,12 +104,16 @@ Per stream per minggu, tiga angka:
 
 ## E03-S1 — Data model + seed sumber pemasukan
 
-- [ ] Tanya Arzaka (AskUserQuestion): stream aktif (Annotator? Asdos? Kenyu = les privat?), hari biasa terima
+- [x] Tanya Arzaka (AskUserQuestion): stream aktif (Annotator? Asdos? Kenyu = les privat?), hari biasa terima
       tiap stream, rekening tujuan tiap stream, les dibayar per minggu atau per bulan, nominal Ruangguru biasanya.
-- [ ] Migration `add_income_streams` (enum + `IncomeStream` + kolom baru `Income`)
-- [ ] Modul baru `apps/backend/src/modules/income-stream/` (CRUD, JwtAuthGuard)
-- [ ] Seed/insert 5 stream sesuai jawaban (lewat UI atau script sekali jalan — bukan `seed.js` yang untuk user admin)
+      Jawaban: Kenyu = murid les privat aktif (Annotator & Asdos sudah tidak aktif, tidak dibuatkan stream);
+      les dibayar per minggu; Ruangguru ~100-200rb/bulan (dipakai 150rb sebagai estimasi awal); semua stream
+      source BCA.
+- [x] Migration `add_income_streams` (enum + `IncomeStream` + kolom baru `Income`)
+- [x] Modul baru `apps/backend/src/modules/income-stream/` (CRUD, JwtAuthGuard)
+- [x] Seed/insert 5 stream sesuai jawaban (script sekali jalan `prisma/seed-income-streams.ts`, idempotent by name)
 - [ ] Link income lama ke stream (dialog sekali: "Mingguan" → Uang mingguan, dst.) — boleh manual lewat UI edit
+      (belum ada UI edit income yang expose `streamId`; deferred ke E03-S2 saat halaman Pemasukan v2 dibuat)
 
 ## E03-S2 — Forecast + halaman Pemasukan v2
 
