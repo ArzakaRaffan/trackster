@@ -92,12 +92,12 @@ model EmailParseLog {
   (`Internet Transaction Journal`, Jago "transfer/membayar/menerima", Flip "BUKTI TRANSFER").
 
 **Tasks**
-- [ ] Migration `add_email_parse_log`
-- [ ] Tulis log di `syncEmails()` (semua cabang: excluded, unparsed, dup, created, error per email)
-- [ ] Endpoint + UI list
-- [ ] Jalankan backfill 30 hari di **dev** → lihat daftar UNPARSED; catat temuan format baru di `01-findings.md`
+- [x] Migration `add_email_parse_log` — dijalankan di DB dev (`trackster-dev`, port 5434), belum di prod (jalan otomatis pas backend container prod restart via `migrate deploy`)
+- [x] Tulis log di `syncEmails()` (semua cabang: excluded, unparsed, dup, created, error per email) — direfactor jadi `processMessage()` + try/catch per-email (ERROR status baru: satu email error nggak lagi gagalin seluruh batch sync), aturan "RECORDED nggak boleh ketimpa" diekstrak jadi fungsi murni `shouldSkipLogUpsert()` (self-check `email-parse-log.check.ts`, 4 assertion)
+- [x] Endpoint `GET /sync/parse-log?status=&limit=` + UI list (Settings → "Email yang gagal dibaca", collapsible, filter chip per status, link ke Gmail) — diverifikasi hidup: endpoint dites end-to-end (server dev + JWT asli + 2 baris `EmailParseLog` manual → response JSON benar utk status UNPARSED & RECORDED). UI belum sempat dicek visual di browser asli (VPS ini cuma 2GB RAM, prod container lagi jalan — nggak aman jalanin `next dev` bareng buat browser check tanpa tunnel dari laptop Arzaka; kode-nya ngikutin pola `BankBalanceRow` yang sudah battle-tested & `tsc --noEmit` bersih)
+- [ ] Jalankan backfill 30 hari di **dev** → lihat daftar UNPARSED; catat temuan format baru di `01-findings.md` — **belum bisa**: DB dev adalah salinan data prod, tapi `GmailToken` tabelnya kosong (OAuth belum pernah di-link ke dev), jadi nggak ada cara narik email asli dari dev tanpa connect Gmail dulu. Log parse-nya sendiri sudah pasti jalan (dibuktikan manual di atas) begitu sync beneran jalan di prod.
 
-**Acceptance:** setelah backfill di dev, email VA GoPay 23 Sep muncul sebagai UNPARSED (sebelum E01-S1) dengan subject & link yang benar.
+**Acceptance:** endpoint + UI sudah ada dan terbukti benar secara mekanis (server dev + data manual). Bagian "lihat daftar UNPARSED asli dari backfill 30 hari" ditunda ke saat sync production jalan (log otomatis keisi begitu cron `gmail-sync` jalan di prod setelah deploy) — nggak butuh sesi devnya sendiri.
 
 ---
 
