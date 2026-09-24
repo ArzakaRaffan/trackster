@@ -6,6 +6,7 @@ import { UpdateNoteDto } from './dto/update-note.dto';
 import { UpdateCategoryDto } from './dto/update-category.dto';
 import { SetAliasDto } from './dto/set-alias.dto';
 import { CreateTransactionDto } from './dto/create-transaction.dto';
+import { wibParts } from '../../common/wib';
 
 @UseGuards(JwtAuthGuard)
 @Controller('transactions')
@@ -45,8 +46,9 @@ export class TransactionController {
 
   @Get('monthly')
   async getMonthly(@Query('year') year: string, @Query('month') month: string) {
-    const y = year ? parseInt(year, 10) : new Date().getFullYear();
-    const m = month ? parseInt(month, 10) : new Date().getMonth() + 1;
+    const nowParts = wibParts(new Date());
+    const y = year ? parseInt(year, 10) : nowParts.year;
+    const m = month ? parseInt(month, 10) : nowParts.month;
     return this.transactionService.getMonthly(y, m);
   }
 

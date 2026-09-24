@@ -4,6 +4,7 @@ import { PrismaService } from '../../prisma.service';
 import { AiService } from './ai.service';
 import { TransactionService } from '../transaction/transaction.service';
 import { TelegramService } from '../telegram/telegram.service';
+import { isLastWibDayOfMonth, startOfWibWeek, wibDateKey, wibParts } from '../../common/wib';
 
 const WEEKLY_NARRATIVE_PROMPT = `Kamu adalah Trackster AI — financial buddy personal Arzaka.
 Tugas: Tulis ringkasan mingguan keuangan Arzaka dalam Bahasa Indonesia yang santai.
@@ -68,15 +69,12 @@ export class AiReportsService {
   @Cron('0 20 * * *', { name: 'monthly-report-card', timeZone: 'Asia/Jakarta' })
   async sendMonthlyReportCard() {
     const now = new Date();
-    const lastDay = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
-    if (now.getDate() !== lastDay) return; // bukan akhir bulan
+    if (!isLastWibDayOfMonth(now)) return; // bukan akhir bulan (WIB)
 
     this.logger.log('Mengirim Monthly Report Card...');
     try {
-      const monthly = await this.transactionService.getMonthly(
-        now.getFullYear(),
-        now.getMonth() + 1,
-      );
+      const { year, month } = wibParts(now);
+      const monthly = await this.transactionService.getMonthly(year, month);
       const allTime = await this.transactionService.getAllTimeSummary();
 
       const narrative = await this.aiService.chat({
@@ -92,7 +90,11 @@ export class AiReportsService {
 
       const text = narrative?.content ?? '';
       if (text) {
-        const monthName = now.toLocaleDateString('id-ID', { month: 'long', year: 'numeric' });
+        const monthName = now.toLocaleDateString('id-ID', {
+          month: 'long',
+          year: 'numeric',
+          timeZone: 'Asia/Jakarta',
+        });
         await this.telegramService.sendMessage(
           `📅 <b>Report Card ${monthName}</b>\n\n${text}`,
         );
@@ -156,12 +158,8 @@ export class AiReportsService {
         // Ignore commentary error — skor tetap tersimpan
       }
 
-      // weekStart = Senin minggu ini
-      const weekStart = new Date(now);
-      const dayOfWeek = now.getDay(); // 0=Minggu
-      const diffToMonday = dayOfWeek === 0 ? -6 : 1 - dayOfWeek;
-      weekStart.setDate(now.getDate() + diffToMonday);
-      weekStart.setHours(0, 0, 0, 0);
+      // weekStart = Senin minggu ini (WIB)
+      const weekStart = startOfWibWeek(now);
 
       await this.prisma.healthScoreLog.upsert({
         where: { weekStart },
@@ -169,7 +167,7 @@ export class AiReportsService {
         create: { weekStart, score, budgetAdherencePct, savingsRatePct, aiCommentary },
       });
 
-      this.logger.log(`HealthScore saved: ${score}/100 (week ${weekStart.toISOString().slice(0, 10)})`);
+      this.logger.log(`HealthScore saved: ${score}/100 (week ${wibDateKey(weekStart)})`);
       return { score, budgetAdherencePct, savingsRatePct, aiCommentary };
     } catch (err: any) {
       this.logger.error(`computeAndSaveHealthScore error: ${err?.message}`);

@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../../prisma.service';
 import { UpdateBudgetDto } from './dto/update-budget.dto';
 import { MerchantAliasService } from '../merchant-alias/merchant-alias.service';
+import { wibDateKey, wibDayOfWeek, wibRange } from '../../common/wib';
 
 @Injectable()
 export class BudgetService {
@@ -35,21 +36,18 @@ export class BudgetService {
 
   async getTodaySummary() {
     const now = new Date();
-    const dayOfWeek = now.getDay();
+    const dayOfWeek = wibDayOfWeek(now);
     const budget = await this.getBudgetForDay(dayOfWeek);
 
-    const startOfDay = new Date(now);
-    startOfDay.setHours(0, 0, 0, 0);
-    const endOfDay = new Date(now);
-    endOfDay.setHours(23, 59, 59, 999);
+    const { start: startOfDay, end: endOfDay } = wibRange('day', now);
 
     const [transactions, incomes] = await Promise.all([
       this.prisma.transaction.findMany({
-        where: { occurredAt: { gte: startOfDay, lte: endOfDay } },
+        where: { occurredAt: { gte: startOfDay, lt: endOfDay } },
         orderBy: { occurredAt: 'desc' },
       }),
       this.prisma.income.findMany({
-        where: { receivedAt: { gte: startOfDay, lte: endOfDay } },
+        where: { receivedAt: { gte: startOfDay, lt: endOfDay } },
         orderBy: { receivedAt: 'desc' },
       }),
     ]);
@@ -59,7 +57,7 @@ export class BudgetService {
     const transactionsWithDisplay = await this.merchantAliasService.attachDisplayNames(transactions);
 
     return {
-      date: startOfDay.toISOString().slice(0, 10),
+      date: wibDateKey(now),
       budget,
       totalSpent,
       remaining: budget - totalSpent,
@@ -86,9 +84,11 @@ export class BudgetService {
     const totalSpent7d = Number(spentAgg._sum.amount ?? 0);
     const burnRatePerDay = totalSpent7d / 7;
 
-    // Sisa hari di bulan ini
-    const daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
-    const remainingDays = daysInMonth - now.getDate();
+    // Sisa hari di bulan ini (kalender WIB)
+    const { start: monthStart, end: monthEnd } = wibRange('month', now);
+    const daysInMonth = Math.round((monthEnd.getTime() - monthStart.getTime()) / 86_400_000);
+    const dayOfMonth = Math.round((wibRange('day', now).start.getTime() - monthStart.getTime()) / 86_400_000) + 1;
+    const remainingDays = daysInMonth - dayOfMonth;
 
     // Saldo BCA + Jago saat ini
     const balances = await this.prisma.bankBalance.findMany();
