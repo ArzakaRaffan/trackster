@@ -10,7 +10,7 @@ import { Button } from '@/components/ui/Button';
 import { Switch } from '@/components/ui/Switch';
 import { AnimatedAmount } from '@/components/ui/AnimatedAmount';
 import { formatRupiah } from '@/lib/format';
-import { Mail, Send, LogOut, Check, Wallet, History, Tag, Pencil, Trash2, X } from 'lucide-react';
+import { Mail, Send, LogOut, Check, Wallet, History, Tag, Pencil, Trash2, X, MailWarning, ChevronDown } from 'lucide-react';
 
 interface GmailStatus {
   connected: boolean;
@@ -50,11 +50,22 @@ interface MerchantAliasData {
   displayName: string;
 }
 
+interface EmailParseLogData {
+  id: number;
+  emailId: string;
+  from: string;
+  subject: string;
+  receivedAt: string;
+  status: 'RECORDED' | 'EXCLUDED' | 'UNPARSED' | 'DUPLICATE' | 'ERROR';
+  reason: string | null;
+}
+
 const gmailFetcher = (path: string) => api.get<GmailStatus>(path);
 const telegramFetcher = (path: string) => api.get<TelegramStatus>(path);
 const nextRunFetcher = (path: string) => api.get<NextRun>(path);
 const balanceFetcher = (path: string) => api.get<BankBalanceData[]>(path);
 const adjustmentsFetcher = (path: string) => api.get<BalanceAdjustmentData[]>(path);
+const parseLogFetcher = (path: string) => api.get<EmailParseLogData[]>(path);
 const merchantAliasFetcher = (path: string) => api.get<MerchantAliasData[]>(path);
 
 function useCountdown(targetIso?: string) {
@@ -274,6 +285,8 @@ const handleBackfill = async () => {
           </div>
         </section>
 
+        <EmailParseLogSection />
+
         {/* Saldo bank */}
         <section className="rounded-comfortable bg-surface p-5">
           <h2 className="flex items-center gap-2 text-heading font-semibold text-ink">
@@ -388,6 +401,78 @@ const handleBackfill = async () => {
         <p className="text-center text-small text-ink-subtle">API: {API_URL}</p>
       </div>
     </div>
+  );
+}
+
+const STATUS_LABEL: Record<EmailParseLogData['status'], string> = {
+  RECORDED: 'Tercatat',
+  EXCLUDED: 'Dikecualikan',
+  UNPARSED: 'Gagal dibaca',
+  DUPLICATE: 'Duplikat',
+  ERROR: 'Error',
+};
+
+function EmailParseLogSection() {
+  const [open, setOpen] = useState(false);
+  const [status, setStatus] = useState<EmailParseLogData['status']>('UNPARSED');
+  const { data: logs } = useSWR(
+    open ? `/sync/parse-log?status=${status}&limit=50` : null,
+    parseLogFetcher,
+  );
+
+  return (
+    <section className="rounded-comfortable bg-surface p-5">
+      <button
+        className="flex w-full items-center justify-between text-left"
+        onClick={() => setOpen((v) => !v)}
+      >
+        <h2 className="flex items-center gap-2 text-heading font-semibold text-ink">
+          <MailWarning size={18} /> Email yang gagal dibaca
+        </h2>
+        <ChevronDown size={18} className={`text-ink-subtle transition-transform ${open ? 'rotate-180' : ''}`} />
+      </button>
+
+      {open && (
+        <div className="mt-4">
+          <div className="flex gap-2 overflow-x-auto pb-1">
+            {(['UNPARSED', 'ERROR', 'EXCLUDED', 'DUPLICATE', 'RECORDED'] as const).map((s) => (
+              <button
+                key={s}
+                onClick={() => setStatus(s)}
+                className={`whitespace-nowrap rounded-full px-3 py-1.5 text-label font-semibold ${
+                  status === s ? 'bg-ink text-base' : 'bg-base text-ink-muted'
+                }`}
+              >
+                {STATUS_LABEL[s]}
+              </button>
+            ))}
+          </div>
+
+          {!logs && <p className="mt-3 text-small text-ink-muted">Memuat...</p>}
+          {logs && logs.length === 0 && (
+            <p className="mt-3 text-small text-ink-muted">Nggak ada email berstatus {STATUS_LABEL[status]}.</p>
+          )}
+          <div className="mt-3 flex flex-col gap-2">
+            {logs?.map((log) => (
+              <a
+                key={log.id}
+                href={`https://mail.google.com/mail/u/0/#all/${log.emailId}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="block rounded-standard bg-base px-3.5 py-3 hover:bg-line-subtle"
+              >
+                <p className="text-label font-semibold text-ink">{log.subject || '(tanpa subjek)'}</p>
+                <p className="mt-0.5 text-small text-ink-muted">{log.from}</p>
+                {log.reason && <p className="mt-1 text-small text-ink-subtle">{log.reason}</p>}
+                <p className="mt-1 text-small text-ink-subtle">
+                  {new Date(log.receivedAt).toLocaleString('id-ID', { dateStyle: 'medium', timeStyle: 'short' })}
+                </p>
+              </a>
+            ))}
+          </div>
+        </div>
+      )}
+    </section>
   );
 }
 
