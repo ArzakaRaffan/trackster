@@ -162,6 +162,7 @@ export default function WeeklyPage() {
                             { revalidate: false },
                           )
                         }
+                        onDeleted={() => mutate()}
                       />
                     ))}
                   </ul>
