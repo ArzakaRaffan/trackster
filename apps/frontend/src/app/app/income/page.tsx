@@ -422,6 +422,12 @@ export default function IncomePage() {
                   </div>
                 ))}
             </div>
+            <Link
+              href="/app/income/checkin"
+              className="flex items-center justify-center rounded-comfortable bg-surface-interactive px-4 py-2.5 text-small font-bold text-ink hover:bg-surface-alt"
+            >
+              Check-in pemasukan minggu ini
+            </Link>
           </section>
         )}
 

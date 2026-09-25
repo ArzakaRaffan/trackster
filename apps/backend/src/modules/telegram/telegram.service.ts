@@ -64,6 +64,62 @@ export class TelegramService {
     }
   }
 
+  /** Kirim pesan dengan inline keyboard (checkin mingguan E03-S3). Return chatId+messageId
+   * biar caller bisa edit pesan ini lagi nanti (mis. setelah tombol di-tap). */
+  async sendMessageWithKeyboard(
+    text: string,
+    keyboard: TelegramBot.InlineKeyboardButton[][],
+  ): Promise<{ chatId: string; messageId: number } | null> {
+    const config = await this.prisma.telegramConfig.findFirst({ where: { isActive: true } });
+    if (!config) {
+      this.logger.warn('Telegram belum dikonfigurasi, skip kirim pesan.');
+      return null;
+    }
+
+    try {
+      const bot = new TelegramBot(config.botToken, { polling: false });
+      const sent = await bot.sendMessage(config.chatId, text, {
+        parse_mode: 'HTML',
+        reply_markup: { inline_keyboard: keyboard },
+      });
+      return { chatId: config.chatId, messageId: sent.message_id };
+    } catch (err) {
+      this.logger.error(`Gagal kirim pesan Telegram (keyboard): ${err.message}`);
+      return null;
+    }
+  }
+
+  /** Edit pesan yang sudah terkirim — dipakai setelah tombol inline keyboard di-tap, biar status
+   * ("sudah masuk") ter-refresh tanpa kirim pesan baru. */
+  async editMessage(chatId: string, messageId: number, text: string, keyboard?: TelegramBot.InlineKeyboardButton[][]) {
+    const config = await this.prisma.telegramConfig.findFirst({ where: { isActive: true } });
+    if (!config) return;
+
+    try {
+      const bot = new TelegramBot(config.botToken, { polling: false });
+      await bot.editMessageText(text, {
+        chat_id: chatId,
+        message_id: messageId,
+        parse_mode: 'HTML',
+        reply_markup: keyboard ? { inline_keyboard: keyboard } : undefined,
+      });
+    } catch (err) {
+      this.logger.error(`Gagal edit pesan Telegram: ${err.message}`);
+    }
+  }
+
+  async answerCallbackQuery(callbackQueryId: string, text?: string) {
+    const config = await this.prisma.telegramConfig.findFirst({ where: { isActive: true } });
+    if (!config) return;
+
+    try {
+      const bot = new TelegramBot(config.botToken, { polling: false });
+      await bot.answerCallbackQuery(callbackQueryId, text ? { text } : undefined);
+    } catch (err) {
+      this.logger.error(`Gagal answerCallbackQuery Telegram: ${err.message}`);
+    }
+  }
+
   /** Return config row mentah — hanya untuk keperluan internal (validasi webhook), JANGAN expose ke endpoint publik). */
   async getConfigRaw() {
     return this.prisma.telegramConfig.findFirst({ where: { isActive: true } });
