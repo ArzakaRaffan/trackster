@@ -1,7 +1,7 @@
 import { randomUUID } from 'crypto';
 import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../../prisma.service';
-import { Category, Source } from '@prisma/client';
+import { Category, Prisma, Source } from '@prisma/client';
 import { BalanceService, shouldAdjustBalance } from '../balance/balance.service';
 import { MerchantAliasService } from '../merchant-alias/merchant-alias.service';
 import { CreateTransactionDto } from './dto/create-transaction.dto';
@@ -144,14 +144,29 @@ export class TransactionService {
     return this.prisma.transaction.update({ where: { id }, data: { category } });
   }
 
+  /** Kolom `merchantKey` ditambah lewat migrasi tanpa backfill (lihat Gotchas.md) — transaksi lama
+   * masih NULL, jadi `where: { merchantKey: key }` doang selalu 0 match buat mereka. Recompute
+   * `merchantKey(description)` di JS buat baris yang NULL supaya tetap ke-match, lalu WHERE gabung
+   * keduanya. Dipakai `updateCategoryForAll` & `countSameMerchant` biar dua-duanya konsisten. */
+  private async merchantMatchWhere(key: string): Promise<Prisma.TransactionWhereInput> {
+    const nullKeyRows = await this.prisma.transaction.findMany({
+      where: { merchantKey: null },
+      select: { id: true, description: true },
+    });
+    const matchedNullIds = nullKeyRows.filter((t) => merchantKey(t.description) === key).map((t) => t.id);
+    return { OR: [{ merchantKey: key }, { id: { in: matchedNullIds } }] };
+  }
+
   /** "Terapkan ke semua transaksi <merchant>?" — simpan rule kategori (MerchantAlias, dipakai
-   * sync berikutnya) DAN update semua transaksi lama dengan merchantKey yang sama sekarang juga. */
+   * sync berikutnya) DAN update semua transaksi lama dengan merchantKey yang sama sekarang juga.
+   * Sekalian backfill kolom `merchantKey` transaksi lama yang match, biar match langsung lain kali. */
   async updateCategoryForAll(id: number, category: Category) {
     const transaction = await this.prisma.transaction.findUniqueOrThrow({ where: { id } });
     const key = merchantKey(transaction.description);
 
     await this.merchantAliasService.upsertCategory(transaction.description, category);
-    const result = await this.prisma.transaction.updateMany({ where: { merchantKey: key }, data: { category } });
+    const where = await this.merchantMatchWhere(key);
+    const result = await this.prisma.transaction.updateMany({ where, data: { category, merchantKey: key } });
     return { updated: result.count };
   }
 
@@ -159,7 +174,8 @@ export class TransactionService {
   async countSameMerchant(id: number): Promise<number> {
     const transaction = await this.prisma.transaction.findUniqueOrThrow({ where: { id } });
     const key = merchantKey(transaction.description);
-    return this.prisma.transaction.count({ where: { merchantKey: key } });
+    const where = await this.merchantMatchWhere(key);
+    return this.prisma.transaction.count({ where });
   }
 
   /** Halaman "Rapikan kategori": semua transaksi LAINNYA dikelompokkan per merchantKey, diurut

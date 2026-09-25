@@ -1,5 +1,35 @@
 # trackster — Gotchas
 
+- **"Rapikan Kategori" (E00-S3) tidak pernah benar-benar nyimpen — semua transaksi lama tetap `LAINNYA`**
+  (dilaporkan Arzaka 2026-09-25, root cause di `TransactionService.updateCategoryForAll()` &
+  `countSameMerchant()` di `apps/backend/src/modules/transaction/transaction.service.ts`). Kolom
+  `merchantKey` ditambah via migrasi `20260924144111_expand_category_and_merchant_key` **tanpa backfill**
+  (`ALTER TABLE ... ADD COLUMN "merchantKey" TEXT;` doang) — backfill-nya cuma skrip manual
+  `prisma/data-fixes/2026-09-backfill-merchant-key.ts` yang butuh `ts-node`, dan **ts-node nggak ada di
+  container prod** (`--omit=dev`, lihat Gotcha Infrastruktur di CLAUDE.md) jadi hampir pasti nggak pernah
+  jalan di prod. Akibatnya semua transaksi lama `merchantKey = NULL`, sementara `updateCategoryForAll`
+  query `where: { merchantKey: key }` — nggak pernah match apa-apa (termasuk transaksi representative-nya
+  sendiri), return `{ updated: 0 }` yang diam-diam dianggap sukses sama frontend (`onApplied()` langsung
+  hapus baris dari list tanpa cek response). Fix: recompute `merchantKey(description)` di JS buat baris
+  yang NULL (helper `merchantMatchWhere()`), sekalian backfill kolomnya pas update — bukan cuma percaya
+  kolom yang mungkin kosong. **Pelajaran:** kolom baru yang dipakai buat matching/join query WAJIB
+  di-backfill di migration yang sama (SQL `UPDATE` langsung, bukan skrip terpisah yang gampang
+  kelewatan/nggak jalan di prod), atau kode yang query kolom itu harus defensif terhadap NULL.
+
+- **VPS 2GB RAM ini bisa kehabisan memori total (RAM+swap) kalau ada beberapa sesi Claude Code jalan
+  bareng** — `npx tsc --noEmit` (backend, project NestJS+Prisma) butuh sekitar 1.2-1.5GB heap buat compile
+  bersih; `nest start --watch` yang gagal boot bisa nyangkut jadi proses orphan makan 800MB+ RSS
+  (`node .../nest start --watch` tanpa child `dist/main` yang jalan — cek `ps aux --sort=-%mem`, bukan
+  cuma `docker stats`, prosesnya bukan di container). Gejala: `tsc`/`nest build` exit dengan
+  "FATAL ERROR: ... JavaScript heap out of memory" (beda dari gejala silent-no-op di gotcha lain di bawah
+  yang exit 0 tanpa error) ATAU exit 0 tapi `dist/main` nggak ada. Mitigasi yang kepake: set
+  `NODE_OPTIONS="--max-old-space-size=1536"` (angka yang sama dipakai di Dockerfile build stage) untuk
+  `tsc --noEmit` langsung di host (bukan cuma di build Docker), cek `free -h` sebelum & sesudah proses
+  berat, dan **selalu** `kill -9` proses `nest start --watch`/`node dist/main` dev begitu selesai verifikasi
+  — jangan biarkan nyangkut, karena itu bisa bikin proses lain (termasuk container prod) ke-OOM-kill kernel.
+  Kalau `tsc --noEmit` OOM padahal `free -h` nunjukin ada RAM "available", coba lagi—kontensi dari sesi lain
+  berfluktuasi tiap beberapa detik di VPS ini.
+
 - **`TransactionService.remove()` tidak punya guard baseline saldo** (beda dari `createFromParsed()` yang sudah dibenerin di E01-S3) — hapus transaksi APAPUN selalu `adjustBalance(+amount)` tanpa cek apakah `occurredAt` lebih tua dari koreksi manual terakhir. Kejadian nyata 2026-09-24: user coba tombol Hapus baru (fitur yang baru di-ship) di 2 transaksi VA Tokopedia lama (occurredAt 4 Sep, sebelum baseline 22 Sep) lewat UI — saldo BCA lompat +Rp3.072.020 jadi salah, padahal transaksinya beneran ke-hapus (bukan cuma coba-coba). Root cause: baseline rule cuma diterapkan di jalur create, bukan delete, padahal keduanya sama-sama butuh (lihat `docs/revamp/02-conventions.md` §4). Fix: `remove()` harus pakai `shouldAdjustBalance()` yang sama (skip restore kalau `occurredAt < lastManualAdjustmentAt`), sama seperti raw-SQL dedupe script E01-S3. (`apps/backend/src/modules/transaction/transaction.service.ts`)
 
 - **`tsconfig.tsbuildinfo` stale bikin `nest build` (backend) silent no-op**: exit code 0, tanpa error,
