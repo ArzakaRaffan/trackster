@@ -5,9 +5,10 @@ import { TelegramService } from './telegram.service';
 import { PrismaService } from '../../prisma.service';
 import { AuthModule } from '../auth/auth.module';
 import { AiModule } from '../ai/ai.module';
+import { IncomeCheckinModule } from '../income-checkin/income-checkin.module';
 
 @Module({
-  imports: [AuthModule, forwardRef(() => AiModule)],
+  imports: [AuthModule, forwardRef(() => AiModule), forwardRef(() => IncomeCheckinModule)],
   controllers: [TelegramController, TelegramWebhookController],
   providers: [TelegramService, PrismaService],
   exports: [TelegramService],

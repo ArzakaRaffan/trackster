@@ -152,10 +152,10 @@ Per stream per minggu, tiga angka:
   tidak dobel.
 - Reminder ulang Senin 12:00 kalau belum diisi (sekali saja).
 
-- [ ] Endpoint `GET /income/checkin?week=` (draft terisi: forecast + yang sudah tercatat) & `POST /income/checkin`
-- [ ] Halaman check-in (mobile-first)
-- [ ] Cron + pesan Telegram + callback_query handler
-- [ ] Tes alur penuh di dev (Telegram dev: pakai bot/chat test, bukan chat asli Arzaka — atau aktifkan sementara dengan izin)
+- [x] Endpoint `GET /income/checkin?week=` (draft terisi: forecast + yang sudah tercatat) & `POST /income/checkin` (modul baru `income-checkin/`, reuse skema `IncomeStream`/`Income` dari E03-S1 — tidak ada migration baru)
+- [x] Halaman check-in (mobile-first) — `/app/income/checkin`, stepper sesi/absen, nominal auto-hitung, link dari halaman Pemasukan
+- [x] Cron (Minggu 19:00 & Senin 12:00 WIB) + pesan Telegram inline keyboard + `callback_query` handler di `telegram-webhook.controller.ts`
+- [x] Tes alur penuh di dev: endpoint `GET`/`POST /income/checkin` diverifikasi end-to-end via curl ke dev DB (FIXED/DEDUCTION/SESSION dihitung benar, idempotent, saldo BCA bergerak sesuai) + self-check `income-checkin.check.ts` (15 assertion). **Belum** diverifikasi: kirim pesan Telegram nyata (nggak ada bot test tersedia sesi ini) dan browser check halaman check-in — VPS kehabisan memori berulang kali pas percobaan (lihat Gotchas.md), dev server sempat naik sekali dan konfirmasi routing/DI beres sebelum itu.
 
 **Acceptance:** Arzaka bisa mencatat pemasukan satu minggu penuh dalam < 30 detik dari Telegram/HP;
 forecast minggu depan berubah sesuai data aktual.

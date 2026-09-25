@@ -9,6 +9,7 @@ import {
 } from '@nestjs/common';
 import { TelegramService } from './telegram.service';
 import { AiChatService } from '../ai/ai-chat.service';
+import { IncomeCheckinReminderService } from '../income-checkin/income-checkin-reminder.service';
 
 @Controller('telegram')
 export class TelegramWebhookController {
@@ -17,6 +18,7 @@ export class TelegramWebhookController {
   constructor(
     private telegramService: TelegramService,
     private aiChatService: AiChatService,
+    private incomeCheckinReminderService: IncomeCheckinReminderService,
   ) {}
 
   /** Public endpoint — TANPA JWT guard.
@@ -34,14 +36,31 @@ export class TelegramWebhookController {
       throw new ForbiddenException('Invalid secret');
     }
 
-    // 2. Pastikan ada text message
+    // 2. Callback query (tombol inline keyboard check-in pemasukan E03-S3) — jalur terpisah dari text message
+    const callbackQuery = body?.callback_query;
+    if (callbackQuery) {
+      const incomingChatId = callbackQuery.message?.chat?.id?.toString();
+      const config = await this.telegramService.getConfigRaw();
+      if (!config || incomingChatId !== config.chatId) {
+        this.logger.warn(`Callback query dari chat ID tidak dikenal: ${incomingChatId} — diabaikan.`);
+        return { ok: true };
+      }
+      try {
+        await this.incomeCheckinReminderService.handleCallback(callbackQuery);
+      } catch (err: any) {
+        this.logger.error(`Error handle callback_query check-in: ${err?.message}`);
+      }
+      return { ok: true };
+    }
+
+    // 3. Pastikan ada text message
     const message = body?.message;
     if (!message?.text) {
       // Bukan text message (sticker, foto, dll) — no-op
       return { ok: true };
     }
 
-    // 3. Validasi chat ID — cegah orang lain ngobrol ke bot dan baca data finansial
+    // 4. Validasi chat ID — cegah orang lain ngobrol ke bot dan baca data finansial
     const incomingChatId = message.chat?.id?.toString();
     const config = await this.telegramService.getConfigRaw();
 
