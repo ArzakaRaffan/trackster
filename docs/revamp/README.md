@@ -54,6 +54,7 @@ Legend: ⬜ belum · 🟨 jalan · ✅ selesai (sudah diverifikasi di browser & 
 | E03-S1 | Data model IncomeStream + seed 5 sumber pemasukan | 1 | E00-S1 | 🟨 (kode selesai & diverifikasi CRUD via curl di dev; belum ada UI, belum dijalankan di prod) |
 | E03-S2 | Forecast pemasukan (konservatif/ekspektasi/maks) + halaman Pemasukan v2 | 1 | E03-S1 | 🟨 (kode selesai & diverifikasi di dev lokal; belum di-deploy/dicek di prod) |
 | E03-S3 | Weekly check-in (web + Telegram tombol) → catat income aktual | 1 | E03-S2 | 🟨 (kode selesai, endpoint diverifikasi via curl di dev; kirim Telegram nyata & browser check belum — VPS memori penuh, lihat Gotchas.md) |
+| E03-S4 | Alokasi 50/30/20 mingguan (overwrite DailyBudget dari check-in + rekomendasi tabungan Telegram) — di luar 10 permintaan awal, ad-hoc request Arzaka | 1 | E03-S3 | 🟨 (kode selesai, `tsc --noEmit` lolos; verifikasi trigger manual di prod menyusul) |
 | E02-S1 | Parser Jago "menerima uang" + deteksi transfer internal | 1 | E03-S1, E00-S2 | ⬜ |
 | E02-S2 | Endpoint ingest + iOS 27 Shortcut notifikasi myBCA (eksperimen) | 1 | E02-S1 | ⬜ |
 | E04-S1 | Persistensi chat (thread + message) + history ke model | 2 | — | ⬜ |
