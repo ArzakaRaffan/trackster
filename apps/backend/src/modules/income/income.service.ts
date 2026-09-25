@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../../prisma.service';
 import { BalanceService } from '../balance/balance.service';
+import { IncomeForecastService } from '../income-forecast/income-forecast.service';
 import { CreateIncomeDto } from './dto/create-income.dto';
 import { UpdateIncomeDto } from './dto/update-income.dto';
 import { addWibDays, startOfWibDay } from '../../common/wib';
@@ -10,6 +11,7 @@ export class IncomeService {
   constructor(
     private prisma: PrismaService,
     private balanceService: BalanceService,
+    private incomeForecastService: IncomeForecastService,
   ) {}
 
   async findAll(params: { startDate?: string; endDate?: string }) {
@@ -20,7 +22,7 @@ export class IncomeService {
       if (startDate) where.receivedAt.gte = startOfWibDay(startDate);
       if (endDate) where.receivedAt.lt = addWibDays(startOfWibDay(endDate), 1);
     }
-    return this.prisma.income.findMany({ where, orderBy: { receivedAt: 'desc' } });
+    return this.prisma.income.findMany({ where, orderBy: { receivedAt: 'desc' }, include: { stream: true } });
   }
 
   async create(dto: CreateIncomeDto) {
@@ -67,18 +69,15 @@ export class IncomeService {
     });
   }
 
-  /** Smoothed daily allowance: rata-rata pemasukan harian dalam windowDays terakhir * faktor tabungan.
+  /** Smoothed daily allowance: total forecast ekspektasi (E03-S2) untuk `windowDays` ke depan / windowDays,
+   *  dikali faktor tabungan. Diganti dari rata-rata historis mentah ke forecast per stream — forward-looking,
+   *  jadi tidak rusak kalau user berhenti mencatat manual.
    *  Faktor 0.7 = asumsi 30% income disisihkan untuk tabungan/darurat — bisa di-tuning. */
   async getSmoothedDailyAllowance(windowDays = 30) {
-    const since = new Date(Date.now() - windowDays * 24 * 60 * 60 * 1000);
-
-    const agg = await this.prisma.income.aggregate({
-      _sum: { amount: true },
-      where: { receivedAt: { gte: since } },
-    });
-
-    const totalIncome = Number(agg._sum.amount ?? 0);
-    const averageDailyIncome = totalIncome / windowDays;
+    const weeks = Math.max(1, Math.ceil(windowDays / 7));
+    const horizon = await this.incomeForecastService.getHorizon(weeks);
+    const totalIncome = horizon.reduce((sum, w) => sum + w.totals.expected, 0);
+    const averageDailyIncome = totalIncome / (weeks * 7);
 
     // 0.7 = faktor tabungan. Asumsi: 30% income disisihkan untuk tabungan/darurat.
     // Angka ini keputusan produk sederhana — dokumentasikan di sini biar tidak jadi magic number.
@@ -94,41 +93,17 @@ export class IncomeService {
     };
   }
 
-  /** Rekomendasi alokasi mingguan: rata-rata income mingguan (windowDays terakhir) dikurangi
-   *  target budget mingguan (jumlah 7 DailyBudget) = leftover, lalu leftover dibagi tabung/invest/
-   *  jajan-bebas. Rasio 50/30/20 keputusan produk sederhana (sama semangatnya dengan SAVINGS_FACTOR
-   *  di atas) — tuning kalau prioritas finansial berubah.
-   *  Kalau nggak ada income tercatat dalam windowDays terakhir (user nyatet nggak rutin tiap minggu
-   *  — kasus nyata: gap 28 hari pas kena boundary window default), fallback ke rata-rata ALL-TIME
-   *  (total income / rentang minggu sejak entry pertama) biar nggak nampilin Rp0 yang menyesatkan. */
-  async getAllocationRecommendation(windowDays = 28) {
-    const since = new Date(Date.now() - windowDays * 24 * 60 * 60 * 1000);
+  /** Rekomendasi alokasi mingguan: forecast ekspektasi minggu ini (E03-S2) dikurangi target budget
+   *  mingguan (jumlah 7 DailyBudget) = leftover, lalu leftover dibagi tabung/invest/jajan-bebas.
+   *  Diganti dari rata-rata historis mentah ke forecast per stream — forecast selalu punya angka
+   *  (fallback ke typicalUnits/amount stream kalau belum ada histori check-in), jadi `isFallback`
+   *  sekarang berarti "belum ada stream aktif sama sekali" (forecast expected = 0), bukan lagi
+   *  "belum ada income tercatat X hari terakhir". Rasio 50/30/20 keputusan produk sederhana (sama
+   *  semangatnya dengan SAVINGS_FACTOR di atas) — tuning kalau prioritas finansial berubah. */
+  async getAllocationRecommendation() {
+    const [week, budgets] = await Promise.all([this.incomeForecastService.getWeekForecast(), this.prisma.dailyBudget.findMany()]);
 
-    const [incomeAgg, budgets] = await Promise.all([
-      this.prisma.income.aggregate({ _sum: { amount: true }, where: { receivedAt: { gte: since } } }),
-      this.prisma.dailyBudget.findMany(),
-    ]);
-
-    let totalIncome = Number(incomeAgg._sum.amount ?? 0);
-    let weeks = windowDays / 7;
-    let usedWindowDays = windowDays;
-    let isFallback = false;
-
-    if (totalIncome === 0) {
-      const [allAgg, oldest] = await Promise.all([
-        this.prisma.income.aggregate({ _sum: { amount: true } }),
-        this.prisma.income.findFirst({ orderBy: { receivedAt: 'asc' } }),
-      ]);
-      totalIncome = Number(allAgg._sum.amount ?? 0);
-      if (oldest && totalIncome > 0) {
-        const spanDays = Math.max(7, (Date.now() - oldest.receivedAt.getTime()) / (24 * 60 * 60 * 1000));
-        weeks = spanDays / 7;
-        usedWindowDays = Math.round(spanDays);
-        isFallback = true;
-      }
-    }
-
-    const weeklyIncome = weeks > 0 ? totalIncome / weeks : 0;
+    const weeklyIncome = week.totals.expected;
     const weeklyBudgetTarget = budgets.reduce((sum, b) => sum + Number(b.amount), 0);
     const leftover = Math.max(0, weeklyIncome - weeklyBudgetTarget);
 
@@ -137,8 +112,8 @@ export class IncomeService {
     const SPEND_RATIO = 0.2;
 
     return {
-      windowDays: usedWindowDays,
-      isFallback,
+      windowDays: 7,
+      isFallback: weeklyIncome === 0,
       weeklyIncome: Math.round(weeklyIncome),
       weeklyBudgetTarget: Math.round(weeklyBudgetTarget),
       leftover: Math.round(leftover),

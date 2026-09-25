@@ -4,9 +4,10 @@ import { IncomeService } from './income.service';
 import { PrismaService } from '../../prisma.service';
 import { AuthModule } from '../auth/auth.module';
 import { BalanceModule } from '../balance/balance.module';
+import { IncomeForecastModule } from '../income-forecast/income-forecast.module';
 
 @Module({
-  imports: [AuthModule, BalanceModule],
+  imports: [AuthModule, BalanceModule, IncomeForecastModule],
   controllers: [IncomeController],
   providers: [IncomeService, PrismaService],
   exports: [IncomeService],
