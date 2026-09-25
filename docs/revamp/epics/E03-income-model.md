@@ -117,16 +117,16 @@ Per stream per minggu, tiga angka:
 
 ## E03-S2 — Forecast + halaman Pemasukan v2
 
-- [ ] `income-forecast.service.ts` + check script
-- [ ] Endpoint: `GET /income/forecast/week?date=`, `GET /income/forecast/horizon?weeks=12`
-- [ ] Refactor allocation/allowance ke forecast
-- [ ] UI `/app/income` v2:
-  - Hero: "Minggu ini **Rp X** masuk dari perkiraan Rp Y" + progress, baris per stream dengan status (✓ masuk / menunggu / kurang)
-  - Kartu "Perkiraan" 3 angka (konservatif · ekspektasi · maks) mingguan & bulanan, dengan penjelasan satu baris tiap angka
-  - Kelola sumber pemasukan (list + form sesuai kind)
-  - Riwayat dikelompokkan per minggu, tag stream, badge PENDING
-  - Section "Tak terduga" (IRREGULAR) terpisah
-- [ ] Verifikasi di browser dengan data salinan prod
+- [x] `income-forecast.service.ts` + check script (21 assertion, `npx ts-node src/modules/income-forecast/income-forecast.check.ts`)
+- [x] Endpoint: `GET /income/forecast/week?date=`, `GET /income/forecast/horizon?weeks=` (modul baru `income-forecast`, terpisah dari `income`/`income-stream`)
+- [x] Refactor allocation/allowance ke forecast (`IncomeService.getAllocationRecommendation()` & `getSmoothedDailyAllowance()` sekarang pakai `IncomeForecastService`, shape response tidak berubah — dipakai juga oleh `ai-finance-tools.service.ts` & `ai-mascot.service.ts`)
+- [x] UI `/app/income` v2:
+  - Hero: "Minggu ini **Rp X** masuk dari perkiraan Rp Y" + progress bar, baris per stream dengan status (Sudah masuk/Sebagian/Menunggu/Terlewat)
+  - Kartu "Perkiraan" 3 angka (konservatif · ekspektasi · maks) minggu ini & ~4 minggu ke depan (bukan kalender bulan persis — lihat catatan di Decisions.md), dengan penjelasan satu baris
+  - Kelola sumber pemasukan (list + form create/edit sesuai kind, field kondisional per `IncomeKind`)
+  - Riwayat tetap grouped per bulan (entry manual, belum ada UI check-in — itu E03-S3), tag nama stream & badge status kalau bukan CONFIRMED
+  - Section "Tak terduga" (IRREGULAR) tampil sebagai catatan upside terpisah di kartu Perkiraan, bukan section sendiri (lebih ringkas, jumlah stream IRREGULAR biasanya cuma satu — "Project/Lainnya")
+- [x] Verifikasi di browser — dev server lokal (Postgres 16 native, bukan Docker — sandbox cloud session ini tidak punya Docker daemon) dengan data seed E03-S1, bukan salinan prod (sesi ini tidak punya akses SSH ke VPS). Login, buka `/app/income`, `/app/budget`, create/delete stream, add/delete income manual — semua lewat Playwright headless, 0 console error, 0 HTTP >=400.
 
 ## E03-S3 — Check-in mingguan
 
