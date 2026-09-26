@@ -340,3 +340,38 @@ model Subscription {
   @@index([nextDueDate])
   @@index([isActive])
 }
+
+enum ChatChannel {
+  WEB
+  TELEGRAM
+}
+
+// Percakapan "Tanya Track". Telegram cuma punya satu thread persisten per channel.
+model ChatThread {
+  id            Int         @id @default(autoincrement())
+  title         String?
+  channel       ChatChannel @default(WEB)
+  summary       String?
+  summaryUpToId Int?
+  archivedAt    DateTime?
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+  messages      ChatMessage[]
+
+  @@index([channel])
+}
+
+model ChatMessage {
+  id          Int        @id @default(autoincrement())
+  threadId    Int
+  thread      ChatThread @relation(fields: [threadId], references: [id], onDelete: Cascade)
+  role        String // 'user' | 'assistant' | 'tool'
+  content     String     @default("")
+  toolCalls   Json?
+  toolCallId  String?
+  toolName    String?
+  attachments Json?
+  createdAt   DateTime   @default(now())
+
+  @@index([threadId, id])
+}

@@ -1,5 +1,5 @@
-import { Controller, Post, Body, Get, UseGuards } from '@nestjs/common';
-import { IsNumber, IsString, MinLength } from 'class-validator';
+import { Controller, Post, Body, Get, Patch, Delete, Param, ParseIntPipe, UseGuards } from '@nestjs/common';
+import { IsBoolean, IsNumber, IsOptional, IsString, MinLength } from 'class-validator';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { AiChatService } from './ai-chat.service';
 import { AiReportsService } from './ai-reports.service';
@@ -10,6 +10,22 @@ class ChatDto {
   @IsString()
   @MinLength(1)
   message: string;
+}
+
+class SendThreadMessageDto {
+  @IsString()
+  @MinLength(1)
+  text: string;
+}
+
+class UpdateThreadDto {
+  @IsOptional()
+  @IsString()
+  title?: string;
+
+  @IsOptional()
+  @IsBoolean()
+  archived?: boolean;
 }
 
 class SuggestCategoryDto {
@@ -36,10 +52,44 @@ export class AiController {
     return this.aiMascotService.getTip();
   }
 
+  /** Legacy — bikin/lanjutkan thread "Quick chat" tunggal. Dipertahankan sampai frontend
+   *  sepenuhnya pindah ke /ai/threads. */
   @Post('chat')
   async chat(@Body() body: ChatDto) {
     const reply = await this.aiChatService.handleMessage(body.message, { channel: 'web' });
     return { reply };
+  }
+
+  @Get('threads')
+  async listThreads() {
+    return this.aiChatService.listThreads();
+  }
+
+  @Post('threads')
+  async createThread() {
+    return this.aiChatService.createThread();
+  }
+
+  @Get('threads/:id/messages')
+  async getThreadMessages(@Param('id', ParseIntPipe) id: number) {
+    return this.aiChatService.getMessages(id);
+  }
+
+  @Post('threads/:id/messages')
+  async sendThreadMessage(@Param('id', ParseIntPipe) id: number, @Body() body: SendThreadMessageDto) {
+    const reply = await this.aiChatService.sendMessage(id, body.text);
+    return { reply };
+  }
+
+  @Patch('threads/:id')
+  async updateThread(@Param('id', ParseIntPipe) id: number, @Body() body: UpdateThreadDto) {
+    return this.aiChatService.updateThread(id, body);
+  }
+
+  @Delete('threads/:id')
+  async deleteThread(@Param('id', ParseIntPipe) id: number) {
+    await this.aiChatService.deleteThread(id);
+    return { ok: true };
   }
 
   /** Dipakai halaman "Rapikan kategori" — saran kategori AI buat merchant yang masih LAINNYA.

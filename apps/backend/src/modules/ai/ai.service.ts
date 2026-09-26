@@ -107,31 +107,33 @@ export class AiService {
   }
 
   /** Tool-calling loop — loop hingga finish_reason !== 'tool_calls' atau maxIterations.
-   *  Return text terakhir dari model. */
+   *  `messages` = history lengkap (termasuk pesan user terbaru). Return HANYA pesan baru
+   *  yang dihasilkan (assistant + tool), berurutan, supaya caller bisa persist ke DB. */
   async runToolLoop(params: {
     system: string;
-    userMessage: string;
+    messages: ChatMessage[];
     tools: AiTool[];
     maxTokens?: number;
     maxIterations?: number;
-  }): Promise<string> {
-    const { system, userMessage, tools, maxTokens = 2048, maxIterations = 5 } = params;
+  }): Promise<ChatMessage[]> {
+    const { system, tools, maxTokens = 2048, maxIterations = 5 } = params;
 
-    const messages: ChatMessage[] = [{ role: 'user', content: userMessage }];
+    const working: ChatMessage[] = [...params.messages];
+    const newMessages: ChatMessage[] = [];
 
     for (let i = 0; i < maxIterations; i++) {
-      const assistantMessage = await this.chat({ system, messages, tools, maxTokens });
+      const assistantMessage = await this.chat({ system, messages: working, tools, maxTokens });
 
-      if (!assistantMessage) return '';
+      if (!assistantMessage) break;
 
-      // Append assistant reply
-      messages.push(assistantMessage);
+      working.push(assistantMessage);
+      newMessages.push(assistantMessage);
 
       const finishReason = assistantMessage.finish_reason ??
         (assistantMessage.tool_calls?.length ? 'tool_calls' : 'stop');
 
       if (finishReason !== 'tool_calls' || !assistantMessage.tool_calls?.length) {
-        return assistantMessage.content ?? '';
+        return newMessages;
       }
 
       // Jalankan tiap tool_call
@@ -158,21 +160,18 @@ export class AiService {
           }
         }
 
-        messages.push({
+        const toolMessage: ChatMessage = {
           role: 'tool',
           content: toolContent,
           tool_call_id: toolCall.id,
           name: toolCall.function.name,
-        });
+        };
+        working.push(toolMessage);
+        newMessages.push(toolMessage);
       }
     }
 
     this.logger.warn(`runToolLoop mencapai maxIterations (${maxIterations})`);
-    // Return teks dari assistant message terakhir
-    for (let i = messages.length - 1; i >= 0; i--) {
-      const msg = messages[i];
-      if (msg.role === 'assistant' && msg.content) return msg.content;
-    }
-    return '';
+    return newMessages;
   }
 }
