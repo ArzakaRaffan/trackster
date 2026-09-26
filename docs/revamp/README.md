@@ -51,11 +51,11 @@ Legend: ⬜ belum · 🟨 jalan · ✅ selesai (sudah diverifikasi di browser & 
 | E01-S1 | Parser BCA Virtual Account (GoPay top-up & VA lain) | 0 | — (E00-S2 disarankan) | ✅ |
 | E01-S2 | Parser Flip: buang CSS, skip email instruksi, label baru | 0 | — (E00-S2 disarankan) | ✅ |
 | E01-S3 | Aturan saldo vs baseline + perbaikan data + backfill | 0 | E01-S1, E01-S2 | ✅ |
-| E03-S1 | Data model IncomeStream + seed 5 sumber pemasukan | 1 | E00-S1 | 🟨 (kode selesai & diverifikasi CRUD via curl di dev; belum ada UI, belum dijalankan di prod) |
-| E03-S2 | Forecast pemasukan (konservatif/ekspektasi/maks) + halaman Pemasukan v2 | 1 | E03-S1 | 🟨 (kode selesai & diverifikasi di dev lokal; belum di-deploy/dicek di prod) |
-| E03-S3 | Weekly check-in (web + Telegram tombol) → catat income aktual | 1 | E03-S2 | 🟨 (kode selesai, endpoint diverifikasi via curl di dev; kirim Telegram nyata & browser check belum — VPS memori penuh, lihat Gotchas.md) |
-| E03-S4 | Alokasi 50/30/20 mingguan (overwrite DailyBudget dari check-in + rekomendasi tabungan Telegram) — di luar 10 permintaan awal, ad-hoc request Arzaka | 1 | E03-S3 | 🟨 (kode selesai & di-deploy ke prod; trigger live sengaja di-skip karena belum ada income minggu ini — nunggu cron Minggu 21:00 pertama & browser check) |
-| E02-S1 | Parser Jago "menerima uang" + deteksi transfer internal | 1 | E03-S1, E00-S2 | ⬜ |
+| E03-S1 | Data model IncomeStream + seed 5 sumber pemasukan | 1 | E00-S1 | ✅ |
+| E03-S2 | Forecast pemasukan (konservatif/ekspektasi/maks) + halaman Pemasukan v2 | 1 | E03-S1 | ✅ |
+| E03-S3 | Weekly check-in (web + Telegram tombol) → catat income aktual | 1 | E03-S2 | ✅ (halaman `/app/income/checkin` diverifikasi di browser prod; kirim Telegram nyata masih belum dites — perlu tunggu cron beneran jalan) |
+| E03-S4 | Alokasi 50/30/20 mingguan (overwrite DailyBudget dari check-in + rekomendasi tabungan Telegram) — di luar 10 permintaan awal, ad-hoc request Arzaka | 1 | E03-S3 | ✅ (kode & halaman `/app/budget` diverifikasi di browser prod; alokasi otomatis dari cron Minggu 21:00 belum kejadian nyata — `DailyBudget` masih nilai lama, sesuai ekspektasi karena belum lewat Minggu pertama sejak deploy) |
+| E02-S1 | Parser Jago "menerima uang" + deteksi transfer internal | 1 | E03-S1, E00-S2 | 🟨 (kode selesai: parser+klasifikasi+balance-only+UI+notif, `npm run build`/`tsc --noEmit`/self-check lulus, endpoint diverifikasi via curl di dev server — **browser dev tidak bisa dites** karena browser Arzaka jalan di laptop, bukan VPS, dan sesi ini nggak ada tunnel SSH; backfill 60 hari juga belum jalan, butuh sync Gmail live) |
 | E02-S2 | Endpoint ingest + iOS 27 Shortcut notifikasi myBCA (eksperimen) | 1 | E02-S1 | ⬜ |
 | E04-S1 | Persistensi chat (thread + message) + history ke model | 2 | — | ⬜ |
 | E04-S2 | Financial snapshot + memory jangka panjang + halaman "Yang Track ingat" | 2 | E04-S1, E03-S2 | ⬜ |

@@ -45,6 +45,20 @@ Konteks tambahan: `docs/context/Product.md` (kenapa & alur uang nyata) dan `docs
 - Semua operasi ubah saldo harus dalam Prisma transaction bareng operasi utamanya (hindari race condition saldo nggak sinkron).
 - **Aturan baseline vs backfill:** transaksi/income yang `occurredAt`-nya lebih lama dari koreksi manual (`BalanceAdjustment`) terakhir untuk source yang sama TIDAK menggerakkan saldo — koreksi manual = snapshot saldo asli bank yang sudah mencakup transaksi itu. Dicek via `BalanceService.getLastManualAdjustmentAt()` + `shouldAdjustBalance()`, dipakai di `TransactionService.createFromParsed()`. Berlaku juga nanti buat income otomatis (E02).
 - `BalanceAdjustment` log HANYA untuk koreksi manual, bukan buat tiap transaksi otomatis (itu sudah keliatan di halaman transaksi biasa).
+- **Prinsip (E02-S1):** uang yang *benar-benar* keluar/masuk rekening selalu menggerakkan saldo; klasifikasi
+  (expense / pemasukan / internal) itu urusan terpisah. Siapa gerakin apa:
+
+  | Event email | Klasifikasi | Saldo |
+  |---|---|---|
+  | BCA → FLIPTECH (SoF) | exclude | **tidak** bergerak (receipt Flip yang pegang) |
+  | Flip receipt → orang lain | expense | source SoF − |
+  | Flip receipt → rekening sendiri | exclude, `balanceOnly` | source SoF − |
+  | BCA/Jago transfer langsung → rekening sendiri | exclude, `balanceOnly` | source − |
+  | Jago "menerima uang" | Income (CONFIRMED/INTERNAL/PENDING) | JAGO + (selalu, apapun status-nya) |
+
+  `ParseResult.balanceOnly=true` (di `bca.parser.ts`/`flip.parser.ts`/`jago.parser.ts`) → `GmailSyncService`
+  tetap mendebit saldo tanpa bikin `Transaction`, dedup lewat `EmailParseLog.status=EXCLUDED` (skip kalau
+  sudah pernah diterapkan, cron scan berulang tidak boleh dobel-debit). Aturan baseline di atas tetap berlaku.
 
 ## Gotcha Infrastruktur (jangan diulang!)
 

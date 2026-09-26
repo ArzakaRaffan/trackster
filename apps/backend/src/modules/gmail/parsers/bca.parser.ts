@@ -101,6 +101,7 @@ export class BcaParser implements EmailParser {
         occurredAt,
         excluded: true,
         excludeReason: 'VA ke rekening sendiri (internal top-up)',
+        balanceOnly: true,
         categoryHint,
       };
     }
@@ -201,8 +202,9 @@ export class BcaParser implements EmailParser {
       beneficiaryName,
     });
 
-    // Flip intermediary (SoF) selalu exclude di sisi BCA — purpose final dibaca dari email Flip.
-    // Transfer langsung ke rekening sendiri juga exclude.
+    // Flip intermediary (SoF) selalu exclude di sisi BCA — purpose final dibaca dari email Flip,
+    // saldo TIDAK gerak di sini (receipt Flip yang pegang). Transfer langsung ke rekening sendiri
+    // juga exclude, tapi uangnya beneran keluar dari BCA sekarang → balanceOnly.
     const excluded = isFlipIntermediary || isOwnDestination;
     let excludeReason: string | undefined;
     if (isFlipIntermediary) excludeReason = 'Transfer SoF ke Flip (FLIPTECH) — bukan expense akhir';
@@ -220,6 +222,7 @@ export class BcaParser implements EmailParser {
       occurredAt,
       excluded,
       excludeReason,
+      balanceOnly: isOwnDestination,
     };
   }
 }

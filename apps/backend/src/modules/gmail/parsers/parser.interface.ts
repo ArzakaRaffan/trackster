@@ -16,10 +16,20 @@ export interface ParseResult {
   excluded: boolean; // true = internal transfer, jangan disimpan sebagai expense
   excludeReason?: string;
   /**
+   * Kalau excluded=true DAN balanceOnly=true, uang beneran keluar dari `source` (transfer ke
+   * rekening sendiri) → gmail-sync tetap mendebit saldo (tanpa bikin Transaction), dicatat sebagai
+   * jejak di EmailParseLog. Default/undefined = tidak gerak sama sekali (mis. BCA→FLIPTECH, SoF
+   * yang belum final — expense/pemasukannya nanti dari email lain).
+   */
+  balanceOnly?: boolean;
+  /**
    * Hint kategori dari parser — dipakai pipeline kategorisasi (E00-S3) sebelum rule/AI.
    * Kalau E00-S3 belum jalan, caller boleh ignore dan pakai AI biasa.
    */
   categoryHint?: Category;
+  /** 'INCOME' = dana masuk (Jago "menerima uang", dst) — gmail-sync route ke IncomeService, bukan
+   * TransactionService. Default undefined = EXPENSE (perilaku lama, tidak berubah). */
+  kind?: 'EXPENSE' | 'INCOME';
 }
 
 export interface EmailParser {

@@ -8,10 +8,19 @@ import * as fs from 'fs';
 import * as path from 'path';
 import * as assert from 'assert';
 
+// own-accounts.ts baca OWNER_ACCOUNT_NUMBERS/OWNER_FULL_NAME dari process.env sekali di module-load
+// time. Import di bawah ini transitif me-require @prisma/client, yang auto-load .env (dotenv) buat
+// DATABASE_URL — efek sampingnya, .env dev (nilai dummy: OWNER_ACCOUNT_NUMBERS=0000000000) bisa
+// menimpa default kalau belum di-set. Set dulu ke nilai asli SEBELUM import lain jalan (dotenv
+// tidak override env yang sudah ada) — fixture di sini pakai rekening/nama produksi asli.
+process.env.OWNER_ACCOUNT_NUMBERS = '6611126589,105602544330,006751400577';
+process.env.OWNER_FULL_NAME = 'ARZAKA RAFFAN MAWARDI';
+
 // ─── Impor fungsi & tipe yang akan diuji ────────────────────────────────────
 import { extractField, parseRupiah, parseEmailDate, htmlToText } from './parser.interface';
 import { BcaParser } from './bca.parser';
 import { FlipParser } from './flip.parser';
+import { JagoParser } from './jago.parser';
 import { Source, Category } from '@prisma/client';
 
 // ─── Helper ──────────────────────────────────────────────────────────────────
@@ -354,7 +363,92 @@ check('Flip receipt internal: excludeReason mengandung "internal"', () => {
   assert.ok(result!.excludeReason?.includes('internal'));
 });
 
-// ─── 6. Ringkasan ────────────────────────────────────────────────────────────
+check('Flip receipt internal: balanceOnly = true (uang beneran keluar dari SoF BCA)', () => {
+  const body = loadFixture('flip-receipt-internal.txt');
+  const result = flipParser.parse(fakeFlipEmail(body, 'Successful transfer to ARZAKA RAFFAN MAWARDI. Here is the receipt.'));
+  assert.strictEqual(result!.balanceOnly, true);
+});
+
+// ─── 6. JagoParser — "menerima sejumlah uang" (E02-S1) ──────────────────────
+
+console.log('\n── JagoParser.parseIncoming ──');
+
+const jagoParser = new JagoParser();
+
+function fakeJagoEmail(body: string, subject = 'Asik, kamu telah menerima sejumlah uang💰') {
+  return {
+    id: 'jago-income-test',
+    from: 'noreply@jago.com',
+    subject,
+    body,
+    internalDate: String(new Date('2026-09-24T06:00:00Z').getTime()),
+  };
+}
+
+check('Jago terima FLIPTECH: kind = INCOME', () => {
+  const body = loadFixture('jago-terima-fliptech.txt');
+  const result = jagoParser.parse(fakeJagoEmail(body));
+  assert.ok(result !== null);
+  assert.strictEqual(result!.kind, 'INCOME');
+});
+
+check('Jago terima FLIPTECH: amount = 112500, description = nama pengirim', () => {
+  const body = loadFixture('jago-terima-fliptech.txt');
+  const result = jagoParser.parse(fakeJagoEmail(body));
+  assert.strictEqual(result!.amount, 112500);
+  assert.strictEqual(result!.description, 'FLIPTECH LENTERA INSPIRASI PERTIWI');
+});
+
+check('Jago terima FLIPTECH: occurredAt = 2026-08-26T06:37:00.000Z (WIB 13:37)', () => {
+  const body = loadFixture('jago-terima-fliptech.txt');
+  const result = jagoParser.parse(fakeJagoEmail(body));
+  assert.strictEqual(result!.occurredAt.toISOString(), '2026-08-26T06:37:00.000Z');
+});
+
+check('Jago terima FLIPTECH: excluded = false (income tetap dicatat, klasifikasi urusan IncomeService)', () => {
+  const body = loadFixture('jago-terima-fliptech.txt');
+  const result = jagoParser.parse(fakeJagoEmail(body));
+  assert.strictEqual(result!.excluded, false);
+});
+
+check('Jago terima owner sendiri: amount = 250000, description = "ARZAKA RAFFAN MAWARDI"', () => {
+  const body = loadFixture('jago-terima-owner.txt');
+  const result = jagoParser.parse(fakeJagoEmail(body));
+  assert.strictEqual(result!.amount, 250000);
+  assert.strictEqual(result!.description, 'ARZAKA RAFFAN MAWARDI');
+});
+
+check('Jago terima dari orang tak dikenal: amount = 50000, description = "BUDI SANTOSO"', () => {
+  const body = loadFixture('jago-terima-unknown.txt');
+  const result = jagoParser.parse(fakeJagoEmail(body));
+  assert.strictEqual(result!.amount, 50000);
+  assert.strictEqual(result!.description, 'BUDI SANTOSO');
+});
+
+check('Jago transfer keluar ke rekening sendiri: balanceOnly = true', () => {
+  const body = [
+    'Kamu telah melakukan transfer uang',
+    'Ke',
+    'ARZAKA RAFFAN MAWARDI',
+    'BCA • 6611126589',
+    'Jumlah',
+    'Rp100.000',
+    'Tanggal transaksi',
+    '10 September 2026 09:00 WIB',
+  ].join('\n');
+  const result = jagoParser.parse({
+    id: 'jago-transfer-self',
+    from: 'noreply@jago.com',
+    subject: 'Kamu telah melakukan transfer uang',
+    body,
+    internalDate: String(new Date('2026-09-10T02:00:00Z').getTime()),
+  });
+  assert.ok(result !== null);
+  assert.strictEqual(result!.excluded, true);
+  assert.strictEqual(result!.balanceOnly, true);
+});
+
+// ─── 7. Ringkasan ────────────────────────────────────────────────────────────
 
 console.log(`\n${'─'.repeat(50)}`);
 if (failed === 0) {

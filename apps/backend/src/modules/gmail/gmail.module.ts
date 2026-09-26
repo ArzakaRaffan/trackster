@@ -13,6 +13,8 @@ import { BudgetModule } from '../budget/budget.module';
 import { TelegramModule } from '../telegram/telegram.module';
 import { AiModule } from '../ai/ai.module';
 import { MerchantAliasModule } from '../merchant-alias/merchant-alias.module';
+import { IncomeModule } from '../income/income.module';
+import { BalanceModule } from '../balance/balance.module';
 
 @Module({
   imports: [
@@ -21,6 +23,8 @@ import { MerchantAliasModule } from '../merchant-alias/merchant-alias.module';
     BudgetModule,
     TelegramModule,
     MerchantAliasModule,
+    IncomeModule,
+    BalanceModule,
     forwardRef(() => AiModule),
   ],
   controllers: [GmailController],

@@ -68,6 +68,12 @@
 
 ---
 
+## 2026-09-26 — E02-S1: parser Jago income + saldo balance-only buat transfer internal
+**Konteks:** Transfer BCA→Flip→rekening sendiri (top-up Jago via Flip, atau transfer langsung BCA/Jago ke rekening sendiri) selama ini di-exclude total (`parsed.excluded=true`) tanpa gerakin saldo sama sekali — padahal uangnya beneran keluar dari SoF. Ini bikin saldo per rekening drift dan Arzaka sering koreksi manual. Cuma ada 2 email Jago "menerima sejumlah uang" nyata di inbox, keduanya dari FLIPTECH.
+**Keputusan:** (1) `ParseResult` dapat `kind?: 'EXPENSE'|'INCOME'` (Jago "menerima uang" → INCOME, dulu ke `IncomeService.createFromParsed()`, bukan `TransactionService`) dan `balanceOnly?: boolean` (transfer exclude yang uangnya beneran keluar → tetap debit saldo lewat `GmailSyncService.applyBalanceOnlyDebit()`, dedup by `EmailParseLog.status=EXCLUDED`). (2) Klasifikasi Income: pengirim = `OWNER_FULL_NAME` → INTERNAL; cocok `IncomeStream.matchKeywords` → CONFIRMED; pengirim FLIPTECH berkorelasi `EmailParseLog` EXCLUDED nominal sama ±3 jam → INTERNAL; selain itu → PENDING ("Perlu dicek" di halaman Pemasukan, resolve lewat `PATCH /income/:id/resolve`). (3) Saldo JAGO **selalu** gerak dari email Jago "menerima uang", apapun status klasifikasinya — klasifikasi cuma metadata, bukan syarat gerak saldo. (4) Fixture: 1 nyata (FLIPTECH, dari Gmail MCP) + 2 sintetis (owner-sender, unknown-sender) buat nutup 3 skenario klasifikasi yang datanya belum ada di inbox asli.
+**Alasan:** Prinsip "uang yang beneran keluar/masuk selalu gerakin saldo, klasifikasi itu urusan terpisah" — motivasi utama biar saldo BCA/JAGO akurat tanpa nunggu Arzaka koreksi manual tiap kali ada transfer internal.
+**Konsekuensi:** Tabel saldo lengkap ditulis ke `CLAUDE.md` bagian Saldo Bank. Backfill 60 hari & verifikasi browser live (dev server) belum jalan sesi ini — backfill butuh Gmail sync nyata (di luar scope tanpa approval eksplisit nyentuh inbox/DB prod), browser dev nggak bisa dites karena browser Arzaka di laptop sedangkan dev server di VPS tanpa tunnel SSH aktif. Endpoint diverifikasi end-to-end via curl (resolve CONFIRMED & INTERNAL, PENDING list kosong setelahnya) dan compile bersih (`npm run build` + `tsc --noEmit` + self-check 53/53).
+
 ## YYYY-MM-DD — <judul>
 **Konteks:**
 **Keputusan:**

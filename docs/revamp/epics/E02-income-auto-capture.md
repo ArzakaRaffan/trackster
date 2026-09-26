@@ -54,15 +54,19 @@ Tanggal transaksi 26 August 2026 13:37 WIB
   Aturan baseline (conventions §4) tetap berlaku. Tulis tabel ini ke `CLAUDE.md` bagian Saldo setelah jalan.
 
 **Tasks**
-- [ ] Ambil 3–5 contoh email "menerima sejumlah uang" dari Gmail (MCP Gmail) → fixture + assert
-- [ ] `kind` di ParseResult, `JagoParser.parseIncoming()`
-- [ ] `IncomeService.createFromParsed()` + dedup externalId + baseline rule
-- [ ] Klasifikasi CONFIRMED/INTERNAL/PENDING + korelasi FLIPTECH
-- [ ] Gerakan saldo balance-only untuk transfer internal sesuai tabel (+ self-check skenario: top-up BCA→Jago via Flip
-      harus menghasilkan BCA −x, JAGO +x, tanpa expense/pemasukan baru)
-- [ ] UI "Perlu dicek" di halaman Pemasukan + endpoint `PATCH /income/:id/resolve`
-- [ ] Notif Telegram opsional "💰 Masuk Rp X dari NAMA" (ikut setting `notifyEveryTransaction`)
-- [ ] Backfill 60 hari di dev → cek hasil
+- [x] Ambil contoh email "menerima sejumlah uang" dari Gmail (MCP Gmail) → fixture + assert
+      (cuma 2 thread nyata ada di inbox, keduanya dari FLIPTECH — fixture owner/unknown dibikin
+      sintetis dari struktur HTML asli buat nutup 3 skenario klasifikasi)
+- [x] `kind` di ParseResult, `JagoParser.parseIncoming()`
+- [x] `IncomeService.createFromParsed()` + dedup externalId + baseline rule
+- [x] Klasifikasi CONFIRMED/INTERNAL/PENDING + korelasi FLIPTECH
+- [x] Gerakan saldo balance-only untuk transfer internal sesuai tabel (+ self-check skenario: top-up BCA→Jago via Flip
+      harus menghasilkan BCA −x, JAGO +x, tanpa expense/pemasukan baru) — `ParseResult.balanceOnly` di
+      bca/flip/jago parser + `GmailSyncService.applyBalanceOnlyDebit()`, dedup lewat EmailParseLog
+- [x] UI "Perlu dicek" di halaman Pemasukan + endpoint `PATCH /income/:id/resolve`
+- [x] Notif Telegram opsional "💰 Masuk Rp X dari NAMA" (ikut setting `notifyEveryTransaction`)
+- [ ] Backfill 60 hari di dev → cek hasil — **belum jalan**: perlu sync Gmail beneran (butuh OAuth
+      Gmail live), sengaja tidak dipicu di sesi ini biar tidak nyentuh inbox/DB prod tanpa approval eksplisit
 
 **Acceptance:** transfer masuk ke Jago dari orang lain tercatat otomatis ≤ 5 menit; top-up BCA→Jago via Flip
 tidak tercatat sebagai pemasukan tapi saldo BCA & Jago sama-sama bergerak benar.
