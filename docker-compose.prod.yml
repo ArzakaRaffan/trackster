@@ -26,6 +26,8 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+    extra_hosts:
+      - 'host.docker.internal:host-gateway'
     environment:
       DATABASE_URL: postgresql://trackster:${POSTGRES_PASSWORD}@postgres:5432/trackster
       JWT_SECRET: ${JWT_SECRET}
