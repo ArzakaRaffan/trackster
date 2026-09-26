@@ -235,7 +235,36 @@ export default function IncomePage() {
   const { data: week, mutate: mutateWeek } = useSWR('/income/forecast/week', weekForecastFetcher);
   const { data: horizon } = useSWR('/income/forecast/horizon?weeks=4', horizonFetcher);
   const { data: streams, mutate: mutateStreams } = useSWR('/income-streams', streamsFetcher);
+  const { data: pending, mutate: mutatePending } = useSWR('/income?status=PENDING', fetcher);
   const [listParent] = useAutoAnimate({ duration: 200, easing: 'cubic-bezier(.3,0,.4,1)' });
+  const [pendingParent] = useAutoAnimate({ duration: 200, easing: 'cubic-bezier(.3,0,.4,1)' });
+
+  const [pendingStreamPick, setPendingStreamPick] = useState<Record<number, string>>({});
+  const [resolvingId, setResolvingId] = useState<number | null>(null);
+
+  const refreshAfterResolve = () => Promise.all([mutatePending(), mutate(), mutateWeek()]);
+
+  const handleConfirmStream = async (incomeId: number) => {
+    const streamId = pendingStreamPick[incomeId];
+    if (!streamId) return;
+    setResolvingId(incomeId);
+    try {
+      await api.patch(`/income/${incomeId}/resolve`, { streamId: Number(streamId) });
+      await refreshAfterResolve();
+    } finally {
+      setResolvingId(null);
+    }
+  };
+
+  const handleMarkInternal = async (incomeId: number) => {
+    setResolvingId(incomeId);
+    try {
+      await api.patch(`/income/${incomeId}/resolve`, { notIncome: true });
+      await refreshAfterResolve();
+    } finally {
+      setResolvingId(null);
+    }
+  };
 
   const [formOpen, setFormOpen] = useState(false);
   const [editingId, setEditingId] = useState<number | null>(null);
@@ -428,6 +457,53 @@ export default function IncomePage() {
             >
               Check-in pemasukan minggu ini
             </Link>
+          </section>
+        )}
+
+        {/* Perlu dicek: income PENDING dari auto-capture (E02-S1) — bukan cocok stream & bukan internal */}
+        {pending && pending.length > 0 && (
+          <section className="flex flex-col gap-3 rounded-medium bg-surface p-5">
+            <p className="text-small font-bold uppercase tracking-caps text-ink-muted">
+              Perlu dicek ({pending.length})
+            </p>
+            <div ref={pendingParent} className="flex flex-col gap-3">
+              {pending.map((income) => (
+                <div key={income.id} className="flex flex-col gap-2 rounded-comfortable bg-surface-interactive p-3.5">
+                  <p className="text-small leading-relaxed text-ink">
+                    <span className="font-bold tabular-nums text-status-under">+{formatRupiah(income.amount)}</span> dari{' '}
+                    <span className="font-bold">{income.description}</span> — ini pemasukan apa?
+                  </p>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <select
+                      value={pendingStreamPick[income.id] ?? ''}
+                      onChange={(e) => setPendingStreamPick((m) => ({ ...m, [income.id]: e.target.value }))}
+                      className="min-w-0 flex-1 appearance-none rounded-subtle bg-surface px-3 py-2 text-small text-ink shadow-field outline-none"
+                    >
+                      <option value="">Pilih sumber…</option>
+                      {(streams ?? []).map((s) => (
+                        <option key={s.id} value={s.id}>
+                          {s.name}
+                        </option>
+                      ))}
+                    </select>
+                    <Button
+                      variant="dark"
+                      onClick={() => handleConfirmStream(income.id)}
+                      disabled={resolvingId === income.id || !pendingStreamPick[income.id]}
+                    >
+                      Simpan
+                    </Button>
+                    <button
+                      onClick={() => handleMarkInternal(income.id)}
+                      disabled={resolvingId === income.id}
+                      className="text-small font-bold text-ink-muted hover:text-ink"
+                    >
+                      Bukan pemasukan (internal)
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
           </section>
         )}
 

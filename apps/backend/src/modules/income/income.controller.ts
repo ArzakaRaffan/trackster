@@ -1,7 +1,9 @@
-import { Body, Controller, Delete, Get, Param, ParseIntPipe, Post, Put, Query, UseGuards } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, ParseIntPipe, Patch, Post, Put, Query, UseGuards } from '@nestjs/common';
+import { IncomeStatus } from '@prisma/client';
 import { IncomeService } from './income.service';
 import { CreateIncomeDto } from './dto/create-income.dto';
 import { UpdateIncomeDto } from './dto/update-income.dto';
+import { ResolveIncomeDto } from './dto/resolve-income.dto';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 
 @UseGuards(JwtAuthGuard)
@@ -10,8 +12,12 @@ export class IncomeController {
   constructor(private incomeService: IncomeService) {}
 
   @Get()
-  async findAll(@Query('startDate') startDate?: string, @Query('endDate') endDate?: string) {
-    return this.incomeService.findAll({ startDate, endDate });
+  async findAll(
+    @Query('startDate') startDate?: string,
+    @Query('endDate') endDate?: string,
+    @Query('status') status?: IncomeStatus,
+  ) {
+    return this.incomeService.findAll({ startDate, endDate, status });
   }
 
   @Get('allowance-suggestion')
@@ -38,5 +44,10 @@ export class IncomeController {
   @Delete(':id')
   async remove(@Param('id', ParseIntPipe) id: number) {
     return this.incomeService.remove(id);
+  }
+
+  @Patch(':id/resolve')
+  async resolve(@Param('id', ParseIntPipe) id: number, @Body() dto: ResolveIncomeDto) {
+    return this.incomeService.resolve(id, dto);
   }
 }

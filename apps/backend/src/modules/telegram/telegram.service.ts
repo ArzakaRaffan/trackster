@@ -184,4 +184,24 @@ export class TelegramService {
 
     return this.sendMessage(text);
   }
+
+  /** Notifikasi dana masuk otomatis (E02-S1, Jago "menerima uang" dkk) — pola sama dengan sendTransactionNotif. */
+  async sendIncomeNotif(income: { source: string; sender: string; amount: number; occurredAt: Date }) {
+    const { source, sender, amount, occurredAt } = income;
+    const formatRp = (n: number) => `Rp ${n.toLocaleString('id-ID')}`;
+    const jam = occurredAt.toLocaleTimeString('id-ID', {
+      hour: '2-digit',
+      minute: '2-digit',
+      timeZone: 'Asia/Jakarta',
+    });
+
+    const text = [
+      '💰 <b>Pemasukan baru</b>',
+      '',
+      `${formatRp(amount)} dari ${sender}`,
+      `${jam} · ${source}`,
+    ].join('\n');
+
+    return this.sendMessage(text);
+  }
 }

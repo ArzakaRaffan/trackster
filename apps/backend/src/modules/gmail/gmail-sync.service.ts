@@ -2,13 +2,15 @@ import { Injectable, Logger } from '@nestjs/common';
 import { Cron, CronExpression, SchedulerRegistry } from '@nestjs/schedule';
 import { GmailAuthService } from './gmail-auth.service';
 import { ParserRegistryService } from './parsers/parser-registry.service';
-import { RawEmail, htmlToText } from './parsers/parser.interface';
+import { RawEmail, ParseResult, htmlToText } from './parsers/parser.interface';
 import { TransactionService } from '../transaction/transaction.service';
 import { BudgetService } from '../budget/budget.service';
 import { TelegramService } from '../telegram/telegram.service';
 import { PrismaService } from '../../prisma.service';
 import { AiChatService } from '../ai/ai-chat.service';
 import { MerchantAliasService } from '../merchant-alias/merchant-alias.service';
+import { IncomeService } from '../income/income.service';
+import { BalanceService, shouldAdjustBalance } from '../balance/balance.service';
 import { Category, ParseStatus } from '@prisma/client';
 import { shouldSkipLogUpsert } from './parsers/email-parse-log.util';
 
@@ -40,6 +42,8 @@ export class GmailSyncService {
     private schedulerRegistry: SchedulerRegistry,
     private aiChatService: AiChatService,
     private merchantAliasService: MerchantAliasService,
+    private incomeService: IncomeService,
+    private balanceService: BalanceService,
   ) {}
 
   @Cron(CronExpression.EVERY_5_MINUTES, { name: SYNC_CRON_JOB_NAME })
@@ -92,6 +96,7 @@ export class GmailSyncService {
       this.logger.log(`Gmail sync query="${query}" candidates=${messageIds.length}`);
 
       let syncedCount = 0;
+      let syncedIncomeCount = 0;
       let skippedExcluded = 0;
       let skippedUnparsed = 0;
       let skippedDuplicate = 0;
@@ -109,6 +114,7 @@ export class GmailSyncService {
               syncedCount++;
               newestTransaction = t;
             },
+            onIncomeRecorded: () => syncedIncomeCount++,
             onDuplicate: () => skippedDuplicate++,
             onExcluded: () => skippedExcluded++,
             onUnparsed: () => skippedUnparsed++,
@@ -122,7 +128,7 @@ export class GmailSyncService {
         }
       }
 
-      const summary = `${syncedCount} baru · ${messageIds.length} discan · dup=${skippedDuplicate} skip=${skippedUnparsed} excl=${skippedExcluded}`;
+      const summary = `${syncedCount} baru (+${syncedIncomeCount} income) · ${messageIds.length} discan · dup=${skippedDuplicate} skip=${skippedUnparsed} excl=${skippedExcluded}`;
       await this.prisma.emailSyncLog.create({
         data: { lastSyncAt: new Date(), status: 'SUCCESS', message: summary },
       });
@@ -133,6 +139,7 @@ export class GmailSyncService {
 
       return {
         synced: syncedCount,
+        syncedIncome: syncedIncomeCount,
         scanned: messageIds.length,
         skippedDuplicate,
         skippedUnparsed,
@@ -157,6 +164,7 @@ export class GmailSyncService {
     notifyEveryTransaction: boolean,
     callbacks: {
       onRecorded: (t: { source: string; description: string; amount: number }) => void;
+      onIncomeRecorded: () => void;
       onDuplicate: () => void;
       onExcluded: () => void;
       onUnparsed: () => void;
@@ -183,9 +191,17 @@ export class GmailSyncService {
       return;
     }
 
+    if (parsed.kind === 'INCOME') {
+      await this.processIncome(id, rawEmail.id, from, subject, receivedAt, parsed, notifyEveryTransaction, parser, callbacks);
+      return;
+    }
+
     if (parsed.excluded) {
       this.logger.debug(`Skip (excluded): ${parsed.excludeReason}`);
       callbacks.onExcluded();
+      if (parsed.balanceOnly) {
+        await this.applyBalanceOnlyDebit(id, parsed);
+      }
       await this.logParseResult(id, from, subject, receivedAt, {
         status: ParseStatus.EXCLUDED,
         reason: parsed.excludeReason,
@@ -233,6 +249,74 @@ export class GmailSyncService {
         parser,
       });
     }
+  }
+
+  /** Dana masuk (Jago "menerima uang", dst) — route ke IncomeService, bukan TransactionService.
+   * Selalu masuk sebagai Income (CONFIRMED/INTERNAL/PENDING, lihat IncomeService.classify), saldo
+   * source SELALU gerak terlepas status-nya. */
+  private async processIncome(
+    id: string,
+    emailId: string,
+    from: string,
+    subject: string,
+    receivedAt: Date,
+    parsed: ParseResult,
+    notifyEveryTransaction: boolean,
+    parser: string | null,
+    callbacks: { onIncomeRecorded: () => void; onDuplicate: () => void },
+  ) {
+    const created = await this.incomeService.createFromParsed({
+      amount: parsed.amount,
+      description: parsed.description,
+      source: parsed.source,
+      occurredAt: parsed.occurredAt,
+      emailId,
+    });
+
+    if (!created) {
+      callbacks.onDuplicate();
+      await this.logParseResult(id, from, subject, receivedAt, {
+        status: ParseStatus.DUPLICATE,
+        amount: parsed.amount,
+        kind: 'INCOME',
+        parser,
+      });
+      return;
+    }
+
+    callbacks.onIncomeRecorded();
+    await this.logParseResult(id, from, subject, receivedAt, {
+      status: ParseStatus.RECORDED,
+      amount: parsed.amount,
+      counterparty: parsed.description,
+      kind: 'INCOME',
+      parser,
+    });
+
+    if (notifyEveryTransaction) {
+      await this.telegramService.sendIncomeNotif({
+        source: parsed.source,
+        sender: parsed.description,
+        amount: parsed.amount,
+        occurredAt: parsed.occurredAt,
+      });
+    }
+  }
+
+  /** Transfer ke rekening sendiri (BCA/Jago langsung, atau via Flip) — bukan expense, tapi uangnya
+   * beneran keluar dari `source` sekarang. Debit saldo sekali per email (dedup: kalau EmailParseLog
+   * emailId ini sudah berstatus EXCLUDED dari sync sebelumnya, jangan diterapkan lagi — repeated
+   * cron scan tidak boleh dobel-debit). Aturan baseline (koreksi manual) tetap berlaku. */
+  private async applyBalanceOnlyDebit(emailId: string, parsed: ParseResult) {
+    const existing = await this.prisma.emailParseLog.findUnique({ where: { emailId } });
+    if (existing?.status === ParseStatus.EXCLUDED) return;
+
+    await this.prisma.$transaction(async (tx) => {
+      const lastAdjustmentAt = await this.balanceService.getLastManualAdjustmentAt(tx, parsed.source);
+      if (shouldAdjustBalance(parsed.occurredAt, lastAdjustmentAt)) {
+        await this.balanceService.adjustBalance(tx, parsed.source, -parsed.amount);
+      }
+    });
   }
 
   /** Pipeline kategorisasi (E00-S3): rule merchant (by merchantKey) → heuristik parser

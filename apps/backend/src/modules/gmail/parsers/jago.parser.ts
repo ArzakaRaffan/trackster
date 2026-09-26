@@ -16,6 +16,10 @@ export class JagoParser implements EmailParser {
     const subject = email.subject.toLowerCase();
     const body = email.body;
 
+    if (subject.includes('menerima sejumlah uang') || body.includes('telah menerima sejumlah uang')) {
+      return this.parseIncoming(body, email);
+    }
+
     if (subject.includes('melakukan transfer') || body.includes('melakukan transfer uang')) {
       return this.parseTransfer(body, email);
     }
@@ -25,6 +29,33 @@ export class JagoParser implements EmailParser {
     }
 
     return null;
+  }
+
+  /**
+   * "Asik, kamu telah menerima sejumlah uang" — dana masuk ke Kantong Jago. `description` = nama
+   * pengirim mentah (dipakai IncomeService buat klasifikasi CONFIRMED/INTERNAL/PENDING via
+   * matchKeywords/OWNER_FULL_NAME/korelasi FLIPTECH — bukan urusan parser ini).
+   */
+  private parseIncoming(body: string, email: RawEmail): ParseResult | null {
+    const jumlahRaw = extractField(body, 'Jumlah');
+    const dari = extractField(body, 'Dari');
+    const tanggalRaw = extractField(body, 'Tanggal transaksi') || extractField(body, 'Tanggal Transaksi');
+
+    if (!jumlahRaw || !dari) return null;
+
+    const amount = parseRupiah(jumlahRaw);
+    if (!amount || amount <= 0) return null;
+
+    const occurredAt = (tanggalRaw && parseEmailDate(tanggalRaw)) || new Date(parseInt(email.internalDate, 10));
+
+    return {
+      amount,
+      description: dari,
+      source: Source.JAGO,
+      occurredAt,
+      excluded: false,
+      kind: 'INCOME',
+    };
   }
 
   private parseTransfer(body: string, email: RawEmail): ParseResult | null {
@@ -51,6 +82,7 @@ export class JagoParser implements EmailParser {
       occurredAt,
       excluded: isSelfTransfer,
       excludeReason: isSelfTransfer ? 'Transfer ke rekening sendiri (internal)' : undefined,
+      balanceOnly: isSelfTransfer,
     };
   }
 

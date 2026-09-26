@@ -1,10 +1,25 @@
 import { Injectable } from '@nestjs/common';
+import { IncomeOrigin, IncomeStatus, ParseStatus, Source } from '@prisma/client';
 import { PrismaService } from '../../prisma.service';
-import { BalanceService } from '../balance/balance.service';
+import { BalanceService, shouldAdjustBalance } from '../balance/balance.service';
 import { IncomeForecastService } from '../income-forecast/income-forecast.service';
 import { CreateIncomeDto } from './dto/create-income.dto';
 import { UpdateIncomeDto } from './dto/update-income.dto';
-import { addWibDays, startOfWibDay } from '../../common/wib';
+import { ResolveIncomeDto } from './dto/resolve-income.dto';
+import { addWibDays, startOfWibDay, startOfWibWeek } from '../../common/wib';
+import { isOwnerName } from '../gmail/parsers/own-accounts';
+
+export interface ParsedIncome {
+  amount: number;
+  description: string; // nama pengirim mentah dari email
+  source: Source;
+  occurredAt: Date;
+  emailId: string;
+}
+
+/** ±3 jam — jendela korelasi FLIPTECH: BCA→Flip (SoF) lalu Flip→Jago sendiri biasanya beda
+ * beberapa menit, bukan jam, tapi kasih jarak buat proses/antrian bank. */
+const FLIPTECH_CORRELATION_WINDOW_MS = 3 * 60 * 60 * 1000;
 
 @Injectable()
 export class IncomeService {
@@ -14,14 +29,15 @@ export class IncomeService {
     private incomeForecastService: IncomeForecastService,
   ) {}
 
-  async findAll(params: { startDate?: string; endDate?: string }) {
-    const { startDate, endDate } = params;
+  async findAll(params: { startDate?: string; endDate?: string; status?: IncomeStatus }) {
+    const { startDate, endDate, status } = params;
     const where: any = {};
     if (startDate || endDate) {
       where.receivedAt = {};
       if (startDate) where.receivedAt.gte = startOfWibDay(startDate);
       if (endDate) where.receivedAt.lt = addWibDays(startOfWibDay(endDate), 1);
     }
+    if (status) where.status = status;
     return this.prisma.income.findMany({ where, orderBy: { receivedAt: 'desc' }, include: { stream: true } });
   }
 
@@ -59,6 +75,92 @@ export class IncomeService {
       await this.balanceService.adjustBalance(tx, updated.source, Number(updated.amount));
       return updated;
     });
+  }
+
+  /** Auto-capture dari email (E02-S1) — dedup via externalId (emailId Gmail), lalu klasifikasi
+   * CONFIRMED/INTERNAL/PENDING. Saldo JAGO **selalu** gerak (uang beneran masuk), terlepas dari
+   * status — klasifikasi cuma soal "ini pemasukan siapa/apa", bukan soal saldo. */
+  async createFromParsed(parsed: ParsedIncome) {
+    const existing = await this.prisma.income.findUnique({ where: { externalId: parsed.emailId } });
+    if (existing) return null;
+
+    const { status, streamId } = await this.classify(parsed);
+    const periodStart = streamId ? startOfWibWeek(parsed.occurredAt) : undefined;
+
+    return this.prisma.$transaction(async (tx) => {
+      const income = await tx.income.create({
+        data: {
+          amount: parsed.amount,
+          description: parsed.description,
+          source: parsed.source,
+          receivedAt: parsed.occurredAt,
+          status,
+          origin: IncomeOrigin.EMAIL,
+          externalId: parsed.emailId,
+          ...(streamId ? { streamId, periodStart } : {}),
+        },
+      });
+
+      const lastAdjustmentAt = await this.balanceService.getLastManualAdjustmentAt(tx, income.source);
+      if (shouldAdjustBalance(income.receivedAt, lastAdjustmentAt)) {
+        await this.balanceService.adjustBalance(tx, income.source, Number(income.amount));
+      }
+
+      return income;
+    });
+  }
+
+  /** Pengirim = owner sendiri → INTERNAL. Cocok `matchKeywords` stream aktif → CONFIRMED. Pengirim
+   * FLIPTECH (Flip) yang berkorelasi dengan EmailParseLog EXCLUDED nominal sama ±3 jam (top-up via
+   * Flip ke rekening sendiri) → INTERNAL. Selain itu (termasuk FLIPTECH tanpa korelasi — bisa orang
+   * lain kirim via Flip) → PENDING, muncul di "Perlu dicek". */
+  private async classify(parsed: ParsedIncome): Promise<{ status: IncomeStatus; streamId: number | null }> {
+    const sender = parsed.description.toUpperCase();
+
+    if (isOwnerName(sender)) {
+      return { status: IncomeStatus.INTERNAL, streamId: null };
+    }
+
+    const streams = await this.prisma.incomeStream.findMany({ where: { isActive: true } });
+    const matched = streams.find((s) => s.matchKeywords.some((kw) => sender.includes(kw.toUpperCase())));
+    if (matched) {
+      return { status: IncomeStatus.CONFIRMED, streamId: matched.id };
+    }
+
+    if (sender.includes('FLIPTECH')) {
+      const correlated = await this.prisma.emailParseLog.findFirst({
+        where: {
+          status: ParseStatus.EXCLUDED,
+          amount: parsed.amount,
+          receivedAt: {
+            gte: new Date(parsed.occurredAt.getTime() - FLIPTECH_CORRELATION_WINDOW_MS),
+            lte: new Date(parsed.occurredAt.getTime() + FLIPTECH_CORRELATION_WINDOW_MS),
+          },
+        },
+      });
+      if (correlated) return { status: IncomeStatus.INTERNAL, streamId: null };
+    }
+
+    return { status: IncomeStatus.PENDING, streamId: null };
+  }
+
+  /** User menyelesaikan income PENDING dari halaman "Perlu dicek": pilih stream (→ CONFIRMED) atau
+   * tandai bukan pemasukan/internal (→ INTERNAL). Saldo tidak disentuh lagi — sudah bergerak saat dibuat. */
+  async resolve(id: number, dto: ResolveIncomeDto) {
+    const income = await this.prisma.income.findUniqueOrThrow({ where: { id } });
+
+    if (dto.notIncome) {
+      return this.prisma.income.update({ where: { id: income.id }, data: { status: IncomeStatus.INTERNAL } });
+    }
+
+    if (dto.streamId) {
+      return this.prisma.income.update({
+        where: { id: income.id },
+        data: { status: IncomeStatus.CONFIRMED, streamId: dto.streamId, periodStart: startOfWibWeek(income.receivedAt) },
+      });
+    }
+
+    return income;
   }
 
   async remove(id: number) {

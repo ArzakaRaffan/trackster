@@ -63,6 +63,7 @@ export class FlipParser implements EmailParser {
       occurredAt,
       excluded,
       excludeReason: excluded ? 'Transfer Flip ke rekening sendiri (internal)' : undefined,
+      balanceOnly: excluded,
       categoryHint: excluded ? undefined : Category.TRANSFER,
     };
   }
