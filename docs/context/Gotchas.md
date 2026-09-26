@@ -1,5 +1,7 @@
 # trackster — Gotchas
 
+- **`docker compose up -d` restart nginx tiap kali backend/frontend trackster di-recreate (dependency), dan nginx nggak resolve upstream sibling site yang lagi mati → nginx ikut crash-loop, SEMUA situs di belakangnya (trackster, charon, isistasiun, dll) ikut down.** Kejadian 2026-09-26: deploy `E02-S1` sempat gagal di GH Actions (lihat gotcha "npx nest build bisa exit 0..."), di-retry manual, tapi `nginx/conf.d/ai-trackster.conf` masih pakai `proxy_pass http://ai-frontend:3100` polos (DNS upstream di-resolve SEKALI saat nginx start) — begitu container `ai-frontend` nggak ada/mati, nginx gagal start total ("host not found in upstream"), bukan cuma 502 di site itu doang. Fix: `resolver 127.0.0.11 valid=10s;` (DNS resolver Docker) + `set $up http://<host>:<port>; proxy_pass $up;` — bikin resolusi DNS lazy per-request, nginx tetap start meski upstream lagi mati (baru 502 pas ada request ke situ). Pola ini SUDAH dipakai di `isistasiun-fe-prod.conf`, belum konsisten di semua vhost lain — cek tiap nambah/ubah vhost baru. (`nginx/conf.d/ai-trackster.conf`)
+
 - **"Rapikan Kategori" (E00-S3) tidak pernah benar-benar nyimpen — semua transaksi lama tetap `LAINNYA`**
   (dilaporkan Arzaka 2026-09-25, root cause di `TransactionService.updateCategoryForAll()` &
   `countSameMerchant()` di `apps/backend/src/modules/transaction/transaction.service.ts`). Kolom
