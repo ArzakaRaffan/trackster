@@ -1,18 +1,33 @@
 'use client';
 
-import { useState, useRef, useEffect } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import useSWR from 'swr';
 import Link from 'next/link';
 import { api } from '@/lib/api';
-import { ChevronLeft, Send, Wallet, Coffee, TrendingUp, ShoppingBag } from 'lucide-react';
+import { ChevronLeft, History, Plus, Send, Trash2, Wallet, Coffee, TrendingUp, ShoppingBag, X } from 'lucide-react';
 import { AnimatePresence, motion } from 'motion/react';
 import { TRANSITION_BASE, TRANSITION_SLOW } from '@/lib/motion';
 import { TracksterMascot } from '@/components/TracksterMascot';
 
-interface Message {
+interface Thread {
+  id: number;
+  title: string | null;
+  channel: 'WEB' | 'TELEGRAM';
+  archivedAt: string | null;
+  updatedAt: string;
+}
+
+interface ThreadMessage {
+  id: number;
+  role: 'user' | 'assistant';
+  content: string;
+  createdAt: string;
+}
+
+interface DisplayMessage {
   id: string;
   role: 'user' | 'assistant';
   content: string;
-  timestamp: Date;
 }
 
 const QUICK_PROMPTS = [
@@ -22,12 +37,11 @@ const QUICK_PROMPTS = [
   { label: 'Cek sebelum beli', Icon: ShoppingBag, text: 'Saya mau beli gadget 2jt, aman ga?' },
 ];
 
-const WELCOME: Message = {
+const WELCOME: DisplayMessage = {
   id: 'welcome',
   role: 'assistant',
   content:
     'Halo Arzaka! Aku Track, financial buddy kamu. Mau cek kondisi keuangan, minta saran pengeluaran, atau catat transaksi bareng?',
-  timestamp: new Date(),
 };
 
 function renderMessageBody(content: string) {
@@ -45,74 +59,129 @@ function renderMessageBody(content: string) {
   });
 }
 
+function fmtThreadDate(iso: string) {
+  return new Date(iso).toLocaleDateString('id-ID', { day: 'numeric', month: 'short' });
+}
+
 export default function ChatPage() {
-  const [messages, setMessages] = useState<Message[]>([WELCOME]);
+  const [activeThreadId, setActiveThreadId] = useState<number | null>(null);
+  const [drawerOpen, setDrawerOpen] = useState(false);
   const [input, setInput] = useState('');
-  const [loading, setLoading] = useState(false);
+  const [sending, setSending] = useState(false);
+  const [pendingUser, setPendingUser] = useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
+  const { data: threads, mutate: mutateThreads } = useSWR<Thread[]>('/ai/threads', (p: string) =>
+    api.get<Thread[]>(p),
+  );
+  const messagesKey = activeThreadId ? `/ai/threads/${activeThreadId}/messages` : null;
+  const { data: threadMessages, mutate: mutateMessages } = useSWR<ThreadMessage[]>(
+    messagesKey,
+    (p: string) => api.get<ThreadMessage[]>(p),
+  );
+
+  const visibleThreads = (threads ?? []).filter((t) => !t.archivedAt);
+
+  const messages: DisplayMessage[] =
+    activeThreadId === null
+      ? [WELCOME]
+      : (threadMessages ?? []).map((m) => ({ id: `m-${m.id}`, role: m.role, content: m.content }));
+
+  const displayMessages = pendingUser
+    ? [...messages, { id: 'pending-user', role: 'user' as const, content: pendingUser }]
+    : messages;
+
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages, loading]);
+  }, [displayMessages.length, sending]);
 
   const handleSend = async (textToSend?: string) => {
     const text = (textToSend ?? input).trim();
-    if (!text || loading) return;
+    if (!text || sending) return;
 
-    const userMsg: Message = {
-      id: `user-${Date.now()}`,
-      role: 'user',
-      content: text,
-      timestamp: new Date(),
-    };
-
-    setMessages((prev) => [...prev, userMsg]);
     setInput('');
-    setLoading(true);
+    setSending(true);
+    setPendingUser(text);
 
     try {
-      const res = await api.post<{ reply: string }>('/ai/chat', { message: text });
-      const assistantMsg: Message = {
-        id: `ai-${Date.now()}`,
-        role: 'assistant',
-        content: res.reply || 'Hmm, aku blank sebentar. Coba kirim ulang ya.',
-        timestamp: new Date(),
-      };
-      setMessages((prev) => [...prev, assistantMsg]);
+      let threadId = activeThreadId;
+      if (threadId === null) {
+        const thread = await api.post<Thread>('/ai/threads');
+        threadId = thread.id;
+        setActiveThreadId(threadId);
+        mutateThreads();
+      }
+      await api.post<{ reply: string }>(`/ai/threads/${threadId}/messages`, { text });
+      await Promise.all([
+        mutateMessages(undefined, { revalidate: true }),
+        mutateThreads(),
+      ]);
     } catch {
-      const errorMsg: Message = {
-        id: `err-${Date.now()}`,
-        role: 'assistant',
-        content: 'Koneksi ke layanan AI terputus. Coba kirim ulang pesanmu.',
-        timestamp: new Date(),
-      };
-      setMessages((prev) => [...prev, errorMsg]);
-    } finally {
-      setLoading(false);
+      // Biarkan history apa adanya; tampilkan pesan error sebagai bubble sementara.
+      setPendingUser(null);
+      setSending(false);
       inputRef.current?.focus();
+      return;
     }
+
+    setPendingUser(null);
+    setSending(false);
+    inputRef.current?.focus();
   };
 
-  const showQuick = messages.length <= 2 && !loading;
+  const startNewChat = () => {
+    setActiveThreadId(null);
+    setDrawerOpen(false);
+  };
+
+  const openThread = (id: number) => {
+    setActiveThreadId(id);
+    setDrawerOpen(false);
+  };
+
+  const deleteThread = async (id: number, e: React.MouseEvent) => {
+    e.stopPropagation();
+    await api.delete(`/ai/threads/${id}`);
+    if (activeThreadId === id) setActiveThreadId(null);
+    mutateThreads();
+  };
+
+  const showQuick = activeThreadId === null && !sending;
 
   return (
-    <div className="flex h-screen flex-col pb-navbar">
+    <div className="relative flex h-screen flex-col pb-navbar">
       <header className="sticky top-0 z-10 flex items-center gap-3 border-b border-line-subtle bg-base/[0.9] px-4 py-3.5 backdrop-blur-md">
         <Link href="/app/more" aria-label="Kembali" className="text-ink-muted transition-colors hover:text-ink">
           <ChevronLeft size={22} />
         </Link>
-        <TracksterMascot mood={loading ? 'thinking' : 'happy'} size="md" glow />
+        <TracksterMascot mood={sending ? 'thinking' : 'happy'} size="md" glow />
         <div className="min-w-0 flex-1">
           <h1 className="font-title text-heading font-bold text-ink truncate">Tanya Track</h1>
           <p className="text-micro text-ink-muted">
-            {loading ? 'Lagi mikir…' : 'AI Financial Buddy · online'}
+            {sending ? 'Lagi mikir…' : 'AI Financial Buddy · online'}
           </p>
         </div>
+        <button
+          type="button"
+          onClick={startNewChat}
+          aria-label="Chat baru"
+          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-ink-muted transition-colors hover:bg-surface-interactive hover:text-ink"
+        >
+          <Plus size={19} />
+        </button>
+        <button
+          type="button"
+          onClick={() => setDrawerOpen(true)}
+          aria-label="Riwayat chat"
+          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-ink-muted transition-colors hover:bg-surface-interactive hover:text-ink"
+        >
+          <History size={19} />
+        </button>
       </header>
 
       <div className="flex-1 space-y-4 overflow-y-auto px-4 py-4">
-        {messages.length === 1 && (
+        {displayMessages.length === 1 && (
           <motion.div
             initial={{ opacity: 0, y: 8 }}
             animate={{ opacity: 1, y: 0 }}
@@ -130,7 +199,7 @@ export default function ChatPage() {
         )}
 
         <AnimatePresence initial={false}>
-          {messages.map((m) => (
+          {displayMessages.map((m) => (
             <motion.div
               key={m.id}
               initial={{ opacity: 0, y: 8 }}
@@ -160,7 +229,7 @@ export default function ChatPage() {
           ))}
         </AnimatePresence>
 
-        {loading && (
+        {sending && (
           <motion.div
             initial={{ opacity: 0, y: 6 }}
             animate={{ opacity: 1, y: 0 }}
@@ -218,12 +287,12 @@ export default function ChatPage() {
             value={input}
             onChange={(e) => setInput(e.target.value)}
             placeholder="Tanya atau catat pengeluaran…"
-            disabled={loading}
+            disabled={sending}
             className="flex-1 rounded-comfortable bg-surface-interactive px-4 py-3 text-body text-ink placeholder:text-ink-subtle outline-none shadow-field transition-shadow duration-base ease-standard focus:shadow-field-focus"
           />
           <button
             type="submit"
-            disabled={!input.trim() || loading}
+            disabled={!input.trim() || sending}
             aria-label="Kirim pesan"
             className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-brand text-base font-bold transition-all hover:brightness-108 active:scale-[.94] disabled:opacity-40"
           >
@@ -231,6 +300,76 @@ export default function ChatPage() {
           </button>
         </form>
       </div>
+
+      <AnimatePresence>
+        {drawerOpen && (
+          <>
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={TRANSITION_BASE}
+              className="absolute inset-0 z-20 bg-ink/40"
+              onClick={() => setDrawerOpen(false)}
+            />
+            <motion.div
+              initial={{ x: '-100%' }}
+              animate={{ x: 0 }}
+              exit={{ x: '-100%' }}
+              transition={TRANSITION_SLOW}
+              className="absolute inset-y-0 left-0 z-30 flex w-[82%] max-w-xs flex-col bg-base shadow-hairline"
+            >
+              <div className="flex items-center justify-between border-b border-line-subtle px-4 py-3.5">
+                <h2 className="font-title text-heading font-bold text-ink">Riwayat Chat</h2>
+                <button
+                  type="button"
+                  onClick={() => setDrawerOpen(false)}
+                  aria-label="Tutup"
+                  className="flex h-8 w-8 items-center justify-center rounded-full text-ink-muted hover:bg-surface-interactive hover:text-ink"
+                >
+                  <X size={17} />
+                </button>
+              </div>
+              <button
+                type="button"
+                onClick={startNewChat}
+                className="mx-4 mt-3 flex items-center justify-center gap-2 rounded-comfortable bg-brand px-4 py-2.5 text-small font-bold text-base"
+              >
+                <Plus size={16} /> Chat baru
+              </button>
+              <div className="mt-2 flex-1 overflow-y-auto px-2 pb-4">
+                {visibleThreads.length === 0 && (
+                  <p className="px-2 py-6 text-center text-small text-ink-muted">Belum ada percakapan tersimpan.</p>
+                )}
+                {visibleThreads.map((t) => (
+                  <button
+                    key={t.id}
+                    type="button"
+                    onClick={() => openThread(t.id)}
+                    className={`group mt-1 flex w-full items-center gap-2 rounded-comfortable px-3 py-2.5 text-left transition-colors ${
+                      t.id === activeThreadId ? 'bg-surface-interactive' : 'hover:bg-surface-interactive'
+                    }`}
+                  >
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-small font-bold text-ink">{t.title || 'Percakapan baru'}</p>
+                      <p className="text-micro text-ink-muted">{fmtThreadDate(t.updatedAt)}</p>
+                    </div>
+                    <span
+                      role="button"
+                      tabIndex={0}
+                      onClick={(e) => deleteThread(t.id, e)}
+                      aria-label="Hapus percakapan"
+                      className="shrink-0 rounded-full p-1.5 text-ink-subtle opacity-0 transition-opacity hover:text-status-over group-hover:opacity-100"
+                    >
+                      <Trash2 size={15} />
+                    </span>
+                  </button>
+                ))}
+              </div>
+            </motion.div>
+          </>
+        )}
+      </AnimatePresence>
     </div>
   );
 }
