@@ -177,7 +177,11 @@ export class AiChatService {
       return reply || 'Maaf, ada gangguan teknis. Coba lagi ya!';
     } catch (err: any) {
       this.logger.error(`sendMessage error: ${err?.message}`);
-      return 'Waduh, ada error nih. Coba beberapa saat lagi ya!';
+      const fallback = 'Waduh, ada error nih. Coba beberapa saat lagi ya!';
+      await this.prisma.chatMessage.create({
+        data: { threadId, role: 'assistant', content: fallback },
+      });
+      return fallback;
     }
   }
 
