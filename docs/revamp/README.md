@@ -58,7 +58,7 @@ Legend: ⬜ belum · 🟨 jalan · ✅ selesai (sudah diverifikasi di browser & 
 | E02-S1 | Parser Jago "menerima uang" + deteksi transfer internal | 1 | E03-S1, E00-S2 | 🟨 (kode **sudah live di prod** — deploy pertama gagal di GH Actions (OOM diam-diam), di-retry manual, sempat bikin nginx crash-loop gara-gara `ai-trackster.conf` (lihat Gotchas & commit `5350f46`), sudah fixed & redeploy kedua sukses; endpoint `PATCH /income/:id/resolve` dikonfirmasi live (401 tanpa auth, bukan 404) — **belum diverifikasi visual di browser** (browser Arzaka di laptop, dev server session sebelumnya di VPS tanpa tunnel); backfill 60 hari juga belum jalan, butuh sync Gmail live) |
 | E02-S2 | Endpoint ingest + iOS 27 Shortcut notifikasi myBCA (eksperimen) | 1 | E02-S1 | ⬜ |
 | E04-S1 | Persistensi chat (thread + message) + history ke model | 2 | — | ✅ (diverifikasi + 1 bug frontend di-fix 2026-09-27 — `activeThreadId` nggak persist, refresh selalu reset ke chat baru meski data DB aman; lihat Decisions.md) |
-| E04-S2 | Financial snapshot + memory jangka panjang + halaman "Yang Track ingat" | 2 | E04-S1, E03-S2 | ⬜ |
+| E04-S2 | Financial snapshot + memory jangka panjang + halaman "Yang Track ingat" | 2 | E04-S1, E03-S2 | 🟨 (kode selesai & diverifikasi dev lokal; ekstraksi memory dari chat asli & follow-up "nanya besok" belum dites — butuh AI completion beneran jalan, cuma bisa di prod/VPS) |
 | E04-S3 | Retrieval (Postgres FTS) atas chat lama, catatan, laporan | 2 | E04-S2 | ⬜ |
 | E04-S4 | Tools advisor baru + engine simulasi + kartu di chat | 2 | E04-S2 | ⬜ |
 | E04-S5 | Persona konsultan + mode cepat + Telegram pakai memory yang sama | 2 | E04-S4 | ⬜ |

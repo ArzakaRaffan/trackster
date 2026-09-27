@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from 'react';
 import useSWR from 'swr';
 import Link from 'next/link';
 import { api } from '@/lib/api';
-import { ChevronLeft, History, Plus, Send, Trash2, Wallet, Coffee, TrendingUp, ShoppingBag, X } from 'lucide-react';
+import { Brain, ChevronLeft, History, Plus, Send, Trash2, Wallet, Coffee, TrendingUp, ShoppingBag, X } from 'lucide-react';
 import { AnimatePresence, motion } from 'motion/react';
 import { TRANSITION_BASE, TRANSITION_SLOW } from '@/lib/motion';
 import { TracksterMascot } from '@/components/TracksterMascot';
@@ -192,6 +192,13 @@ export default function ChatPage() {
             {sending ? 'Lagi mikir…' : 'AI Financial Buddy · online'}
           </p>
         </div>
+        <Link
+          href="/app/chat/memory"
+          aria-label="Yang Track ingat"
+          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-ink-muted transition-colors hover:bg-surface-interactive hover:text-ink"
+        >
+          <Brain size={19} />
+        </Link>
         <button
           type="button"
           onClick={startNewChat}

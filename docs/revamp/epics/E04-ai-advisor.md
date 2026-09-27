@@ -144,12 +144,19 @@ model AiMemory {
 - UI "Yang Track ingat tentang kamu" (`/app/chat/memory`, link dari header chat): list per kind, edit inline,
   hapus, tambah manual. Transparansi = rasa percaya.
 
-**Tasks**
-- [ ] Snapshot service + endpoint debug `GET /ai/snapshot` (lihat teks yang dikirim ke model)
-- [ ] Migration `add_ai_memory` + service + ekstraksi async + tool remember/forget
-- [ ] Rakit system prompt berlapis [1]–[3],[5] di `AiChatService`
-- [ ] Halaman memory
-- [ ] Tes: bilang "aku lagi nabung buat laptop 12 juta, target Juni" → muncul di halaman memory → chat baru
+**Tasks** (dikerjain 2026-09-27)
+- [x] Snapshot service + endpoint debug `GET /ai/snapshot` (`financial-snapshot.service.ts`, cache 5 menit,
+      deterministik — balance/budget/forecast/goal/subscription/pending income, tanpa panggilan AI)
+- [x] Migration `add_ai_memory` + service + ekstraksi async + tool remember/forget
+- [x] Rakit system prompt berlapis [1]–[3],[5] di `AiChatService` (persona + snapshot + memory + summary thread)
+- [x] Halaman memory (`/app/chat/memory`, link ikon Brain di header chat) — list per kind + dot importance,
+      edit inline, arsip/pulihkan, hapus permanen, tambah manual
+- [x] Tes manual (bukan lewat chat AI — proxy AI 401 dari sandbox sesi ini, lihat Decisions.md): tambah memory
+      manual "nabung buat laptop 12 juta, target Juni 2027" → muncul di halaman memory dengan importance dots →
+      survive refresh → edit → arsip → pulihkan → hapus permanen, semua lewat Playwright, 0 error. Endpoint
+      `GET /ai/snapshot` dan sendMessage (assembly system prompt) diverifikasi lewat curl ke dev DB nyata.
+      **Belum dites**: ekstraksi otomatis dari chat asli (butuh AI completion beneran jalan — cuma bisa
+      dikonfirmasi di prod/VPS) dan "chat baru besok nanya progres → dijawab pakai memory itu".
       besoknya "gimana progres laptopku?" dijawab dengan konteks itu
 
 ---
