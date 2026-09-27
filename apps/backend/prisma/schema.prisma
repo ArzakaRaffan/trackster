@@ -375,6 +375,7 @@ model ChatMessage {
   toolName    String?
   attachments Json?
   createdAt   DateTime   @default(now())
+  search      Unsupported("tsvector")?
 
   @@index([threadId, id])
 }

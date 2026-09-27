@@ -184,11 +184,33 @@ model AiMemory {
 - Jalur upgrade (JANGAN dikerjakan sekarang): kalau proxy kelak punya embeddings → `pgvector`. Ganti image ke
   `pgvector/pgvector:pg16` = pindah Alpine (musl) → Debian (glibc): **collation beda, index teks harus di-REINDEX**.
 
-**Tasks**
-- [ ] Migration FTS + trigram
-- [ ] RetrievalService + check script sederhana (insert beberapa pesan di dev, query stem "nabung"/"menabung" ketemu)
-- [ ] Blok [4] di prompt + tool `searchPastConversations`
+**Tasks** (dikerjain 2026-09-27, verifikasi lewat dev DB terpisah — `docker compose -p trackster-dev up -d postgres`
+port 5434 — bukan DB prod)
+- [x] Migration `--create-only` (`add_chat_search_fts`): generated column `search` tsvector + GIN index di
+      `ChatMessage`, extension `pg_trgm` + trigram index di `Transaction.description`. **Drift check dilakuin**:
+      `migrate dev --create-only` sesudahnya nyoba bikin migration yang nge-drop index & kolom yang baru dibuat
+      (Prisma salah baca generated column sebagai kolom ber-default) — migration itu dihapus, dicatat di
+      `docs/context/Gotchas.md` biar nggak keulang.
+- [x] `RetrievalService.search()` (`retrieval.service.ts`) via `$queryRaw` + `Prisma.sql` (parameterized, bukan
+      string interpolation) — `websearch_to_tsquery('indonesian', ...)`, skor `ts_rank_cd × recency_decay`
+      (half-life 60 hari), exclude pesan yang sudah di window thread aktif (`excludeThreadId`+`excludeAfterId`),
+      snippet `ts_headline` ≤300 karakter. Check script `retrieval.check.ts` (insert pesan sungguhan di dev DB,
+      query, assert, bersihkan) — 4/4 lulus. **Catatan nyata, bukan asumsi epic**: dictionary `indonesian` nge-stem
+      "menabung" → `abung`, BUKAN root yang sama dengan "nabung" (→ `nabung` apa adanya). Pasangan yang beneran
+      konsisten: "tabungan"/"ditabung"/"nabung ditabung" → `tabung`. Detail di Gotchas.md.
+- [x] Blok [4] disuntik di `AiChatService.sendMessage` (antara memory [3] dan ringkasan thread [5]) + tool
+      `searchPastConversations({query})` di `ai-finance-tools.service.ts` (exclude thread & window yang sama
+      dengan blok [4], lewat `getTools(ctx)` yang sekarang terima `{threadId, excludeAfterId}` per giliran).
 - [ ] Tes: tanya hal yang pernah dibahas di thread lain minggu lalu → jawaban merujuk ("minggu lalu kamu bilang…")
+      — **belum bisa**, AI proxy 401 dari sandbox sesi ini (sama seperti S1/S2, lihat Decisions.md). Yang sudah
+      diverifikasi tanpa AI: query FTS asli lewat `retrieval.check.ts` mengembalikan snippet + judul thread yang
+      benar dari DB nyata, dan block [4] ter-assembly dengan format yang benar (`formatForPrompt`). Belum
+      diverifikasi: model beneran memakai/merujuk hasil retrieval itu secara natural di jawaban — butuh cek di prod.
+- **Scope yang sengaja dilewatin** (bukan bug, bukan di Tasks checklist): union `PeriodReport.narrative` (tabelnya
+  belum ada, E07 belum dikerjain) dan `Transaction.note` sebagai sumber tambahan retrieval — disebut di prosa
+  epic sebagai "kalau tabelnya sudah ada", tapi nggak masuk 4 checkbox Tasks resmi. `Transaction.note` ada di
+  schema tapi nge-union-nya butuh tsvector kolom baru + normalisasi skala rank yang beda dari chat — cukup buat
+  sesi terpisah kalau memang dibutuhkan nanti.
 
 ---
 

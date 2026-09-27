@@ -5,6 +5,7 @@ import { IncomeService } from '../income/income.service';
 import { AiTool } from './ai.service';
 import { AiCaptionService } from './ai-caption.service';
 import { AiMemoryService } from './ai-memory.service';
+import { RetrievalService } from './retrieval.service';
 import { Source, Category, MemoryKind } from '@prisma/client';
 
 @Injectable()
@@ -15,9 +16,12 @@ export class AiFinanceToolsService {
     private incomeService: IncomeService,
     private aiCaptionService: AiCaptionService,
     private aiMemoryService: AiMemoryService,
+    private retrievalService: RetrievalService,
   ) {}
 
-  getTools(): AiTool[] {
+  /** `ctx` = thread & window pesan yang sedang dikirim ulang ke model, dipakai
+   *  `searchPastConversations` biar nggak nyaranin balik pesan yang sudah ada di history. */
+  getTools(ctx: { threadId?: number; excludeAfterId?: number } = {}): AiTool[] {
     return [
       {
         name: 'getTodaySummary',
@@ -171,6 +175,22 @@ export class AiFinanceToolsService {
           required: ['memoryId'],
         },
         handler: async (input: { memoryId: number }) => this.aiMemoryService.update(input.memoryId, { archived: true }),
+      },
+      {
+        name: 'searchPastConversations',
+        description: 'Cari percakapan atau laporan lama yang mungkin relevan dengan pertanyaan Arzaka sekarang (mis. "dulu aku pernah nanya soal apa ya?"). Bukan buat data finansial presisi — pakai tool lain untuk itu.',
+        input_schema: {
+          type: 'object',
+          properties: {
+            query: { type: 'string', description: 'Kata kunci pencarian, contoh: "laptop" atau "nabung"' },
+          },
+          required: ['query'],
+        },
+        handler: async (input: { query: string }) =>
+          this.retrievalService.search(input.query, {
+            excludeThreadId: ctx.threadId,
+            excludeAfterId: ctx.excludeAfterId,
+          }),
       },
     ];
   }
