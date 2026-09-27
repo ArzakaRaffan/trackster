@@ -1,5 +1,18 @@
 # trackster — Gotchas
 
+- **Sesi cloud Claude Code ini punya env var asli level-container** (`NEXT_PUBLIC_API_URL`, `AI_API_KEY`,
+  `COOKIE_DOMAIN`, `GMAIL_CLIENT_*`, `TELEGRAM_BOT_TOKEN`, dll — bukan cuma placeholder) yang **menunjuk ke
+  prod** (`https://api.track.trackster.my.id`), ditambahin user lewat environment settings (bukan lewat
+  `.env` file). Bikin `apps/frontend/.env.local` buat override **TIDAK CUKUP** — Next.js (`@next/env`)
+  nggak nimpa env var yang udah ke-`export` di `process.env`, jadi `next dev` tetap pakai
+  `NEXT_PUBLIC_API_URL` prod walau `.env.local` bilang `localhost:4000`. Harus di-override eksplisit pas
+  start: `NEXT_PUBLIC_API_URL=http://localhost:4000 npm run dev`. Sama juga buat backend: `COOKIE_DOMAIN`
+  container = `.track.trackster.my.id`, bikin cookie nggak ke-set di `localhost` (browser tolak Domain
+  attribute yang nggak match host) — `unset COOKIE_DOMAIN` sebelum `node dist/main.js` buat dev lokal.
+  **Risiko nyata:** request (login, dll) dari test lokal yang lupa di-override bisa kekirim ke API PROD
+  beneran, bukan cuma dev — sempat kejadian 2026-09-27 (1 login gagal doang, tapi bisa lebih parah kalau
+  request-nya nulis data). Selalu cek `env | grep NEXT_PUBLIC` sebelum jalanin browser test di sesi ini.
+
 - **`docker compose up -d` restart nginx tiap kali backend/frontend trackster di-recreate (dependency), dan nginx nggak resolve upstream sibling site yang lagi mati → nginx ikut crash-loop, SEMUA situs di belakangnya (trackster, charon, isistasiun, dll) ikut down.** Kejadian 2026-09-26: deploy `E02-S1` sempat gagal di GH Actions (lihat gotcha "npx nest build bisa exit 0..."), di-retry manual, tapi `nginx/conf.d/ai-trackster.conf` masih pakai `proxy_pass http://ai-frontend:3100` polos (DNS upstream di-resolve SEKALI saat nginx start) — begitu container `ai-frontend` nggak ada/mati, nginx gagal start total ("host not found in upstream"), bukan cuma 502 di site itu doang. Fix: `resolver 127.0.0.11 valid=10s;` (DNS resolver Docker) + `set $up http://<host>:<port>; proxy_pass $up;` — bikin resolusi DNS lazy per-request, nginx tetap start meski upstream lagi mati (baru 502 pas ada request ke situ). Pola ini SUDAH dipakai di `isistasiun-fe-prod.conf`, belum konsisten di semua vhost lain — cek tiap nambah/ubah vhost baru. (`nginx/conf.d/ai-trackster.conf`)
 
 - **"Rapikan Kategori" (E00-S3) tidak pernah benar-benar nyimpen — semua transaksi lama tetap `LAINNYA`**

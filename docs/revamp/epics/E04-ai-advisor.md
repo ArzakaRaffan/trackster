@@ -87,7 +87,11 @@ ngerjain aslinya; status verifikasi browser/prod di bawah ini belum dikonfirmasi
 - [x] Summarization window (`ai-chat.service.ts`)
 - [x] Endpoint + Telegram thread (6 endpoint di `ai.controller.ts` sesuai spec di atas)
 - [x] Frontend thread UI (`/app/chat` +231 baris)
-- [ ] Tes: refresh halaman → chat masih ada; pertanyaan lanjutan "kalau yang tadi dibagi 2?" dijawab nyambung — **belum dikonfirmasi**
+- [x] Tes: refresh halaman → chat masih ada — **dikonfirmasi 2026-09-27**, tapi awalnya GAGAL: `activeThreadId`
+      cuma `useState`, nggak disimpan di mana pun, jadi refresh selalu balik ke welcome screen walau data
+      di DB masih ada. Di-fix (localStorage `trackster_chat_active_thread`, restore sekali pas thread list
+      kebaca). Pertanyaan lanjutan nyambung belum dites end-to-end (AI API dari sandbox sesi ini 401 —
+      lihat Decisions.md) tapi history yang dikirim ke model sudah benar (dicek lewat endpoint messages).
 
 ---
 
