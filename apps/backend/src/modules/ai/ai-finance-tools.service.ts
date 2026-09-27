@@ -2,11 +2,21 @@ import { Injectable } from '@nestjs/common';
 import { BudgetService } from '../budget/budget.service';
 import { TransactionService } from '../transaction/transaction.service';
 import { IncomeService } from '../income/income.service';
+import { GoalService } from '../goal/goal.service';
+import { IncomeForecastService } from '../income-forecast/income-forecast.service';
+import { PlanSimulatorService } from './plan-simulator.service';
 import { AiTool } from './ai.service';
 import { AiCaptionService } from './ai-caption.service';
 import { AiMemoryService } from './ai-memory.service';
 import { RetrievalService } from './retrieval.service';
 import { Source, Category, MemoryKind } from '@prisma/client';
+import { wibDateKey } from '../../common/wib';
+
+/** Kartu yang ikut disimpan di ChatMessage.attachments pesan assistant terakhir (lihat
+ * AiChatService.sendMessage) — cuma metadata rendering, bukan sumber angka baru buat model. */
+export interface ToolCard {
+  card: Record<string, unknown>;
+}
 
 @Injectable()
 export class AiFinanceToolsService {
@@ -14,6 +24,9 @@ export class AiFinanceToolsService {
     private budgetService: BudgetService,
     private transactionService: TransactionService,
     private incomeService: IncomeService,
+    private goalService: GoalService,
+    private incomeForecastService: IncomeForecastService,
+    private planSimulatorService: PlanSimulatorService,
     private aiCaptionService: AiCaptionService,
     private aiMemoryService: AiMemoryService,
     private retrievalService: RetrievalService,
@@ -145,6 +158,210 @@ export class AiFinanceToolsService {
             .catch(() => {});
           return created;
         },
+      },
+      {
+        name: 'searchTransactions',
+        description: 'Cari transaksi berdasarkan kata kunci deskripsi/catatan, kategori, rentang tanggal, dan/atau nominal minimum. Pakai ini kalau user nanya soal transaksi spesifik (mis. "kapan terakhir aku beli di Indomaret?").',
+        input_schema: {
+          type: 'object',
+          properties: {
+            text: { type: 'string', description: 'Kata kunci pencarian di deskripsi/catatan/alias merchant' },
+            category: {
+              type: 'string',
+              enum: ['MAKANAN', 'TRANSPORT', 'BELANJA', 'TAGIHAN', 'HIBURAN', 'KESEHATAN', 'LAINNYA', 'TRANSFER', 'TOPUP', 'PENDIDIKAN', 'PERAWATAN', 'INVESTASI', 'ROKOK'],
+            },
+            from: { type: 'string', description: 'Tanggal mulai, format YYYY-MM-DD' },
+            to: { type: 'string', description: 'Tanggal akhir (inklusif), format YYYY-MM-DD' },
+            minAmount: { type: 'number', description: 'Nominal minimum dalam Rupiah' },
+            limit: { type: 'number', description: 'Maks hasil, default 20, maks 50' },
+          },
+          required: [],
+        },
+        handler: async (input: { text?: string; category?: string; from?: string; to?: string; minAmount?: number; limit?: number }) =>
+          this.transactionService.findAll({
+            search: input.text,
+            category: input.category as Category | undefined,
+            startDate: input.from,
+            endDate: input.to,
+            minAmount: input.minAmount,
+            limit: Math.min(50, input.limit ?? 20),
+          }),
+      },
+      {
+        name: 'getPeriodStats',
+        description: 'Statistik pengeluaran satu periode: "week" (minggu berjalan per hari), "month" (butuh date "YYYY-MM", default bulan berjalan), atau "range" (butuh from & to "YYYY-MM-DD").',
+        input_schema: {
+          type: 'object',
+          properties: {
+            period: { type: 'string', enum: ['week', 'month', 'range'] },
+            date: { type: 'string', description: 'Untuk period="month": "YYYY-MM"' },
+            from: { type: 'string', description: 'Untuk period="range": tanggal mulai "YYYY-MM-DD"' },
+            to: { type: 'string', description: 'Untuk period="range": tanggal akhir "YYYY-MM-DD"' },
+          },
+          required: ['period'],
+        },
+        handler: async (input: { period: 'week' | 'month' | 'range'; date?: string; from?: string; to?: string }) => {
+          if (input.period === 'week') return this.transactionService.getWeekly();
+          if (input.period === 'range') {
+            if (!input.from || !input.to) return { error: 'period="range" butuh from & to' };
+            return this.transactionService.getRangeSummary(input.from, input.to);
+          }
+          const now = new Date();
+          const [y, m] = (input.date ?? wibDateKey(now).slice(0, 7)).split('-').map(Number);
+          return this.transactionService.getMonthly(y, m);
+        },
+      },
+      {
+        name: 'getIncomeForecast',
+        description: 'Forecast pemasukan mingguan (konservatif/ekspektasi/maks) untuk beberapa minggu ke depan, per stream pemasukan.',
+        input_schema: {
+          type: 'object',
+          properties: {
+            weeks: { type: 'number', description: 'Jumlah minggu ke depan, default 4, maks 26' },
+          },
+          required: [],
+        },
+        handler: async (input: { weeks?: number }) => this.incomeForecastService.getHorizon(Math.min(26, input.weeks ?? 4)),
+      },
+      {
+        name: 'getGoals',
+        description: 'Ambil daftar goal tabungan aktif beserta progres saat ini dan kontribusi mingguan yang dibutuhkan untuk mengejar deadline (kalau ada deadline).',
+        input_schema: { type: 'object', properties: {}, required: [] },
+        handler: async () => {
+          const goals = await this.goalService.findAll();
+          const today = new Date();
+          return goals.map((g) => {
+            const remaining = Math.max(0, Number(g.targetAmount) - g.currentAmount);
+            let weeklyContributionNeeded: number | null = null;
+            if (g.targetDate) {
+              const weeksLeft = Math.max(1, Math.ceil((g.targetDate.getTime() - today.getTime()) / (7 * 86_400_000)));
+              weeklyContributionNeeded = Math.round(remaining / weeksLeft);
+            }
+            return { ...g, remaining, weeklyContributionNeeded };
+          });
+        },
+      },
+      {
+        name: 'simulatePlan',
+        description: 'Simulasikan rencana keuangan ke depan (pemasukan skenario, perubahan pengeluaran per kategori, pembelian sekali-jalan, target nabung mingguan) dan lihat proyeksi saldo/goal minggu demi minggu. Hasilnya ditampilkan sebagai kartu grafik ke user — jelaskan angka pentingnya di jawabanmu, jangan cuma bilang "sudah kubuatkan".',
+        input_schema: {
+          type: 'object',
+          properties: {
+            weeks: { type: 'number', description: 'Horizon simulasi dalam minggu, maks 104' },
+            incomeScenario: { type: 'string', enum: ['conservative', 'expected', 'max'] },
+            extraIncomePerWeek: { type: 'number' },
+            spendChanges: {
+              type: 'array',
+              items: {
+                type: 'object',
+                properties: {
+                  category: { type: 'string', description: 'Kategori spesifik, kosongkan untuk total' },
+                  pct: { type: 'number', description: 'mis. -20 = kurangi 20%' },
+                  weeklyAmount: { type: 'number', description: 'Delta nominal tetap per minggu' },
+                },
+              },
+            },
+            oneOffs: {
+              type: 'array',
+              items: {
+                type: 'object',
+                properties: {
+                  week: { type: 'number' },
+                  amount: { type: 'number' },
+                  label: { type: 'string' },
+                },
+                required: ['week', 'amount', 'label'],
+              },
+            },
+            savePerWeek: { type: 'number', description: 'Target nabung tetap per minggu' },
+            goal: {
+              type: 'object',
+              properties: { target: { type: 'number' }, current: { type: 'number' } },
+            },
+          },
+          required: ['weeks', 'incomeScenario'],
+        },
+        handler: async (input: any) => {
+          const result = await this.planSimulatorService.simulatePlan(input);
+          return {
+            ...result,
+            card: { type: 'simulation', title: `Simulasi ${input.weeks} minggu`, ...result },
+          };
+        },
+      },
+      {
+        name: 'whatIfPurchase',
+        description: 'Bandingkan dampak SATU pembelian (tunai atau cicilan) terhadap goal tabungan — dipakai untuk pertanyaan "kalau aku beli X, goal aku mundur berapa lama?".',
+        input_schema: {
+          type: 'object',
+          properties: {
+            amount: { type: 'number' },
+            label: { type: 'string' },
+            method: { type: 'string', enum: ['cash', 'installment'] },
+            months: { type: 'number', description: 'Untuk method=installment' },
+            monthlyRate: { type: 'number', description: 'Bunga per bulan dalam persen, default 0' },
+            weeks: { type: 'number', description: 'Horizon simulasi, default 26' },
+            incomeScenario: { type: 'string', enum: ['conservative', 'expected', 'max'] },
+            savePerWeek: { type: 'number' },
+            goal: {
+              type: 'object',
+              properties: { target: { type: 'number' }, current: { type: 'number' } },
+            },
+          },
+          required: ['amount', 'label', 'method'],
+        },
+        handler: async (input: any) => {
+          const result = await this.planSimulatorService.whatIfPurchase(input);
+          return {
+            ...result,
+            card: {
+              type: 'simulation',
+              title: `Simulasi: ${input.label}`,
+              series: result.with.series,
+              compareSeries: result.without.series,
+              summary: result.with.summary,
+              assumptions: result.with.assumptions,
+              extra: { weeksDelay: result.weeksDelay, totalCost: result.totalCost },
+            },
+          };
+        },
+      },
+      {
+        name: 'proposeGoal',
+        description: 'Usulkan goal tabungan baru ke user — TIDAK langsung membuat goal, cuma menampilkan kartu dengan tombol "Buat goal" yang harus dikonfirmasi user sendiri.',
+        input_schema: {
+          type: 'object',
+          properties: {
+            name: { type: 'string' },
+            target: { type: 'number' },
+            deadline: { type: 'string', description: 'Format YYYY-MM-DD, opsional' },
+            weeklyContribution: { type: 'number', description: 'Saran nabung per minggu, opsional' },
+          },
+          required: ['name', 'target'],
+        },
+        handler: async (input: { name: string; target: number; deadline?: string; weeklyContribution?: number }): Promise<ToolCard> => ({
+          card: { type: 'goal-proposal', ...input },
+        }),
+      },
+      {
+        name: 'logIncome',
+        description: 'Catat pemasukan manual yang disebutkan user di chat (mis. "barusan dapat honor 200rb"). Untuk pemasukan rutin terjadwal (les/magang/mingguan), arahkan user ke halaman check-in mingguan, bukan tool ini.',
+        input_schema: {
+          type: 'object',
+          properties: {
+            amount: { type: 'number' },
+            description: { type: 'string' },
+            source: { type: 'string', enum: ['BCA', 'JAGO'] },
+          },
+          required: ['amount', 'description', 'source'],
+        },
+        handler: async (input: { amount: number; description: string; source: string }) =>
+          this.incomeService.create({
+            amount: input.amount,
+            description: input.description,
+            source: input.source as Source,
+            receivedAt: new Date().toISOString(),
+          }),
       },
       {
         name: 'remember',

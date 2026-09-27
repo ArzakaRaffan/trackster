@@ -59,6 +59,30 @@ export function extractFinalReply(messages: AiMessage[]): string | undefined {
   return undefined;
 }
 
+function findLastAssistantWithContentIndex(messages: AiMessage[]): number {
+  for (let i = messages.length - 1; i >= 0; i--) {
+    if (messages[i].role === 'assistant' && messages[i].content) return i;
+  }
+  return -1;
+}
+
+/** Tool (E04-S4) yang hasilnya punya `card` (simulasi, usulan goal, dst) — dikumpulkan dari
+ * semua tool call satu giliran, ditempel ke pesan assistant final biar frontend bisa render.
+ * Tool result = untrusted-ish (JSON dari handler kita sendiri, tapi tetap parse defensif). */
+function extractCards(messages: AiMessage[]): Record<string, unknown>[] {
+  const cards: Record<string, unknown>[] = [];
+  for (const m of messages) {
+    if (m.role !== 'tool' || !m.content) continue;
+    try {
+      const parsed = JSON.parse(m.content);
+      if (parsed && typeof parsed === 'object' && parsed.card) cards.push(parsed.card);
+    } catch {
+      // tool content bukan JSON valid — skip diam-diam, tidak fatal buat balasan.
+    }
+  }
+  return cards;
+}
+
 @Injectable()
 export class AiChatService {
   private readonly logger = new Logger(AiChatService.name);
@@ -186,7 +210,11 @@ export class AiChatService {
         maxTokens: 1024,
       });
 
-      for (const m of newMessages) {
+      const cards = extractCards(newMessages);
+      const lastAssistantIdx = findLastAssistantWithContentIndex(newMessages);
+
+      for (let i = 0; i < newMessages.length; i++) {
+        const m = newMessages[i];
         await this.prisma.chatMessage.create({
           data: {
             threadId,
@@ -195,6 +223,10 @@ export class AiChatService {
             toolCalls: m.tool_calls ? (m.tool_calls as any) : undefined,
             toolCallId: m.tool_call_id,
             toolName: m.name,
+            // Kartu (grafik simulasi, usulan goal, dst) dari tool di giliran ini ikut ditempel
+            // ke pesan assistant FINAL — bukan tiap stub tool_calls — biar frontend cuma perlu
+            // render attachments dari satu pesan per giliran (E04-S4).
+            attachments: i === lastAssistantIdx && cards.length > 0 ? (cards as any) : undefined,
           },
         });
       }

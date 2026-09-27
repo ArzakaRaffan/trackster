@@ -8,6 +8,10 @@ import { Brain, ChevronLeft, History, Plus, Send, Trash2, Wallet, Coffee, Trendi
 import { AnimatePresence, motion } from 'motion/react';
 import { TRANSITION_BASE, TRANSITION_SLOW } from '@/lib/motion';
 import { TracksterMascot } from '@/components/TracksterMascot';
+import { SimulationCard, SimulationCardData } from '@/components/chat/SimulationCard';
+import { GoalProposalCard, GoalProposalCardData } from '@/components/chat/GoalProposalCard';
+
+type ChatCard = SimulationCardData | GoalProposalCardData;
 
 interface Thread {
   id: number;
@@ -21,6 +25,7 @@ interface ThreadMessage {
   id: number;
   role: 'user' | 'assistant';
   content: string;
+  attachments: ChatCard[] | null;
   createdAt: string;
 }
 
@@ -28,6 +33,7 @@ interface DisplayMessage {
   id: string;
   role: 'user' | 'assistant';
   content: string;
+  attachments?: ChatCard[] | null;
 }
 
 const QUICK_PROMPTS = [
@@ -116,7 +122,7 @@ export default function ChatPage() {
   const messages: DisplayMessage[] =
     activeThreadId === null
       ? [WELCOME]
-      : (threadMessages ?? []).map((m) => ({ id: `m-${m.id}`, role: m.role, content: m.content }));
+      : (threadMessages ?? []).map((m) => ({ id: `m-${m.id}`, role: m.role, content: m.content, attachments: m.attachments }));
 
   const displayMessages = pendingUser
     ? [...messages, { id: 'pending-user', role: 'user' as const, content: pendingUser }]
@@ -253,14 +259,24 @@ export default function ChatPage() {
                   A
                 </span>
               )}
-              <div
-                className={`max-w-[82%] rounded-panel px-4 py-3 text-body leading-relaxed whitespace-pre-wrap ${
-                  m.role === 'user'
-                    ? 'rounded-br-subtle bg-brand text-base font-medium'
-                    : 'rounded-bl-subtle bg-surface text-ink shadow-hairline'
-                }`}
-              >
-                {m.role === 'assistant' ? renderMessageBody(m.content) : m.content}
+              <div className="max-w-[82%]">
+                <div
+                  className={`rounded-panel px-4 py-3 text-body leading-relaxed whitespace-pre-wrap ${
+                    m.role === 'user'
+                      ? 'rounded-br-subtle bg-brand text-base font-medium'
+                      : 'rounded-bl-subtle bg-surface text-ink shadow-hairline'
+                  }`}
+                >
+                  {m.role === 'assistant' ? renderMessageBody(m.content) : m.content}
+                </div>
+                {m.role === 'assistant' &&
+                  m.attachments?.map((card, i) =>
+                    card.type === 'simulation' ? (
+                      <SimulationCard key={i} card={card} />
+                    ) : card.type === 'goal-proposal' ? (
+                      <GoalProposalCard key={i} card={card} />
+                    ) : null,
+                  )}
               </div>
             </motion.div>
           ))}
