@@ -7,7 +7,7 @@ import { DAY_NAMES } from '@/lib/format';
 import { Input } from '@/components/ui/Input';
 import { Button } from '@/components/ui/Button';
 import { AnimatedAmount } from '@/components/ui/AnimatedAmount';
-import { Check, Sparkles } from 'lucide-react';
+import { Check, Sparkles, PiggyBank } from 'lucide-react';
 import { formatRupiah } from '@/lib/format';
 
 
@@ -17,6 +17,15 @@ interface AllowanceSuggestion {
   averageDailyIncome: number;
   suggestedDailyAllowance: number;
   savingsFactor: number;
+}
+
+interface AllocationPreview {
+  weekStart: string;
+  totalIncome: number;
+  leftover: number;
+  isOverspent: boolean;
+  savingsRecommendation: number;
+  allocation: { needs: number; wants: number; savings: number };
 }
 
 interface DailyBudget {
@@ -29,6 +38,7 @@ const fetcher = (path: string) => api.get<DailyBudget[]>(path);
 export default function BudgetPage() {
   const { data, mutate } = useSWR('/budget', fetcher);
   const { data: suggestion } = useSWR<AllowanceSuggestion>('/income/allowance-suggestion', (url: string) => api.get<AllowanceSuggestion>(url));
+  const { data: allocation } = useSWR<AllocationPreview>('/budget-allocation/preview', (url: string) => api.get<AllocationPreview>(url));
   const [values, setValues] = useState<Record<number, string>>({});
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
@@ -93,6 +103,42 @@ export default function BudgetPage() {
                 Berdasarkan rata-rata pemasukan Rp {Math.round(suggestion.averageDailyIncome).toLocaleString('id-ID')}/hari dalam {suggestion.windowDays} hari terakhir (disisihkan 30% untuk tabungan).
               </p>
             </div>
+          </div>
+        )}
+
+        {allocation && allocation.totalIncome > 0 && (
+          <div className="flex flex-col gap-3 rounded-comfortable bg-surface p-4">
+            <div className="flex items-center gap-2">
+              <PiggyBank size={18} className="shrink-0 text-brand" />
+              <p className="text-label font-bold text-ink">Alokasi 50/30/20 minggu ini</p>
+            </div>
+            <p className="text-small text-ink-muted">
+              Pemasukan minggu ini: {formatRupiah(allocation.totalIncome)}
+            </p>
+            <div className="grid grid-cols-3 gap-2 text-center">
+              <div>
+                <p className="text-small text-ink-muted">Kebutuhan</p>
+                <p className="text-label font-bold tabular-nums text-ink">{formatRupiah(allocation.allocation.needs)}</p>
+              </div>
+              <div>
+                <p className="text-small text-ink-muted">Keinginan</p>
+                <p className="text-label font-bold tabular-nums text-ink">{formatRupiah(allocation.allocation.wants)}</p>
+              </div>
+              <div>
+                <p className="text-small text-ink-muted">Tabungan</p>
+                <p className="text-label font-bold tabular-nums text-ink">{formatRupiah(allocation.allocation.savings)}</p>
+              </div>
+            </div>
+            {allocation.isOverspent ? (
+              <p className="text-small text-status-over">
+                ⚠️ Pengeluaran minggu ini sudah lebih besar dari budget yang berlaku — nggak ada sisa buat nabung minggu ini.
+              </p>
+            ) : (
+              <p className="text-small text-ink-muted leading-relaxed">
+                Rekomendasi pindah ke Jago minggu depan: <span className="font-bold text-ink">{formatRupiah(allocation.savingsRecommendation)}</span>
+                {allocation.leftover > 0 && ` (termasuk sisa budget minggu ini yang nggak kepake: ${formatRupiah(allocation.leftover)})`}
+              </p>
+            )}
           </div>
         )}
 
