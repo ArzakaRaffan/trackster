@@ -26,23 +26,17 @@ export class AiService {
   private readonly logger = new Logger(AiService.name);
   private readonly baseUrl: string;
   private readonly apiKey: string;
-  private readonly authHeader: string;
   private readonly model: string;
   private readonly fastModel: string;
 
   constructor() {
-    this.baseUrl =
-      process.env.AI_BASE_URL ??
-      process.env.SPLITBILL_AI_BASE_URL ??
-      'https://api.ghrocx.my.id';
-    this.apiKey =
-      process.env.AI_API_KEY ?? process.env.SPLITBILL_AI_API_KEY ?? '';
-    this.authHeader =
-      process.env.AI_AUTH_HEADER ?? 'x-bf-vk';
-    this.model =
-      process.env.AI_MODEL ?? process.env.SPLITBILL_AI_MODEL ?? 'ghrocx/sonnet-5';
+    // 9router (self-hosted, OpenAI-compatible) — dari container, host-nya diakses via
+    // host.docker.internal (lihat extra_hosts di docker-compose.prod.yml).
+    this.baseUrl = process.env.AI_BASE_URL ?? 'http://host.docker.internal:20128';
+    this.apiKey = process.env.AI_API_KEY ?? '';
+    this.model = process.env.AI_MODEL ?? 'cc/claude-sonnet-5';
     // Model murah/cepat buat tugas pendek (kategorisasi, ekstraksi) — lihat 02-conventions.md §3.
-    this.fastModel = process.env.AI_MODEL_FAST ?? 'ghrocx/haiku-4.5';
+    this.fastModel = process.env.AI_MODEL_FAST ?? 'cc/claude-haiku-4-5-20251001';
 
     if (!this.apiKey) {
       this.logger.warn('AI_API_KEY belum di-set — fitur AI tidak akan berjalan.');
@@ -71,6 +65,9 @@ export class AiService {
 
     const body: Record<string, any> = {
       model,
+      // 9router defaults ke SSE streaming kalau field ini nggak eksplisit di-set false, walau
+      // request-nya bukan buat streaming — respons jadi "data: {...}\n\n" chunks, bukan JSON tunggal.
+      stream: false,
       max_tokens: params.maxTokens ?? 2048,
       messages: allMessages,
     };
@@ -91,7 +88,7 @@ export class AiService {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        [this.authHeader]: this.apiKey,
+        Authorization: `Bearer ${this.apiKey}`,
       },
       body: JSON.stringify(body),
     });

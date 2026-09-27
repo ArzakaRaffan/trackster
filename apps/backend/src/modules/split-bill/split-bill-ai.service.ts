@@ -26,9 +26,11 @@ export class SplitBillAiService {
   }
 
   async scanReceipt(imageBase64: string): Promise<ScannedItem[]> {
-    const baseUrl = process.env.SPLITBILL_AI_BASE_URL || 'https://api.mwapi.dev';
+    // 9router (self-hosted, OpenAI-compatible) — dari container, host-nya diakses via
+    // host.docker.internal (lihat extra_hosts di docker-compose.prod.yml).
+    const baseUrl = process.env.SPLITBILL_AI_BASE_URL || 'http://host.docker.internal:20128';
     const apiKey = process.env.SPLITBILL_AI_API_KEY;
-    const model = process.env.SPLITBILL_AI_MODEL || 'claude-sonnet-5';
+    const model = process.env.SPLITBILL_AI_MODEL || 'cc/claude-sonnet-5';
 
     if (!apiKey) {
       throw new InternalServerErrorException('SPLITBILL_AI_API_KEY belum di-set di environment');
@@ -36,22 +38,22 @@ export class SplitBillAiService {
 
     const { mediaType, data } = this.parseImageInput(imageBase64);
 
-    const res = await fetch(`${baseUrl}/v1/messages`, {
+    const res = await fetch(`${baseUrl}/v1/chat/completions`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'x-api-key': apiKey,
-        'anthropic-version': '2023-06-01',
+        Authorization: `Bearer ${apiKey}`,
       },
       body: JSON.stringify({
         model,
+        stream: false, // 9router default streaming kalau nggak eksplisit false — lihat ai.service.ts
         max_tokens: 2048,
-        system: SCAN_SYSTEM_PROMPT,
         messages: [
+          { role: 'system', content: SCAN_SYSTEM_PROMPT },
           {
             role: 'user',
             content: [
-              { type: 'image', source: { type: 'base64', media_type: mediaType, data } },
+              { type: 'image_url', image_url: { url: `data:${mediaType};base64,${data}` } },
               { type: 'text', text: 'Ekstrak item dari struk ini.' },
             ],
           },
@@ -66,12 +68,12 @@ export class SplitBillAiService {
     }
 
     const responseData = await res.json();
-    const textBlock = responseData.content?.find((c: any) => c.type === 'text');
-    if (!textBlock?.text) {
+    const text: string | undefined = responseData.choices?.[0]?.message?.content;
+    if (!text) {
       throw new InternalServerErrorException('Response scan struk tidak berisi teks yang valid');
     }
 
-    const raw = textBlock.text.trim().replace(/^```(json)?/i, '').replace(/```$/, '').trim();
+    const raw = text.trim().replace(/^```(json)?/i, '').replace(/```$/, '').trim();
 
     let parsed: unknown;
     try {
