@@ -63,8 +63,11 @@ function fmtThreadDate(iso: string) {
   return new Date(iso).toLocaleDateString('id-ID', { day: 'numeric', month: 'short' });
 }
 
+const ACTIVE_THREAD_STORAGE_KEY = 'trackster_chat_active_thread';
+
 export default function ChatPage() {
-  const [activeThreadId, setActiveThreadId] = useState<number | null>(null);
+  const [activeThreadId, setActiveThreadIdState] = useState<number | null>(null);
+  const [hydratedThread, setHydratedThread] = useState(false);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [input, setInput] = useState('');
   const [sending, setSending] = useState(false);
@@ -82,6 +85,33 @@ export default function ChatPage() {
   );
 
   const visibleThreads = (threads ?? []).filter((t) => !t.archivedAt);
+
+  /** Thread aktif nggak disimpan cuma di React state - refresh halaman bikin state itu hilang
+   * meskipun data di DB masih ada (persis kasus yang mau dicegah E04-S1). localStorage nyimpen
+   * thread id terakhir, di-restore sekali begitu daftar thread pertama kali kebaca. */
+  const setActiveThreadId = (id: number | null) => {
+    setActiveThreadIdState(id);
+    try {
+      if (id === null) localStorage.removeItem(ACTIVE_THREAD_STORAGE_KEY);
+      else localStorage.setItem(ACTIVE_THREAD_STORAGE_KEY, String(id));
+    } catch {
+      // localStorage bisa gagal (private mode dll) - nggak fatal, cuma nggak ke-restore pas refresh.
+    }
+  };
+
+  useEffect(() => {
+    if (hydratedThread || !threads) return;
+    setHydratedThread(true);
+    try {
+      const stored = localStorage.getItem(ACTIVE_THREAD_STORAGE_KEY);
+      const storedId = stored ? Number(stored) : null;
+      if (storedId && threads.some((t) => t.id === storedId && !t.archivedAt)) {
+        setActiveThreadIdState(storedId);
+      }
+    } catch {
+      // ignore
+    }
+  }, [threads, hydratedThread]);
 
   const messages: DisplayMessage[] =
     activeThreadId === null
