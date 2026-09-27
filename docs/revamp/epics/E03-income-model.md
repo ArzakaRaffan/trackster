@@ -152,10 +152,10 @@ Per stream per minggu, tiga angka:
   tidak dobel.
 - Reminder ulang Senin 12:00 kalau belum diisi (sekali saja).
 
-- [ ] Endpoint `GET /income/checkin?week=` (draft terisi: forecast + yang sudah tercatat) & `POST /income/checkin`
-- [ ] Halaman check-in (mobile-first)
-- [ ] Cron + pesan Telegram + callback_query handler
-- [ ] Tes alur penuh di dev (Telegram dev: pakai bot/chat test, bukan chat asli Arzaka — atau aktifkan sementara dengan izin)
+- [x] Endpoint `GET /income/checkin?week=` (draft terisi: forecast + yang sudah tercatat) & `POST /income/checkin` (modul baru `income-checkin/`, reuse `IncomeForecastService`)
+- [x] Halaman check-in (mobile-first) — `/app/income/checkin`, stepper per kind (FIXED: tombol konfirmasi; SESSION: stepper sesi + sesi offline; DEDUCTION: stepper hari absen; VARIABLE: input nominal manual), preview nominal live, link masuk dari hero `/app/income`
+- [x] Cron + pesan Telegram + callback_query handler — `income-checkin-cron.service.ts`: Minggu 19:00 WIB (`income-checkin-prompt`) + reminder Senin 12:00 (`income-checkin-reminder`), keduanya no-op kalau semua stream sudah tercatat. Inline keyboard cuma FIXED (tombol konfirmasi) & DEDUCTION (tombol 0/1/2/3+ absen); SESSION/VARIABLE dapat link web. `TelegramWebhookController` di-extend handle `callback_query` (`ci:<action>:<streamId>:<week>[:<value>]`)
+- [x] Tes alur penuh di dev — DB dev lokal (Postgres 16 native, bukan Docker/salinan prod — sesi cloud ini nggak punya akses SSH VPS/Docker daemon, sama seperti catatan E03-S2). Web: submit 4 stream sekaligus (SESSION+DEDUCTION+FIXED+VARIABLE) via Playwright headless, reload → status "sudah tercatat" konsisten, 0 console error, 0 HTTP >=400. Telegram: `TelegramConfig` dummy (bot token palsu) + POST langsung ke `/telegram/webhook/:secret` mensimulasikan `callback_query` (`confirm` & `absent`) — income kesimpen benar, `answerCallbackQuery` gagal ke-log (bot token palsu) tapi tidak throw, callback berulang tidak dobel (idempotent). **Bug ditemukan & diperbaiki di sesi ini:** `Income.periodStart` (`@db.Date`) mundur 1 hari kalau ditulis pakai `startOfWibWeek()`/`startOfWibMonth()` apa adanya — lihat `wibDateOnly()` baru di `wib.ts` + `docs/context/Gotchas.md` + `docs/context/Decisions.md`.
 
 **Acceptance:** Arzaka bisa mencatat pemasukan satu minggu penuh dalam < 30 detik dari Telegram/HP;
 forecast minggu depan berubah sesuai data aktual.
