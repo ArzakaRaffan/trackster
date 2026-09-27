@@ -20,6 +20,7 @@ import { SubscriptionModule } from '../subscription/subscription.module';
 import { GoalModule } from '../goal/goal.module';
 import { BalanceModule } from '../balance/balance.module';
 import { IncomeForecastModule } from '../income-forecast/income-forecast.module';
+import { AnalyticsModule } from '../analytics/analytics.module';
 import { PrismaService } from '../../prisma.service';
 
 @Module({
@@ -31,6 +32,7 @@ import { PrismaService } from '../../prisma.service';
     GoalModule,
     BalanceModule,
     IncomeForecastModule,
+    AnalyticsModule,
     forwardRef(() => SubscriptionModule),
     forwardRef(() => TelegramModule),
   ],

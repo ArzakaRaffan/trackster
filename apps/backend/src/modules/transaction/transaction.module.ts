@@ -5,9 +5,10 @@ import { PrismaService } from '../../prisma.service';
 import { AuthModule } from '../auth/auth.module';
 import { BalanceModule } from '../balance/balance.module';
 import { MerchantAliasModule } from '../merchant-alias/merchant-alias.module';
+import { AnalyticsModule } from '../analytics/analytics.module';
 
 @Module({
-  imports: [AuthModule, BalanceModule, MerchantAliasModule],
+  imports: [AuthModule, BalanceModule, MerchantAliasModule, AnalyticsModule],
   controllers: [TransactionController],
   providers: [TransactionService, PrismaService],
   exports: [TransactionService],
