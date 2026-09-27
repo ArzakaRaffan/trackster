@@ -46,43 +46,74 @@ export class BudgetAllocationService {
   @Cron('0 21 * * 0', { name: 'weekly-budget-allocation', timeZone: 'Asia/Jakarta' })
   async runWeeklyAllocation() {
     try {
-      const now = new Date();
-      const weekStart = startOfWibWeek(now);
-
-      const incomes = await this.prisma.income.findMany({
-        where: { periodStart: weekStart, stream: { kind: { not: 'IRREGULAR' } } },
-        select: { amount: true },
-      });
-      const totalIncome = incomes.reduce((sum, i) => sum + Number(i.amount), 0);
-
-      const prevBudgets = await this.prisma.dailyBudget.findMany();
-      const prevWeekPool = prevBudgets.reduce((sum, b) => sum + Number(b.amount), 0);
-
-      const { start: weekEndStart, end: weekEndEnd } = wibRange('week', now);
-      const spentAgg = await this.prisma.transaction.aggregate({
-        _sum: { amount: true },
-        where: { occurredAt: { gte: weekEndStart, lt: weekEndEnd } },
-      });
-      const actualSpent = Number(spentAgg._sum.amount ?? 0);
-      const isOverspent = actualSpent > prevWeekPool;
-      const leftover = Math.max(0, prevWeekPool - actualSpent);
-
-      const alloc = calcWeeklyAllocation(totalIncome);
+      const preview = await this.computePreview();
 
       await this.budgetService.updateAll({
-        budgets: alloc.dailyAmounts.map((amount, dayOfWeek) => ({ dayOfWeek, amount })),
+        budgets: preview.alloc.dailyAmounts.map((amount, dayOfWeek) => ({ dayOfWeek, amount })),
       });
 
-      const savingsRecommendation = alloc.savings + leftover;
-      const text = this.buildMessage(weekStart, totalIncome, alloc, leftover, savingsRecommendation, isOverspent);
+      const text = this.buildMessage(
+        preview.weekStart,
+        preview.totalIncome,
+        preview.alloc,
+        preview.leftover,
+        preview.savingsRecommendation,
+        preview.isOverspent,
+      );
       await this.telegramService.sendMessage(text);
 
       this.logger.log(
-        `Alokasi minggu ${wibDateKey(weekStart)} selesai: income=${totalIncome}, savings rec=${savingsRecommendation}`,
+        `Alokasi minggu ${wibDateKey(preview.weekStart)} selesai: income=${preview.totalIncome}, savings rec=${preview.savingsRecommendation}`,
       );
     } catch (err: any) {
       this.logger.error(`runWeeklyAllocation error: ${err?.message}`);
     }
+  }
+
+  /** Sama persis kalkulasinya dengan `runWeeklyAllocation`, tapi read-only — dipakai buat kartu
+   * "Alokasi 50/30/20" di halaman Budget, biar rekomendasi nabung nggak cuma lewat Telegram. */
+  async getWeeklyAllocationPreview() {
+    const preview = await this.computePreview();
+    return {
+      weekStart: wibDateKey(preview.weekStart),
+      totalIncome: Math.round(preview.totalIncome),
+      leftover: Math.round(preview.leftover),
+      isOverspent: preview.isOverspent,
+      savingsRecommendation: Math.round(preview.savingsRecommendation),
+      allocation: {
+        needs: preview.alloc.needs,
+        wants: preview.alloc.wants,
+        savings: preview.alloc.savings,
+      },
+    };
+  }
+
+  private async computePreview() {
+    const now = new Date();
+    const weekStart = startOfWibWeek(now);
+
+    const incomes = await this.prisma.income.findMany({
+      where: { periodStart: weekStart, stream: { kind: { not: 'IRREGULAR' } } },
+      select: { amount: true },
+    });
+    const totalIncome = incomes.reduce((sum, i) => sum + Number(i.amount), 0);
+
+    const prevBudgets = await this.prisma.dailyBudget.findMany();
+    const prevWeekPool = prevBudgets.reduce((sum, b) => sum + Number(b.amount), 0);
+
+    const { start: weekEndStart, end: weekEndEnd } = wibRange('week', now);
+    const spentAgg = await this.prisma.transaction.aggregate({
+      _sum: { amount: true },
+      where: { occurredAt: { gte: weekEndStart, lt: weekEndEnd } },
+    });
+    const actualSpent = Number(spentAgg._sum.amount ?? 0);
+    const isOverspent = actualSpent > prevWeekPool;
+    const leftover = Math.max(0, prevWeekPool - actualSpent);
+
+    const alloc = calcWeeklyAllocation(totalIncome);
+    const savingsRecommendation = alloc.savings + leftover;
+
+    return { weekStart, totalIncome, alloc, leftover, isOverspent, savingsRecommendation };
   }
 
   private buildMessage(
