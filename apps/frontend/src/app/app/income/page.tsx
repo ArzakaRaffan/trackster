@@ -13,7 +13,7 @@ import { SourceTag } from '@/components/ui/SourceTag';
 import { AnimatedAmount } from '@/components/ui/AnimatedAmount';
 import { StatTile } from '@/components/ui/StatTile';
 import { TRANSITION_BASE, TRANSITION_SLOW } from '@/lib/motion';
-import { ChevronLeft, Inbox, Pencil, Plus, Sparkles, Trash2, X } from 'lucide-react';
+import { CalendarCheck, ChevronLeft, Inbox, Pencil, Plus, Sparkles, Trash2, X } from 'lucide-react';
 
 type IncomeKind = 'FIXED' | 'SESSION' | 'DEDUCTION' | 'VARIABLE' | 'IRREGULAR';
 type IncomeCadence = 'WEEKLY' | 'MONTHLY' | 'NONE';
@@ -422,6 +422,14 @@ export default function IncomePage() {
                   </div>
                 ))}
             </div>
+            {week.streams.some((s) => s.kind !== 'IRREGULAR' && s.status === 'PENDING' && s.expected > 0) && (
+              <Link
+                href="/app/income/checkin"
+                className="flex items-center justify-center gap-2 rounded-comfortable bg-surface-interactive px-4 py-3 text-small font-bold text-ink hover:bg-surface-alt"
+              >
+                <CalendarCheck size={16} /> Check-in pemasukan minggu ini
+              </Link>
+            )}
           </section>
         )}
 

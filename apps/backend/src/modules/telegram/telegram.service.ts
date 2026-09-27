@@ -104,6 +104,40 @@ export class TelegramService {
     return !!config?.notifyEveryTransaction;
   }
 
+  /** Kirim pesan dengan inline keyboard (tombol callback_query) — dipakai check-in pemasukan (E03-S3). */
+  async sendMessageWithKeyboard(text: string, inlineKeyboard: TelegramBot.InlineKeyboardButton[][]): Promise<boolean> {
+    const config = await this.prisma.telegramConfig.findFirst({ where: { isActive: true } });
+    if (!config) {
+      this.logger.warn('Telegram belum dikonfigurasi, skip kirim pesan.');
+      return false;
+    }
+
+    try {
+      const bot = new TelegramBot(config.botToken, { polling: false });
+      await bot.sendMessage(config.chatId, text, {
+        parse_mode: 'HTML',
+        reply_markup: { inline_keyboard: inlineKeyboard },
+      });
+      return true;
+    } catch (err) {
+      this.logger.error(`Gagal kirim pesan Telegram (keyboard): ${err.message}`);
+      return false;
+    }
+  }
+
+  /** Balas callback_query supaya tombol berhenti "loading" di UI Telegram. Gagal di-swallow —
+   *  bukan hal fatal kalau chat_id/token bermasalah, cukup di-log. */
+  async answerCallbackQuery(callbackQueryId: string, text?: string): Promise<void> {
+    const config = await this.prisma.telegramConfig.findFirst({ where: { isActive: true } });
+    if (!config) return;
+    try {
+      const bot = new TelegramBot(config.botToken, { polling: false });
+      await bot.answerCallbackQuery(callbackQueryId, text ? { text } : undefined);
+    } catch (err) {
+      this.logger.error(`Gagal answerCallbackQuery: ${err.message}`);
+    }
+  }
+
   /** Notifikasi per transaksi baru masuk — terpisah dari alert over-budget, dua-duanya bisa jalan bareng. */
   async sendTransactionNotif(transaction: {
     source: string;
