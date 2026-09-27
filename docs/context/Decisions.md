@@ -4,6 +4,61 @@
 
 ---
 
+## 2026-09-27 — E04-S5: Persona konsultan + mode cepat, eval 10/10 dengan AI ASLI + fix bug tanggal memory
+**Konteks:** Lanjutan sesi E04-S4 (masih di VPS produksi, jadi masih bisa akses AI asli). Ganti system
+prompt "financial buddy" generik (E04-S1..S4) jadi persona konsultan dengan alur 7 langkah eksplisit
+(pahami→cek data→diagnosis→opsi+trade-off→rekomendasi tegas→langkah konkret→tawaran lanjutan), plus 6 chip
+mode cepat di `/app/chat`.
+**Keputusan:** (1) Chip mode cepat mengisi input field (bukan auto-send seperti `QUICK_PROMPTS` versi lama)
+karena beberapa butuh detail spesifik dari Arzaka ("Mau beli sesuatu", "Simulasi rencana nabung") — auto-send
+generik bakal menghasilkan jawaban nggak berguna tanpa nominal/barang. (2) Telegram TIDAK perlu perubahan
+kode — `telegram-webhook.controller.ts` sudah lewat `AiChatService.handleMessage()` yang sama persis dengan
+web sejak E04-S1, jadi persona+memory+snapshot otomatis ikut. (3) Eval manual dijalankan dengan AI ASLI
+(dev DB sintetis, `AI_MODEL` default, bukan `AI_MODEL_ADVISOR` — sudah lulus 10/10 jadi belum ada alasan
+ganti model) — detail lengkap di `docs/revamp/eval/advisor-2026-09-27.md`. "Sebelum" formal (persona lama)
+tidak dijalankan ulang berpasangan, pertimbangan waktu sesi. (4) Eval nemuin bug NYATA di luar scope S5:
+`extractMemory()` (E04-S2) manggil `AI_MODEL_FAST` buat nulis `validUntil` tanpa dikasih tau tahun berjalan
+— model nebak pakai tahun training-nya (2024) buat kalimat kayak "sebelum Desember", padahal tahun berjalan
+2026. `AiMemoryService.listActive()` (yang otomatis ngarsipin `validUntil < now`) langsung ngarsipin memory
+itu beberapa detik setelah dibuat, sebelum sempat kepake. Fix: suntik `Hari ini: ${wibDateKey(new Date())}`
+ke prompt ekstraksi (satu baris di `ai-chat.service.ts`). Diverifikasi ulang dengan AI asli: memory baru
+soal tanggal sekarang nulis tahun yang benar.
+**Alasan:** Alur 7 langkah eksplisit dipilih supaya model konsisten "berpendapat" (rekomendasi tegas)
+alih-alih cuma nyerahin data mentah + pilihan ke user — itu beda paling jelas dibanding persona lama pas
+dites informal di E04-S4. Bug tanggal memory ditemukan justru KARENA eval ini pakai AI asli — sesi-sesi
+sebelumnya (S1-S3) nggak pernah bisa nangkep ini karena proxy 401 dari sandbox.
+**Konsekuensi:** `tsc --noEmit` (backend+frontend) lulus bersih. 10/10 kriteria eval lulus (angka benar,
+pakai memory kontekstual, rekomendasi tegas, tidak mengarang, jujur soal data yang nggak ada — lihat Q5 &
+Q8 di file eval). **Belum diverifikasi**: tampilan visual 6 chip mode cepat di browser sungguhan (sesi ini
+tanpa Playwright/browser). Belum di-push — nunggu konfirmasi Arzaka.
+
+---
+
+## 2026-09-27 — Insiden: push E04-S4 bikin CD gagal karena kontensi RAM dari dev-testing sesi sendiri
+**Konteks:** Habis push commit `2d15ee3` (E04-S4), Arzaka dapat email notifikasi "deploy failed" dari
+GitHub Actions. Sesi ini kebetulan jalan LANGSUNG di VPS produksi (bukan sandbox cloud) — begitu push,
+sesi langsung lanjut jalanin dev-testing lokal (dev Postgres + `node dist/main.js` buat verifikasi E04-S4)
+di VPS yang SAMA yang lagi diproses CD lewat SSH.
+**Keputusan:** (1) Diagnosis: RAM 2GB VPS ini kena kontensi antara `docker compose build` yang dijalanin CD
+dan proses dev-testing sesi ini, bikin job `deploy.yml` gagal — TAPI docker layer cache dari attempt itu
+sempat kebentuk lengkap sampai image `trackster-backend:latest` (dikonfirmasi berisi kode E04-S4 lewat
+`docker run --rm ... grep`), cuma langkah `docker compose up -d` yang nggak sempat/gagal jalan buat swap
+container yang lagi hidup. (2) Sebelum redeploy manual, `git stash` dulu semua perubahan lokal yang belum
+di-commit (WIP E04-S5) — karena `deploy.yml` beneran `git reset --hard origin/main` di checkout `~/trackster`
+yang SAMA dengan yang dipakai sesi interaktif ini, bukan checkout terpisah. (3) Matiin dev Postgres + proses
+lokal buat bebasin RAM, lalu manual ulangi 3 langkah terakhir `deploy.yml` (`build backend` — ternyata semua
+CACHED dari attempt yang gagal, `build frontend`, `up -d`) setelah izin eksplisit dari Arzaka (aksi
+"Production Deploy" di-block otomatis oleh classifier, wajib approval manual). (4) `git stash pop` buat
+lanjut kerjaan setelah prod stabil.
+**Alasan:** Root cause asli (kontensi RAM), bukan bug di kode E04-S4 — dikonfirmasi karena image yang sama
+persis, dibangun dari commit yang sama, jalan normal begitu di-swap in.
+**Konsekuensi:** Dicatat di Gotchas.md: JANGAN mulai dev-testing lokal di VPS ini segera setelah push ke
+`main` tanpa jeda/cek CD dulu. Prod balik sehat (`trackster-backend-1`/`trackster-frontend-1` recreated,
+dikonfirmasi `simulatePlan` ada di dist, HTTP 200/404-normal, `nginx`/`certbot`/`postgres` prod tidak
+disentuh sama sekali). Tidak ada data prod yang hilang atau rusak.
+
+---
+
 ## 2026-09-27 — E04-S4: Tools advisor + engine simulasi + kartu, diverifikasi dengan AI ASLI
 **Konteks:** Lanjutan roadmap setelah fix bug crash financial-snapshot (E04-S2) di-push ke prod pagi ini.
 Sesi ini ternyata berjalan LANGSUNG di VPS produksi (bukan sandbox cloud seperti sesi-sesi E04 sebelumnya)

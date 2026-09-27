@@ -61,7 +61,7 @@ Legend: ⬜ belum · 🟨 jalan · ✅ selesai (sudah diverifikasi di browser & 
 | E04-S2 | Financial snapshot + memory jangka panjang + halaman "Yang Track ingat" | 2 | E04-S1, E03-S2 | 🟨 (kode selesai & diverifikasi dev lokal; ekstraksi memory dari chat asli & follow-up "nanya besok" belum dites — butuh AI completion beneran jalan, cuma bisa di prod/VPS) |
 | E04-S3 | Retrieval (Postgres FTS) atas chat lama, catatan, laporan | 2 | E04-S2 | 🟨 (kode selesai & diverifikasi lewat `retrieval.check.ts` + dev DB nyata; model beneran merujuk hasil retrieval belum dites — AI proxy 401 dari sandbox, lihat Decisions.md) |
 | E04-S4 | Tools advisor baru + engine simulasi + kartu di chat | 2 | E04-S2 | 🟨 (kode selesai; **pertama kalinya diverifikasi end-to-end pakai AI asli** — sesi ini jalan langsung di VPS produksi, bukan sandbox cloud, jadi proxy 9router bisa diakses; 4 skenario chat nyata dicek benar di dev DB. Belum: tampilan visual kartu di browser) |
-| E04-S5 | Persona konsultan + mode cepat + Telegram pakai memory yang sama | 2 | E04-S4 | ⬜ |
+| E04-S5 | Persona konsultan + mode cepat + Telegram pakai memory yang sama | 2 | E04-S4 | 🟨 (kode selesai + **eval manual 10/10 dengan AI asli** lulus — lihat `docs/revamp/eval/advisor-2026-09-27.md`; ketemu & fix 1 bug nyata di ekstraksi memory (tahun salah). Belum: visual chip mode cepat di browser sungguhan) |
 | E06-S1 | PeriodStats service (range + pembanding) — dipakai Analisis & Laporan | 3 | E00-S1, E00-S3 | ⬜ |
 | E06-S2 | Halaman Analisis v2 (kebiasaan, heatmap, anomali, rutin vs besar) | 3 | E06-S1 | ⬜ |
 | E07-S1 | Laporan Mingguan & Bulanan v2 + snapshot tersimpan | 3 | E06-S1 | ⬜ |

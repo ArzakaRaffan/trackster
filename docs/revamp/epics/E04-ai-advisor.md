@@ -318,11 +318,25 @@ Tiap chip = template prompt yang mengarahkan tool yang tepat.
 10. "Bikinin rencana 3 bulan ke depan."
 Kriteria: angka benar (cek manual ke DB), pakai memory/konteks, ada rekomendasi tegas + langkah konkret, tidak mengarang.
 
-**Tasks**
-- [ ] Prompt baru + chip mode cepat
-- [ ] Telegram pakai `AiChatService` yang sama (thread TELEGRAM, memory sama)
-- [ ] Eval sebelum/sesudah + catat hasil
-- [ ] (stretch) streaming SSE untuk balasan panjang — hanya kalau latensi terasa mengganggu
+**Tasks** (dikerjain 2026-09-27, sesi yang sama dengan E04-S4 — masih di VPS produksi langsung, jadi eval
+di bawah bisa pakai AI asli, bukan simulasi)
+- [x] Prompt baru (`FINANCIAL_ADVISOR_SYSTEM_PROMPT` di `ai-chat.service.ts`, alur 7 langkah konsultan +
+      aturan keras) + 6 chip mode cepat di `/app/chat` (`QUICK_PROMPTS`) — diisi ke input field (bukan
+      auto-send) karena beberapa butuh detail dari Arzaka dulu ("Mau beli sesuatu", "Simulasi rencana nabung").
+- [x] Telegram pakai `AiChatService` yang sama — **sudah benar tanpa perubahan**: `telegram-webhook.controller.ts`
+      manggil `aiChatService.handleMessage(text, {channel:'telegram'})` → `getOrCreateTelegramThread()` →
+      `sendMessage()`, pipeline persis sama dengan web (snapshot+memory+retrieval+persona baru otomatis ikut).
+- [x] **Eval manual dengan AI ASLI** (bukan cuma "sesudah" — lihat `docs/revamp/eval/advisor-2026-09-27.md`
+      buat detail kenapa "sebelum" formal di-skip): 10/10 pertanyaan epic lulus kriteria (angka benar, pakai
+      memory, rekomendasi tegas, tidak mengarang). Ketemu 1 bug nyata di jalur (bukan di persona S5, tapi
+      di `extractMemory()` E04-S2): model `AI_MODEL_FAST` nggak tau tahun berjalan, nulis `validUntil`
+      pakai tahun training (2024) buat tanggal kayak "1 Desember" — bikin `AiMemoryService.listActive()`
+      langsung ngarsipin memory itu sebagai "sudah lewat" cuma detik setelah dibuat. Fix: suntik
+      `Hari ini: ${wibDateKey(new Date())}` ke prompt ekstraksi. Diverifikasi ulang, sudah benar.
+- [ ] (stretch) streaming SSE untuk balasan panjang — TIDAK dikerjain, latensi belum terasa jadi masalah
+      di eval manual (semua balasan < 90 detik dengan tool call, biasanya jauh lebih cepat)
+- **Sengaja tidak dikerjain**: ganti model ke `AI_MODEL_ADVISOR`/`ghrocx/opus-5` — `AI_MODEL` default
+      (sonnet-5) sudah lulus eval 10/10, jadi belum ada alasan buat nambah env var/kompleksitas ganti model.
 
 ## Pertanyaan terbuka
 

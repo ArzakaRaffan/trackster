@@ -1,5 +1,24 @@
 # trackster — Gotchas
 
+- **Push ke `main` lalu langsung jalanin dev-testing lokal di VPS ini (dev Postgres, `node dist/main.js`
+  lokal, dll) bisa bikin CD (`deploy.yml`) gagal diam-diam** — kejadian nyata 2026-09-27 sesi E04-S4/S5:
+  push commit lalu (di sesi yang sama, VPS yang sama) langsung `docker compose -p trackster-dev up -d
+  postgres` + jalanin backend lokal buat verifikasi manual, sementara GitHub Actions SSH masuk dan mulai
+  `docker compose -f docker-compose.prod.yml build backend` (sequential, RAM 2GB pas-pasan per Gotcha di
+  bawah). Kontensi RAM bikin job CD gagal — Arzaka dapat email notifikasi "deploy failed" — TAPI docker
+  layer cache dari attempt yang gagal itu ternyata sempat kebentuk lengkap sampai `trackster-backend:latest`
+  (dicek: `docker run --rm trackster-backend:latest grep ...` sudah punya kode baru), cuma `docker compose
+  up -d` yang nggak sempat/gagal jalan buat swap container yang lagi hidup. Gejala: container lama TETAP
+  jalan kode lama tanpa error apapun di `docker logs` (tidak crash, cuma nggak keganti). Fix: matiin dulu
+  semua proses dev lokal (`docker compose -p trackster-dev down -v`, `pkill -f "node dist/main.js"`), cek
+  `free -h`, baru manual ulangi 3 langkah terakhir `deploy.yml` (`build backend`, `build frontend`, `up -d`)
+  — kalau image sudah cached, ini cepat. **Pelajaran:** kalau abis push ke main, JANGAN langsung mulai
+  sesi dev-testing lokal di VPS yang sama sebelum ngecek CD selesai (atau minimal kasih jeda) — dan kalau
+  mau redeploy manual gara-gara ini, WAJIB `git stash` dulu perubahan lokal yang belum di-commit, karena
+  `deploy.yml` beneran `git reset --hard origin/main` di checkout yang SAMA dengan yang dipakai sesi
+  interaktif ini (`~/trackster`) — kalau nggak di-stash, kerjaan lokal yang belum di-commit bisa
+  ke-hard-reset kalau CD (atau redeploy manual yang niru `git reset --hard`) kebetulan jalan lagi.
+
 - **`AI_BASE_URL=http://host.docker.internal:20128` (nilai container prod) tidak resolve kalau backend
   dijalanin langsung di host** (`node dist/main.js`, bukan lewat Docker) — `host.docker.internal` cuma
   valid dari DALAM container (`extra_hosts` di `docker-compose.prod.yml`). Gejala: chat AI balas fallback
