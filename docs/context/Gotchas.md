@@ -1,5 +1,15 @@
 # trackster — Gotchas
 
+- **`AI_BASE_URL=http://host.docker.internal:20128` (nilai container prod) tidak resolve kalau backend
+  dijalanin langsung di host** (`node dist/main.js`, bukan lewat Docker) — `host.docker.internal` cuma
+  valid dari DALAM container (`extra_hosts` di `docker-compose.prod.yml`). Gejala: chat AI balas fallback
+  generik "ada gangguan teknis", log sebenarnya `TypeError: fetch failed` di `AiService.chat()`. Fix buat
+  verifikasi lokal di VPS ini (2026-09-27, sesi E04-S4): `export AI_BASE_URL=http://localhost:20128` sebelum
+  start — 9router jalan sebagai proses host biasa (`ps aux | grep 9router`), bukan container, jadi
+  `localhost` yang benar dari host. Ini gotcha BARU yang beda dari soal `NEXT_PUBLIC_API_URL`/`COOKIE_DOMAIN`
+  di bawah (itu soal env var container yang salah ke-inherit; ini soal hostname yang cuma valid di dalam
+  container satunya lagi). (`apps/backend/src/modules/ai/ai.service.ts`)
+
 - **Sesi cloud Claude Code ini punya env var asli level-container** (`NEXT_PUBLIC_API_URL`, `AI_API_KEY`,
   `COOKIE_DOMAIN`, `GMAIL_CLIENT_*`, `TELEGRAM_BOT_TOKEN`, dll — bukan cuma placeholder) yang **menunjuk ke
   prod** (`https://api.track.trackster.my.id`), ditambahin user lewat environment settings (bukan lewat

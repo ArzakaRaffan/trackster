@@ -4,6 +4,47 @@
 
 ---
 
+## 2026-09-27 — E04-S4: Tools advisor + engine simulasi + kartu, diverifikasi dengan AI ASLI
+**Konteks:** Lanjutan roadmap setelah fix bug crash financial-snapshot (E04-S2) di-push ke prod pagi ini.
+Sesi ini ternyata berjalan LANGSUNG di VPS produksi (bukan sandbox cloud seperti sesi-sesi E04 sebelumnya)
+— artinya proxy AI self-hosted 9router (`localhost:20128`) beneran bisa diakses, sesuatu yang sejak E04-S1
+selalu ditandai "belum bisa dites, proxy 401 dari sandbox".
+**Keputusan:** (1) Engine simulasi murni di `plan-simulator.ts` (`simulatePlan`, `whatIfPurchase`) — goal
+punya "pocket" tabungan terpisah dari saldo (cuma bergerak lewat `savePerWeek` eksplisit, BUKAN otomatis
+dari surplus income−spend); `spendChanges` tanpa `category` berlaku ke total (bukan diulang per kategori,
+biar tidak double-count); cicilan (`whatIfPurchase` method=installment) dimodelkan sebagai deretan `oneOffs`
+mingguan (berhenti begitu lunas), bukan `spendChange` permanen. (2) `PlanSimulatorService` (baru, di modul
+`ai`, bukan `transaction` — biar tidak nambah beban `transaction.service.ts` yang sudah besar) ngerakit
+baseline nyata: forecast pemasukan E03 (`IncomeForecastService.getHorizon(1)`) + median pengeluaran rutin
+per kategori 8 minggu terakhir (buang pembelian besar ≥Rp500rb, threshold sama dengan
+`financial-snapshot.service.ts`). (3) Mekanisme kartu: tool yang return `{card:{...}}` dikumpulkan
+(`extractCards`) dan ditempel HANYA ke `ChatMessage.attachments` pesan assistant final (`findLastAssistantWithContentIndex`),
+bukan ke tiap stub tool_calls — biar frontend cuma perlu baca satu pesan per giliran. (4) Tools baru:
+`searchTransactions`, `getPeriodStats` (dispatch week/month/range — `range` pakai method baru
+`TransactionService.getRangeSummary()`, sengaja bukan modul `PeriodStats` E06-S1 yang belum ada), `getIncomeForecast`,
+`getGoals` (+ `weeklyContributionNeeded` dihitung inline dari `targetDate`), `simulatePlan`, `whatIfPurchase`,
+`proposeGoal` (TIDAK bikin goal, cuma kartu konfirmasi), `logIncome` (minimal, TIDAK link ke stream — beda
+dari niat awal epic "mengarah ke stream", ditunda karena alur link-ke-stream yang benar itu jalur check-in
+E03-S3, bukan create manual polos).
+**Alasan:** Baseline dari data nyata (bukan angka konstan) biar simulasi actually reflect kondisi Arzaka;
+kartu ditempel ke pesan final biar frontend sederhana; `logIncome` minimal daripada membangun ulang logika
+stream-matching yang sudah ada di `income-checkin` (YAGNI — kalau butuh linking penuh, itu perluasan terpisah).
+**Konsekuensi:** **Pertama kalinya di seluruh rantai E04-S1..S4, tes end-to-end dengan AI sungguhan berhasil**
+(dev DB `trackster-dev`, data SINTETIS 8 minggu + 1 goal — BUKAN salinan prod, classifier sesi ini menolak
+baca DB prod langsung, jadi tidak seperti biasanya di `02-conventions.md`). 4 giliran chat nyata dicek: (1)
+"nabung 100rb/minggu, goal 2jt" → "minggu ke-20" tepat + kartu simulasi valid, dan model **secara mandiri**
+menyadari baseline income Rp0 bikin saldo defisit (bukan cuma echo tool result); (2) `proposeGoal` → kartu
+`goal-proposal` dengan `weeklyContribution` benar; (3) `whatIfPurchase` cash → `weeksDelay=0` (benar sesuai
+desain "goal pocket terpisah dari saldo") dan model **menjelaskan nuansa itu dengan tepat**; (4) pertanyaan
+gabungan memicu `getWeeklySummary`+`getGoals` natural. Ketemu gotcha baru: `AI_BASE_URL=host.docker.internal`
+(nilai container) tidak resolve di luar Docker — `localhost:20128` yang benar buat run lokal di VPS ini
+(dicatat di Gotchas.md). **Belum diverifikasi**: tampilan visual `SimulationCard`/`GoalProposalCard` di
+browser sungguhan (sesi ini tanpa Playwright/browser terpasang) — cuma `tsc --noEmit` bersih + shape data
+API dicek cocok dengan prop types komponen. `npm run build` (backend) lulus bersih. Belum di-push ke `main`
+(nunggu konfirmasi Arzaka per aturan 02-conventions.md §1).
+
+---
+
 ## 2026-09-27 — E04-S2: Financial Snapshot + Memory jangka panjang
 **Konteks:** System prompt chat (E04-S1) masih statis — nggak ada kondisi keuangan real-time atau fakta tahan lama tentang Arzaka yang disuntik. Epic minta arsitektur berlapis: persona + snapshot deterministik + memory + retrieval (E04-S3, belum) + summary thread (E04-S1).
 **Keputusan:** (1) `FinancialSnapshotService` & `AiMemoryService` jadi provider tambahan di `AiModule` yang sudah ada (pola sama `ai-caption`/`ai-anomaly` — bukan modul NestJS terpisah, karena domainnya emang bagian dari fitur AI, bukan domain data baru). `AiModule` nambah import `BalanceModule` & `IncomeForecastModule` buat data snapshot. (2) Snapshot teks (bukan JSON) di-cache 5 menit in-memory (single-user, nggak perlu Redis) — dipanggil tiap `sendMessage()`, jadi harus murah. Threshold "pembelian besar" Rp500rb, heuristik sederhana sama semangatnya kayak `ai-anomaly.service.ts` (didokumentasikan di kode, bukan angka ajaib diam-diam). (3) Migration `add_ai_memory` dibuat manual (`prisma migrate diff` lalu `migrate deploy`) — `npx prisma migrate dev` selalu gagal non-interactive di sesi Claude Code (gotcha lama). (4) `parseMemoryOps` (validasi output JSON model ekstraksi) fungsi murni diekspor dari `ai-memory.service.ts`, dites `ai-memory.check.ts` (13 assertion) tanpa DB/AI call — output model itu untrusted input, jadi entry invalid di-skip diam-diam (bukan gagal semua array). (5) Ekstraksi memory dipanggil fire-and-forget (`.catch()`, nggak di-`await` sebelum return reply) setelah `sendMessage()` sukses dapat balasan — TIDAK boleh nambah latensi ke user ataupun bikin chat gagal kalau ekstraksi error. (6) Tool `remember`/`forget` ditambah ke `ai-finance-tools.service.ts` yang sudah ada (bukan tools terpisah) — `AiFinanceToolsService` sekarang juga inject `AiMemoryService`. (7) Halaman `/app/chat/memory`: hapus dari UI = hard delete (`DELETE /ai/memory/:id`), beda dari "arsip" (soft, bisa dipulihkan) — dua aksi terpisah di UI (ikon Archive vs Trash2) karena beda makna: arsip = "sudah nggak relevan tapi riwayatnya masih valid", hapus = "salah input/nggak pernah relevan".

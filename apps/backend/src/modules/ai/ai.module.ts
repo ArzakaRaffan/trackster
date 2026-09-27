@@ -9,6 +9,7 @@ import { AiAnomalyService } from './ai-anomaly.service';
 import { FinancialSnapshotService } from './financial-snapshot.service';
 import { AiMemoryService } from './ai-memory.service';
 import { RetrievalService } from './retrieval.service';
+import { PlanSimulatorService } from './plan-simulator.service';
 import { AiController } from './ai.controller';
 import { BudgetModule } from '../budget/budget.module';
 import { TransactionModule } from '../transaction/transaction.module';
@@ -44,6 +45,7 @@ import { PrismaService } from '../../prisma.service';
     FinancialSnapshotService,
     AiMemoryService,
     RetrievalService,
+    PlanSimulatorService,
     PrismaService,
   ],
   controllers: [AiController],
@@ -58,6 +60,7 @@ import { PrismaService } from '../../prisma.service';
     FinancialSnapshotService,
     AiMemoryService,
     RetrievalService,
+    PlanSimulatorService,
   ],
 })
 export class AiModule {}

@@ -39,10 +39,11 @@ export class TransactionService {
     source?: Source;
     category?: Category;
     search?: string;
+    minAmount?: number;
     page?: number;
     limit?: number;
   }) {
-    const { startDate, endDate, source, category, search, page = 1, limit = 50 } = params;
+    const { startDate, endDate, source, category, search, minAmount, page = 1, limit = 50 } = params;
     const where: any = {};
     if (startDate || endDate) {
       where.occurredAt = {};
@@ -51,6 +52,7 @@ export class TransactionService {
     }
     if (source) where.source = source;
     if (category) where.category = category;
+    if (minAmount != null) where.amount = { gte: minAmount };
 
     if (search) {
       // Alias juga ikut dicari: transaksi dengan description mentah yang alias-nya cocok search
@@ -267,6 +269,29 @@ export class TransactionService {
 
     const transactionsWithDisplay = await this.attachDisplayNames(transactions);
     return { year, month, totalSpent, byCategory, byDay, transactions: transactionsWithDisplay };
+  }
+
+  /** Ringkasan periode bebas (from/to inklusif, WIB) — dipakai tool AI `getPeriodStats({period:'range'})`
+   * sebelum `PeriodStats` (E06-S1) ada. Bentuk sama seperti getMonthly, cuma rentangnya custom. */
+  async getRangeSummary(from: string, to: string) {
+    const start = startOfWibDay(from);
+    const end = addWibDays(startOfWibDay(to), 1);
+
+    const [transactions, byCategoryRaw] = await Promise.all([
+      this.prisma.transaction.findMany({ where: { occurredAt: { gte: start, lt: end } }, orderBy: { occurredAt: 'asc' } }),
+      this.prisma.transaction.groupBy({
+        by: ['category'],
+        where: { occurredAt: { gte: start, lt: end } },
+        _sum: { amount: true },
+      }),
+    ]);
+
+    const totalSpent = transactions.reduce((sum, t) => sum + Number(t.amount), 0);
+    const byCategory = byCategoryRaw
+      .map((row) => ({ category: row.category, total: Number(row._sum.amount ?? 0) }))
+      .sort((a, b) => b.total - a.total);
+
+    return { from, to, totalSpent, byCategory, count: transactions.length };
   }
 
   /** Total sepanjang waktu, breakdown per kategori, dan bulan tertinggi/terendah. */

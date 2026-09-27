@@ -254,10 +254,33 @@ simulatePlan({
   Frontend render `SimulationCard` (recharts line: saldo & progres goal; 3 angka ringkasan; daftar asumsi) dan
   `GoalProposalCard` (tombol Buat → `POST /goals`).
 
-**Tasks**
-- [ ] Tools baru + `plan-simulator.ts` + check (kasus: target 2jt, nabung 100rb/minggu → 20 minggu)
-- [ ] Mekanisme attachments + render kartu di chat
-- [ ] Tes: "kalau aku kurangin jajan kopi setengahnya, kapan bisa beli laptop 12 juta?" → kartu grafik masuk akal
+**Tasks** (dikerjain 2026-09-27, sesi ini dijalankan LANGSUNG DI VPS produksi — bukan sandbox cloud — jadi
+`AI_BASE_URL=http://localhost:20128` beneran bisa diakses; verifikasi end-to-end pakai AI asli akhirnya
+mungkin, pertama kali sepanjang E04-S1..S4)
+- [x] Tools baru (`searchTransactions`, `getPeriodStats`, `getIncomeForecast`, `getGoals`, `simulatePlan`,
+      `whatIfPurchase`, `proposeGoal`, `logIncome`) di `ai-finance-tools.service.ts` + `plan-simulator.ts`
+      (fungsi murni: `simulatePlan`, `whatIfPurchase`) + `plan-simulator.service.ts` (baseline nyata: forecast
+      pemasukan E03 + median pengeluaran rutin 8 minggu tanpa pembelian besar, threshold sama dengan
+      `financial-snapshot.service.ts`) + `plan-simulator.check.ts` (12 assertion, termasuk kasus eksplisit
+      epic: target 2jt, nabung 100rb/minggu → weeksToGoal 20).
+- [x] Mekanisme attachments: tool yang return `{card: {...}}` dikumpulkan di `AiChatService.sendMessage`
+      (`extractCards`) dan ditempel ke `ChatMessage.attachments` pesan assistant FINAL (bukan tiap stub
+      tool_calls) via `findLastAssistantWithContentIndex`. Frontend: `SimulationCard.tsx` (recharts line
+      chart saldo + compareSeries opsional + ringkasan + daftar asumsi) dan `GoalProposalCard.tsx` (tombol
+      "Buat goal" → `POST /goal`), dirender di `/app/chat` dari `ThreadMessage.attachments`.
+- [x] **Tes end-to-end dengan AI asli** (bukan cuma pure-function check) — dev DB (`trackster-dev`, data
+      sintetis: 8 minggu transaksi rutin + goal "Laptop baru" 2jt, BUKAN salinan prod karena classifier sesi
+      ini menolak baca DB prod), backend `dist/main.js` lokal (`AI_BASE_URL=http://localhost:20128` — beda
+      dari container yang pakai `host.docker.internal`, gotcha baru dicatat di Gotchas.md) dikonfirmasi
+      benar-benar jalan 4 giliran chat nyata: (1) "nabung 100rb/minggu buat goal 2jt" → balasan tepat
+      "minggu ke-20" + kartu simulasi tersimpan di `attachments` dengan series yang benar, DAN model
+      menyadari sendiri baseline income Rp0 bikin saldo defisit — bukan cuma echo angka; (2) `proposeGoal`
+      → kartu `goal-proposal` dengan `weeklyContribution` terhitung benar dari deadline; (3) `whatIfPurchase`
+      cash → `weeksDelay=0` (benar, karena `savePerWeek` independen dari saldo di desain engine ini) dan
+      model MENJELASKAN nuansa itu dengan tepat, bukan cuma baca angka; (4) `getWeeklySummary`+`getGoals`
+      dipanggil natural buat pertanyaan gabungan. **Belum diverifikasi**: tampilan visual kartu di browser
+      (`SimulationCard`/`GoalProposalCard`) — sesi ini di VPS tanpa browser/Playwright terpasang, cuma tsc
+      + shape data dari API yang dicek. Backend build (`npm run build`) & frontend (`tsc --noEmit`) lulus bersih.
 
 ---
 
