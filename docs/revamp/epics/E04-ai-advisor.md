@@ -80,13 +80,14 @@ model ChatMessage {
 - Frontend `/app/chat`: drawer daftar thread (judul + tanggal), "Chat baru", load history via SWR,
   optimistic append, tetap satu layar di mobile.
 
-**Tasks**
-- [ ] Migration `add_chat_threads`
-- [ ] Refactor `runToolLoop` + simpan pesan (user, assistant, tool) dalam urutan yang benar
-- [ ] Summarization window
-- [ ] Endpoint + Telegram thread
-- [ ] Frontend thread UI
-- [ ] Tes: refresh halaman → chat masih ada; pertanyaan lanjutan "kalau yang tadi dibagi 2?" dijawab nyambung
+**Tasks** (dicentang 2026-09-27 berdasar bukti kode di `main` — commit `07efc8f` dkk — bukan sesi yang
+ngerjain aslinya; status verifikasi browser/prod di bawah ini belum dikonfirmasi siapapun)
+- [x] Migration `add_chat_threads`
+- [x] Refactor `runToolLoop` + simpan pesan (user, assistant, tool) dalam urutan yang benar
+- [x] Summarization window (`ai-chat.service.ts`)
+- [x] Endpoint + Telegram thread (6 endpoint di `ai.controller.ts` sesuai spec di atas)
+- [x] Frontend thread UI (`/app/chat` +231 baris)
+- [ ] Tes: refresh halaman → chat masih ada; pertanyaan lanjutan "kalau yang tadi dibagi 2?" dijawab nyambung — **belum dikonfirmasi**
 
 ---
 
