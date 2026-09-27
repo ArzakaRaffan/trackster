@@ -61,11 +61,11 @@ interface PeriodStats {
 - Bucket waktu (WIB): pagi 05–11, siang 11–15, sore 15–18, malam 18–22, larut 22–05.
 
 **Tasks**
-- [ ] Migration `Transaction.isBig`
-- [ ] `PeriodStatsService` + `period-stats.check.ts` (data sintetis: pembelian besar terpisah, pembanding periode, kunci WIB)
-- [ ] Endpoint `GET /analytics/stats?from=&to=` dan `GET /analytics/stats?range=7d|30d|90d|all`
-- [ ] Tool AI `getPeriodStats` diarahkan ke sini (kalau E04-S4 sudah ada)
-- [ ] `getInsights()` lama: jadikan wrapper tipis di atas PeriodStats (dipakai weekly report/health score/mascot) atau
+- [x] Migration `Transaction.isBig`
+- [x] `PeriodStatsService` + `period-stats.check.ts` (data sintetis: pembelian besar terpisah, pembanding periode, kunci WIB)
+- [x] Endpoint `GET /analytics/stats?from=&to=` dan `GET /analytics/stats?range=7d|30d|90d|all`
+- [x] Tool AI `getPeriodStats` diarahkan ke sini (kalau E04-S4 sudah ada)
+- [x] `getInsights()` lama: jadikan wrapper tipis di atas PeriodStats (dipakai weekly report/health score/mascot) atau
       ganti pemanggilnya — jangan biarkan dua implementasi hidup
 
 ## E06-S2 — Halaman Analisis v2 (`/app/insights`)

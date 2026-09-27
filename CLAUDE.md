@@ -4,6 +4,10 @@ Personal finance expense tracker untuk Arzaka. Otomatis mencatat pengeluaran dar
 
 **Single-user app.** Nggak ada multi-tenant, nggak ada signup flow. Semua fitur didesain buat satu orang (Arzaka), bukan produk publik.
 
+> ⚠️ **Baca [`CAUTION.md`](CAUTION.md) sebelum `npm run build`/`start:dev` apapun.** VPS ini cuma 2GB
+> RAM dan prod jalan di sini terus — pernah bikin prod down gara-gara build tanpa cap memory + dev
+> Postgres nyala bareng. Selalu `NODE_OPTIONS=--max-old-space-size=1536`, jangan tumpuk proses berat.
+
 Konteks tambahan: `docs/context/Product.md` (kenapa & alur uang nyata) dan `docs/context/Codemap.md` (peta module/route/cron + drift yang diketahui).
 
 ## Tech Stack
@@ -64,7 +68,7 @@ Konteks tambahan: `docs/context/Product.md` (kenapa & alur uang nyata) dan `docs
 
 - **Prisma + Alpine**: image `node:20-alpine` butuh `RUN apk add --no-cache openssl` eksplisit di builder DAN runner stage, kalau nggak Prisma engine crash-loop dengan error samar ("Could not parse schema engine response").
 - **NODE_ENV urutan penting**: `ENV NODE_ENV=production` di Dockerfile HARUS di-set SETELAH `npm install`, bukan sebelum — npm otomatis skip devDependencies kalau NODE_ENV=production sudah aktif saat install, meskipun tidak ada flag `--omit=dev` eksplisit.
-- **VPS cuma 2GB RAM**: build backend+frontend paralel bisa OOM (`JavaScript heap out of memory`). Build sequential (`docker compose build backend` lalu `build frontend`, baru `up -d`), dan set `NODE_OPTIONS=--max-old-space-size=1536` di Dockerfile build stage.
+- **VPS cuma 2GB RAM**: build backend+frontend paralel bisa OOM (`JavaScript heap out of memory`). Build sequential (`docker compose build backend` lalu `build frontend`, baru `up -d`), dan set `NODE_OPTIONS=--max-old-space-size=1536` di Dockerfile build stage. Berlaku juga buat `npm run build`/`npm run start:dev` lokal di sesi Claude Code — **pernah bikin prod down** (2026-09-28) gara-gara build tanpa cap + dev Postgres nyala bareng container prod. Detail & checklist: [`CAUTION.md`](CAUTION.md).
 - **tsconfig rootDir**: `apps/backend/tsconfig.json` harus punya `"rootDir": "./src"` dan `"include": ["src/**/*.ts"]` — kalau nggak, TypeScript ikut compile `prisma/seed.ts` dan bikin output `dist/src/main.js` bukan `dist/main.js`, sementara CMD di Dockerfile expect `node dist/main`.
 - **Prisma seed jangan pakai ts-node di production** — pakai plain JS (`prisma/seed.js` + `"prisma": {"seed": "node prisma/seed.js"}` di package.json). ts-node sering konflik ESM/CJS di Node 20+ dan gampang exclude dari devDependencies pas `npm install --omit=dev`.
 - **Cookie cross-subdomain**: karena frontend (`track.trackster.my.id`) dan backend (`api.track.trackster.my.id`) beda subdomain, cookie JWT butuh `domain: process.env.COOKIE_DOMAIN` (`.track.trackster.my.id`) eksplisit di `res.cookie()`, kalau nggak browser nggak nge-share cookie antar subdomain (gejala: login sukses 201 tapi langsung ke-redirect balik ke /login).

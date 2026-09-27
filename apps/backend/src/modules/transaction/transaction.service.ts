@@ -4,6 +4,7 @@ import { PrismaService } from '../../prisma.service';
 import { Category, Prisma, Source } from '@prisma/client';
 import { BalanceService, shouldAdjustBalance } from '../balance/balance.service';
 import { MerchantAliasService } from '../merchant-alias/merchant-alias.service';
+import { AnalyticsService } from '../analytics/analytics.service';
 import { CreateTransactionDto } from './dto/create-transaction.dto';
 import { addWibDays, startOfWibDay, startOfWibMonth, startOfWibWeek, wibDateKey, wibDayOfWeek } from '../../common/wib';
 import { merchantKey } from '../../common/merchant-key';
@@ -25,6 +26,7 @@ export class TransactionService {
     private prisma: PrismaService,
     private balanceService: BalanceService,
     private merchantAliasService: MerchantAliasService,
+    private analyticsService: AnalyticsService,
   ) {}
 
   /** Tempel displayDescription (alias merchant kalau ada) ke tiap transaksi — satu query per
@@ -271,29 +273,6 @@ export class TransactionService {
     return { year, month, totalSpent, byCategory, byDay, transactions: transactionsWithDisplay };
   }
 
-  /** Ringkasan periode bebas (from/to inklusif, WIB) — dipakai tool AI `getPeriodStats({period:'range'})`
-   * sebelum `PeriodStats` (E06-S1) ada. Bentuk sama seperti getMonthly, cuma rentangnya custom. */
-  async getRangeSummary(from: string, to: string) {
-    const start = startOfWibDay(from);
-    const end = addWibDays(startOfWibDay(to), 1);
-
-    const [transactions, byCategoryRaw] = await Promise.all([
-      this.prisma.transaction.findMany({ where: { occurredAt: { gte: start, lt: end } }, orderBy: { occurredAt: 'asc' } }),
-      this.prisma.transaction.groupBy({
-        by: ['category'],
-        where: { occurredAt: { gte: start, lt: end } },
-        _sum: { amount: true },
-      }),
-    ]);
-
-    const totalSpent = transactions.reduce((sum, t) => sum + Number(t.amount), 0);
-    const byCategory = byCategoryRaw
-      .map((row) => ({ category: row.category, total: Number(row._sum.amount ?? 0) }))
-      .sort((a, b) => b.total - a.total);
-
-    return { from, to, totalSpent, byCategory, count: transactions.length };
-  }
-
   /** Total sepanjang waktu, breakdown per kategori, dan bulan tertinggi/terendah. */
   async getAllTimeSummary() {
     const [transactions, byCategoryRaw] = await Promise.all([
@@ -323,124 +302,54 @@ export class TransactionService {
     return { totalSpent, byCategory, highestMonth, lowestMonth };
   }
 
-  /** Dashboard analisis: trend minggu-ke-minggu, top merchant, breakdown kategori, pola per
-   * hari-dalam-minggu (dipengaruhi `range`), dan kepatuhan budget 30 hari terakhir (tetap, tidak
-   * terpengaruh `range`). Semua murni dari data yang sudah ada, tanpa panggilan eksternal apapun. */
+  /** Wrapper tipis di atas `AnalyticsService.getPeriodStats` (E06-S1) — dipertahankan buat
+   * caller lama (mascot, weekly report, health score) yang belum pindah ke `/analytics/stats`
+   * langsung. Bentuk field ('trend', 'topMerchants', dst) sengaja dipertahankan sama supaya
+   * caller itu tidak perlu diubah. Jangan tambah logika baru di sini — tambahkan di PeriodStats. */
   async getInsights(range: 'all' | '30d' = '30d') {
     const now = new Date();
-    const rangeStart =
+    const end = addWibDays(startOfWibDay(now), 1);
+    const start =
       range === 'all'
-        ? (await this.prisma.transaction.aggregate({ _min: { occurredAt: true } }))._min.occurredAt ?? now
-        : addWibDays(startOfWibDay(now), -29);
-    const rangeWhere = { occurredAt: { gte: rangeStart, lte: now } };
+        ? startOfWibDay((await this.prisma.transaction.aggregate({ _min: { occurredAt: true } }))._min.occurredAt ?? now)
+        : addWibDays(end, -30);
 
-    const [trend, topMerchantsRaw, categoryRaw, dayOfWeekTx, budgetAdherence] = await Promise.all([
-      this.getWeekOverWeekTrend(),
-      this.prisma.transaction.groupBy({
-        by: ['description'],
-        where: rangeWhere,
-        _sum: { amount: true },
-        _count: { _all: true },
-        orderBy: { _sum: { amount: 'desc' } },
-        take: 5,
-      }),
-      this.prisma.transaction.groupBy({ by: ['category'], where: rangeWhere, _sum: { amount: true } }),
-      this.prisma.transaction.findMany({ where: rangeWhere, select: { amount: true, occurredAt: true } }),
-      this.getBudgetAdherence(),
-    ]);
-
-    const topMerchants = topMerchantsRaw.map((row) => ({
-      description: row.description,
-      totalAmount: Number(row._sum.amount ?? 0),
-      transactionCount: row._count._all,
-    }));
-
-    const categoryTotal = categoryRaw.reduce((sum, row) => sum + Number(row._sum.amount ?? 0), 0);
-    const categoryBreakdown = Object.values(Category).map((category) => {
-      const row = categoryRaw.find((r) => r.category === category);
-      const totalAmount = row ? Number(row._sum.amount ?? 0) : 0;
-      return { category, totalAmount, percentage: categoryTotal > 0 ? (totalAmount / categoryTotal) * 100 : 0 };
-    });
-
-    const weekdaySums = Array(7).fill(0);
-    for (const t of dayOfWeekTx) weekdaySums[wibDayOfWeek(t.occurredAt)] += Number(t.amount);
-    const weekdayCounts = this.countWeekdaysInRange(rangeStart, now);
-    const spendByDayOfWeek = weekdaySums.map((sum, dayOfWeek) => ({
-      dayOfWeek,
-      averageAmount: weekdayCounts[dayOfWeek] > 0 ? sum / weekdayCounts[dayOfWeek] : 0,
-    }));
-
-    return { range, trend, topMerchants, categoryBreakdown, spendByDayOfWeek, budgetAdherence };
-  }
-
-  /** Total spend minggu berjalan (Senin-hari ini) vs minggu lalu penuh (Senin-Minggu). */
-  private async getWeekOverWeekTrend() {
-    const now = new Date();
-    const thisWeekStart = startOfWibWeek(now);
-    const lastWeekStart = addWibDays(thisWeekStart, -7);
-
-    const [thisWeekTx, lastWeekTx] = await Promise.all([
+    const [stats, thisWeekTx, lastWeekTx] = await Promise.all([
+      this.analyticsService.getPeriodStats(start, end, false),
+      this.prisma.transaction.findMany({ where: { occurredAt: { gte: startOfWibWeek(now), lte: now } }, select: { amount: true } }),
       this.prisma.transaction.findMany({
-        where: { occurredAt: { gte: thisWeekStart, lte: now } },
-        select: { amount: true },
-      }),
-      this.prisma.transaction.findMany({
-        where: { occurredAt: { gte: lastWeekStart, lt: thisWeekStart } },
+        where: { occurredAt: { gte: addWibDays(startOfWibWeek(now), -7), lt: startOfWibWeek(now) } },
         select: { amount: true },
       }),
     ]);
 
     const thisWeekTotal = thisWeekTx.reduce((sum, t) => sum + Number(t.amount), 0);
     const lastWeekTotal = lastWeekTx.reduce((sum, t) => sum + Number(t.amount), 0);
-    const percentageChange =
-      lastWeekTotal > 0 ? ((thisWeekTotal - lastWeekTotal) / lastWeekTotal) * 100 : thisWeekTotal > 0 ? 100 : 0;
+    const trend = {
+      thisWeekTotal,
+      lastWeekTotal,
+      percentageChange: lastWeekTotal > 0 ? ((thisWeekTotal - lastWeekTotal) / lastWeekTotal) * 100 : thisWeekTotal > 0 ? 100 : 0,
+    };
 
-    return { thisWeekTotal, lastWeekTotal, percentageChange };
-  }
+    const topMerchants = stats.byMerchant.slice(0, 5).map((m) => ({
+      description: m.displayName,
+      totalAmount: m.total,
+      transactionCount: m.count,
+    }));
+    const categoryTotal = stats.byCategory.reduce((sum, c) => sum + c.total, 0);
+    const categoryBreakdown = Object.values(Category).map((category) => {
+      const row = stats.byCategory.find((c) => c.category === category);
+      const totalAmount = row?.total ?? 0;
+      return { category, totalAmount, percentage: categoryTotal > 0 ? (totalAmount / categoryTotal) * 100 : 0 };
+    });
+    const spendByDayOfWeek = stats.byWeekday.map((w) => ({ dayOfWeek: w.dayOfWeek, averageAmount: w.avgRoutine }));
+    const budgetAdherence = {
+      totalDays: stats.budget.daysWithBudget,
+      daysOverBudget: stats.budget.daysOver,
+      percentageOverBudget: stats.budget.daysWithBudget > 0 ? (stats.budget.daysOver / stats.budget.daysWithBudget) * 100 : 0,
+    };
 
-  /** Berapa dari 30 hari terakhir yang actual spend-nya melebihi DailyBudget hari itu. */
-  private async getBudgetAdherence() {
-    const totalDays = 30;
-    const now = new Date();
-    const start = addWibDays(startOfWibDay(now), -(totalDays - 1));
-
-    const [transactions, budgetRows] = await Promise.all([
-      this.prisma.transaction.findMany({
-        where: { occurredAt: { gte: start } },
-        select: { amount: true, occurredAt: true },
-      }),
-      this.prisma.dailyBudget.findMany(),
-    ]);
-    const budgetByDow = new Map(budgetRows.map((b) => [b.dayOfWeek, Number(b.amount)]));
-
-    const spentByDate = new Map<string, number>();
-    for (const t of transactions) {
-      const key = wibDateKey(t.occurredAt);
-      spentByDate.set(key, (spentByDate.get(key) ?? 0) + Number(t.amount));
-    }
-
-    let daysOverBudget = 0;
-    for (let i = 0; i < totalDays; i++) {
-      const date = addWibDays(start, i);
-      const spent = spentByDate.get(wibDateKey(date)) ?? 0;
-      const budget = budgetByDow.get(wibDayOfWeek(date)) ?? 0;
-      if (spent > budget) daysOverBudget++;
-    }
-
-    return { totalDays, daysOverBudget, percentageOverBudget: (daysOverBudget / totalDays) * 100 };
-  }
-
-  /** Berapa kali tiap day-of-week (0=Minggu...6=Sabtu) muncul di kalender antara start-end, dipakai
-   * sebagai pembagi buat rata-rata spendByDayOfWeek (bukan cuma dibagi jumlah transaksi). */
-  private countWeekdaysInRange(start: Date, end: Date): number[] {
-    const counts = Array(7).fill(0);
-    let cur = startOfWibDay(start);
-    const endDay = startOfWibDay(end);
-    while (cur <= endDay) {
-      counts[wibDayOfWeek(cur)]++;
-      cur = addWibDays(cur, 1);
-    }
-    return counts;
+    return { range, trend, topMerchants, categoryBreakdown, spendByDayOfWeek, budgetAdherence };
   }
 
   /** Input manual dari user (bukan hasil parse email) — dipakai buat pengeluaran yang nggak

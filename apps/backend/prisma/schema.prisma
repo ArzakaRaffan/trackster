@@ -34,6 +34,9 @@ model Transaction {
   // Caption satu-baris digenerate AI (fast model) buat feed transaksi — kosmetik, nullable,
   // gagal generate tidak boleh gagalkan pencatatan transaksi. Lihat AiCaptionService.
   aiCaption   String?
+  // Override manual "pembelian besar" (E06-S1). null = pakai aturan otomatis
+  // (>= max(300rb, 5x median 90 hari)); true/false = ditandai eksplisit lewat tombol di detail transaksi.
+  isBig       Boolean?
 
   @@index([occurredAt])
   @@index([merchantKey])

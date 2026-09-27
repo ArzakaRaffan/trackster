@@ -9,8 +9,9 @@ import { AiTool } from './ai.service';
 import { AiCaptionService } from './ai-caption.service';
 import { AiMemoryService } from './ai-memory.service';
 import { RetrievalService } from './retrieval.service';
+import { AnalyticsService } from '../analytics/analytics.service';
 import { Source, Category, MemoryKind } from '@prisma/client';
-import { wibDateKey } from '../../common/wib';
+import { addWibDays, startOfWibDay, wibDateKey } from '../../common/wib';
 
 /** Kartu yang ikut disimpan di ChatMessage.attachments pesan assistant terakhir (lihat
  * AiChatService.sendMessage) — cuma metadata rendering, bukan sumber angka baru buat model. */
@@ -30,6 +31,7 @@ export class AiFinanceToolsService {
     private aiCaptionService: AiCaptionService,
     private aiMemoryService: AiMemoryService,
     private retrievalService: RetrievalService,
+    private analyticsService: AnalyticsService,
   ) {}
 
   /** `ctx` = thread & window pesan yang sedang dikirim ulang ke model, dipakai
@@ -204,7 +206,9 @@ export class AiFinanceToolsService {
           if (input.period === 'week') return this.transactionService.getWeekly();
           if (input.period === 'range') {
             if (!input.from || !input.to) return { error: 'period="range" butuh from & to' };
-            return this.transactionService.getRangeSummary(input.from, input.to);
+            const start = startOfWibDay(input.from);
+            const end = addWibDays(startOfWibDay(input.to), 1);
+            return this.analyticsService.getPeriodStats(start, end);
           }
           const now = new Date();
           const [y, m] = (input.date ?? wibDateKey(now).slice(0, 7)).split('-').map(Number);

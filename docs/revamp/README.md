@@ -62,7 +62,7 @@ Legend: ⬜ belum · 🟨 jalan · ✅ selesai (sudah diverifikasi di browser & 
 | E04-S3 | Retrieval (Postgres FTS) atas chat lama, catatan, laporan | 2 | E04-S2 | 🟨 (kode selesai & diverifikasi lewat `retrieval.check.ts` + dev DB nyata; model beneran merujuk hasil retrieval belum dites — AI proxy 401 dari sandbox, lihat Decisions.md) |
 | E04-S4 | Tools advisor baru + engine simulasi + kartu di chat | 2 | E04-S2 | 🟨 (kode selesai; **pertama kalinya diverifikasi end-to-end pakai AI asli** — sesi ini jalan langsung di VPS produksi, bukan sandbox cloud, jadi proxy 9router bisa diakses; 4 skenario chat nyata dicek benar di dev DB. Belum: tampilan visual kartu di browser) |
 | E04-S5 | Persona konsultan + mode cepat + Telegram pakai memory yang sama | 2 | E04-S4 | 🟨 (kode selesai + **eval manual 10/10 dengan AI asli** lulus — lihat `docs/revamp/eval/advisor-2026-09-27.md`; ketemu & fix 1 bug nyata di ekstraksi memory (tahun salah). Belum: visual chip mode cepat di browser sungguhan) |
-| E06-S1 | PeriodStats service (range + pembanding) — dipakai Analisis & Laporan | 3 | E00-S1, E00-S3 | ⬜ |
+| E06-S1 | PeriodStats service (range + pembanding) — dipakai Analisis & Laporan | 3 | E00-S1, E00-S3 | ✅ (live diverifikasi lewat `curl` ke `/analytics/stats` di prod dengan data asli — 7d/30d/90d/all beda angka, pembanding null kalau sebelum `dataStartsAt`; `/transactions/insights` (wrapper lama) dicek tetap kompatibel. Belum: halaman `/app/insights` E06-S2, jadi belum ada verifikasi visual browser) |
 | E06-S2 | Halaman Analisis v2 (kebiasaan, heatmap, anomali, rutin vs besar) | 3 | E06-S1 | ⬜ |
 | E07-S1 | Laporan Mingguan & Bulanan v2 + snapshot tersimpan | 3 | E06-S1 | ⬜ |
 | E07-S2 | Laporan 6 Bulan & All-time + export/share | 3 | E07-S1 | ⬜ |

@@ -18,6 +18,7 @@ import { SplitBillModule } from './modules/split-bill/split-bill.module';
 import { AiModule } from './modules/ai/ai.module';
 import { GoalModule } from './modules/goal/goal.module';
 import { SubscriptionModule } from './modules/subscription/subscription.module';
+import { AnalyticsModule } from './modules/analytics/analytics.module';
 
 @Module({
   imports: [
@@ -40,6 +41,7 @@ import { SubscriptionModule } from './modules/subscription/subscription.module';
     AiModule,
     GoalModule,
     SubscriptionModule,
+    AnalyticsModule,
   ],
 })
 export class AppModule {}
