@@ -4,7 +4,21 @@ import { useEffect, useRef, useState } from 'react';
 import useSWR from 'swr';
 import Link from 'next/link';
 import { api } from '@/lib/api';
-import { Brain, ChevronLeft, History, Plus, Send, Trash2, Wallet, Coffee, TrendingUp, ShoppingBag, X } from 'lucide-react';
+import {
+  Brain,
+  ChevronLeft,
+  History,
+  Plus,
+  Send,
+  Trash2,
+  Wallet,
+  TrendingUp,
+  ShoppingBag,
+  AlertTriangle,
+  CalendarDays,
+  SlidersHorizontal,
+  X,
+} from 'lucide-react';
 import { AnimatePresence, motion } from 'motion/react';
 import { TRANSITION_BASE, TRANSITION_SLOW } from '@/lib/motion';
 import { TracksterMascot } from '@/components/TracksterMascot';
@@ -36,11 +50,15 @@ interface DisplayMessage {
   attachments?: ChatCard[] | null;
 }
 
+// Mode cepat (E04-S5) — tiap chip = template prompt yang mengarahkan tool yang tepat. Diisi ke
+// input (bukan auto-send) karena beberapa butuh detail dari Arzaka dulu sebelum masuk akal dikirim.
 const QUICK_PROMPTS = [
-  { label: 'Sisa budget hari ini?', Icon: Wallet, text: 'Berapa sisa budget hari ini?' },
-  { label: 'Catat kopi 25rb', Icon: Coffee, text: 'Beli kopi 25rb tadi di Jago' },
-  { label: 'Pengeluaran bulan ini', Icon: TrendingUp, text: 'Gimana pengeluaran saya bulan ini?' },
-  { label: 'Cek sebelum beli', Icon: ShoppingBag, text: 'Saya mau beli gadget 2jt, aman ga?' },
+  { label: 'Mau beli sesuatu', Icon: ShoppingBag, text: 'Aku mau beli ' },
+  { label: 'Simulasi rencana nabung', Icon: TrendingUp, text: 'Simulasiin dong kalau aku nabung ' },
+  { label: 'Kenapa minggu ini boros?', Icon: AlertTriangle, text: 'Kenapa minggu ini boros banget?' },
+  { label: 'Aku lagi bokek, harus gimana?', Icon: Wallet, text: 'Aku lagi bokek, harus gimana?' },
+  { label: 'Review bulan ini', Icon: CalendarDays, text: 'Coba review pengeluaran aku bulan ini dong' },
+  { label: 'Atur ulang budget', Icon: SlidersHorizontal, text: 'Bantuin atur ulang budget harian aku dong' },
 ];
 
 const WELCOME: DisplayMessage = {
@@ -314,7 +332,10 @@ export default function ChatPage() {
             <button
               key={text}
               type="button"
-              onClick={() => handleSend(text)}
+              onClick={() => {
+                setInput(text);
+                inputRef.current?.focus();
+              }}
               className="flex items-center gap-2.5 rounded-comfortable bg-surface px-3 py-2.5 text-left shadow-hairline transition-colors hover:bg-surface-alt"
             >
               <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-surface-interactive text-brand">

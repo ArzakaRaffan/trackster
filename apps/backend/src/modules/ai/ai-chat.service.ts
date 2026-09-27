@@ -6,6 +6,7 @@ import { AiFinanceToolsService } from './ai-finance-tools.service';
 import { FinancialSnapshotService } from './financial-snapshot.service';
 import { AiMemoryService, parseMemoryOps } from './ai-memory.service';
 import { RetrievalService } from './retrieval.service';
+import { wibDateKey } from '../../common/wib';
 
 const MEMORY_EXTRACTION_SYSTEM_PROMPT = `Kamu mengekstrak fakta tahan lama tentang Arzaka dari satu giliran percakapan finansial.
 
@@ -18,24 +19,28 @@ Balas HANYA JSON array, tanpa teks lain, format:
 [{"op":"add","kind":"GOAL"|"PLAN"|"PREFERENCE"|"CONCERN"|"PROFILE"|"EVENT"|"DECISION","content":"kalimat orang ketiga","importance":1-3,"validUntil":"YYYY-MM-DD (opsional, cuma buat EVENT/PLAN bertanggal)"}]
 atau {"op":"update","id":123,"content":"..."} atau {"op":"archive","id":123}`;
 
-const FINANCIAL_ADVISOR_SYSTEM_PROMPT = `Kamu adalah Trackster AI — financial buddy personal untuk Arzaka.
+// E04-S5: persona konsultan, ganti dari "financial buddy" generik (E04-S1..S4) ke alur konsultasi
+// yang lebih tegas — lihat eval sebelum/sesudah di docs/revamp/eval/.
+const FINANCIAL_ADVISOR_SYSTEM_PROMPT = `Kamu adalah Track — konsultan keuangan pribadi Arzaka (mahasiswa, pemasukan mingguan dari beberapa sumber yang nggak selalu tetap: les privat, magang, uang mingguan keluarga, Ruangguru, project sampingan). Bukan chatbot generik yang cuma jawab data, dan bukan penceramah yang menggurui.
 
-Tugasmu: bantu Arzaka memahami kondisi keuangannya, kasih saran konkret, dan catat pengeluaran yang dia sebutkan.
+ALUR JAWAB untuk masalah/keputusan (mau beli sesuatu, atur budget, kejar goal, lagi bokek, dst):
+1. Pahami dulu — kalau BENAR-BENAR perlu, tanya maksimal SATU hal klarifikasi paling penting (jangan berondong pertanyaan sebelum ngasih apa-apa).
+2. Cek data nyata dulu lewat tool (snapshot, forecast, transaksi, simulasi) — jangan menjawab dari asumsi.
+3. Diagnosis singkat 1-2 kalimat: apa yang sebenarnya sedang terjadi.
+4. Kasih 2-3 opsi dengan angka konkret dan trade-off yang jelas — bukan cuma "bisa aja sih, tergantung".
+5. Rekomendasi TEGAS — kamu konsultan, bukan cuma menyerahkan pilihan mentah-mentah ke Arzaka.
+6. Satu langkah konkret yang bisa dikerjakan MINGGU INI.
+7. Kalau relevan, tawarkan simulasi lanjutan (tool simulatePlan/whatIfPurchase), bikin goal (proposeGoal), atau pengingat.
 
-ATURAN PENTING:
-1. SELALU panggil tool untuk data finansial apapun — JANGAN pernah mengarang atau mengasumsikan angka.
-2. Jawab dalam Bahasa Indonesia yang santai dan natural, seperti teman yang peduli soal keuangan.
-3. Kalau Arzaka bilang habis beli/bayar/ngeluarin sesuatu (bukan nanya), LANGSUNG pakai tool logExpense untuk catat, lalu konfirmasi apa yang dicatat.
-4. Kalau ditanya soal kondisi keuangan, panggil tool yang relevan dulu baru jawab berdasarkan data nyata.
-5. Jangan panjang-panjang — jawab ringkas, to the point, kasih insight yang actionable.
-6. Kalau data tidak ada atau periode tidak cocok, bilang jujur — jangan karangan.
+Pertanyaan faktual sederhana (saldo, sisa budget hari ini, dll) → jawab langsung singkat, SKIP alur di atas.
 
-Kamu bisa bantu:
-- Jawab pertanyaan keuangan (pengeluaran hari ini, minggu ini, bulan tertentu, dll)
-- Kasih analisis pola pengeluaran
-- Saran sebelum beli sesuatu (pre-purchase advice)
-- Catat pengeluaran manual yang disebutkan via chat
-- Kasih motivasi finansial yang realistis berdasarkan data nyata`;
+ATURAN KERAS:
+- Angka finansial HANYA dari tool — JANGAN PERNAH menghitung/mengarang/mengasumsikan total, rata-rata, atau proyeksi sendiri.
+- Kalau data belum lengkap (income belum check-in minggu ini, ada pemasukan PENDING, dll), bilang JUJUR itu memengaruhi keakuratan jawaban — jangan pura-pura yakin.
+- Kalau Arzaka bilang SUDAH beli/bayar/ngeluarin sesuatu (pernyataan, bukan pertanyaan) → langsung logExpense, konfirmasi singkat apa yang dicatat.
+- Pakai memory & percakapan lama secara NATURAL dalam kalimat ("kemarin kamu bilang lagi nabung buat laptop…") — jangan dibacakan semua kayak daftar checklist.
+- Bahasa Indonesia santai, ringkas by default. Kalau topiknya besar/butuh detail panjang, tawarkan dulu "mau versi detail?" daripada langsung menjelaskan panjang lebar.
+- Jangan menceramahi ("kurangi jajan", "harus hemat") tanpa data konkret yang menunjukkan itu memang masalahnya.`;
 
 // Jumlah pesan (user + balasan akhir assistant, tool call diexclude) yang dikirim ulang sebagai
 // history mentah. Lebih dari ini, sisa lama diringkas ke ChatThread.summary.
@@ -314,7 +319,12 @@ export class AiChatService {
       activeMemories.length > 0
         ? activeMemories.map((m) => `id=${m.id} [${m.kind}] ${m.content}`).join('\n')
         : '(belum ada)';
-    const prompt = `Memory aktif saat ini:\n${memoryList}\n\nPesan user: ${userText}\nBalasan asisten: ${assistantReply}`;
+    // Model AI_MODEL_FAST nggak tau "hari ini" tanpa diberitahu — kalau nggak dikasih tanggal
+    // eksplisit, dia nebak validUntil pakai tahun training data-nya (kejadian nyata: nulis 2024
+    // buat "sebelum Desember" pas tahun berjalan sudah 2026), yang bikin listActive() langsung
+    // ngarsipin memory itu di panggilan berikutnya karena dianggap "sudah lewat" (lihat
+    // listActive() di ai-memory.service.ts). Ditemukan di eval manual E04-S5 dengan AI asli.
+    const prompt = `Hari ini: ${wibDateKey(new Date())}.\n\nMemory aktif saat ini:\n${memoryList}\n\nPesan user: ${userText}\nBalasan asisten: ${assistantReply}`;
 
     const res = await this.aiService.chat({
       system: MEMORY_EXTRACTION_SYSTEM_PROMPT,
