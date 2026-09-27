@@ -140,7 +140,9 @@ export class FinancialSnapshotService {
     }
 
     if (upcomingSubs.length > 0) {
-      const parts = upcomingSubs.map((s: any) => `${s.name} ${fmtRp(Number(s.amount))} (${fmtDateShort(s.nextDueDate)})`);
+      // getUpcomingReminders() serialize() nextDueDate jadi string "YYYY-MM-DD" (buat konsumen API) —
+      // fmtDateShort butuh Date asli, konversi balik di sini.
+      const parts = upcomingSubs.map((s) => `${s.name} ${fmtRp(Number(s.amount))} (${fmtDateShort(new Date(s.nextDueDate))})`);
       lines.push(`Langganan 14 hari ke depan: ${parts.join(', ')}.`);
     }
 
