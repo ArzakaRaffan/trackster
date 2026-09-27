@@ -5,6 +5,7 @@ import { AiService, ChatMessage as AiMessage } from './ai.service';
 import { AiFinanceToolsService } from './ai-finance-tools.service';
 import { FinancialSnapshotService } from './financial-snapshot.service';
 import { AiMemoryService, parseMemoryOps } from './ai-memory.service';
+import { RetrievalService } from './retrieval.service';
 
 const MEMORY_EXTRACTION_SYSTEM_PROMPT = `Kamu mengekstrak fakta tahan lama tentang Arzaka dari satu giliran percakapan finansial.
 
@@ -68,6 +69,7 @@ export class AiChatService {
     private aiFinanceToolsService: AiFinanceToolsService,
     private financialSnapshotService: FinancialSnapshotService,
     private aiMemoryService: AiMemoryService,
+    private retrievalService: RetrievalService,
   ) {}
 
   listThreads(channel?: ChatChannel) {
@@ -146,17 +148,26 @@ export class AiChatService {
       });
       history.reverse();
 
-      const [snapshot, activeMemories] = await Promise.all([
+      // Pesan tertua di window sudah masuk history mentah di bawah — retrieval tidak perlu
+      // menyarankan balik pesan yang sama, cukup ekor panjang di luar window ini.
+      const excludeAfterId = history.length > 0 ? history[0].id - 1 : 0;
+
+      const [snapshot, activeMemories, retrieved] = await Promise.all([
         this.financialSnapshotService.getSnapshot(),
         this.aiMemoryService.listActive(),
+        this.retrievalService.search(text, { excludeThreadId: threadId, excludeAfterId }),
       ]);
       const memoryBlock = this.aiMemoryService.formatForPrompt(activeMemories);
+      const retrievalBlock = this.retrievalService.formatForPrompt(retrieved);
 
       const system = [
         FINANCIAL_ADVISOR_SYSTEM_PROMPT,
         `\nKondisi keuangan Arzaka saat ini:\n${snapshot}`,
         memoryBlock
           ? `\nYang kamu tau tentang Arzaka dari percakapan sebelumnya (konteks, bukan angka presisi — tetap pakai tool buat angka):\n${memoryBlock}`
+          : '',
+        retrievalBlock
+          ? `\nPercakapan/laporan lama yang mungkin relevan (rujuk kalau memang nyambung, jangan dipaksakan):\n${retrievalBlock}`
           : '',
         thread.summary ? `\nRingkasan percakapan lama dengan Arzaka di thread ini:\n${thread.summary}` : '',
       ]
@@ -171,7 +182,7 @@ export class AiChatService {
       const newMessages = await this.aiService.runToolLoop({
         system,
         messages: aiMessages,
-        tools: this.aiFinanceToolsService.getTools(),
+        tools: this.aiFinanceToolsService.getTools({ threadId, excludeAfterId }),
         maxTokens: 1024,
       });
 
