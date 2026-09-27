@@ -9,6 +9,7 @@ import {
   startOfWibMonth,
   wibRange,
   isLastWibDayOfMonth,
+  wibDateOnly,
 } from './wib';
 
 // 2026-09-23T17:30:00Z = 2026-09-24T00:30 WIB -> sudah hari berikutnya
@@ -43,5 +44,13 @@ assert.strictEqual(startOfWibMonth(2026, 9).toISOString(), wibRange('month', new
 // wibRange('day', ...) end eksklusif tepat 24 jam setelah start
 const dayRange = wibRange('day', new Date('2026-09-24T10:00:00Z'));
 assert.strictEqual(dayRange.end.getTime() - dayRange.start.getTime(), 86_400_000);
+
+// wibDateOnly: startOfWibMonth('2026-09') = instant UTC 2026-08-31T17:00:00Z. Kalau instant ini
+// disimpan apa adanya ke kolom @db.Date, Postgres nyimpen tanggal UTC-nya (31 Agustus) — MUNDUR
+// satu hari dari yang dimaksud. wibDateOnly harus balikin instant yang tanggal UTC-nya PERSIS 1 Sep.
+const monthStartWib = startOfWibMonth(2026, 9);
+assert.strictEqual(monthStartWib.toISOString(), '2026-08-31T17:00:00.000Z'); // pra-syarat: buktikan bug-nya nyata
+assert.strictEqual(wibDateOnly(monthStartWib).toISOString(), '2026-09-01T00:00:00.000Z');
+assert.strictEqual(wibDateOnly(monthStartWib).toISOString().slice(0, 10), '2026-09-01');
 
 console.log('wib.check.ts OK');

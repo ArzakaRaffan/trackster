@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { IncomeCadence, IncomeKind } from '@prisma/client';
 import { PrismaService } from '../../prisma.service';
-import { addWibDays, startOfWibMonth, startOfWibWeek, wibDateKey, wibParts, wibRange } from '../../common/wib';
+import { addWibDays, startOfWibMonth, startOfWibWeek, wibDateKey, wibDateOnly, wibParts, wibRange } from '../../common/wib';
 
 export type StreamForecastStatus = 'RECEIVED' | 'PARTIAL' | 'PENDING' | 'MISSED';
 
@@ -222,7 +222,7 @@ export class IncomeForecastService {
     weekStart: Date,
     monthStart: Date,
   ): Promise<number[]> {
-    const before = stream.cadence === 'MONTHLY' ? monthStart : weekStart;
+    const before = wibDateOnly(stream.cadence === 'MONTHLY' ? monthStart : weekStart);
     const take = stream.cadence === 'MONTHLY' ? 3 : 8;
     const rows = await this.prisma.income.findMany({
       where: { streamId: stream.id, status: 'CONFIRMED', periodStart: { not: null, lt: before } },
@@ -235,7 +235,7 @@ export class IncomeForecastService {
 
   private async fetchHistoricalAbsences(streamId: number, weekStart: Date): Promise<number[]> {
     const rows = await this.prisma.income.findMany({
-      where: { streamId, status: 'CONFIRMED', periodStart: { not: null, lt: weekStart }, units: { not: null } },
+      where: { streamId, status: 'CONFIRMED', periodStart: { not: null, lt: wibDateOnly(weekStart) }, units: { not: null } },
       orderBy: { periodStart: 'desc' },
       take: 8,
       select: { units: true },
@@ -252,7 +252,10 @@ export class IncomeForecastService {
     weekEnd: Date,
     monthStart: Date,
   ): Promise<number> {
-    const periodMatch = stream.cadence === 'MONTHLY' ? { periodStart: monthStart } : { periodStart: { gte: weekStart, lt: weekEnd } };
+    const periodMatch =
+      stream.cadence === 'MONTHLY'
+        ? { periodStart: wibDateOnly(monthStart) }
+        : { periodStart: { gte: wibDateOnly(weekStart), lt: wibDateOnly(weekEnd) } };
     const agg = await this.prisma.income.aggregate({
       _sum: { amount: true },
       where: {

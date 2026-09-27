@@ -61,6 +61,15 @@ export function wibRange(kind: 'day' | 'week' | 'month', anchor: Date): { start:
   return { start, end };
 }
 
+/** Instant UTC yang tanggalnya (secara harfiah) sama dengan tanggal WIB `d` — WAJIB dipakai sebelum
+ * create/where pada kolom Prisma `@db.Date` (mis. `Income.periodStart`). Kolom DATE Postgres nyimpen
+ * tanggal dari representasi UTC instant yang dikirim; WIB 00:00 = UTC 17:00 HARI SEBELUMNYA, jadi
+ * `startOfWibWeek()`/`startOfWibMonth()` dipakai apa adanya bakal mundur satu hari di kolom @db.Date
+ * (aman dipakai langsung untuk DateTime biasa seperti `receivedAt`/`occurredAt`). Lihat docs/context/Gotchas.md. */
+export function wibDateOnly(d: Date): Date {
+  return new Date(`${wibDateKey(d)}T00:00:00.000Z`);
+}
+
 /** Apakah `d` jatuh di hari terakhir bulan (kalender WIB). Dipakai cron laporan bulanan. */
 export function isLastWibDayOfMonth(d: Date): boolean {
   const { end } = wibRange('month', d);
