@@ -4,6 +4,9 @@ import { PrismaService } from '../../prisma.service';
 import { AiService } from './ai.service';
 import { TransactionService } from '../transaction/transaction.service';
 import { TelegramService } from '../telegram/telegram.service';
+import { BudgetService } from '../budget/budget.service';
+import { GoalService } from '../goal/goal.service';
+import { SubscriptionService } from '../subscription/subscription.service';
 import { isLastWibDayOfMonth, startOfWibWeek, wibDateKey, wibParts } from '../../common/wib';
 
 const WEEKLY_NARRATIVE_PROMPT = `Kamu adalah Trackster AI — financial buddy personal Arzaka.
@@ -29,6 +32,23 @@ Format:
 
 Gunakan angka nyata dari data. Tidak perlu salam pembuka/penutup formal. Singkat dan actionable.`;
 
+const DAILY_RECAP_PROMPT = `Kamu adalah Trackster AI — financial buddy personal Arzaka.
+Tugas: Tulis recap SANGAT SINGKAT (maks 2 kalimat) soal hari ini, Bahasa Indonesia santai.
+Sebut satu hal konkret dari data (transaksi terbesar/kategori dominan/status budget), bukan generik.
+Kalau hari ini nggak ada apa-apa istimewa, boleh santai/jenaka. Tidak perlu salam pembuka/penutup formal.`;
+
+const GOAL_NUDGE_PROMPT = `Kamu adalah Trackster AI — financial buddy personal Arzaka.
+Tugas: Tulis SATU pesan singkat (maks 3 kalimat) soal progres goal tabungan Arzaka minggu ini, Bahasa Indonesia santai.
+Sebut goal yang paling butuh perhatian (paling jauh dari target/deadline terdekat), kasih angka konkret
+berapa yang perlu ditabung per minggu buat kejar. Jujur kalau progresnya nggak realistis, tapi tetap suportif.
+Tidak perlu salam pembuka/penutup formal.`;
+
+const SUBSCRIPTION_REVIEW_PROMPT = `Kamu adalah Trackster AI — financial buddy personal Arzaka.
+Tugas: Tulis review bulanan langganan (subscription) Arzaka, Bahasa Indonesia santai, maks 4 kalimat.
+Sebut total biaya bulanan semua langganan aktif, dan kalau ada nama yang terdengar mirip/duplikat
+(dari data yang diberikan), tanya apakah masih kepake semua. Jangan mengarang langganan yang tidak ada di data.
+Tidak perlu salam pembuka/penutup formal.`;
+
 @Injectable()
 export class AiReportsService {
   private readonly logger = new Logger(AiReportsService.name);
@@ -38,7 +58,114 @@ export class AiReportsService {
     private aiService: AiService,
     private transactionService: TransactionService,
     private telegramService: TelegramService,
+    private budgetService: BudgetService,
+    private goalService: GoalService,
+    private subscriptionService: SubscriptionService,
   ) {}
+
+  /** Daily: setiap hari jam 22:00 WIB. Skip kalau nggak ada aktivitas hari ini — jangan spam
+   *  recap kosong. */
+  @Cron('0 22 * * *', { name: 'daily-recap', timeZone: 'Asia/Jakarta' })
+  async sendDailyRecap() {
+    this.logger.log('Mengirim Daily Recap...');
+    try {
+      const today = await this.budgetService.getTodaySummary();
+      if (today.totalSpent === 0 && today.totalIncome === 0) return; // nggak ada aktivitas, skip
+
+      const narrative = await this.aiService.chat({
+        system: DAILY_RECAP_PROMPT,
+        messages: [{ role: 'user', content: JSON.stringify(today) }],
+        maxTokens: 150,
+        model: 'fast',
+      });
+
+      const text = narrative?.content?.trim();
+      if (text) {
+        await this.telegramService.sendMessage(`🌙 <b>Recap Hari Ini</b>\n\n${text}`);
+      }
+    } catch (err: any) {
+      this.logger.error(`sendDailyRecap error: ${err?.message}`);
+    }
+  }
+
+  /** Weekly: setiap Minggu jam 20:10 WIB (setelah weekly-insight-report) — nudge progres goal. */
+  @Cron('10 20 * * 0', { name: 'weekly-goal-nudge', timeZone: 'Asia/Jakarta' })
+  async sendGoalNudge() {
+    this.logger.log('Mengirim Goal Nudge...');
+    try {
+      const goals = await this.goalService.findAll();
+      if (!goals.length) return;
+
+      const narrative = await this.aiService.chat({
+        system: GOAL_NUDGE_PROMPT,
+        messages: [{ role: 'user', content: JSON.stringify(goals) }],
+        maxTokens: 250,
+      });
+
+      const text = narrative?.content?.trim();
+      if (text) {
+        await this.telegramService.sendMessage(`🎯 <b>Progres Goal</b>\n\n${text}`);
+      }
+    } catch (err: any) {
+      this.logger.error(`sendGoalNudge error: ${err?.message}`);
+    }
+  }
+
+  /** Monthly: cek setiap hari jam 20:30 WIB, eksekusi kalau hari ini = hari terakhir bulan
+   *  (offset dari monthly-report-card biar nggak numpuk di jam yang sama). */
+  @Cron('30 20 * * *', { name: 'monthly-subscription-review', timeZone: 'Asia/Jakarta' })
+  async sendSubscriptionReview() {
+    const now = new Date();
+    if (!isLastWibDayOfMonth(now)) return;
+
+    this.logger.log('Mengirim Subscription Review...');
+    try {
+      const subs = await this.subscriptionService.findAll();
+      const active = subs.filter((s) => s.isActive);
+      if (!active.length) return;
+
+      const totalMonthly = active.reduce(
+        (sum, s) => sum + (s.cycle === 'YEARLY' ? s.amount / 12 : s.amount),
+        0,
+      );
+
+      const possibleDuplicates = this.findSimilarNames(active.map((s) => s.name));
+
+      const narrative = await this.aiService.chat({
+        system: SUBSCRIPTION_REVIEW_PROMPT,
+        messages: [
+          {
+            role: 'user',
+            content: JSON.stringify({
+              langganan: active.map((s) => ({ nama: s.name, jumlah: s.amount, siklus: s.cycle })),
+              totalBulanan: Math.round(totalMonthly),
+              kemungkinanDuplikat: possibleDuplicates,
+            }),
+          },
+        ],
+        maxTokens: 300,
+      });
+
+      const text = narrative?.content?.trim();
+      if (text) {
+        await this.telegramService.sendMessage(`📦 <b>Review Langganan</b>\n\n${text}`);
+      }
+    } catch (err: any) {
+      this.logger.error(`sendSubscriptionReview error: ${err?.message}`);
+    }
+  }
+
+  /** Heuristik sederhana: nama langganan yang berbagi kata pertama (lowercase) — cukup buat
+   *  nangkep "Netflix" vs "Netflix Premium", tidak buat typo/sinonim. */
+  private findSimilarNames(names: string[]): string[][] {
+    const groups = new Map<string, string[]>();
+    for (const name of names) {
+      const key = name.trim().toLowerCase().split(/\s+/)[0];
+      if (!groups.has(key)) groups.set(key, []);
+      groups.get(key)!.push(name);
+    }
+    return [...groups.values()].filter((g) => g.length > 1);
+  }
 
   /** Weekly: setiap Minggu jam 20:00 WIB */
   @Cron('0 20 * * 0', { name: 'weekly-insight-report', timeZone: 'Asia/Jakarta' })

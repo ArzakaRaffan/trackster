@@ -4,6 +4,8 @@ import { AiFinanceToolsService } from './ai-finance-tools.service';
 import { AiChatService } from './ai-chat.service';
 import { AiReportsService } from './ai-reports.service';
 import { AiMascotService } from './ai-mascot.service';
+import { AiCaptionService } from './ai-caption.service';
+import { AiAnomalyService } from './ai-anomaly.service';
 import { AiController } from './ai.controller';
 import { BudgetModule } from '../budget/budget.module';
 import { TransactionModule } from '../transaction/transaction.module';
@@ -11,6 +13,7 @@ import { IncomeModule } from '../income/income.module';
 import { AuthModule } from '../auth/auth.module';
 import { TelegramModule } from '../telegram/telegram.module';
 import { SubscriptionModule } from '../subscription/subscription.module';
+import { GoalModule } from '../goal/goal.module';
 import { PrismaService } from '../../prisma.service';
 
 @Module({
@@ -19,11 +22,21 @@ import { PrismaService } from '../../prisma.service';
     TransactionModule,
     IncomeModule,
     AuthModule,
+    GoalModule,
     forwardRef(() => SubscriptionModule),
     forwardRef(() => TelegramModule),
   ],
-  providers: [AiService, AiFinanceToolsService, AiChatService, AiReportsService, AiMascotService, PrismaService],
+  providers: [
+    AiService,
+    AiFinanceToolsService,
+    AiChatService,
+    AiReportsService,
+    AiMascotService,
+    AiCaptionService,
+    AiAnomalyService,
+    PrismaService,
+  ],
   controllers: [AiController],
-  exports: [AiService, AiFinanceToolsService, AiChatService, AiReportsService, AiMascotService],
+  exports: [AiService, AiFinanceToolsService, AiChatService, AiReportsService, AiMascotService, AiCaptionService, AiAnomalyService],
 })
 export class AiModule {}

@@ -16,6 +16,7 @@ export interface NoteableTransaction {
   note?: string | null;
   category?: string;
   displayDescription?: string;
+  aiCaption?: string | null;
 }
 
 const rp = (n: number) => 'Rp' + Math.abs(Math.round(n)).toLocaleString('id-ID');
@@ -139,6 +140,9 @@ export function TransactionNoteRow({
         </span>
         <span className="min-w-0 flex-1">
           <span className="block truncate text-body font-bold text-ink">{title}</span>
+          {transaction.aiCaption && (
+            <span className="block truncate text-small italic text-ink-subtle">{transaction.aiCaption}</span>
+          )}
           <span className="mt-0.75 flex items-center gap-2">
             <SourceTag source={transaction.source} size="sm" />
             <span className="text-small tabular-nums text-ink-muted">{clock(transaction.occurredAt)}</span>

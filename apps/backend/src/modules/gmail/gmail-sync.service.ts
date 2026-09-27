@@ -8,6 +8,8 @@ import { BudgetService } from '../budget/budget.service';
 import { TelegramService } from '../telegram/telegram.service';
 import { PrismaService } from '../../prisma.service';
 import { AiChatService } from '../ai/ai-chat.service';
+import { AiCaptionService } from '../ai/ai-caption.service';
+import { AiAnomalyService } from '../ai/ai-anomaly.service';
 import { MerchantAliasService } from '../merchant-alias/merchant-alias.service';
 import { IncomeService } from '../income/income.service';
 import { BalanceService, shouldAdjustBalance } from '../balance/balance.service';
@@ -41,6 +43,8 @@ export class GmailSyncService {
     private prisma: PrismaService,
     private schedulerRegistry: SchedulerRegistry,
     private aiChatService: AiChatService,
+    private aiCaptionService: AiCaptionService,
+    private aiAnomalyService: AiAnomalyService,
     private merchantAliasService: MerchantAliasService,
     private incomeService: IncomeService,
     private balanceService: BalanceService,
@@ -224,6 +228,18 @@ export class GmailSyncService {
 
     if (created) {
       callbacks.onRecorded({ source: parsed.source, description: parsed.description, amount: parsed.amount });
+
+      // Fire-and-forget — kosmetik/proaktif, tidak boleh menahan atau menggagalkan sync.
+      const captionable = {
+        id: created.id,
+        description: created.description,
+        amount: Number(created.amount),
+        category: created.category,
+        occurredAt: created.occurredAt,
+        merchantKey: created.merchantKey,
+      };
+      this.aiCaptionService.generate(captionable).catch(() => {});
+      this.aiAnomalyService.checkAndNotify(captionable).catch(() => {});
 
       await this.logParseResult(id, from, subject, receivedAt, {
         status: ParseStatus.RECORDED,
