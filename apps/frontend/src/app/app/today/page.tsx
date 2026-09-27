@@ -45,6 +45,7 @@ interface Transaction {
   note?: string | null;
   category?: string;
   displayDescription?: string;
+  aiCaption?: string | null;
 }
 
 

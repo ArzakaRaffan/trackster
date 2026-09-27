@@ -31,6 +31,9 @@ model Transaction {
   // dipakai groupBy merchant di analisis & lookup rule kategori. Lihat merchantKey() di
   // merchant-key.util.ts. Nullable karena transaksi lama di-backfill terpisah (bukan migration).
   merchantKey String?
+  // Caption satu-baris digenerate AI (fast model) buat feed transaksi — kosmetik, nullable,
+  // gagal generate tidak boleh gagalkan pencatatan transaksi. Lihat AiCaptionService.
+  aiCaption   String?
 
   @@index([occurredAt])
   @@index([merchantKey])

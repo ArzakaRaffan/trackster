@@ -3,6 +3,7 @@ import { BudgetService } from '../budget/budget.service';
 import { TransactionService } from '../transaction/transaction.service';
 import { IncomeService } from '../income/income.service';
 import { AiTool } from './ai.service';
+import { AiCaptionService } from './ai-caption.service';
 import { Source, Category } from '@prisma/client';
 
 @Injectable()
@@ -11,6 +12,7 @@ export class AiFinanceToolsService {
     private budgetService: BudgetService,
     private transactionService: TransactionService,
     private incomeService: IncomeService,
+    private aiCaptionService: AiCaptionService,
   ) {}
 
   getTools(): AiTool[] {
@@ -118,14 +120,25 @@ export class AiFinanceToolsService {
           description: string;
           category: string;
           source: string;
-        }) =>
-          this.transactionService.create({
+        }) => {
+          const created = await this.transactionService.create({
             amount: input.amount,
             description: input.description,
             category: input.category as Category,
             source: (input.source || 'BCA') as Source,
             occurredAt: new Date().toISOString(),
-          }),
+          });
+          this.aiCaptionService
+            .generate({
+              id: created.id,
+              description: created.description,
+              amount: Number(created.amount),
+              category: created.category,
+              occurredAt: created.occurredAt,
+            })
+            .catch(() => {});
+          return created;
+        },
       },
     ];
   }
