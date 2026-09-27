@@ -4,7 +4,8 @@ import { TransactionService } from '../transaction/transaction.service';
 import { IncomeService } from '../income/income.service';
 import { AiTool } from './ai.service';
 import { AiCaptionService } from './ai-caption.service';
-import { Source, Category } from '@prisma/client';
+import { AiMemoryService } from './ai-memory.service';
+import { Source, Category, MemoryKind } from '@prisma/client';
 
 @Injectable()
 export class AiFinanceToolsService {
@@ -13,6 +14,7 @@ export class AiFinanceToolsService {
     private transactionService: TransactionService,
     private incomeService: IncomeService,
     private aiCaptionService: AiCaptionService,
+    private aiMemoryService: AiMemoryService,
   ) {}
 
   getTools(): AiTool[] {
@@ -139,6 +141,36 @@ export class AiFinanceToolsService {
             .catch(() => {});
           return created;
         },
+      },
+      {
+        name: 'remember',
+        description: 'Simpan fakta tahan lama tentang Arzaka yang dia minta diingat secara eksplisit (mis. "ingat ya, aku...") — bukan buat angka yang sudah ada di database.',
+        input_schema: {
+          type: 'object',
+          properties: {
+            content: { type: 'string', description: 'Fakta, ditulis orang ketiga, contoh: "Arzaka ingin beli laptop ±Rp12jt sebelum Juni 2027"' },
+            kind: {
+              type: 'string',
+              enum: ['PROFILE', 'GOAL', 'PLAN', 'PREFERENCE', 'CONCERN', 'EVENT', 'DECISION'],
+              description: 'Jenis fakta',
+            },
+          },
+          required: ['content', 'kind'],
+        },
+        handler: async (input: { content: string; kind: string }) =>
+          this.aiMemoryService.create({ content: input.content, kind: input.kind as MemoryKind }),
+      },
+      {
+        name: 'forget',
+        description: 'Hapus (arsip) satu memory yang sudah tidak relevan — dipakai kalau Arzaka bilang "lupain yang itu" atau semacamnya.',
+        input_schema: {
+          type: 'object',
+          properties: {
+            memoryId: { type: 'number', description: 'id memory yang mau dilupakan' },
+          },
+          required: ['memoryId'],
+        },
+        handler: async (input: { memoryId: number }) => this.aiMemoryService.update(input.memoryId, { archived: true }),
       },
     ];
   }

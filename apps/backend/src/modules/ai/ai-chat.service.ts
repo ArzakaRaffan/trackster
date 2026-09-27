@@ -3,6 +3,19 @@ import { ChatChannel } from '@prisma/client';
 import { PrismaService } from '../../prisma.service';
 import { AiService, ChatMessage as AiMessage } from './ai.service';
 import { AiFinanceToolsService } from './ai-finance-tools.service';
+import { FinancialSnapshotService } from './financial-snapshot.service';
+import { AiMemoryService, parseMemoryOps } from './ai-memory.service';
+
+const MEMORY_EXTRACTION_SYSTEM_PROMPT = `Kamu mengekstrak fakta tahan lama tentang Arzaka dari satu giliran percakapan finansial.
+
+Hanya simpan: rencana, preferensi, kekhawatiran, profil, atau keputusan yang akan tetap relevan di percakapan berikutnya.
+JANGAN simpan angka yang sudah ada di database (saldo, total belanja, budget) — itu sudah otomatis disuntik ke prompt tiap kali.
+Kalau ada memory yang mirip di daftar "Memory aktif saat ini", UPDATE itu (jangan bikin duplikat baru).
+Maksimal 3 operasi. Kalau tidak ada fakta baru yang layak disimpan, balas array kosong [].
+
+Balas HANYA JSON array, tanpa teks lain, format:
+[{"op":"add","kind":"GOAL"|"PLAN"|"PREFERENCE"|"CONCERN"|"PROFILE"|"EVENT"|"DECISION","content":"kalimat orang ketiga","importance":1-3,"validUntil":"YYYY-MM-DD (opsional, cuma buat EVENT/PLAN bertanggal)"}]
+atau {"op":"update","id":123,"content":"..."} atau {"op":"archive","id":123}`;
 
 const FINANCIAL_ADVISOR_SYSTEM_PROMPT = `Kamu adalah Trackster AI — financial buddy personal untuk Arzaka.
 
@@ -53,6 +66,8 @@ export class AiChatService {
     private prisma: PrismaService,
     private aiService: AiService,
     private aiFinanceToolsService: AiFinanceToolsService,
+    private financialSnapshotService: FinancialSnapshotService,
+    private aiMemoryService: AiMemoryService,
   ) {}
 
   listThreads(channel?: ChatChannel) {
@@ -131,9 +146,22 @@ export class AiChatService {
       });
       history.reverse();
 
-      const system = thread.summary
-        ? `${FINANCIAL_ADVISOR_SYSTEM_PROMPT}\n\nRingkasan percakapan lama dengan Arzaka di thread ini:\n${thread.summary}`
-        : FINANCIAL_ADVISOR_SYSTEM_PROMPT;
+      const [snapshot, activeMemories] = await Promise.all([
+        this.financialSnapshotService.getSnapshot(),
+        this.aiMemoryService.listActive(),
+      ]);
+      const memoryBlock = this.aiMemoryService.formatForPrompt(activeMemories);
+
+      const system = [
+        FINANCIAL_ADVISOR_SYSTEM_PROMPT,
+        `\nKondisi keuangan Arzaka saat ini:\n${snapshot}`,
+        memoryBlock
+          ? `\nYang kamu tau tentang Arzaka dari percakapan sebelumnya (konteks, bukan angka presisi — tetap pakai tool buat angka):\n${memoryBlock}`
+          : '',
+        thread.summary ? `\nRingkasan percakapan lama dengan Arzaka di thread ini:\n${thread.summary}` : '',
+      ]
+        .filter(Boolean)
+        .join('\n');
 
       const aiMessages: AiMessage[] = history.map((m) => ({
         role: m.role as 'user' | 'assistant',
@@ -173,6 +201,10 @@ export class AiChatService {
       this.maybeSummarize(threadId).catch((err) =>
         this.logger.warn(`Summarize thread ${threadId} gagal: ${err?.message}`),
       );
+
+      if (reply) {
+        this.extractMemory(text, reply).catch((err) => this.logger.warn(`Ekstraksi memory gagal: ${err?.message}`));
+      }
 
       return reply || 'Maaf, ada gangguan teknis. Coba lagi ya!';
     } catch (err: any) {
@@ -228,6 +260,27 @@ export class AiChatService {
       where: { id: threadId },
       data: { summary, summaryUpToId: toSummarize[toSummarize.length - 1].id },
     });
+  }
+
+  /** Async, fire-and-forget (dipanggil tanpa await dari sendMessage) — TIDAK boleh throw ke atas.
+   *  Model AI_MODEL_FAST diminta ekstrak fakta tahan lama dari satu giliran, hasil JSON divalidasi
+   *  ketat oleh parseMemoryOps sebelum diterapkan (output model = untrusted input). */
+  private async extractMemory(userText: string, assistantReply: string): Promise<void> {
+    const activeMemories = await this.aiMemoryService.listActive();
+    const memoryList =
+      activeMemories.length > 0
+        ? activeMemories.map((m) => `id=${m.id} [${m.kind}] ${m.content}`).join('\n')
+        : '(belum ada)';
+    const prompt = `Memory aktif saat ini:\n${memoryList}\n\nPesan user: ${userText}\nBalasan asisten: ${assistantReply}`;
+
+    const res = await this.aiService.chat({
+      system: MEMORY_EXTRACTION_SYSTEM_PROMPT,
+      model: 'fast',
+      messages: [{ role: 'user', content: prompt }],
+      maxTokens: 400,
+    });
+    const ops = parseMemoryOps(res?.content ?? '[]');
+    if (ops.length > 0) await this.aiMemoryService.applyOps(ops);
   }
 
   private async assertThreadExists(id: number) {

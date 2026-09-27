@@ -378,3 +378,30 @@ model ChatMessage {
 
   @@index([threadId, id])
 }
+
+enum MemoryKind {
+  PROFILE
+  GOAL
+  PLAN
+  PREFERENCE
+  CONCERN
+  EVENT
+  DECISION
+}
+
+// Fakta tahan lama tentang Arzaka (bukan angka yang sudah ada di DB lain) — disuntik ke system
+// prompt tiap chat (E04-S2). Diisi otomatis (ekstraksi async tiap balasan) atau manual lewat
+// tool remember/forget & halaman "Yang Track ingat".
+model AiMemory {
+  id              Int        @id @default(autoincrement())
+  kind            MemoryKind
+  content         String
+  importance      Int        @default(2) // 1 rendah .. 3 tinggi
+  sourceMessageId Int?
+  validUntil      DateTime? // EVENT/PLAN yang ada tanggalnya — lewat = auto-archive
+  archivedAt      DateTime?
+  createdAt       DateTime   @default(now())
+  updatedAt       DateTime   @updatedAt
+
+  @@index([archivedAt])
+}

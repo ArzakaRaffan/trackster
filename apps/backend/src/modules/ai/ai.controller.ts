@@ -1,9 +1,12 @@
 import { Controller, Post, Body, Get, Patch, Delete, Param, ParseIntPipe, UseGuards } from '@nestjs/common';
-import { IsBoolean, IsNumber, IsOptional, IsString, MinLength } from 'class-validator';
+import { IsBoolean, IsEnum, IsInt, IsNumber, IsOptional, IsString, Max, Min, MinLength } from 'class-validator';
+import { MemoryKind } from '@prisma/client';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { AiChatService } from './ai-chat.service';
 import { AiReportsService } from './ai-reports.service';
 import { AiMascotService } from './ai-mascot.service';
+import { FinancialSnapshotService } from './financial-snapshot.service';
+import { AiMemoryService } from './ai-memory.service';
 import { PrismaService } from '../../prisma.service';
 
 class ChatDto {
@@ -37,6 +40,50 @@ class SuggestCategoryDto {
   amount: number;
 }
 
+class CreateMemoryDto {
+  @IsString()
+  @MinLength(1)
+  content: string;
+
+  @IsEnum(MemoryKind)
+  kind: MemoryKind;
+
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  @Max(3)
+  importance?: number;
+
+  @IsOptional()
+  @IsString()
+  validUntil?: string;
+}
+
+class UpdateMemoryDto {
+  @IsOptional()
+  @IsString()
+  @MinLength(1)
+  content?: string;
+
+  @IsOptional()
+  @IsEnum(MemoryKind)
+  kind?: MemoryKind;
+
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  @Max(3)
+  importance?: number;
+
+  @IsOptional()
+  @IsString()
+  validUntil?: string | null;
+
+  @IsOptional()
+  @IsBoolean()
+  archived?: boolean;
+}
+
 @UseGuards(JwtAuthGuard)
 @Controller('ai')
 export class AiController {
@@ -44,12 +91,42 @@ export class AiController {
     private aiChatService: AiChatService,
     private aiReportsService: AiReportsService,
     private aiMascotService: AiMascotService,
+    private financialSnapshotService: FinancialSnapshotService,
+    private aiMemoryService: AiMemoryService,
     private prisma: PrismaService,
   ) {}
 
   @Get('mascot-tip')
   async mascotTip() {
     return this.aiMascotService.getTip();
+  }
+
+  /** Debug — lihat persis teks yang disuntik ke system prompt sebagai kondisi keuangan saat ini. */
+  @Get('snapshot')
+  async snapshot() {
+    const text = await this.financialSnapshotService.getSnapshot(true);
+    return { text };
+  }
+
+  @Get('memory')
+  async listMemory() {
+    return this.aiMemoryService.listAll();
+  }
+
+  @Post('memory')
+  async createMemory(@Body() body: CreateMemoryDto) {
+    return this.aiMemoryService.create(body);
+  }
+
+  @Patch('memory/:id')
+  async updateMemory(@Param('id', ParseIntPipe) id: number, @Body() body: UpdateMemoryDto) {
+    return this.aiMemoryService.update(id, body);
+  }
+
+  @Delete('memory/:id')
+  async deleteMemory(@Param('id', ParseIntPipe) id: number) {
+    await this.aiMemoryService.remove(id);
+    return { ok: true };
   }
 
   /** Legacy — bikin/lanjutkan thread "Quick chat" tunggal. Dipertahankan sampai frontend
