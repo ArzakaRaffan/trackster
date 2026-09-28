@@ -1,11 +1,13 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { IncomeOrigin, IncomeStatus, ParseStatus, Source } from '@prisma/client';
 import { PrismaService } from '../../prisma.service';
 import { BalanceService, shouldAdjustBalance } from '../balance/balance.service';
 import { IncomeForecastService } from '../income-forecast/income-forecast.service';
+import { TelegramService } from '../telegram/telegram.service';
 import { CreateIncomeDto } from './dto/create-income.dto';
 import { UpdateIncomeDto } from './dto/update-income.dto';
 import { ResolveIncomeDto } from './dto/resolve-income.dto';
+import { QuickIncomeDto } from './dto/quick-income.dto';
 import { addWibDays, startOfWibDay, startOfWibWeek } from '../../common/wib';
 import { isOwnerName } from '../gmail/parsers/own-accounts';
 
@@ -23,10 +25,13 @@ const FLIPTECH_CORRELATION_WINDOW_MS = 3 * 60 * 60 * 1000;
 
 @Injectable()
 export class IncomeService {
+  private readonly logger = new Logger(IncomeService.name);
+
   constructor(
     private prisma: PrismaService,
     private balanceService: BalanceService,
     private incomeForecastService: IncomeForecastService,
+    private telegramService: TelegramService,
   ) {}
 
   async findAll(params: { startDate?: string; endDate?: string; status?: IncomeStatus }) {
@@ -55,6 +60,92 @@ export class IncomeService {
       return income;
     });
   }
+
+  /** Quick logging endpoint untuk iOS Shortcut / integrasi webhook tanpa JWT.
+   * Mencocokkan nama kategori ke IncomeStream yang sudah ada secara otomatis. */
+  async createQuick(dto: QuickIncomeDto) {
+    const source = dto.source ?? Source.BCA;
+    const receivedAt = new Date();
+    const amount = Number(dto.amount);
+
+    const streamHint = (dto.category || dto.streamName || '').trim();
+    const noteHint = (dto.note || dto.description || '').trim();
+    const lookupText = `${streamHint} ${noteHint}`.toUpperCase();
+
+    const streams = await this.prisma.incomeStream.findMany({ where: { isActive: true } });
+
+    // Prioritas 1: streamHint cocok dengan nama stream
+    let matchedStream = streams.find(
+      (s) => streamHint && s.name.toUpperCase().includes(streamHint.toUpperCase()),
+    );
+
+    // Prioritas 2: streamHint cocok dengan matchKeywords
+    if (!matchedStream && streamHint) {
+      matchedStream = streams.find((s) =>
+        s.matchKeywords.some((kw) => streamHint.toUpperCase().includes(kw.toUpperCase())),
+      );
+    }
+
+    // Prioritas 3: noteHint cocok dengan matchKeywords
+    if (!matchedStream && lookupText) {
+      matchedStream = streams.find((s) =>
+        s.matchKeywords.some((kw) => lookupText.includes(kw.toUpperCase())),
+      );
+    }
+
+    // Prioritas 4: streamHint cocok partial dengan "Project" atau "Lainnya"
+    if (!matchedStream && /project|lainnya|other/i.test(lookupText)) {
+      matchedStream = streams.find((s) => s.name.toLowerCase().includes('project'));
+    }
+
+    const streamId = matchedStream?.id ?? null;
+    const periodStart = streamId ? startOfWibWeek(receivedAt) : null;
+    const description = noteHint || (matchedStream ? matchedStream.name : streamHint || 'Pemasukan Shortcut');
+
+    const income = await this.prisma.$transaction(async (tx) => {
+      const created = await tx.income.create({
+        data: {
+          amount,
+          description,
+          source,
+          receivedAt,
+          status: IncomeStatus.CONFIRMED,
+          origin: IncomeOrigin.MANUAL,
+          ...(streamId ? { streamId, periodStart } : {}),
+        },
+        include: { stream: true },
+      });
+
+      const lastAdjustmentAt = await this.balanceService.getLastManualAdjustmentAt(tx, created.source);
+      if (shouldAdjustBalance(created.receivedAt, lastAdjustmentAt)) {
+        await this.balanceService.adjustBalance(tx, created.source, Number(created.amount));
+      }
+
+      return created;
+    });
+
+    // Kirim notifikasi konfirmasi ke Telegram
+    try {
+      const streamName = income.stream?.name ?? 'Tanpa Kategori';
+      const formattedAmount = `Rp ${Math.round(amount).toLocaleString('id-ID')}`;
+      await this.telegramService.sendMessage(
+        `💰 <b>Pemasukan Dicatat via Shortcut</b>\n` +
+        `• <b>Jumlah:</b> ${formattedAmount}\n` +
+        `• <b>Kategori:</b> ${streamName}\n` +
+        `• <b>Keterangan:</b> ${income.description}\n` +
+        `• <b>Rekening:</b> ${income.source}`
+      );
+    } catch (err: any) {
+      this.logger.warn(`Gagal kirim notif Telegram quick income: ${err?.message}`);
+    }
+
+    return {
+      success: true,
+      income,
+      message: `Pemasukan Rp ${amount.toLocaleString('id-ID')} berhasil dicatat ke ${source}`,
+    };
+  }
+
 
   /** Reverse efek balance dari data lama dulu, baru apply data baru — lebih simpel & aman
    * daripada ngitung selisih per-field, dan tetap benar walau amount dan source dua-duanya berubah. */
