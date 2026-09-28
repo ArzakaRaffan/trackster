@@ -6,6 +6,7 @@ import { UpdateNoteDto } from './dto/update-note.dto';
 import { UpdateCategoryDto } from './dto/update-category.dto';
 import { SetAliasDto } from './dto/set-alias.dto';
 import { CreateTransactionDto } from './dto/create-transaction.dto';
+import { SetBigDto } from './dto/set-big.dto';
 import { wibParts } from '../../common/wib';
 
 @UseGuards(JwtAuthGuard)
@@ -106,5 +107,11 @@ export class TransactionController {
   @Patch(':id/alias')
   async setAlias(@Param('id', ParseIntPipe) id: number, @Body() dto: SetAliasDto) {
     return this.transactionService.setAlias(id, dto.displayName);
+  }
+
+  /** Override manual "pembelian besar" (dipakai tombol "Tandai rutin/besar" di Analisis). `null` = balik ke aturan otomatis. */
+  @Patch(':id/big')
+  async setBig(@Param('id', ParseIntPipe) id: number, @Body() dto: SetBigDto) {
+    return this.transactionService.setBig(id, dto.isBig);
   }
 }

@@ -7,7 +7,8 @@ import { TelegramService } from '../telegram/telegram.service';
 import { BudgetService } from '../budget/budget.service';
 import { GoalService } from '../goal/goal.service';
 import { SubscriptionService } from '../subscription/subscription.service';
-import { isLastWibDayOfMonth, startOfWibWeek, wibDateKey, wibParts } from '../../common/wib';
+import { AnalyticsService } from '../analytics/analytics.service';
+import { addWibDays, isLastWibDayOfMonth, startOfWibDay, startOfWibWeek, wibDateKey, wibParts } from '../../common/wib';
 
 const WEEKLY_NARRATIVE_PROMPT = `Kamu adalah Trackster AI — financial buddy personal Arzaka.
 Tugas: Tulis ringkasan mingguan keuangan Arzaka dalam Bahasa Indonesia yang santai.
@@ -61,6 +62,7 @@ export class AiReportsService {
     private budgetService: BudgetService,
     private goalService: GoalService,
     private subscriptionService: SubscriptionService,
+    private analyticsService: AnalyticsService,
   ) {}
 
   /** Daily: setiap hari jam 22:00 WIB. Skip kalau nggak ada aktivitas hari ini — jangan spam
@@ -186,7 +188,7 @@ export class AiReportsService {
       }
 
       // Hitung & simpan Health Score sekalian
-      await this.computeAndSaveHealthScore(insights);
+      await this.computeAndSaveHealthScore();
     } catch (err: any) {
       this.logger.error(`sendWeeklyInsight error: ${err?.message}`);
     }
@@ -231,37 +233,18 @@ export class AiReportsService {
     }
   }
 
-  /** Hitung Health Score algoritmik + simpan ke HealthScoreLog */
-  async computeAndSaveHealthScore(insights?: any) {
+  /** Hitung Health Score algoritmik (dari PeriodStats 30 hari) + simpan ke HealthScoreLog */
+  async computeAndSaveHealthScore() {
     try {
-      const data = insights ?? (await this.transactionService.getInsights('30d'));
-
-      // budgetAdherencePct: 100 - percentageOverBudget (clamp 0-100)
-      const overBudgetPct = Number(data?.budgetAdherence?.percentageOverBudget ?? 50);
-      const budgetAdherencePct = Math.max(0, Math.min(100, 100 - overBudgetPct));
-
-      // savingsRatePct: (totalIncome - totalSpent) / totalIncome * 100 (30 hari terakhir)
       const now = new Date();
-      const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+      const end = addWibDays(startOfWibDay(now), 1);
+      const stats = await this.analyticsService.getPeriodStats(addWibDays(end, -30), end, false);
 
-      const [incomeAgg, spentAgg] = await Promise.all([
-        this.prisma.income.aggregate({
-          _sum: { amount: true },
-          where: { receivedAt: { gte: thirtyDaysAgo } },
-        }),
-        this.prisma.transaction.aggregate({
-          _sum: { amount: true },
-          where: { occurredAt: { gte: thirtyDaysAgo } },
-        }),
-      ]);
+      // budgetAdherencePct: langsung dari PeriodStats (null kalau nggak ada hari berbudget di periode ini)
+      const budgetAdherencePct = Math.max(0, Math.min(100, stats.budget.adherencePct ?? 50));
 
-      const totalIncome = Number(incomeAgg._sum.amount ?? 0);
-      const totalSpent = Number(spentAgg._sum.amount ?? 0);
-
-      let savingsRatePct = 0;
-      if (totalIncome > 0) {
-        savingsRatePct = Math.max(0, Math.min(100, ((totalIncome - totalSpent) / totalIncome) * 100));
-      }
+      // savingsRatePct: dari PeriodStats juga (null kalau income 0)
+      const savingsRatePct = Math.max(0, Math.min(100, stats.totals.savingsRate ?? 0));
 
       // Score: budget adherence 60% weight, savings rate 40%
       // Bobot ini bisa di-tuning — budget discipline > savings rate karena income tidak selalu kontrolnya Arzaka

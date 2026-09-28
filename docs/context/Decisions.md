@@ -198,6 +198,47 @@ API dicek cocok dengan prop types komponen. `npm run build` (backend) lulus bers
 **Alasan:** Shadow-DB Prisma tidak tahu cara diff kolom generated (`Unsupported` type memang sengaja tidak direpresentasikan penuh oleh Prisma) — setiap migration baru lewat `migrate dev` akan terus mencoba "memperbaiki" kolom itu dan gagal, padahal skema sebenarnya sudah benar.
 **Konsekuensi:** Pola ini akan berulang tiap kali butuh migration baru selama `ChatMessage.search` (atau kolom `Unsupported` lain) ada di schema — pakai langkah manual di atas, jangan coba `migrate dev` berulang kali (baca juga [`CAUTION.md`](../../CAUTION.md) soal insiden RAM yang terjadi bersamaan waktu debugging ini).
 
+## 2026-09-28 — E06-S2: Halaman Analisis v2 di atas PeriodStats, drill-down di-skip
+**Konteks:** Lanjutan langsung E06-S1 (`PeriodStatsService`). Halaman `/app/insights` lama masih baca
+`/transactions/insights` (wrapper lama), bukan `/analytics/stats` — jadi walau E06-S1 sudah live, belum ada
+satupun bagian frontend yang benar-benar konsumsi `PeriodStats` atau kelihatan bedanya 7H/30H/90H/Semua.
+**Keputusan:** (1) `AnalyticsService` dapat method baru `resolvePeriod(range?, from?, to?)` — logika parsing
+`?range=7d|30d|90d|all` vs `?from&to` yang tadinya di `AnalyticsController` dipindah ke sini biar bisa dipakai
+ulang tanpa duplikasi (dipakai controller & fitur kartu AI baru). (2) Kartu AI "3 hal yang perlu kamu tahu"
+(`GET /ai/insight-card?range=`) di-cache per `(rangeKey, wibDateKey(now))` di tabel baru `AiInsightCard` (kolom
+`points Json`, unique `[rangeKey, dayKey]`) — pola upsert-by-key sama seperti `HealthScoreLog`, tapi generik
+per-hari-per-range bukan per-minggu. Migration ditulis manual (`CREATE TABLE`) + `prisma migrate deploy`, bukan
+`migrate dev`, karena `ChatMessage.search` (tsvector generated column) bikin shadow-DB diff Prisma selalu gagal
+(gotcha lama, lihat Gotchas.md). (3) `AiReportsService.computeAndSaveHealthScore()` diganti total sumber datanya:
+dulu `TransactionService.getInsights('30d')` (dua query terpisah buat savings rate), sekarang langsung
+`AnalyticsService.getPeriodStats()` 30 hari terakhir — `budgetAdherencePct` & `savingsRatePct` tinggal baca
+`stats.budget.adherencePct`/`stats.totals.savingsRate` (`?? 50`/`?? 0` kalau null), metode lebih pendek & satu
+sumber angka sesuai prinsip E06-S1. (4) Endpoint baru `PATCH /transactions/:id/big` (`TransactionService.setBig`)
+buat tombol "Tandai rutin" di kartu Pembelian Besar — belum ada endpoint ini sebelumnya walau kolom `isBig` sudah
+ada sejak E06-S1. (5) **Scope cut dari draft epic:** "tap kategori/habit → daftar transaksinya" di-skip total —
+tidak ada halaman daftar transaksi yang bisa difilter di frontend sama sekali (dicek, `apps/frontend/src/app/app/`
+tidak punya route transactions list), dan `PeriodStats` tidak menyimpan daftar transaksi per kategori/merchant
+(cuma agregat). Bikin halaman baru + endpoint filter itu di luar scope sesi ini (YAGNI — epic minta drill-down
+sebagai nice-to-have, bukan acceptance criteria eksplisit). Section "Tren mingguan" (90H/Semua) juga disederhanakan
+jadi rutin-vs-besar per minggu (bukan bertumpuk per kategori) karena `PeriodStats.byDay` tidak pecah per kategori
+per hari — pecah per kategori butuh query tambahan yang tidak ada di scope E06-S1.
+**Alasan:** Satu sumber angka (prinsip E06-S1) diterapkan penuh sampai ke health score, bukan cuma endpoint baru
+yang berdiri sendiri di samping yang lama. Scope cut drill-down dipilih daripada membangun halaman transaksi baru
+tanpa diminta eksplisit di acceptance criteria — kalau dibutuhkan, itu perluasan terpisah dengan keputusan UX sendiri
+(filter apa, URL param apa) yang belum ada preseden di codebase ini.
+**Konsekuensi:** `npm run build` (backend) + `tsc --noEmit` (frontend) lulus bersih. `/analytics/stats` &
+`/ai/insight-card` diverifikasi lewat `curl` ke dev DB (salinan prod, 207 transaksi) — 7d/30d/90d/all
+menghasilkan `totals`/`budget`/`habits`/`bigPurchases` yang benar-benar beda (bukan basically-30d==all lagi),
+`previous` `null` ketika periode pembanding jatuh sebelum `dataStartsAt` (persis kasus 30d/90d/all di data ini).
+`POST /ai/reports/trigger-health-score` dites live, hasil `budgetAdherencePct=60` cocok dengan `/analytics/stats?range=30d`
+punya `budget.adherencePct=60`. `PATCH /transactions/:id/big` dites set+revert di transaksi nyata. **Belum
+diverifikasi**: tampilan visual browser sungguhan — Claude in Chrome extension nggak konek di sesi ini, dan
+Playwright headless gagal jalan (`chrome-headless-shell: error while loading shared libraries: libatk-1.0.so.0`)
+karena `npx playwright install --with-deps` butuh `sudo apt install` yang nggak tersedia (no password, no
+passwordless sudo) di VPS ini. AI insight card & AI commentary health score kembali fallback kosong/null di
+verifikasi ini karena `AI_API_KEY` memang belum di-set di `.env` dev (bukan bug) — behaviour "never throw"-nya
+sendiri sudah kekonfirmasi jalan (endpoint tetap 200 dengan array kosong, bukan 500).
+
 ## YYYY-MM-DD — <judul>
 **Konteks:**
 **Keputusan:**

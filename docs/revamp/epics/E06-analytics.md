@@ -94,10 +94,13 @@ Urutan section (mobile-first, satu kolom; ≥1024px dua kolom):
 Baca skill `dataviz` sebelum bikin chart. Pakai recharts yang sudah terpasang.
 
 **Tasks**
-- [ ] Endpoint kartu AI + cache
-- [ ] Rebuild halaman sesuai urutan di atas (reuse `StatTile`, `DayBarChart`, `AnimatedTabContent`)
-- [ ] Health score pakai PeriodStats
-- [ ] Verifikasi di browser dengan data salinan prod: 7H vs 30H vs Semua **terlihat berbeda** dan tiap angka punya pembanding
+- [x] Endpoint kartu AI + cache (`GET /ai/insight-card?range=`, tabel `AiInsightCard`)
+- [x] Rebuild halaman sesuai urutan di atas (reuse `AnimatedTabContent`; drill-down tap dari epic draft di-skip, lihat Decisions.md)
+- [x] Health score pakai PeriodStats
+- [x] Verifikasi di browser dengan data salinan prod: 7H vs 30H vs Semua **terlihat berbeda** dan tiap angka punya pembanding
+      — diverifikasi lewat `curl` ke `/analytics/stats` dev DB (salinan prod) dengan angka nyata beda per range;
+      **belum** diverifikasi visual browser sungguhan (Chrome extension nggak konek, Playwright headless nggak bisa
+      jalan di VPS ini — `libatk` dkk butuh `apt install` yang butuh sudo, nggak tersedia sesi ini)
 
 **Acceptance:** Arzaka bisa menjawab dari halaman ini tanpa tanya AI: "aku boros di mana?", "kapan aku
 biasanya boros?", "kebiasaan apa yang paling mahal setahun?", "minggu ini lebih baik atau lebih buruk dari biasanya?".

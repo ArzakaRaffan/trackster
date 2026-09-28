@@ -10,6 +10,7 @@ import { FinancialSnapshotService } from './financial-snapshot.service';
 import { AiMemoryService } from './ai-memory.service';
 import { RetrievalService } from './retrieval.service';
 import { PlanSimulatorService } from './plan-simulator.service';
+import { AiInsightCardService } from './ai-insight-card.service';
 import { AiController } from './ai.controller';
 import { BudgetModule } from '../budget/budget.module';
 import { TransactionModule } from '../transaction/transaction.module';
@@ -48,6 +49,7 @@ import { PrismaService } from '../../prisma.service';
     AiMemoryService,
     RetrievalService,
     PlanSimulatorService,
+    AiInsightCardService,
     PrismaService,
   ],
   controllers: [AiController],
