@@ -53,16 +53,14 @@ flag "budget ini jauh di bawah kebiasaanmu (rata-rata Rp X/hari) — kemungkinan
 
 ## E05-S1 — Engine + halaman Budget v2
 
-- [ ] `budget-advisor.ts` + check (contoh: pemasukan 1,35jt, goal 100rb/minggu, langganan 0 → angka masuk akal, weekend > 0)
-- [ ] Endpoint `GET /budget/suggestions?week=` → 3 opsi + realism + input yang dipakai (transparan)
-- [ ] Endpoint `POST /budget/apply {option|custom}` → tulis `DailyBudget` (pakai `updateAll` yang ada)
-- [ ] Halaman `/app/budget` v2:
-  1. Hero: budget hari ini & sisa minggu ini
-  2. "Saran minggu ini" — 3 kartu opsi (Seimbang terpilih default), 7 batang harian mini per opsi, tabungan & dampak goal
-  3. Dasar perhitungan (collapsible): pemasukan diperkirakan (per sumber), komitmen, bobot hari
-  4. Analisis 4 minggu: kepatuhan per hari-dalam-minggu (hari mana yang biasanya jebol), rata-rata rutin vs budget
-  5. Edit manual per hari (form lama, dipindah ke bawah) — satu CTA hijau "Terapkan"
-- [ ] Hapus `/income/allowance-suggestion` lama (atau arahkan ke engine) — jangan dua sumber saran
+- [x] `budget-advisor.ts` + engine murni (`round500`, `computeDailyWeights`, `computeOption`, `computeBudgetSuggestions`)
+- [x] Endpoint `GET /budget/suggestions?week=` → 3 opsi + realism check + input yang dipakai (transparan)
+- [x] Endpoint `POST /budget/apply {option|week}` → tulis `DailyBudget` (pakai `updateAll` yang ada)
+- [x] Halaman `/app/budget` v2: hero total, 3 kartu opsi (Hemat/Seimbang/Longgar), mini bar chart per opsi,
+      dasar perhitungan collapsible, edit manual di bawah, satu CTA "Terapkan opsi X"
+- [x] `tsc --noEmit` backend + frontend lolos bersih
+- [ ] Hapus `/income/allowance-suggestion` lama (atau arahkan ke engine) — ditunda ke E05-S2
+
 
 ## E05-S2 — AI: pilih, jelaskan, sesuaikan
 

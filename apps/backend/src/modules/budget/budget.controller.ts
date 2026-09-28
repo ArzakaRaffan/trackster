@@ -1,12 +1,16 @@
-import { Body, Controller, Get, Put, UseGuards } from '@nestjs/common';
+import { BadRequestException, Body, Controller, Get, Post, Put, Query, UseGuards } from '@nestjs/common';
 import { BudgetService } from './budget.service';
+import { BudgetAdvisorService } from './budget-advisor.service';
 import { UpdateBudgetDto } from './dto/update-budget.dto';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 
 @UseGuards(JwtAuthGuard)
 @Controller('budget')
 export class BudgetController {
-  constructor(private budgetService: BudgetService) {}
+  constructor(
+    private budgetService: BudgetService,
+    private budgetAdvisorService: BudgetAdvisorService,
+  ) {}
 
   @Get()
   async getAll() {
@@ -26,5 +30,22 @@ export class BudgetController {
   @Get('runway')
   async getRunway() {
     return this.budgetService.getRunwayForecast();
+  }
+
+  @Get('suggestions')
+  async getSuggestions(@Query('week') week?: string) {
+    return this.budgetAdvisorService.getSuggestions(week);
+  }
+
+  @Post('apply')
+  async applyBudget(
+    @Body() body: { option: 'hemat' | 'seimbang' | 'longgar'; week?: string },
+  ) {
+    const suggestion = await this.budgetAdvisorService.getSuggestions(body.week);
+    const chosen = suggestion.options.find(o => o.option === body.option);
+    if (!chosen) throw new BadRequestException('option harus hemat|seimbang|longgar');
+    return this.budgetService.updateAll({
+      budgets: chosen.dailyAmounts.map((amount, dayOfWeek) => ({ dayOfWeek, amount })),
+    });
   }
 }

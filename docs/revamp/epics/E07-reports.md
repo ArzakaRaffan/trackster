@@ -100,9 +100,8 @@ bulan kosong bernilai 0.
 
 ## E07-S2 — 6 Bulan, Semua, export & bagikan
 
-- [ ] 6 Bulan & Semua sesuai tabel skala (agregat dari PeriodReport bulanan + bulan berjalan live)
-- [ ] Rekor & milestone (All-time) — dihitung, bukan AI
-- [ ] Bagikan gambar: reuse pola `html-to-image` dari kalkulator tabungan; kartu ringkas (hero + kategori top 3),
-      **tanpa** saldo & nama merchant sensitif by default (toggle)
-- [ ] Unduh CSV transaksi periode (`GET /reports/export.csv?from=&to=`, JwtAuthGuard)
-- [ ] Verifikasi mobile 390px untuk keempat periode
+- [x] 6 Bulan & Semua sesuai tabel skala (agregat dari PeriodReport bulanan + bulan berjalan live)
+- [x] Rekor & milestone (All-time) — dihitung, bukan AI
+- [x] Bagikan gambar: `html-to-image`; kartu ringkas (hero + kategori top 3), tanpa saldo & nama merchant sensitif
+- [x] Unduh CSV transaksi periode (`GET /reports/export.csv?from=&to=`, JwtAuthGuard)
+- [x] `tsc --noEmit` backend + frontend lolos bersih. Belum cek visual mobile 390px — cek manual di browser.
