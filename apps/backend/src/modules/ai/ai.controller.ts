@@ -1,4 +1,4 @@
-import { Controller, Post, Body, Get, Patch, Delete, Param, ParseIntPipe, UseGuards } from '@nestjs/common';
+import { Controller, Post, Body, Get, Patch, Delete, Param, ParseIntPipe, Query, UseGuards } from '@nestjs/common';
 import { IsBoolean, IsEnum, IsInt, IsNumber, IsOptional, IsString, Max, Min, MinLength } from 'class-validator';
 import { MemoryKind } from '@prisma/client';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
@@ -7,6 +7,7 @@ import { AiReportsService } from './ai-reports.service';
 import { AiMascotService } from './ai-mascot.service';
 import { FinancialSnapshotService } from './financial-snapshot.service';
 import { AiMemoryService } from './ai-memory.service';
+import { AiInsightCardService } from './ai-insight-card.service';
 import { PrismaService } from '../../prisma.service';
 
 class ChatDto {
@@ -93,6 +94,7 @@ export class AiController {
     private aiMascotService: AiMascotService,
     private financialSnapshotService: FinancialSnapshotService,
     private aiMemoryService: AiMemoryService,
+    private aiInsightCardService: AiInsightCardService,
     private prisma: PrismaService,
   ) {}
 
@@ -176,6 +178,12 @@ export class AiController {
   async suggestCategory(@Body() body: SuggestCategoryDto) {
     const category = await this.aiChatService.categorize(body.description, body.amount);
     return { category };
+  }
+
+  /** "3 hal yang perlu kamu tahu" — kartu AI ringkas dari PeriodStats, di-cache per range per hari WIB. */
+  @Get('insight-card')
+  async insightCard(@Query('range') range?: string) {
+    return this.aiInsightCardService.getInsightCard(range ?? '30d');
   }
 
   /** Return 12 data HealthScoreLog terakhir untuk chart trend di frontend */

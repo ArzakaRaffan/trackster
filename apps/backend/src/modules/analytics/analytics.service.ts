@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { BadRequestException, Injectable } from '@nestjs/common';
 import { Category, IncomeStatus, ParseStatus, Transaction } from '@prisma/client';
 import { PrismaService } from '../../prisma.service';
 import { MerchantAliasService } from '../merchant-alias/merchant-alias.service';
@@ -59,6 +59,27 @@ export class AnalyticsService {
     private prisma: PrismaService,
     private merchantAliasService: MerchantAliasService,
   ) {}
+
+  /** `?range=7d|30d|90d|all` ATAU `from`&`to` (WIB, inklusif) → `{start,end}` instant UTC, `end` eksklusif.
+   * Dipakai `AnalyticsController` & `AiInsightCardService` biar parsing range cuma sekali. */
+  async resolvePeriod(range?: string, from?: string, to?: string): Promise<{ start: Date; end: Date }> {
+    if (from && to) {
+      return { start: startOfWibDay(from), end: addWibDays(startOfWibDay(to), 1) };
+    }
+
+    const now = new Date();
+    const end = addWibDays(startOfWibDay(now), 1);
+
+    if (range === 'all') {
+      const first = await this.getPeriodStats(new Date(0), end, false);
+      const start = first.range.dataStartsAt ? startOfWibDay(new Date(first.range.dataStartsAt)) : startOfWibDay(now);
+      return { start, end };
+    }
+
+    const days = { '7d': 7, '30d': 30, '90d': 90 }[range ?? '30d'];
+    if (!days) throw new BadRequestException('range harus 7d|30d|90d|all, atau pakai from & to');
+    return { start: addWibDays(end, -days), end };
+  }
 
   /** `end` eksklusif. Semua kunci hari pakai `wibDateKey`, batas hari/minggu dari `wib.ts`. */
   async getPeriodStats(start: Date, end: Date, compare = true): Promise<PeriodStats> {

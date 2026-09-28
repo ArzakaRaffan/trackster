@@ -220,6 +220,11 @@ export class TransactionService {
     return this.merchantAliasService.upsert(transaction.description, displayName);
   }
 
+  /** Override manual "pembelian besar" (`Transaction.isBig`) — `null` balik ke aturan otomatis di `AnalyticsService`. */
+  async setBig(id: number, isBig: boolean | null) {
+    return this.prisma.transaction.update({ where: { id }, data: { isBig } });
+  }
+
   /** Semua transaksi di satu tanggal (YYYY-MM-DD) — buat drill-down dari chart bulanan/mingguan. */
   async getByDay(date: string) {
     const start = startOfWibDay(date);

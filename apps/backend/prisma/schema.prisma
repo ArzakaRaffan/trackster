@@ -301,6 +301,16 @@ model HealthScoreLog {
   createdAt          DateTime @default(now())
 }
 
+model AiInsightCard {
+  id        Int      @id @default(autoincrement())
+  rangeKey  String   // '7d' | '30d' | '90d' | 'all'
+  dayKey    String   // wibDateKey(now) — cache per hari WIB
+  points    Json     // string[] — 3 poin insight
+  createdAt DateTime @default(now())
+
+  @@unique([rangeKey, dayKey])
+}
+
 model Goal {
   id            Int               @id @default(autoincrement())
   name          String
