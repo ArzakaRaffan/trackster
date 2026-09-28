@@ -1,22 +1,53 @@
 'use client';
 
-import { Suspense, useEffect, useState } from 'react';
+import { Suspense, useCallback, useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import useSWR from 'swr';
 import { useAutoAnimate } from '@formkit/auto-animate/react';
 import { motion } from 'motion/react';
-import { Bar, BarChart, Cell, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
+import { toPng } from 'html-to-image';
+import {
+  Bar,
+  BarChart,
+  Cell,
+  Legend,
+  Line,
+  LineChart,
+  ReferenceLine,
+  ResponsiveContainer,
+  Tooltip,
+  XAxis,
+  YAxis,
+} from 'recharts';
 import { api } from '@/lib/api';
 import { formatRupiah, formatRupiahCompact, MONTH_NAMES } from '@/lib/format';
-import { CATEGORY_COLORS, CATEGORY_LABELS, TransactionNoteRow, type NoteableTransaction } from '@/components/ui/TransactionNoteRow';
+import {
+  CATEGORY_COLORS,
+  CATEGORY_LABELS,
+  TransactionNoteRow,
+  type NoteableTransaction,
+} from '@/components/ui/TransactionNoteRow';
 import { Input } from '@/components/ui/Input';
 import { StatTile } from '@/components/ui/StatTile';
 import { AnimatedTabContent } from '@/components/ui/AnimatedTabContent';
 import { TRANSITION_SLOW } from '@/lib/motion';
-import { ArrowRight, ChevronLeft, ChevronRight, Inbox, Search, TrendingDown, TrendingUp, X } from 'lucide-react';
+import {
+  ArrowRight,
+  ChevronLeft,
+  ChevronRight,
+  Download,
+  Inbox,
+  Search,
+  Share2,
+  TrendingDown,
+  TrendingUp,
+  Trophy,
+  X,
+} from 'lucide-react';
 
-/** Debounce a fast-changing value (search input) so we don't fire a request per keystroke. */
+// ─── Types ────────────────────────────────────────────────────────────────────
+
 function useDebouncedValue<T>(value: T, delayMs: number): T {
   const [debounced, setDebounced] = useState(value);
   useEffect(() => {
@@ -26,7 +57,7 @@ function useDebouncedValue<T>(value: T, delayMs: number): T {
   return debounced;
 }
 
-type Period = 'week' | 'month';
+type Period = 'week' | 'month' | '6m' | 'all';
 
 interface PeriodTotals {
   spend: number;
@@ -51,7 +82,7 @@ interface PeriodStats {
 }
 
 interface ReportResponse {
-  period: Period;
+  period: 'week' | 'month';
   start: string;
   end: string;
   closed: boolean;
@@ -60,16 +91,40 @@ interface ReportResponse {
   generatedAt: string | null;
 }
 
+interface MonthAggregate {
+  month: string; // 'YYYY-MM'
+  spend: number;
+  spendRoutine: number;
+  income: number;
+  net: number;
+  savingsRate: number | null;
+  txCount: number;
+  isLive: boolean;
+  narrative: string | null;
+}
+
+interface AggregateReport {
+  period: '6m' | 'all';
+  months: MonthAggregate[];
+  totals: { spend: number; income: number; net: number; avgMonthlySpend: number; avgMonthlyIncome: number };
+  dataStartsAt: string | null;
+  bestMonth: MonthAggregate | null;
+  worstMonth: MonthAggregate | null;
+}
+
+interface RecordsResult {
+  biggestTransaction: { id: number; amount: number; description: string; date: string; category: string } | null;
+  mostVisitedMerchant: { merchantKey: string; displayName: string; count: number; total: number } | null;
+  bestSavingsRateMonth: { month: string; savingsRate: number } | null;
+  longestUnderBudgetStreak: number;
+  totalTransactions: number;
+  totalSpend: number;
+  dataStartsAt: string | null;
+}
+
 interface CategoryTotal {
   category: string;
   total: number;
-}
-
-interface AllTimeSummary {
-  totalSpent: number;
-  byCategory: CategoryTotal[];
-  highestMonth: { month: string; total: number } | null;
-  lowestMonth: { month: string; total: number } | null;
 }
 
 interface DayDetail {
@@ -85,13 +140,18 @@ interface TransactionListResponse {
   limit: number;
 }
 
+// ─── Fetchers ────────────────────────────────────────────────────────────────
+
 const CATEGORY_FILTER_OPTIONS = Object.keys(CATEGORY_LABELS);
 const SOURCE_FILTER_OPTIONS = ['ALL', 'BCA', 'JAGO'] as const;
 
 const reportFetcher = (path: string) => api.get<ReportResponse>(path);
-const summaryFetcher = (path: string) => api.get<AllTimeSummary>(path);
+const aggregateFetcher = (path: string) => api.get<AggregateReport>(path);
+const recordsFetcher = (path: string) => api.get<RecordsResult>(path);
 const dayFetcher = (path: string) => api.get<DayDetail>(path);
 const transactionListFetcher = (path: string) => api.get<TransactionListResponse>(path);
+
+// ─── Helpers ──────────────────────────────────────────────────────────────────
 
 function pctChange(curr: number, prev: number): number {
   if (prev === 0) return curr === 0 ? 0 : 100;
@@ -102,8 +162,7 @@ function wibDateKey(iso: string): string {
   return new Date(new Date(iso).getTime() + 7 * 3600_000).toISOString().slice(0, 10);
 }
 
-/** `end` eksklusif (dari backend). Label "23–29 Sep 2026" (minggu) atau "September 2026" (bulan). */
-function formatPeriodLabel(period: Period, startIso: string, endIso: string): string {
+function formatPeriodLabel(period: 'week' | 'month', startIso: string, endIso: string): string {
   const start = new Date(new Date(startIso).getTime() + 7 * 3600_000);
   const endInclusive = new Date(new Date(endIso).getTime() + 7 * 3600_000 - 86_400_000);
   if (period === 'month') return `${MONTH_NAMES[start.getUTCMonth()]} ${start.getUTCFullYear()}`;
@@ -111,6 +170,13 @@ function formatPeriodLabel(period: Period, startIso: string, endIso: string): st
   const startLabel = sameMonth ? `${start.getUTCDate()}` : `${start.getUTCDate()} ${MONTH_NAMES[start.getUTCMonth()]}`;
   return `${startLabel}–${endInclusive.getUTCDate()} ${MONTH_NAMES[endInclusive.getUTCMonth()]} ${endInclusive.getUTCFullYear()}`;
 }
+
+function formatMonthLabel(yyyyMM: string): string {
+  const [y, m] = yyyyMM.split('-').map(Number);
+  return `${MONTH_NAMES[m - 1]} ${y}`;
+}
+
+// ─── Shared chart components ──────────────────────────────────────────────────
 
 function ChartTooltip({ active, payload, label }: any) {
   if (!active || !payload?.length) return null;
@@ -126,6 +192,199 @@ function ChartTooltip({ active, payload, label }: any) {
   );
 }
 
+function CategoryBarChart({ data }: { data: (CategoryTotal & { label: string })[] }) {
+  return (
+    <ResponsiveContainer width="100%" height={Math.max(120, data.length * 34)}>
+      <BarChart data={data} layout="vertical" margin={{ top: 4, right: 12, left: 0, bottom: 0 }}>
+        <XAxis type="number" hide />
+        <YAxis
+          type="category"
+          dataKey="label"
+          width={84}
+          tick={{ fill: '#b3b3b3', fontSize: 12 }}
+          axisLine={false}
+          tickLine={false}
+        />
+        <Tooltip content={<ChartTooltip />} cursor={{ fill: 'rgba(255,255,255,0.06)' }} />
+        <Bar dataKey="total" radius={[0, 4, 4, 0]}>
+          {data.map((c) => (
+            <Cell key={c.category} fill={CATEGORY_COLORS[c.category] ?? '#94a3b8'} />
+          ))}
+        </Bar>
+      </BarChart>
+    </ResponsiveContainer>
+  );
+}
+
+// ─── Share card component (ref-able, no sensitive data by default) ─────────────
+
+function ShareCard({
+  cardRef,
+  period,
+  label,
+  totals,
+  topCategories,
+  dataStartsAt,
+}: {
+  cardRef: React.RefObject<HTMLDivElement | null>;
+  period: Period;
+  label: string;
+  totals: { spend: number; income: number; net: number; savingsRate: number | null };
+  topCategories: { category: string; total: number }[];
+  dataStartsAt?: string | null;
+}) {
+  const top3 = topCategories.slice(0, 3);
+  const maxCat = Math.max(...top3.map((c) => c.total), 1);
+  return (
+    <div
+      ref={cardRef as React.RefObject<HTMLDivElement>}
+      className="w-80 rounded-2xl bg-[#0a0a0a] p-6 text-white"
+      style={{ fontFamily: 'system-ui, sans-serif' }}
+    >
+      <p className="mb-1 text-xs font-bold uppercase tracking-widest text-[#666]">Trackster · {label}</p>
+      <p
+        className={`mb-4 font-bold tabular-nums ${totals.net >= 0 ? 'text-[#1ed760]' : 'text-[#ff4d4d]'}`}
+        style={{ fontSize: 32 }}
+      >
+        {totals.net >= 0 ? '+' : ''}
+        {formatRupiah(totals.net)}
+      </p>
+      <div className="mb-4 grid grid-cols-2 gap-3 text-sm">
+        <div>
+          <p className="text-[#666]">Keluar</p>
+          <p className="font-bold">{formatRupiahCompact(totals.spend)}</p>
+        </div>
+        <div>
+          <p className="text-[#666]">Masuk</p>
+          <p className="font-bold">{formatRupiahCompact(totals.income)}</p>
+        </div>
+        {totals.savingsRate != null && (
+          <div>
+            <p className="text-[#666]">Savings rate</p>
+            <p className="font-bold text-[#1ed760]">{totals.savingsRate.toFixed(0)}%</p>
+          </div>
+        )}
+      </div>
+      {top3.length > 0 && (
+        <div className="flex flex-col gap-2">
+          <p className="text-xs font-bold uppercase tracking-widest text-[#666]">Top kategori</p>
+          {top3.map((c) => (
+            <div key={c.category}>
+              <div className="mb-0.5 flex justify-between text-xs">
+                <span>{CATEGORY_LABELS[c.category] ?? c.category}</span>
+                <span className="tabular-nums">{formatRupiahCompact(c.total)}</span>
+              </div>
+              <div className="h-1.5 overflow-hidden rounded-full bg-[#222]">
+                <div
+                  className="h-full rounded-full"
+                  style={{ width: `${(c.total / maxCat) * 100}%`, backgroundColor: CATEGORY_COLORS[c.category] ?? '#94a3b8' }}
+                />
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+      {dataStartsAt && (
+        <p className="mt-4 text-[10px] text-[#444]">Data mulai {dataStartsAt}</p>
+      )}
+    </div>
+  );
+}
+
+// ─── Share & Export button row ─────────────────────────────────────────────────
+
+function ExportRow({
+  period,
+  label,
+  totals,
+  topCategories,
+  fromDate,
+  toDate,
+  dataStartsAt,
+}: {
+  period: Period;
+  label: string;
+  totals: { spend: number; income: number; net: number; savingsRate: number | null };
+  topCategories: { category: string; total: number }[];
+  fromDate: string;
+  toDate: string;
+  dataStartsAt?: string | null;
+}) {
+  const cardRef = useRef<HTMLDivElement>(null);
+  const [showCard, setShowCard] = useState(false);
+  const [sharing, setSharing] = useState(false);
+
+  const handleShare = useCallback(async () => {
+    if (!cardRef.current) return;
+    setSharing(true);
+    try {
+      const dataUrl = await toPng(cardRef.current!, { pixelRatio: 2, backgroundColor: '#0a0a0a' });
+      const blob = await (await fetch(dataUrl)).blob();
+      const file = new File([blob], `trackster-${label.replace(/\s/g, '-')}.png`, { type: 'image/png' });
+      if (navigator.share && navigator.canShare({ files: [file] })) {
+        await navigator.share({ files: [file], title: `Laporan ${label} — Trackster` });
+      } else {
+        const link = document.createElement('a');
+        link.href = dataUrl;
+        link.download = file.name;
+        link.click();
+      }
+    } finally {
+      setSharing(false);
+    }
+  }, [label]);
+
+  const handleDownloadCsv = () => {
+    const url = `/api/reports/export.csv?from=${fromDate}&to=${toDate}`;
+    window.open(url, '_blank');
+  };
+
+  return (
+    <>
+      <div className="flex gap-2">
+        <button
+          onClick={() => setShowCard((v) => !v)}
+          className="flex flex-1 items-center justify-center gap-2 rounded-comfortable bg-surface-interactive py-3 text-small font-bold text-ink-muted transition-colors hover:text-ink"
+        >
+          <Share2 size={15} />
+          Bagikan gambar
+        </button>
+        <button
+          onClick={handleDownloadCsv}
+          className="flex flex-1 items-center justify-center gap-2 rounded-comfortable bg-surface-interactive py-3 text-small font-bold text-ink-muted transition-colors hover:text-ink"
+        >
+          <Download size={15} />
+          Unduh CSV
+        </button>
+      </div>
+
+      {showCard && (
+        <div className="flex flex-col items-center gap-3 rounded-comfortable bg-surface p-4">
+          <p className="text-micro text-ink-subtle">Preview kartu — tidak ada saldo atau nama merchant sensitif</p>
+          <ShareCard
+            cardRef={cardRef}
+            period={period}
+            label={label}
+            totals={totals}
+            topCategories={topCategories}
+            dataStartsAt={dataStartsAt}
+          />
+          <button
+            onClick={handleShare}
+            disabled={sharing}
+            className="flex w-full items-center justify-center gap-2 rounded-comfortable bg-brand py-3 text-small font-bold text-base disabled:opacity-50"
+          >
+            <Share2 size={15} />
+            {sharing ? 'Membuat gambar...' : 'Bagikan / Simpan'}
+          </button>
+        </div>
+      )}
+    </>
+  );
+}
+
+// ─── Main page ────────────────────────────────────────────────────────────────
+
 export default function ReportsPage() {
   return (
     <Suspense fallback={<div className="px-4 pt-6 text-small text-ink-muted">Memuat...</div>}>
@@ -136,10 +395,15 @@ export default function ReportsPage() {
 
 function ReportsPageInner() {
   const searchParams = useSearchParams();
-  const initialPeriod = searchParams.get('period') === 'month' ? 'month' : searchParams.get('period') === 'all' ? 'all' : 'week';
+  const rawPeriod = searchParams.get('period');
+  const initialPeriod: Period =
+    rawPeriod === 'month' ? 'month' :
+    rawPeriod === '6m' ? '6m' :
+    rawPeriod === 'all' ? 'all' :
+    'week';
   const initialDate = searchParams.get('date') ?? new Date().toISOString().slice(0, 10);
 
-  const [tab, setTab] = useState<Period | 'all'>(initialPeriod as Period | 'all');
+  const [tab, setTab] = useState<Period>(initialPeriod);
   const [anchorDate, setAnchorDate] = useState(initialDate);
   const [selectedDay, setSelectedDay] = useState<string | null>(null);
 
@@ -151,17 +415,23 @@ function ReportsPageInner() {
       </header>
 
       <div className="flex flex-col gap-3 px-4">
+        {/* Period tabs */}
         <div className="flex gap-1 rounded-full-pill bg-surface p-1">
-          {([
-            { key: 'week', label: 'Minggu' },
-            { key: 'month', label: 'Bulan' },
-            { key: 'all', label: 'Semua transaksi' },
-          ] as const).map((t) => (
+          {(
+            [
+              { key: 'week', label: 'Minggu' },
+              { key: 'month', label: 'Bulan' },
+              { key: '6m', label: '6 Bln' },
+              { key: 'all', label: 'Semua' },
+            ] as const
+          ).map((t) => (
             <button
               key={t.key}
               onClick={() => {
                 setTab(t.key);
-                if (t.key !== 'all') setAnchorDate(new Date().toISOString().slice(0, 10));
+                if (t.key === 'week' || t.key === 'month') {
+                  setAnchorDate(new Date().toISOString().slice(0, 10));
+                }
               }}
               className={`flex-1 rounded-full-pill py-2 text-label font-bold transition-colors duration-base ease-standard ${
                 tab === t.key ? 'bg-brand text-base' : 'text-ink-muted'
@@ -173,10 +443,12 @@ function ReportsPageInner() {
         </div>
 
         <AnimatedTabContent tabKey={tab}>
-          {tab === 'all' ? (
-            <AllTimeTab />
-          ) : (
+          {tab === 'week' || tab === 'month' ? (
             <PeriodReportTab period={tab} anchorDate={anchorDate} onAnchorChange={setAnchorDate} onSelectDay={setSelectedDay} />
+          ) : tab === '6m' ? (
+            <AggregateTab period="6m" />
+          ) : (
+            <AllTab />
           )}
         </AnimatedTabContent>
       </div>
@@ -186,13 +458,15 @@ function ReportsPageInner() {
   );
 }
 
+// ─── PeriodReportTab (Week + Month) ──────────────────────────────────────────
+
 function PeriodReportTab({
   period,
   anchorDate,
   onAnchorChange,
   onSelectDay,
 }: {
-  period: Period;
+  period: 'week' | 'month';
   anchorDate: string;
   onAnchorChange: (date: string) => void;
   onSelectDay: (date: string) => void;
@@ -204,7 +478,6 @@ function PeriodReportTab({
 
   const { stats, narrative, closed } = data;
   const { totals, previous } = stats;
-  const showNet = totals.income > 0 || (previous?.income ?? 0) > 0;
   const isFuture = new Date(data.end).getTime() > Date.now();
 
   const goPrev = () => onAnchorChange(wibDateKey(new Date(new Date(data.start).getTime() - 86_400_000).toISOString()));
@@ -212,6 +485,11 @@ function PeriodReportTab({
 
   const categoryData = stats.byCategory.map((c) => ({ ...c, label: CATEGORY_LABELS[c.category] ?? c.category }));
   const topMerchants = stats.byMerchant.slice(0, 5);
+  const periodLabel = formatPeriodLabel(period, data.start, data.end);
+
+  // From/to for CSV export
+  const fromDate = wibDateKey(data.start);
+  const toDate = wibDateKey(new Date(new Date(data.end).getTime() - 86_400_000).toISOString());
 
   return (
     <>
@@ -219,7 +497,7 @@ function PeriodReportTab({
         <button onClick={goPrev} aria-label="Periode sebelumnya" className="flex h-9 w-9 items-center justify-center rounded-full text-ink-muted hover:text-ink">
           <ChevronLeft size={18} />
         </button>
-        <span className="text-label font-bold text-ink">{formatPeriodLabel(period, data.start, data.end)}</span>
+        <span className="text-label font-bold text-ink">{periodLabel}</span>
         <button
           onClick={goNext}
           disabled={isFuture}
@@ -240,7 +518,7 @@ function PeriodReportTab({
           {totals.net >= 0 ? '+' : ''}
           {formatRupiah(totals.net)}
         </p>
-        {showNet && (
+        {(totals.income > 0 || (previous?.income ?? 0) > 0) && (
           <p className="mt-1 text-small text-ink-muted">
             Masuk {formatRupiahCompact(totals.income)} · Keluar {formatRupiahCompact(totals.spend)}
           </p>
@@ -333,17 +611,161 @@ function PeriodReportTab({
       )}
 
       <SubscriptionsSection />
+
+      {/* Export row */}
+      <ExportRow
+        period={period}
+        label={periodLabel}
+        totals={totals}
+        topCategories={categoryData}
+        fromDate={fromDate}
+        toDate={toDate}
+      />
     </>
   );
 }
 
-function AllTimeTab() {
-  const { data, error, isLoading } = useSWR('/transactions/summary?range=all', summaryFetcher);
-  const [resultsParent] = useAutoAnimate({ duration: 200, easing: 'cubic-bezier(.3,0,.4,1)' });
+// ─── AggregateTab (6m) ────────────────────────────────────────────────────────
 
+function AggregateTab({ period }: { period: '6m' }) {
+  const { data, isLoading, error } = useSWR(`/reports/aggregate?period=${period}`, aggregateFetcher);
+
+  if (isLoading || !data) return <ReportSkeleton />;
+  if (error) return <p className="text-label text-status-over">Gagal memuat laporan.</p>;
+
+  const { months, totals, dataStartsAt, bestMonth, worstMonth } = data;
+  const withData = months.filter((m) => m.txCount > 0 || m.income > 0);
+
+  // Chart: batang bulanan masuk vs keluar
+  const chartData = withData.map((m) => ({
+    label: formatMonthLabel(m.month).slice(0, 7), // 'Sep 26'
+    keluar: m.spend,
+    masuk: m.income,
+    net: m.net,
+  }));
+
+  // Kategori aggregated — dari bulan-bulan (tidak ada di agregat, jadi skip)
+  const label = '6 Bulan Terakhir';
+  const fromDate = withData[0]?.month ? `${withData[0].month}-01` : '';
+  const lastMonth = withData[withData.length - 1];
+  const toDate = lastMonth ? `${lastMonth.month}-28` : '';
+
+  return (
+    <>
+      {dataStartsAt && (
+        <p className="px-1 text-micro text-ink-subtle">Data mulai {dataStartsAt}</p>
+      )}
+
+      {/* Hero aggregate */}
+      <section className="rounded-medium bg-surface p-5">
+        <div className="flex items-baseline justify-between">
+          <p className="text-small font-bold uppercase tracking-caps text-ink-muted">Net 6 bulan</p>
+        </div>
+        <p className={`font-title text-amount-hero font-black tabular-nums ${totals.net >= 0 ? 'text-status-under' : 'text-status-over'}`}>
+          {totals.net >= 0 ? '+' : ''}{formatRupiah(totals.net)}
+        </p>
+        <p className="mt-1 text-small text-ink-muted">
+          Masuk {formatRupiahCompact(totals.income)} · Keluar {formatRupiahCompact(totals.spend)}
+        </p>
+        <p className="text-small text-ink-muted">Rata-rata bulanan: {formatRupiahCompact(totals.avgMonthlySpend)}/bln</p>
+      </section>
+
+      {/* Bulan terbaik / terburuk */}
+      {(bestMonth || worstMonth) && (
+        <div className="grid grid-cols-2 gap-3">
+          {bestMonth && (
+            <StatTile label="Bulan terbaik" value={formatRupiahCompact(bestMonth.spend)} tone="under" />
+          )}
+          {worstMonth && (
+            <StatTile label="Bulan terboros" value={formatRupiahCompact(worstMonth.spend)} tone="over" />
+          )}
+        </div>
+      )}
+      <div className="grid grid-cols-2 gap-2.5 -mt-2">
+        {bestMonth && (
+          <p className="flex items-center gap-1.5 px-1 text-small text-ink-muted">
+            <TrendingDown size={13} /> {formatMonthLabel(bestMonth.month)}
+          </p>
+        )}
+        {worstMonth && (
+          <p className="flex items-center gap-1.5 px-1 text-small text-ink-muted">
+            <TrendingUp size={13} /> {formatMonthLabel(worstMonth.month)}
+          </p>
+        )}
+      </div>
+
+      {/* Chart bulanan masuk vs keluar */}
+      {chartData.length > 0 && (
+        <section className="rounded-medium bg-surface p-5">
+          <p className="text-small font-bold uppercase tracking-caps text-ink-muted">Tren bulanan</p>
+          <ResponsiveContainer width="100%" height={160}>
+            <BarChart data={chartData} margin={{ top: 4, right: 0, left: 0, bottom: 0 }}>
+              <XAxis dataKey="label" tick={{ fill: '#7c7c7c', fontSize: 10 }} axisLine={false} tickLine={false} />
+              <YAxis hide />
+              <Tooltip content={<ChartTooltip />} cursor={{ fill: 'rgba(255,255,255,0.06)' }} />
+              <Bar dataKey="keluar" name="Keluar" radius={[3, 3, 0, 0]} fill="#1ed760" stackId="a" />
+              <Bar dataKey="masuk" name="Masuk" radius={[3, 3, 0, 0]} fill="#3b82f6" stackId="b" />
+            </BarChart>
+          </ResponsiveContainer>
+          <div className="mt-2 flex gap-4 text-micro text-ink-muted">
+            <span className="flex items-center gap-1"><span className="inline-block h-2 w-2 rounded-full bg-[#1ed760]" />Keluar</span>
+            <span className="flex items-center gap-1"><span className="inline-block h-2 w-2 rounded-full bg-[#3b82f6]" />Masuk</span>
+          </div>
+        </section>
+      )}
+
+      {/* Per bulan list */}
+      <section className="rounded-comfortable bg-surface p-5">
+        <p className="mb-3 text-small font-bold uppercase tracking-caps text-ink-muted">Per bulan</p>
+        <div className="flex flex-col gap-3">
+          {withData.map((m) => (
+            <div key={m.month} className="flex items-start justify-between gap-2">
+              <div>
+                <p className="text-small font-bold text-ink">
+                  {formatMonthLabel(m.month)}
+                  {m.isLive && <span className="ml-1.5 text-micro font-normal text-ink-muted">(berjalan)</span>}
+                </p>
+                {m.narrative && (
+                  <p className="mt-0.5 text-micro leading-relaxed text-ink-muted line-clamp-2">{m.narrative}</p>
+                )}
+              </div>
+              <div className="shrink-0 text-right">
+                <p className="tabular-nums text-small font-bold text-ink">{formatRupiahCompact(m.spend)}</p>
+                {m.savingsRate != null && (
+                  <p className={`text-micro ${m.savingsRate > 0 ? 'text-status-under' : 'text-status-over'}`}>
+                    SR {m.savingsRate.toFixed(0)}%
+                  </p>
+                )}
+              </div>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      {/* Export */}
+      <ExportRow
+        period="6m"
+        label={label}
+        totals={{ spend: totals.spend, income: totals.income, net: totals.net, savingsRate: null }}
+        topCategories={[]}
+        fromDate={fromDate}
+        toDate={toDate}
+      />
+    </>
+  );
+}
+
+// ─── AllTab (Semua) ──────────────────────────────────────────────────────────
+
+function AllTab() {
+  const { data, isLoading, error } = useSWR('/reports/aggregate?period=all', aggregateFetcher);
+  const { data: records, isLoading: recordsLoading } = useSWR('/reports/records', recordsFetcher);
+
+  // Transaction list search
   const [searchInput, setSearchInput] = useState('');
   const [category, setCategory] = useState('ALL');
   const [source, setSource] = useState<(typeof SOURCE_FILTER_OPTIONS)[number]>('ALL');
+  const [resultsParent] = useAutoAnimate({ duration: 200, easing: 'cubic-bezier(.3,0,.4,1)' });
   const search = useDebouncedValue(searchInput, 400);
 
   const listParams = new URLSearchParams({ limit: '50' });
@@ -351,22 +773,111 @@ function AllTimeTab() {
   if (category !== 'ALL') listParams.set('category', category);
   if (source !== 'ALL') listParams.set('source', source);
 
-  const {
-    data: listData,
-    isLoading: listLoading,
-    mutate: mutateList,
-  } = useSWR(`/transactions?${listParams.toString()}`, transactionListFetcher);
+  const { data: listData, isLoading: listLoading, mutate: mutateList } = useSWR(
+    `/transactions?${listParams.toString()}`,
+    transactionListFetcher,
+  );
 
-  if (isLoading) return <ReportSkeleton />;
+  if (isLoading || !data) return <ReportSkeleton />;
   if (error || !data) return <p className="text-label text-status-over">Gagal memuat laporan.</p>;
 
-  const categoryData = data.byCategory.map((c) => ({
-    ...c,
-    label: CATEGORY_LABELS[c.category] ?? c.category,
-  }));
+  const { totals, dataStartsAt, bestMonth, worstMonth, months } = data;
+  const withData = months.filter((m) => m.txCount > 0 || m.income > 0);
 
   return (
     <>
+      {dataStartsAt && (
+        <p className="px-1 text-micro text-ink-subtle">Data mulai {dataStartsAt}</p>
+      )}
+
+      {/* Hero */}
+      <section className="rounded-medium bg-surface p-5">
+        <p className="text-small font-bold uppercase tracking-caps text-ink-muted">Total sepanjang waktu</p>
+        <p className="font-title text-amount-hero font-extrabold tabular-nums text-ink">{formatRupiah(totals.spend)}</p>
+        {totals.income > 0 && (
+          <p className="mt-1 text-small text-ink-muted">
+            Masuk {formatRupiahCompact(totals.income)} · Net {formatRupiahCompact(totals.net)}
+          </p>
+        )}
+      </section>
+
+      {/* Bulan terbaik / terburuk */}
+      <div className="grid grid-cols-2 gap-3">
+        <StatTile label="Bulan terboros" value={worstMonth ? formatRupiah(worstMonth.spend) : '—'} tone="over" />
+        <StatTile label="Bulan terendah" value={bestMonth ? formatRupiah(bestMonth.spend) : '—'} tone="under" />
+      </div>
+      <div className="grid grid-cols-2 gap-2.5 -mt-2">
+        <p className="flex items-center gap-1.5 px-1 text-small text-ink-muted">
+          <TrendingUp size={13} /> {worstMonth ? formatMonthLabel(worstMonth.month) : '—'}
+        </p>
+        <p className="flex items-center gap-1.5 px-1 text-small text-ink-muted">
+          <TrendingDown size={13} /> {bestMonth ? formatMonthLabel(bestMonth.month) : '—'}
+        </p>
+      </div>
+
+      {/* Rekor & Milestone */}
+      {!recordsLoading && records && (
+        <section className="rounded-comfortable bg-surface p-5">
+          <div className="mb-3 flex items-center gap-2">
+            <Trophy size={16} className="text-[#f59e0b]" />
+            <p className="text-small font-bold text-ink">Rekor & Milestone</p>
+          </div>
+          <div className="flex flex-col gap-3">
+            {records.biggestTransaction && (
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <p className="text-micro text-ink-muted">Transaksi terbesar</p>
+                  <p className="text-small font-bold text-ink truncate">{records.biggestTransaction.description}</p>
+                  <p className="text-micro text-ink-muted">{records.biggestTransaction.date}</p>
+                </div>
+                <p className="shrink-0 tabular-nums font-bold text-ink">{formatRupiah(records.biggestTransaction.amount)}</p>
+              </div>
+            )}
+            {records.mostVisitedMerchant && (
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <p className="text-micro text-ink-muted">Merchant paling sering</p>
+                  <p className="text-small font-bold text-ink">{records.mostVisitedMerchant.displayName}</p>
+                </div>
+                <p className="shrink-0 tabular-nums text-small text-ink-muted">{records.mostVisitedMerchant.count}×</p>
+              </div>
+            )}
+            {records.bestSavingsRateMonth && (
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <p className="text-micro text-ink-muted">Savings rate terbaik</p>
+                  <p className="text-small font-bold text-ink">{formatMonthLabel(records.bestSavingsRateMonth.month)}</p>
+                </div>
+                <p className="shrink-0 tabular-nums font-bold text-status-under">
+                  {records.bestSavingsRateMonth.savingsRate.toFixed(0)}%
+                </p>
+              </div>
+            )}
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <p className="text-micro text-ink-muted">Total transaksi</p>
+                <p className="text-small font-bold text-ink">{records.totalTransactions.toLocaleString('id-ID')}</p>
+              </div>
+            </div>
+          </div>
+        </section>
+      )}
+
+      {/* Chart tren bulanan */}
+      {withData.length > 0 && (
+        <section className="rounded-medium bg-surface p-5">
+          <p className="text-small font-bold uppercase tracking-caps text-ink-muted">Tren bulanan</p>
+          <ResponsiveContainer width="100%" height={160}>
+            <BarChart data={withData.map((m) => ({ label: m.month.slice(2), spend: m.spend }))} margin={{ top: 4, right: 0, left: 0, bottom: 0 }}>
+              <XAxis dataKey="label" tick={{ fill: '#7c7c7c', fontSize: 10 }} axisLine={false} tickLine={false} interval={withData.length > 6 ? 1 : 0} />
+              <YAxis hide />
+              <Tooltip content={<ChartTooltip />} cursor={{ fill: 'rgba(255,255,255,0.06)' }} />
+              <Bar dataKey="spend" radius={[3, 3, 0, 0]} fill="#1ed760" />
+            </BarChart>
+          </ResponsiveContainer>
+        </section>
+      )}
+
       {/* Search & filter */}
       <section className="flex flex-col gap-2.5 rounded-comfortable bg-surface p-4">
         <Input
@@ -384,9 +895,7 @@ function AllTimeTab() {
             >
               <option value="ALL">Semua kategori</option>
               {CATEGORY_FILTER_OPTIONS.map((c) => (
-                <option key={c} value={c}>
-                  {CATEGORY_LABELS[c]}
-                </option>
+                <option key={c} value={c}>{CATEGORY_LABELS[c]}</option>
               ))}
             </select>
             <span className="pointer-events-none absolute right-2.5 text-micro text-ink-muted">▾</span>
@@ -423,28 +932,19 @@ function AllTimeTab() {
                   transaction={t}
                   onSaved={(id, note) =>
                     mutateList(
-                      (current) =>
-                        current && { ...current, data: current.data.map((tx) => (tx.id === id ? { ...tx, note } : tx)) },
+                      (current) => current && { ...current, data: current.data.map((tx) => (tx.id === id ? { ...tx, note } : tx)) },
                       { revalidate: false },
                     )
                   }
                   onCategorySaved={(id, cat) =>
                     mutateList(
-                      (current) =>
-                        current && {
-                          ...current,
-                          data: current.data.map((tx) => (tx.id === id ? { ...tx, category: cat } : tx)),
-                        },
+                      (current) => current && { ...current, data: current.data.map((tx) => (tx.id === id ? { ...tx, category: cat } : tx)) },
                       { revalidate: false },
                     )
                   }
                   onAliasSaved={(id, displayName) =>
                     mutateList(
-                      (current) =>
-                        current && {
-                          ...current,
-                          data: current.data.map((tx) => (tx.id === id ? { ...tx, displayDescription: displayName } : tx)),
-                        },
+                      (current) => current && { ...current, data: current.data.map((tx) => (tx.id === id ? { ...tx, displayDescription: displayName } : tx)) },
                       { revalidate: false },
                     )
                   }
@@ -456,70 +956,21 @@ function AllTimeTab() {
         </section>
       )}
 
-      <section className="rounded-medium bg-surface p-5">
-        <p className="text-small font-bold uppercase tracking-caps text-ink-muted">Total sepanjang waktu</p>
-        <p className="font-title text-amount-hero font-extrabold tabular-nums text-ink">{formatRupiah(data.totalSpent)}</p>
-      </section>
-
-      <div className="grid grid-cols-2 gap-3">
-        <StatTile
-          label="Bulan tertinggi"
-          value={data.highestMonth ? formatRupiah(data.highestMonth.total) : '—'}
-          tone="over"
-        />
-        <StatTile
-          label="Bulan terendah"
-          value={data.lowestMonth ? formatRupiah(data.lowestMonth.total) : '—'}
-          tone="under"
-        />
-      </div>
-      <div className="grid grid-cols-2 gap-2.5 -mt-2">
-        <p className="flex items-center gap-1.5 px-1 text-small text-ink-muted">
-          <TrendingUp size={13} /> {data.highestMonth ? formatMonthLabel(data.highestMonth.month) : '-'}
-        </p>
-        <p className="flex items-center gap-1.5 px-1 text-small text-ink-muted">
-          <TrendingDown size={13} /> {data.lowestMonth ? formatMonthLabel(data.lowestMonth.month) : '-'}
-        </p>
-      </div>
-
-      {categoryData.length > 0 && (
-        <section className="rounded-medium bg-surface p-5">
-          <p className="text-small font-bold uppercase tracking-caps text-ink-muted">Per kategori</p>
-          <CategoryBarChart data={categoryData} />
-        </section>
-      )}
+      {/* Export */}
+      <ExportRow
+        period="all"
+        label="Semua Waktu"
+        totals={{ spend: totals.spend, income: totals.income, net: totals.net, savingsRate: null }}
+        topCategories={[]}
+        fromDate={dataStartsAt ?? ''}
+        toDate={new Date().toISOString().slice(0, 10)}
+        dataStartsAt={dataStartsAt}
+      />
     </>
   );
 }
 
-const formatMonthLabel = (yyyyMM: string) => {
-  const [y, m] = yyyyMM.split('-').map(Number);
-  return `${MONTH_NAMES[m - 1]} ${y}`;
-};
-
-function CategoryBarChart({ data }: { data: (CategoryTotal & { label: string })[] }) {
-  return (
-    <ResponsiveContainer width="100%" height={Math.max(120, data.length * 34)}>
-      <BarChart data={data} layout="vertical" margin={{ top: 4, right: 12, left: 0, bottom: 0 }}>
-        <XAxis type="number" hide />
-        <YAxis
-          type="category"
-          dataKey="label"
-          width={84}
-          tick={{ fill: '#b3b3b3', fontSize: 12 }}
-          axisLine={false}
-          tickLine={false}
-        />
-        <Tooltip content={<ChartTooltip />} cursor={{ fill: 'rgba(255,255,255,0.06)' }} />
-        <Bar dataKey="total" radius={[0, 4, 4, 0]}>
-          {data.map((c) => (
-            <Cell key={c.category} fill={CATEGORY_COLORS[c.category] ?? '#94a3b8'} />
-          ))}
-        </Bar>
-      </BarChart>
-    </ResponsiveContainer>
-  );
-}
+// ─── DayDetailSheet ──────────────────────────────────────────────────────────
 
 function DayDetailSheet({ date, onClose }: { date: string; onClose: () => void }) {
   const { data, isLoading, mutate } = useSWR(`/transactions/day/${date}`, dayFetcher);
@@ -611,6 +1062,8 @@ function DayDetailSheet({ date, onClose }: { date: string; onClose: () => void }
   );
 }
 
+// ─── ReportSkeleton ──────────────────────────────────────────────────────────
+
 function ReportSkeleton() {
   return (
     <div className="flex flex-col gap-3">
@@ -619,6 +1072,8 @@ function ReportSkeleton() {
     </div>
   );
 }
+
+// ─── SubscriptionsSection ─────────────────────────────────────────────────────
 
 interface SubscriptionItem {
   id: number;
