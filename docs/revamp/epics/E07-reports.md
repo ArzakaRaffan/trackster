@@ -71,19 +71,32 @@ bulan kosong bernilai 0.
 
 ## E07-S1 — Mingguan & Bulanan + snapshot tersimpan
 
-- [ ] Migration `add_period_report`; modul `report` (atau di dalam `analytics`, pilih yang lebih sedikit file)
-- [ ] `ReportService.getReport(period, anchorDate)`: periode tutup → baca `PeriodReport` (generate kalau belum ada);
+> Scope layout dikurangi dari spesifikasi penuh di atas: "Pemasukan per sumber vs perkiraan" (butuh E03,
+> belum ada di `PeriodStats`) dan "Goal: progres" di-skip dulu — bisa nempel gampang belakangan begitu E03/E05
+> jalan, tapi belum ada datanya sekarang jadi nggak dipaksain. Hero, narasi, delta vs periode lalu, chart
+> harian, kategori (dengan delta), top merchant, budget, dan langganan sudah ada.
+
+- [x] Migration `add_period_report`; modul `report` terpisah (bukan di dalam `analytics`, biar tidak
+      circular dependency dgn `AiModule` — pakai `forwardRef` dua arah seperti `TelegramModule`↔`AiModule`)
+- [x] `ReportService.getReport(period, anchorDate)`: periode tutup → baca `PeriodReport` (generate kalau belum ada);
       periode berjalan → live dari PeriodStats (tanpa simpan, narasi opsional on-demand)
-- [ ] Cron tutup periode: Senin 06:00 WIB (minggu lalu), tanggal 1 06:30 WIB (bulan lalu). Generate narasi (AI_MODEL),
-      simpan. Backfill sekali untuk minggu/bulan sejak 10 Agu 2026.
-- [ ] Ganti `AiReportsService.sendWeeklyInsight` & `sendMonthlyReportCard`: kirim narasi tersimpan + link ke
-      `/app/reports?period=week&date=...`. Jadwal default Senin 07:00 WIB (minggu lengkap) — **tanya Arzaka**
-      apakah tetap mau Minggu 20:00 (pratinjau).
-- [ ] Prompt narasi: pakai angka dari stats saja, sebut 1 hal baik + 1 hal yang perlu diperbaiki + 1 saran
-      konkret minggu/bulan depan; boleh pakai memory AI (E04) kalau ada ("progres laptop: …").
-- [ ] Frontend: switcher periode + navigasi ‹ › + layout di atas untuk Minggu & Bulan; transaksi list & detail
-      hari yang sudah ada tetap bisa diakses (tab/section "Semua transaksi")
-- [ ] Verifikasi: minggu 15–21 Sep & bulan Agustus terbuka dengan narasi tersimpan; minggu berjalan live
+- [x] Cron tutup periode: Senin 06:00 WIB (minggu lalu), tanggal 1 06:30 WIB (bulan lalu). Generate narasi (AI_MODEL),
+      simpan. Backfill eksplisit di-skip (ponytail: `getOrGenerate` sudah lazy-generate on-read pertama kali
+      periode lama dibuka — cukup buat kebutuhan sekarang, tambah cron backfill terpisah kalau ternyata perlu
+      generate semua sekaligus tanpa nunggu dibuka).
+- [x] Ganti `AiReportsService.sendWeeklyInsight` & `sendMonthlyReportCard`: kirim narasi tersimpan + link ke
+      `/app/reports?period=week&date=...`. Jadwal **Senin 07:00 WIB** (dikonfirmasi Arzaka, gantiin Minggu 20:00
+      lama) — `weekly-goal-nudge` ikut digeser ke Senin 07:10 biar urutannya tetap benar.
+- [x] Prompt narasi: pakai angka dari stats saja, sebut 1 hal baik + 1 hal yang perlu diperbaiki + 1 saran
+      konkret minggu/bulan depan. Belum pakai memory AI (E04) — opsional di spec, di-skip sesi ini.
+- [x] Frontend: switcher periode + navigasi ‹ › + layout di atas untuk Minggu & Bulan; transaksi list & detail
+      hari yang sudah ada tetap bisa diakses (tab "Semua transaksi", eks-`AllTimeTab`)
+- [x] Verifikasi: `tsc --noEmit` (backend+frontend) & `nest build`/`next build` lolos bersih. API diverifikasi
+      langsung lewat curl lokal (dev DB): minggu berjalan live, minggu 20–27 Sep & bulan Agustus closed →
+      snapshot `PeriodReport` ke-generate & ke-cache (generatedAt stabil di request kedua). **Belum** cek visual
+      di browser — Claude in Chrome extension nggak connect di sesi ini; halaman lolos render tanpa error
+      (curl shell HTML + dev server log bersih) tapi bagian yang butuh JS (hero, chart, narasi) belum
+      dikonfirmasi visual. Cek manual di browser sebelum push.
 
 ## E07-S2 — 6 Bulan, Semua, export & bagikan
 

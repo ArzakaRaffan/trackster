@@ -1,37 +1,18 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { Cron } from '@nestjs/schedule';
+import { ReportPeriod } from '@prisma/client';
 import { PrismaService } from '../../prisma.service';
 import { AiService } from './ai.service';
-import { TransactionService } from '../transaction/transaction.service';
 import { TelegramService } from '../telegram/telegram.service';
 import { BudgetService } from '../budget/budget.service';
 import { GoalService } from '../goal/goal.service';
 import { SubscriptionService } from '../subscription/subscription.service';
 import { AnalyticsService } from '../analytics/analytics.service';
-import { addWibDays, isLastWibDayOfMonth, startOfWibDay, startOfWibWeek, wibDateKey, wibParts } from '../../common/wib';
-
-const WEEKLY_NARRATIVE_PROMPT = `Kamu adalah Trackster AI — financial buddy personal Arzaka.
-Tugas: Tulis ringkasan mingguan keuangan Arzaka dalam Bahasa Indonesia yang santai.
-
-Format laporan:
-1. Satu paragraf pola pengeluaran minggu ini (jujur, tidak menghakimi)
-2. Maksimal 3 rekomendasi konkret dan spesifik (bukan saran generik)
-3. Satu kalimat opportunity-cost dari merchant terbesar: "Uang yang kamu habiskan di [merchant] selama sebulan setara dengan [analogi menarik]"
-
-Jangan panjang-panjang. Gunakan angka nyata dari data yang diberikan. Tidak perlu salam pembuka/penutup formal.`;
+import { ReportService } from '../report/report.service';
+import { addWibDays, isLastWibDayOfMonth, startOfWibDay, startOfWibWeek, wibDateKey, wibRange } from '../../common/wib';
 
 const HEALTH_SCORE_COMMENTARY_PROMPT = `Kamu adalah Trackster AI. Berikan 1 kalimat reaksi manusiawi dan jujur terhadap Financial Health Score berikut.
 Jangan terlalu positif kalau skor rendah, tapi tetap konstruktif. Maks 20 kata. Bahasa Indonesia santai.`;
-
-const MONTHLY_REPORT_PROMPT = `Kamu adalah Trackster AI — financial buddy personal Arzaka.
-Tugas: Tulis report card bulanan keuangan Arzaka dalam Bahasa Indonesia yang santai.
-
-Format:
-1. Satu kalimat verdict bulan ini (jujur)
-2. 2-3 highlight: apa yang bagus, apa yang perlu diperbaiki
-3. Satu target konkret untuk bulan depan
-
-Gunakan angka nyata dari data. Tidak perlu salam pembuka/penutup formal. Singkat dan actionable.`;
 
 const DAILY_RECAP_PROMPT = `Kamu adalah Trackster AI — financial buddy personal Arzaka.
 Tugas: Tulis recap SANGAT SINGKAT (maks 2 kalimat) soal hari ini, Bahasa Indonesia santai.
@@ -57,12 +38,12 @@ export class AiReportsService {
   constructor(
     private prisma: PrismaService,
     private aiService: AiService,
-    private transactionService: TransactionService,
     private telegramService: TelegramService,
     private budgetService: BudgetService,
     private goalService: GoalService,
     private subscriptionService: SubscriptionService,
     private analyticsService: AnalyticsService,
+    private reportService: ReportService,
   ) {}
 
   /** Daily: setiap hari jam 22:00 WIB. Skip kalau nggak ada aktivitas hari ini — jangan spam
@@ -90,8 +71,8 @@ export class AiReportsService {
     }
   }
 
-  /** Weekly: setiap Minggu jam 20:10 WIB (setelah weekly-insight-report) — nudge progres goal. */
-  @Cron('10 20 * * 0', { name: 'weekly-goal-nudge', timeZone: 'Asia/Jakarta' })
+  /** Weekly: setiap Senin jam 07:10 WIB (setelah weekly-insight-report) — nudge progres goal. */
+  @Cron('10 7 * * 1', { name: 'weekly-goal-nudge', timeZone: 'Asia/Jakarta' })
   async sendGoalNudge() {
     this.logger.log('Mengirim Goal Nudge...');
     try {
@@ -169,22 +150,45 @@ export class AiReportsService {
     return [...groups.values()].filter((g) => g.length > 1);
   }
 
-  /** Weekly: setiap Minggu jam 20:00 WIB */
-  @Cron('0 20 * * 0', { name: 'weekly-insight-report', timeZone: 'Asia/Jakarta' })
+  /** Tutup minggu lalu (Senin-Minggu) → hitung PeriodStats + narasi, simpan snapshot `PeriodReport`.
+   *  Jalan sebelum `weekly-insight-report` biar narasinya udah siap pas dikirim. */
+  @Cron('0 6 * * 1', { name: 'close-weekly-report', timeZone: 'Asia/Jakarta' })
+  async closeWeeklyReport() {
+    this.logger.log('Menutup laporan mingguan...');
+    try {
+      const anchor = this.reportService.lastClosedWeekAnchor(new Date());
+      const { start, end } = wibRange('week', anchor);
+      await this.reportService.closePeriod(ReportPeriod.WEEK, start, end);
+    } catch (err: any) {
+      this.logger.error(`closeWeeklyReport error: ${err?.message}`);
+    }
+  }
+
+  /** Tutup bulan lalu → sama seperti di atas, buat bulan kalender. */
+  @Cron('30 6 1 * *', { name: 'close-monthly-report', timeZone: 'Asia/Jakarta' })
+  async closeMonthlyReport() {
+    this.logger.log('Menutup laporan bulanan...');
+    try {
+      const anchor = this.reportService.lastClosedMonthAnchor(new Date());
+      const { start, end } = wibRange('month', anchor);
+      await this.reportService.closePeriod(ReportPeriod.MONTH, start, end);
+    } catch (err: any) {
+      this.logger.error(`closeMonthlyReport error: ${err?.message}`);
+    }
+  }
+
+  /** Weekly: setiap Senin jam 07:00 WIB — kirim narasi tersimpan (minggu Senin-Minggu yang baru tutup). */
+  @Cron('0 7 * * 1', { name: 'weekly-insight-report', timeZone: 'Asia/Jakarta' })
   async sendWeeklyInsight() {
     this.logger.log('Mengirim Weekly Insight Report...');
     try {
-      const insights = await this.transactionService.getInsights('30d');
-
-      const narrative = await this.aiService.chat({
-        system: WEEKLY_NARRATIVE_PROMPT,
-        messages: [{ role: 'user', content: JSON.stringify(insights) }],
-        maxTokens: 512,
-      });
-
-      const text = narrative?.content ?? '';
-      if (text) {
-        await this.telegramService.sendMessage(`📊 <b>Weekly Financial Report</b>\n\n${text}`);
+      const anchor = this.reportService.lastClosedWeekAnchor(new Date());
+      const report = await this.reportService.getReport('week', anchor);
+      if (report.narrative) {
+        const link = `${this.frontendUrl()}/app/reports?period=week&date=${wibDateKey(new Date(report.start))}`;
+        await this.telegramService.sendMessage(
+          `📊 <b>Laporan Minggu Ini</b>\n\n${report.narrative}\n\n<a href="${link}">Lihat detail</a>`,
+        );
       }
 
       // Hitung & simpan Health Score sekalian
@@ -194,43 +198,31 @@ export class AiReportsService {
     }
   }
 
-  /** Monthly: cek setiap hari jam 20:00 WIB, eksekusi kalau hari ini = hari terakhir bulan */
-  @Cron('0 20 * * *', { name: 'monthly-report-card', timeZone: 'Asia/Jakarta' })
+  /** Monthly: setiap tanggal 1 jam 07:00 WIB — kirim narasi tersimpan (bulan lalu yang baru tutup). */
+  @Cron('0 7 1 * *', { name: 'monthly-report-card', timeZone: 'Asia/Jakarta' })
   async sendMonthlyReportCard() {
-    const now = new Date();
-    if (!isLastWibDayOfMonth(now)) return; // bukan akhir bulan (WIB)
-
     this.logger.log('Mengirim Monthly Report Card...');
     try {
-      const { year, month } = wibParts(now);
-      const monthly = await this.transactionService.getMonthly(year, month);
-      const allTime = await this.transactionService.getAllTimeSummary();
-
-      const narrative = await this.aiService.chat({
-        system: MONTHLY_REPORT_PROMPT,
-        messages: [
-          {
-            role: 'user',
-            content: JSON.stringify({ monthly, allTime }),
-          },
-        ],
-        maxTokens: 512,
-      });
-
-      const text = narrative?.content ?? '';
-      if (text) {
-        const monthName = now.toLocaleDateString('id-ID', {
+      const anchor = this.reportService.lastClosedMonthAnchor(new Date());
+      const report = await this.reportService.getReport('month', anchor);
+      if (report.narrative) {
+        const monthName = new Date(report.start).toLocaleDateString('id-ID', {
           month: 'long',
           year: 'numeric',
           timeZone: 'Asia/Jakarta',
         });
+        const link = `${this.frontendUrl()}/app/reports?period=month&date=${wibDateKey(new Date(report.start))}`;
         await this.telegramService.sendMessage(
-          `📅 <b>Report Card ${monthName}</b>\n\n${text}`,
+          `📅 <b>Report Card ${monthName}</b>\n\n${report.narrative}\n\n<a href="${link}">Lihat detail</a>`,
         );
       }
     } catch (err: any) {
       this.logger.error(`sendMonthlyReportCard error: ${err?.message}`);
     }
+  }
+
+  private frontendUrl(): string {
+    return process.env.FRONTEND_URL || 'http://localhost:3000';
   }
 
   /** Hitung Health Score algoritmik (dari PeriodStats 30 hari) + simpan ke HealthScoreLog */

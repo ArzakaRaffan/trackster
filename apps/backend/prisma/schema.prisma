@@ -311,6 +311,24 @@ model AiInsightCard {
   @@unique([rangeKey, dayKey])
 }
 
+enum ReportPeriod {
+  WEEK
+  MONTH
+}
+
+// Snapshot laporan periode yang sudah tutup (E07-S1) — angka & narasi dibekukan
+// di waktu tutup, konsisten walau data berubah kemudian (koreksi, kategori ulang, dll).
+model PeriodReport {
+  id          Int          @id @default(autoincrement())
+  period      ReportPeriod
+  periodStart DateTime     @db.Date
+  stats       Json         // PeriodStats saat periode ditutup
+  narrative   String?      // ringkasan Track (markdown pendek)
+  generatedAt DateTime     @default(now())
+
+  @@unique([period, periodStart])
+}
+
 model Goal {
   id            Int               @id @default(autoincrement())
   name          String

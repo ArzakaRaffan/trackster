@@ -239,6 +239,44 @@ passwordless sudo) di VPS ini. AI insight card & AI commentary health score kemb
 verifikasi ini karena `AI_API_KEY` memang belum di-set di `.env` dev (bukan bug) — behaviour "never throw"-nya
 sendiri sudah kekonfirmasi jalan (endpoint tetap 200 dengan array kosong, bukan 500).
 
+## 2026-09-28 — E07-S1: Laporan Mingguan & Bulanan v2 (`PeriodReport` snapshot) + jadwal Telegram Senin 07:00
+**Konteks:** `/app/reports` lama cuma tab bulanan/all-time tanpa pemasukan/net/narasi tersimpan; laporan
+Telegram mingguan (Minggu 20:00) & bulanan (cek hari terakhir bulan jam 20:00) pakai `TransactionService.getInsights`/
+`getMonthly` langsung, dihitung ulang tiap kirim, tidak konsisten kalau data berubah setelahnya, dan tidak ada
+cara balik lihat laporan minggu/bulan lama dari halaman web.
+**Keputusan:** (1) Model `PeriodReport` (`period` WEEK/MONTH, `periodStart`, `stats` Json snapshot dari
+`PeriodStatsService`, `narrative`) — periode yang sudah tutup (`end <= now`) dibaca dari snapshot ini, generate
+on-demand kalau belum ada (lazy, bukan backfill cron terpisah — cukup buat kebutuhan sekarang). Periode yang masih
+berjalan selalu live dari `PeriodStats`, tidak pernah disimpan. (2) Modul baru `report/` (bukan digabung ke
+`analytics/` seperti disaran epic) karena `ReportService` butuh `AiService` buat narasi, dan `AiModule` sudah
+import `AnalyticsModule` — kalau `ReportService` ditaruh di situ jadi `AnalyticsModule → AiModule → AnalyticsModule`.
+Solusinya: `ReportModule` berdiri sendiri, `forwardRef` dua arah dengan `AiModule` (pola yang sama seperti
+`TelegramModule`↔`AiModule` yang sudah ada). (3) Cron tutup periode terpisah dari cron kirim: `close-weekly-report`
+Senin 06:00 WIB & `close-monthly-report` tanggal 1 06:30 WIB menghitung+simpan snapshot duluan, baru
+`weekly-insight-report` (Senin 07:00) & `monthly-report-card` (tanggal 1 07:00) kirim narasi yang sudah tersimpan.
+Jadwal mingguan **pindah dari Minggu 20:00 (pratinjau minggu berjalan) ke Senin 07:00 (minggu Senin–Minggu yang
+baru betul-betul tutup)** — dikonfirmasi eksplisit ke Arzaka, bukan asumsi. `weekly-goal-nudge` ikut digeser ke
+Senin 07:10 (dari Minggu 20:10) biar tetap jalan setelah laporan mingguan. (4) Frontend `/app/reports` di-rebuild
+total: switcher Minggu/Bulan/Semua transaksi (bukan Bulanan/All Time lama), nav ‹ ›, hero net+savings rate, narasi
+Track, delta vs periode lalu, kategori dgn ghost-bar periode lalu (pola sama dgn `/app/insights`), top merchant,
+budget over/under, langganan. Tab "Semua transaksi" = `AllTimeTab` lama dipindah utuh (masih dukung search/filter/
+detail hari) supaya nggak hilang fungsi lama.
+**Alasan:** Snapshot dibekukan di waktu tutup (bukan dihitung ulang tiap load) sesuai prinsip epic — laporan
+minggu lalu harus konsisten walau kategori/koreksi berubah belakangan. Lazy-generate dipilih daripada backfill
+cron eksplisit karena efeknya sama (baca pertama kali = generate & cache) dengan kode jauh lebih sedikit — YAGNI
+kalau ternyata butuh generate semua sekaligus tanpa nunggu dibuka, itu penambahan kecil nanti. "Pemasukan per
+sumber vs perkiraan" (E03) dan "Goal: progres" di-skip dari layout karena datanya belum ada di `PeriodStats` —
+dipaksain sekarang cuma bikin section kosong/palsu.
+**Konsekuensi:** `tsc --noEmit` (backend+frontend) & `nest build`/`next build` lolos bersih. Diverifikasi lewat
+curl langsung ke dev DB: minggu berjalan & bulan berjalan live (angka beda tiap query, `narrative:null`); minggu
+20–27 Sep dan bulan Agustus (`closed:true`) generate snapshot sekali (`generatedAt` muncul) lalu re-request kedua
+`generatedAt` **sama persis** (idempotent, tidak regenerate). Narasi AI konsisten `null` di semua uji lokal karena
+`AI_API_KEY` memang belum di-set di `.env` dev (bukan bug — try/catch di `ReportService.closePeriod` sengaja tidak
+menggagalkan simpan snapshot kalau cuma narasinya yang gagal). **Belum diverifikasi:** tampilan visual di browser
+— Claude in Chrome extension nggak connect di sesi ini (sama seperti sesi E06-S2 sebelumnya, lihat entri di atas).
+Halaman lolos render tanpa error server (curl shell HTML 200, dev log bersih, tab label ketemu di HTML) tapi bagian
+yang butuh JS (hero/chart/narasi via `useSWR`) belum dikonfirmasi visual — cek manual sebelum push.
+
 ## YYYY-MM-DD — <judul>
 **Konteks:**
 **Keputusan:**

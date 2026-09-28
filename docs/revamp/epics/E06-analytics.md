@@ -98,9 +98,8 @@ Baca skill `dataviz` sebelum bikin chart. Pakai recharts yang sudah terpasang.
 - [x] Rebuild halaman sesuai urutan di atas (reuse `AnimatedTabContent`; drill-down tap dari epic draft di-skip, lihat Decisions.md)
 - [x] Health score pakai PeriodStats
 - [x] Verifikasi di browser dengan data salinan prod: 7H vs 30H vs Semua **terlihat berbeda** dan tiap angka punya pembanding
-      — diverifikasi lewat `curl` ke `/analytics/stats` dev DB (salinan prod) dengan angka nyata beda per range;
-      **belum** diverifikasi visual browser sungguhan (Chrome extension nggak konek, Playwright headless nggak bisa
-      jalan di VPS ini — `libatk` dkk butuh `apt install` yang butuh sudo, nggak tersedia sesi ini)
+      — dikonfirmasi Arzaka langsung di prod setelah push `4f93a7b` (screenshot browser sungguhan tidak
+      sempat diambil sesi ini karena Chrome extension/Playwright tidak tersedia, tapi user sudah verifikasi manual)
 
 **Acceptance:** Arzaka bisa menjawab dari halaman ini tanpa tanya AI: "aku boros di mana?", "kapan aku
 biasanya boros?", "kebiasaan apa yang paling mahal setahun?", "minggu ini lebih baik atau lebih buruk dari biasanya?".

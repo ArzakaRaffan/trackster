@@ -1,16 +1,19 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { Suspense, useEffect, useState } from 'react';
 import Link from 'next/link';
+import { useSearchParams } from 'next/navigation';
 import useSWR from 'swr';
 import { useAutoAnimate } from '@formkit/auto-animate/react';
+import { motion } from 'motion/react';
 import { Bar, BarChart, Cell, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import { api } from '@/lib/api';
-import { formatRupiah, MONTH_NAMES } from '@/lib/format';
+import { formatRupiah, formatRupiahCompact, MONTH_NAMES } from '@/lib/format';
 import { CATEGORY_COLORS, CATEGORY_LABELS, TransactionNoteRow, type NoteableTransaction } from '@/components/ui/TransactionNoteRow';
 import { Input } from '@/components/ui/Input';
 import { StatTile } from '@/components/ui/StatTile';
 import { AnimatedTabContent } from '@/components/ui/AnimatedTabContent';
+import { TRANSITION_SLOW } from '@/lib/motion';
 import { ArrowRight, ChevronLeft, ChevronRight, Inbox, Search, TrendingDown, TrendingUp, X } from 'lucide-react';
 
 /** Debounce a fast-changing value (search input) so we don't fire a request per keystroke. */
@@ -23,18 +26,43 @@ function useDebouncedValue<T>(value: T, delayMs: number): T {
   return debounced;
 }
 
+type Period = 'week' | 'month';
+
+interface PeriodTotals {
+  spend: number;
+  spendRoutine: number;
+  spendBig: number;
+  txCount: number;
+  avgRoutinePerDay: number;
+  income: number;
+  net: number;
+  savingsRate: number | null;
+}
+
+interface PeriodStats {
+  range: { start: string; end: string; days: number; dataStartsAt: string | null };
+  totals: PeriodTotals;
+  previous?: PeriodTotals & { start: string; end: string };
+  byCategory: { category: string; total: number; count: number; prevTotal?: number }[];
+  byMerchant: { merchantKey: string; displayName: string; total: number; count: number; avgTicket: number; perWeek: number }[];
+  byDay: { date: string; spend: number; spendRoutine: number; budget: number; income: number }[];
+  budget: { daysWithBudget: number; daysOver: number; adherencePct: number | null; streakUnder: number; worstWeekday: number | null };
+  dataQuality: { lainnyaPct: number; pendingIncomeCount: number; unparsedEmailCount: number };
+}
+
+interface ReportResponse {
+  period: Period;
+  start: string;
+  end: string;
+  closed: boolean;
+  stats: PeriodStats;
+  narrative: string | null;
+  generatedAt: string | null;
+}
+
 interface CategoryTotal {
   category: string;
   total: number;
-}
-
-interface MonthlyReport {
-  year: number;
-  month: number;
-  totalSpent: number;
-  byCategory: CategoryTotal[];
-  byDay: { date: string; totalSpent: number }[];
-  transactions: NoteableTransaction[];
 }
 
 interface AllTimeSummary {
@@ -60,21 +88,35 @@ interface TransactionListResponse {
 const CATEGORY_FILTER_OPTIONS = Object.keys(CATEGORY_LABELS);
 const SOURCE_FILTER_OPTIONS = ['ALL', 'BCA', 'JAGO'] as const;
 
-const monthlyFetcher = (path: string) => api.get<MonthlyReport>(path);
+const reportFetcher = (path: string) => api.get<ReportResponse>(path);
 const summaryFetcher = (path: string) => api.get<AllTimeSummary>(path);
 const dayFetcher = (path: string) => api.get<DayDetail>(path);
 const transactionListFetcher = (path: string) => api.get<TransactionListResponse>(path);
 
-const formatMonthLabel = (yyyyMM: string) => {
-  const [y, m] = yyyyMM.split('-').map(Number);
-  return `${MONTH_NAMES[m - 1]} ${y}`;
-};
+function pctChange(curr: number, prev: number): number {
+  if (prev === 0) return curr === 0 ? 0 : 100;
+  return ((curr - prev) / prev) * 100;
+}
+
+function wibDateKey(iso: string): string {
+  return new Date(new Date(iso).getTime() + 7 * 3600_000).toISOString().slice(0, 10);
+}
+
+/** `end` eksklusif (dari backend). Label "23–29 Sep 2026" (minggu) atau "September 2026" (bulan). */
+function formatPeriodLabel(period: Period, startIso: string, endIso: string): string {
+  const start = new Date(new Date(startIso).getTime() + 7 * 3600_000);
+  const endInclusive = new Date(new Date(endIso).getTime() + 7 * 3600_000 - 86_400_000);
+  if (period === 'month') return `${MONTH_NAMES[start.getUTCMonth()]} ${start.getUTCFullYear()}`;
+  const sameMonth = start.getUTCMonth() === endInclusive.getUTCMonth();
+  const startLabel = sameMonth ? `${start.getUTCDate()}` : `${start.getUTCDate()} ${MONTH_NAMES[start.getUTCMonth()]}`;
+  return `${startLabel}–${endInclusive.getUTCDate()} ${MONTH_NAMES[endInclusive.getUTCMonth()]} ${endInclusive.getUTCFullYear()}`;
+}
 
 function ChartTooltip({ active, payload, label }: any) {
   if (!active || !payload?.length) return null;
   return (
     <div className="rounded-standard bg-surface-overlay px-3 py-2 text-small shadow-medium">
-      <p className="font-bold text-ink">{label}</p>
+      {label && <p className="font-bold text-ink">{label}</p>}
       {payload.map((p: any) => (
         <p key={p.dataKey} className="tabular-nums text-ink-muted">
           {formatRupiah(p.value)}
@@ -85,28 +127,21 @@ function ChartTooltip({ active, payload, label }: any) {
 }
 
 export default function ReportsPage() {
-  const now = new Date();
-  const [tab, setTab] = useState<'monthly' | 'all'>('monthly');
-  const [year, setYear] = useState(now.getFullYear());
-  const [month, setMonth] = useState(now.getMonth() + 1);
-  const [selectedDay, setSelectedDay] = useState<string | null>(null);
+  return (
+    <Suspense fallback={<div className="px-4 pt-6 text-small text-ink-muted">Memuat...</div>}>
+      <ReportsPageInner />
+    </Suspense>
+  );
+}
 
-  const goPrevMonth = () => {
-    if (month === 1) {
-      setYear((y) => y - 1);
-      setMonth(12);
-    } else {
-      setMonth((m) => m - 1);
-    }
-  };
-  const goNextMonth = () => {
-    if (month === 12) {
-      setYear((y) => y + 1);
-      setMonth(1);
-    } else {
-      setMonth((m) => m + 1);
-    }
-  };
+function ReportsPageInner() {
+  const searchParams = useSearchParams();
+  const initialPeriod = searchParams.get('period') === 'month' ? 'month' : searchParams.get('period') === 'all' ? 'all' : 'week';
+  const initialDate = searchParams.get('date') ?? new Date().toISOString().slice(0, 10);
+
+  const [tab, setTab] = useState<Period | 'all'>(initialPeriod as Period | 'all');
+  const [anchorDate, setAnchorDate] = useState(initialDate);
+  const [selectedDay, setSelectedDay] = useState<string | null>(null);
 
   return (
     <div className="pb-navbar animate-fade-in-up">
@@ -116,26 +151,32 @@ export default function ReportsPage() {
       </header>
 
       <div className="flex flex-col gap-3 px-4">
-        {/* Tab switcher */}
         <div className="flex gap-1 rounded-full-pill bg-surface p-1">
-          {(['monthly', 'all'] as const).map((t) => (
+          {([
+            { key: 'week', label: 'Minggu' },
+            { key: 'month', label: 'Bulan' },
+            { key: 'all', label: 'Semua transaksi' },
+          ] as const).map((t) => (
             <button
-              key={t}
-              onClick={() => setTab(t)}
+              key={t.key}
+              onClick={() => {
+                setTab(t.key);
+                if (t.key !== 'all') setAnchorDate(new Date().toISOString().slice(0, 10));
+              }}
               className={`flex-1 rounded-full-pill py-2 text-label font-bold transition-colors duration-base ease-standard ${
-                tab === t ? 'bg-brand text-base' : 'text-ink-muted'
+                tab === t.key ? 'bg-brand text-base' : 'text-ink-muted'
               }`}
             >
-              {t === 'monthly' ? 'Bulanan' : 'All Time'}
+              {t.label}
             </button>
           ))}
         </div>
 
         <AnimatedTabContent tabKey={tab}>
-          {tab === 'monthly' ? (
-            <MonthlyTab year={year} month={month} onPrev={goPrevMonth} onNext={goNextMonth} onSelectDay={setSelectedDay} />
-          ) : (
+          {tab === 'all' ? (
             <AllTimeTab />
+          ) : (
+            <PeriodReportTab period={tab} anchorDate={anchorDate} onAnchorChange={setAnchorDate} onSelectDay={setSelectedDay} />
           )}
         </AnimatedTabContent>
       </div>
@@ -145,89 +186,153 @@ export default function ReportsPage() {
   );
 }
 
-function MonthlyTab({
-  year,
-  month,
-  onPrev,
-  onNext,
+function PeriodReportTab({
+  period,
+  anchorDate,
+  onAnchorChange,
   onSelectDay,
 }: {
-  year: number;
-  month: number;
-  onPrev: () => void;
-  onNext: () => void;
+  period: Period;
+  anchorDate: string;
+  onAnchorChange: (date: string) => void;
   onSelectDay: (date: string) => void;
 }) {
-  const { data, error, isLoading } = useSWR(`/transactions/monthly?year=${year}&month=${month}`, monthlyFetcher);
+  const { data, error, isLoading } = useSWR(`/reports?period=${period}&date=${anchorDate}`, reportFetcher);
 
-  if (isLoading) return <ReportSkeleton />;
-  if (error || !data) return <p className="text-label text-status-over">Gagal memuat laporan.</p>;
+  if (isLoading || !data) return <ReportSkeleton />;
+  if (error) return <p className="text-label text-status-over">Gagal memuat laporan.</p>;
 
-  const categoryData = data.byCategory.map((c) => ({
-    ...c,
-    label: CATEGORY_LABELS[c.category] ?? c.category,
-  }));
+  const { stats, narrative, closed } = data;
+  const { totals, previous } = stats;
+  const showNet = totals.income > 0 || (previous?.income ?? 0) > 0;
+  const isFuture = new Date(data.end).getTime() > Date.now();
+
+  const goPrev = () => onAnchorChange(wibDateKey(new Date(new Date(data.start).getTime() - 86_400_000).toISOString()));
+  const goNext = () => onAnchorChange(wibDateKey(data.end));
+
+  const categoryData = stats.byCategory.map((c) => ({ ...c, label: CATEGORY_LABELS[c.category] ?? c.category }));
+  const topMerchants = stats.byMerchant.slice(0, 5);
 
   return (
     <>
-      {/* Month nav */}
       <div className="flex items-center justify-between rounded-comfortable bg-surface p-2">
-        <button
-          onClick={onPrev}
-          aria-label="Bulan sebelumnya"
-          className="flex h-9 w-9 items-center justify-center rounded-full text-ink-muted hover:text-ink"
-        >
+        <button onClick={goPrev} aria-label="Periode sebelumnya" className="flex h-9 w-9 items-center justify-center rounded-full text-ink-muted hover:text-ink">
           <ChevronLeft size={18} />
         </button>
-        <span className="text-label font-bold text-ink">
-          {MONTH_NAMES[month - 1]} {year}
-        </span>
+        <span className="text-label font-bold text-ink">{formatPeriodLabel(period, data.start, data.end)}</span>
         <button
-          onClick={onNext}
-          aria-label="Bulan berikutnya"
-          className="flex h-9 w-9 items-center justify-center rounded-full text-ink-muted hover:text-ink"
+          onClick={goNext}
+          disabled={isFuture}
+          aria-label="Periode berikutnya"
+          className="flex h-9 w-9 items-center justify-center rounded-full text-ink-muted hover:text-ink disabled:opacity-30"
         >
           <ChevronRight size={18} />
         </button>
       </div>
 
+      {/* Hero */}
       <section className="rounded-medium bg-surface p-5">
-        <p className="text-small font-bold uppercase tracking-caps text-ink-muted">Total bulan ini</p>
-        <p className="font-title text-amount font-extrabold tabular-nums text-ink">{formatRupiah(data.totalSpent)}</p>
+        <div className="flex items-baseline justify-between">
+          <p className="text-small font-bold uppercase tracking-caps text-ink-muted">Net</p>
+          {totals.savingsRate != null && <p className="text-small text-ink-muted">Savings rate {totals.savingsRate.toFixed(0)}%</p>}
+        </div>
+        <p className={`font-title text-amount-hero font-black tabular-nums ${totals.net >= 0 ? 'text-status-under' : 'text-status-over'}`}>
+          {totals.net >= 0 ? '+' : ''}
+          {formatRupiah(totals.net)}
+        </p>
+        {showNet && (
+          <p className="mt-1 text-small text-ink-muted">
+            Masuk {formatRupiahCompact(totals.income)} · Keluar {formatRupiahCompact(totals.spend)}
+          </p>
+        )}
+      </section>
 
-        <p className="mt-5 text-small font-bold uppercase tracking-caps text-ink-muted">Tren harian</p>
+      {narrative ? (
+        <section className="rounded-comfortable bg-surface-interactive p-5">
+          <p className="text-small font-bold uppercase tracking-caps text-ink-muted">Ringkasan dari Track</p>
+          <p className="mt-2 whitespace-pre-line text-small leading-relaxed text-ink">{narrative}</p>
+        </section>
+      ) : !closed ? (
+        <p className="px-1 text-micro text-ink-subtle">Periode masih berjalan — narasi & snapshot muncul setelah periode ini tutup.</p>
+      ) : null}
+
+      {previous ? (
+        <p className="px-1 text-micro text-ink-muted">
+          vs periode sebelumnya: keluar rutin {previous.spendRoutine > 0 ? `${pctChange(totals.spendRoutine, previous.spendRoutine) >= 0 ? '↑' : '↓'}${Math.abs(pctChange(totals.spendRoutine, previous.spendRoutine)).toFixed(0)}%` : '—'}
+          {' · '}
+          pemasukan {previous.income > 0 ? `${totals.income >= previous.income ? '↑' : '↓'}${formatRupiahCompact(Math.abs(totals.income - previous.income))}` : '—'}
+        </p>
+      ) : (
+        <p className="px-1 text-micro text-ink-subtle">Belum ada data pembanding untuk periode ini</p>
+      )}
+
+      {/* Chart harian */}
+      <section className="rounded-medium bg-surface p-5">
+        <p className="text-small font-bold uppercase tracking-caps text-ink-muted">Tren harian</p>
         <p className="mb-2 text-micro text-ink-subtle">Klik satu batang buat lihat detail transaksi hari itu</p>
         <ResponsiveContainer width="100%" height={160}>
-          <BarChart data={data.byDay} margin={{ top: 4, right: 0, left: 0, bottom: 0 }}>
-            <XAxis
-              dataKey="date"
-              tickFormatter={(d: string) => d.slice(-2)}
-              tick={{ fill: '#7c7c7c', fontSize: 10 }}
-              axisLine={false}
-              tickLine={false}
-              interval={2}
-            />
+          <BarChart data={stats.byDay} margin={{ top: 4, right: 0, left: 0, bottom: 0 }}>
+            <XAxis dataKey="date" tickFormatter={(d: string) => d.slice(-2)} tick={{ fill: '#7c7c7c', fontSize: 10 }} axisLine={false} tickLine={false} interval={period === 'month' ? 3 : 0} />
             <YAxis hide />
             <Tooltip content={<ChartTooltip />} cursor={{ fill: 'rgba(255,255,255,0.06)' }} />
-            <Bar
-              dataKey="totalSpent"
-              radius={[3, 3, 0, 0]}
-              fill="#1ed760"
-              cursor="pointer"
-              onClick={(d: any) => onSelectDay(d.date)}
-            />
+            <Bar dataKey="spend" radius={[3, 3, 0, 0]} fill="#1ed760" cursor="pointer" onClick={(d: any) => onSelectDay(d.date)} />
           </BarChart>
         </ResponsiveContainer>
       </section>
 
-      <SubscriptionsSection />
-
       {categoryData.length > 0 && (
-        <section className="rounded-medium bg-surface p-5">
-          <p className="text-small font-bold uppercase tracking-caps text-ink-muted">Per kategori</p>
-          <CategoryBarChart data={categoryData} />
+        <section className="rounded-comfortable bg-surface p-5">
+          <p className="text-small font-bold uppercase tracking-caps text-ink-muted">Kategori</p>
+          <motion.div initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} transition={TRANSITION_SLOW} className="mt-3 flex flex-col gap-3">
+            {categoryData.filter((c) => c.total > 0).map((c) => {
+              const max = Math.max(1, ...categoryData.map((x) => Math.max(x.total, x.prevTotal ?? 0)));
+              return (
+                <div key={c.category}>
+                  <div className="flex items-baseline justify-between text-small">
+                    <span className="text-ink-muted">{c.label}</span>
+                    <span className="tabular-nums font-bold text-ink">{formatRupiah(c.total)}</span>
+                  </div>
+                  <div className="mt-1 flex flex-col gap-1">
+                    <div className="h-2 overflow-hidden rounded-pill bg-track">
+                      <div className="h-full rounded-pill transition-[width] duration-slow ease-expressive" style={{ width: `${(c.total / max) * 100}%`, backgroundColor: CATEGORY_COLORS[c.category] ?? '#94a3b8' }} />
+                    </div>
+                    {c.prevTotal != null && (
+                      <div className="h-1.5 overflow-hidden rounded-pill bg-track">
+                        <div className="h-full rounded-pill bg-ink-subtle/50" style={{ width: `${(c.prevTotal / max) * 100}%` }} />
+                      </div>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </motion.div>
         </section>
       )}
+
+      {topMerchants.length > 0 && (
+        <section className="rounded-comfortable bg-surface p-5">
+          <p className="text-small font-bold uppercase tracking-caps text-ink-muted">Top merchant</p>
+          <div className="mt-3 flex flex-col gap-3">
+            {topMerchants.map((m) => (
+              <div key={m.merchantKey} className="flex items-baseline justify-between gap-3 text-small">
+                <p className="min-w-0 truncate font-bold text-ink">{m.displayName}</p>
+                <p className="shrink-0 tabular-nums text-ink-muted">{m.count}× · {formatRupiah(m.total)}</p>
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
+
+      {stats.budget.daysWithBudget > 0 && (
+        <section className="rounded-comfortable bg-surface p-5">
+          <p className="text-small font-bold uppercase tracking-caps text-ink-muted">Kepatuhan budget</p>
+          <p className="mt-2 text-small text-ink-muted">
+            <b className={stats.budget.daysOver === 0 ? 'text-status-under' : 'text-status-over'}>{stats.budget.daysOver}</b> dari {stats.budget.daysWithBudget} hari berbudget over
+          </p>
+        </section>
+      )}
+
+      <SubscriptionsSection />
     </>
   );
 }
@@ -377,8 +482,6 @@ function AllTimeTab() {
         </p>
       </div>
 
-      <SubscriptionsSection />
-
       {categoryData.length > 0 && (
         <section className="rounded-medium bg-surface p-5">
           <p className="text-small font-bold uppercase tracking-caps text-ink-muted">Per kategori</p>
@@ -388,6 +491,11 @@ function AllTimeTab() {
     </>
   );
 }
+
+const formatMonthLabel = (yyyyMM: string) => {
+  const [y, m] = yyyyMM.split('-').map(Number);
+  return `${MONTH_NAMES[m - 1]} ${y}`;
+};
 
 function CategoryBarChart({ data }: { data: (CategoryTotal & { label: string })[] }) {
   return (
