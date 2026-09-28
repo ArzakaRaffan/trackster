@@ -14,6 +14,7 @@
 | merchant-alias | `apps/backend/src/modules/merchant-alias` | `MerchantAlias` — nama panggilan merchant, match by `rawDescription` string (bukan FK). |
 | split-bill | `apps/backend/src/modules/split-bill` | Fitur publik bagi tagihan, terisolasi dari Transaction/BankBalance. `publicSlug` (lihat) vs `ownerToken` (kelola tanpa login). Scan struk via `split-bill-ai.service` (Claude vision di mwapi.dev). |
 | analytics | `apps/backend/src/modules/analytics` | `AnalyticsService.getPeriodStats(start,end,compare?)` — satu sumber statistik periode (total, kategori, merchant, habit, anomali, heatmap waktu, kepatuhan budget) dipakai `/analytics/stats`, halaman Analisis (`/app/insights`), kartu AI (`ai-insight-card.service.ts`), dan health score. `resolvePeriod()` parsing `?range=`/`?from&to`. |
+| report | `apps/backend/src/modules/report` | `ReportService.getReport('week'\|'month', anchorDate)` — periode tutup (`end<=now`) baca/generate snapshot `PeriodReport` (stats + narasi AI dibekukan, idempotent); periode berjalan selalu live dari `PeriodStats`, tidak disimpan. `GET /reports?period=&date=` dipakai halaman `/app/reports`. Modul terpisah dari `analytics` (bukan digabung) biar tidak circular dgn `AiModule` — `forwardRef` dua arah spt `TelegramModule`. |
 
 ## Data flow
 - Email bank masuk Gmail → cron 5 menit `GmailSyncService.syncEmails()` → `messages.list` query `from:(bca OR jago) newer_than:7d` → `extractBody` (text/plain, fallback HTML → `htmlToText` per baris) → `ParserRegistryService` → `TransactionService.createFromParsed` (dedup by `emailId`, saldo −amount dlm 1 tx) → kalau over-budget & belum alert hari ini → Telegram.
@@ -21,7 +22,8 @@
 
 ## Database
 - ORM: Prisma 5 | Schema: `apps/backend/prisma/schema.prisma`
-- Tabel penting: `Transaction` (`emailId` unique dedup; manual = `manual:<uuid>`; `isBig` override manual "pembelian besar"), `Income`, `BankBalance` (live incremental per `Source` BCA/JAGO/GOPAY), `BalanceAdjustment` (koreksi manual saja), `DailyBudget`, `AlertLog` (`@@unique([date])`), `GmailToken`, `TelegramConfig`, `MerchantAlias`, `SplitBill`/`SplitBillParticipant`/`SplitBillItem`, `HealthScoreLog`, `AiInsightCard` (cache kartu AI Analisis, unique `[rangeKey, dayKey]`).
+- Tabel penting: `Transaction` (`emailId` unique dedup; manual = `manual:<uuid>`; `isBig` override manual "pembelian besar"), `Income`, `BankBalance` (live incremental per `Source` BCA/JAGO/GOPAY), `BalanceAdjustment` (koreksi manual saja), `DailyBudget`, `AlertLog` (`@@unique([date])`), `GmailToken`, `TelegramConfig`, `MerchantAlias`, `SplitBill`/`SplitBillParticipant`/`SplitBillItem`, `HealthScoreLog`, `AiInsightCard` (cache kartu AI Analisis, unique `[rangeKey, dayKey]`), `PeriodReport`
+(snapshot laporan WEEK/MONTH yang sudah tutup, unique `[period, periodStart]`).
 - Migrasi: dev `npx prisma migrate dev`; prod `npx prisma migrate deploy` otomatis di CMD Dockerfile tiap container start.
 
 ## Integrasi eksternal

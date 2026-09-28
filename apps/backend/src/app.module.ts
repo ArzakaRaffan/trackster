@@ -19,6 +19,7 @@ import { AiModule } from './modules/ai/ai.module';
 import { GoalModule } from './modules/goal/goal.module';
 import { SubscriptionModule } from './modules/subscription/subscription.module';
 import { AnalyticsModule } from './modules/analytics/analytics.module';
+import { ReportModule } from './modules/report/report.module';
 
 @Module({
   imports: [
@@ -42,6 +43,7 @@ import { AnalyticsModule } from './modules/analytics/analytics.module';
     GoalModule,
     SubscriptionModule,
     AnalyticsModule,
+    ReportModule,
   ],
 })
 export class AppModule {}
