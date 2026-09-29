@@ -1,9 +1,18 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../../prisma.service';
 import { AnalyticsService } from '../analytics/analytics.service';
 import { IncomeForecastService } from '../income-forecast/income-forecast.service';
 import { startOfWibWeek, wibDateKey, addWibDays, startOfWibDay } from '../../common/wib';
-import { computeBudgetSuggestions, BudgetSuggestion } from './budget-advisor';
+import {
+  computeBudgetSuggestions,
+  computeOption,
+  computeDailyWeights,
+  applyDayOverrides,
+  BudgetSuggestion,
+  BudgetSuggestionInput,
+  BudgetOption,
+  BudgetOptionResult,
+} from './budget-advisor';
 
 @Injectable()
 export class BudgetAdvisorService {
@@ -14,7 +23,7 @@ export class BudgetAdvisorService {
   ) {}
 
   /** `weekParam`: 'YYYY-MM-DD' hari Senin dari minggu yang diminta. Default = minggu ini. */
-  async getSuggestions(weekParam?: string): Promise<BudgetSuggestion> {
+  private async buildInput(weekParam?: string): Promise<{ input: BudgetSuggestionInput; weekKey: string }> {
     const weekStart = weekParam
       ? startOfWibDay(weekParam)
       : startOfWibWeek(new Date());
@@ -39,9 +48,31 @@ export class BudgetAdvisorService {
     const medianRoutineByDow = stats.byWeekday.map(d => d.avgRoutine);
     const avgRoutinePerDay = stats.totals.avgRoutinePerDay;
 
-    return computeBudgetSuggestions(
-      { expectedIncome, conservativeIncome, commitments, medianRoutineByDow, avgRoutinePerDay },
+    return {
+      input: { expectedIncome, conservativeIncome, commitments, medianRoutineByDow, avgRoutinePerDay },
       weekKey,
-    );
+    };
+  }
+
+  async getSuggestions(weekParam?: string): Promise<BudgetSuggestion> {
+    const { input, weekKey } = await this.buildInput(weekParam);
+    return computeBudgetSuggestions(input, weekKey);
+  }
+
+  /** Opsi + penyesuaian hari tertentu (dari tool chat `proposeBudget`) — total mingguan opsi
+   * dipertahankan, sisa hari yang tidak di-override diredistribusi proporsional bobot aslinya. */
+  async proposeAdjusted(
+    weekParam: string | undefined,
+    option: BudgetOption,
+    dayOverrides: { dayOfWeek: number; amount: number }[] = [],
+  ): Promise<BudgetOptionResult> {
+    for (const o of dayOverrides) {
+      if (o.dayOfWeek < 0 || o.dayOfWeek > 6) throw new BadRequestException('dayOfWeek harus 0-6');
+    }
+
+    const { input } = await this.buildInput(weekParam);
+    const base = computeOption(option, input);
+    const weights = computeDailyWeights(input.medianRoutineByDow);
+    return applyDayOverrides(base, weights, dayOverrides);
   }
 }

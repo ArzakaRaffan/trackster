@@ -84,6 +84,29 @@ export function computeOption(
   return { option, totalWeekly, dailyAmounts, weeklySavings, realismFlag };
 }
 
+/** Terapkan penyesuaian hari tertentu (dari tool chat `proposeBudget`) ke satu opsi — total mingguan
+ * opsi dipertahankan; hari yang tidak di-override diredistribusi proporsional ke bobot aslinya. */
+export function applyDayOverrides(
+  base: BudgetOptionResult,
+  weights: number[],
+  dayOverrides: { dayOfWeek: number; amount: number }[],
+): BudgetOptionResult {
+  if (!dayOverrides.length) return base;
+
+  const overrideMap = new Map(dayOverrides.map(o => [o.dayOfWeek, o.amount]));
+  const overriddenSum = dayOverrides.reduce((s, o) => s + o.amount, 0);
+  const remaining = Math.max(0, base.totalWeekly - overriddenSum);
+  const otherDays = [0, 1, 2, 3, 4, 5, 6].filter(d => !overrideMap.has(d));
+  const otherWeightSum = otherDays.reduce((s, d) => s + weights[d], 0) || 1;
+
+  const dailyAmounts = [0, 1, 2, 3, 4, 5, 6].map(d =>
+    overrideMap.has(d) ? overrideMap.get(d)! : round500(remaining * (weights[d] / otherWeightSum)),
+  );
+  const totalWeekly = dailyAmounts.reduce((s, v) => s + v, 0);
+
+  return { option: base.option, totalWeekly, dailyAmounts, weeklySavings: base.weeklySavings, realismFlag: base.realismFlag };
+}
+
 /** Hitung semua 3 opsi. */
 export function computeBudgetSuggestions(
   input: BudgetSuggestionInput,

@@ -301,6 +301,17 @@ model HealthScoreLog {
   createdAt          DateTime @default(now())
 }
 
+// Cache narasi budget advisor (E05-S2): "Saran Track" per minggu — dipilih AI dari 3 opsi
+// deterministik (budget-advisor.ts), bukan AI yang menghitung angkanya.
+model BudgetAdvice {
+  id          Int      @id @default(autoincrement())
+  weekStart   DateTime @db.Date @unique
+  recommended String   // 'hemat' | 'seimbang' | 'longgar'
+  reason      String?
+  tip         String?
+  createdAt   DateTime @default(now())
+}
+
 model AiInsightCard {
   id        Int      @id @default(autoincrement())
   rangeKey  String   // '7d' | '30d' | '90d' | 'all'

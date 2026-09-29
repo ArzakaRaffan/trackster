@@ -11,6 +11,8 @@ import { AiMemoryService } from './ai-memory.service';
 import { RetrievalService } from './retrieval.service';
 import { PlanSimulatorService } from './plan-simulator.service';
 import { AiInsightCardService } from './ai-insight-card.service';
+import { AiBudgetService } from './ai-budget.service';
+import { AiBudgetReminderService } from './ai-budget-reminder.service';
 import { AiController } from './ai.controller';
 import { BudgetModule } from '../budget/budget.module';
 import { TransactionModule } from '../transaction/transaction.module';
@@ -52,6 +54,8 @@ import { PrismaService } from '../../prisma.service';
     RetrievalService,
     PlanSimulatorService,
     AiInsightCardService,
+    AiBudgetService,
+    AiBudgetReminderService,
     PrismaService,
   ],
   controllers: [AiController],
@@ -67,6 +71,8 @@ import { PrismaService } from '../../prisma.service';
     AiMemoryService,
     RetrievalService,
     PlanSimulatorService,
+    AiBudgetService,
+    AiBudgetReminderService,
   ],
 })
 export class AiModule {}
