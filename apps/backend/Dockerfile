@@ -10,7 +10,7 @@ ENV NODE_OPTIONS=--max-old-space-size=1536
 RUN npm run build
 
 FROM node:20-alpine AS runner
-RUN apk add --no-cache openssl
+RUN apk add --no-cache openssl tini
 WORKDIR /app
 COPY package*.json ./
 COPY prisma ./prisma
@@ -19,4 +19,5 @@ ENV NODE_ENV=production
 COPY --from=builder /app/dist ./dist
 
 EXPOSE 4000
-CMD ["sh", "-c", "npx prisma migrate deploy && node dist/main"]
+ENTRYPOINT ["/sbin/tini", "--"]
+CMD ["sh", "-c", "npx prisma migrate deploy && exec node dist/main"]
