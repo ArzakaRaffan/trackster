@@ -8,6 +8,8 @@ import { AiMascotService } from './ai-mascot.service';
 import { FinancialSnapshotService } from './financial-snapshot.service';
 import { AiMemoryService } from './ai-memory.service';
 import { AiInsightCardService } from './ai-insight-card.service';
+import { AiBudgetService } from './ai-budget.service';
+import { BudgetAdvisorService } from '../budget/budget-advisor.service';
 import { PrismaService } from '../../prisma.service';
 
 class ChatDto {
@@ -95,6 +97,8 @@ export class AiController {
     private financialSnapshotService: FinancialSnapshotService,
     private aiMemoryService: AiMemoryService,
     private aiInsightCardService: AiInsightCardService,
+    private aiBudgetService: AiBudgetService,
+    private budgetAdvisorService: BudgetAdvisorService,
     private prisma: PrismaService,
   ) {}
 
@@ -193,6 +197,18 @@ export class AiController {
       orderBy: { weekStart: 'desc' },
       take: 12,
     });
+  }
+
+  /** E05-S2: 3 opsi budget (E05-S1) + saran AI (opsi yang direkomendasikan, alasan, tips) — dipakai
+   *  halaman /app/budget & kartu chat, digabung di sini (bukan di /budget) supaya BudgetModule
+   *  tidak perlu bergantung ke AiModule (hindari circular module dependency). */
+  @Get('budget-suggestions')
+  async budgetSuggestions(@Query('week') week?: string) {
+    const [suggestion, advice] = await Promise.all([
+      this.budgetAdvisorService.getSuggestions(week),
+      this.aiBudgetService.explain(week),
+    ]);
+    return { ...suggestion, advice };
   }
 
   /** Manual trigger weekly insight (untuk testing) */

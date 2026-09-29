@@ -24,8 +24,9 @@ import { TRANSITION_BASE, TRANSITION_SLOW } from '@/lib/motion';
 import { TracksterMascot } from '@/components/TracksterMascot';
 import { SimulationCard, SimulationCardData } from '@/components/chat/SimulationCard';
 import { GoalProposalCard, GoalProposalCardData } from '@/components/chat/GoalProposalCard';
+import { BudgetProposalCard, BudgetProposalCardData } from '@/components/chat/BudgetProposalCard';
 
-type ChatCard = SimulationCardData | GoalProposalCardData;
+type ChatCard = SimulationCardData | GoalProposalCardData | BudgetProposalCardData;
 
 interface Thread {
   id: number;
@@ -293,6 +294,8 @@ export default function ChatPage() {
                       <SimulationCard key={i} card={card} />
                     ) : card.type === 'goal-proposal' ? (
                       <GoalProposalCard key={i} card={card} />
+                    ) : card.type === 'budget-proposal' ? (
+                      <BudgetProposalCard key={i} card={card} />
                     ) : null,
                   )}
               </div>

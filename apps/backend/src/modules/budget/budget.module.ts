@@ -12,6 +12,6 @@ import { IncomeForecastModule } from '../income-forecast/income-forecast.module'
   imports: [AuthModule, MerchantAliasModule, AnalyticsModule, IncomeForecastModule],
   controllers: [BudgetController],
   providers: [BudgetService, BudgetAdvisorService, PrismaService],
-  exports: [BudgetService],
+  exports: [BudgetService, BudgetAdvisorService],
 })
 export class BudgetModule {}

@@ -33,10 +33,17 @@ interface BudgetSuggestionInput {
   avgRoutinePerDay: number;
 }
 
+interface BudgetAdvice {
+  recommended: 'hemat' | 'seimbang' | 'longgar';
+  reason: string | null;
+  tip: string | null;
+}
+
 interface BudgetSuggestion {
   input: BudgetSuggestionInput;
   options: BudgetOptionResult[];
   weekStart: string;
+  advice: BudgetAdvice;
 }
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -91,10 +98,12 @@ function MiniBarChart({ amounts }: { amounts: number[] }) {
 function OptionCard({
   opt,
   selected,
+  recommended,
   onSelect,
 }: {
   opt: BudgetOptionResult;
   selected: boolean;
+  recommended: boolean;
   onSelect: () => void;
 }) {
   const meta = OPTION_META[opt.option];
@@ -105,6 +114,11 @@ function OptionCard({
         selected ? meta.color + ' shadow-medium' : 'bg-surface-interactive'
       }`}
     >
+      {recommended && (
+        <span className="mb-1 inline-flex w-fit items-center gap-1 rounded-full bg-brand/15 px-2 py-0.5 text-[10px] font-bold uppercase tracking-caps text-brand">
+          <Sparkles size={10} /> Saran Track
+        </span>
+      )}
       <div className="flex items-start justify-between gap-2">
         <div>
           <p className={`text-label font-bold ${selected ? meta.textColor : 'text-ink'}`}>{meta.label}</p>
@@ -145,12 +159,14 @@ function SuggestionsSection({
   suggestion: BudgetSuggestion;
   onApplied: () => void;
 }) {
-  const [selectedOption, setSelectedOption] = useState<'hemat' | 'seimbang' | 'longgar'>('seimbang');
+  const [selectedOption, setSelectedOption] = useState<'hemat' | 'seimbang' | 'longgar'>(
+    suggestion.advice?.recommended ?? 'seimbang',
+  );
   const [applying, setApplying] = useState(false);
   const [applied, setApplied] = useState(false);
   const [showBasis, setShowBasis] = useState(false);
 
-  const { input, options, weekStart } = suggestion;
+  const { input, options, weekStart, advice } = suggestion;
 
   const handleApply = async () => {
     setApplying(true);
@@ -177,10 +193,18 @@ function SuggestionsSection({
             key={opt.option}
             opt={opt}
             selected={selectedOption === opt.option}
+            recommended={advice?.recommended === opt.option}
             onSelect={() => setSelectedOption(opt.option)}
           />
         ))}
       </div>
+
+      {(advice?.reason || advice?.tip) && (
+        <div className="flex flex-col gap-1 rounded-comfortable bg-brand/5 p-3">
+          {advice.reason && <p className="text-small leading-relaxed text-ink">{advice.reason}</p>}
+          {advice.tip && <p className="text-micro text-ink-muted">💡 {advice.tip}</p>}
+        </div>
+      )}
 
       {/* Collapsible basis perhitungan */}
       <button
@@ -255,7 +279,7 @@ function SuggestionsSection({
 
 export default function BudgetPage() {
   const { data, mutate } = useSWR('/budget', fetcher);
-  const { data: suggestion, isLoading: suggestionLoading } = useSWR('/budget/suggestions', suggestionFetcher);
+  const { data: suggestion, isLoading: suggestionLoading } = useSWR('/ai/budget-suggestions', suggestionFetcher);
   const [values, setValues] = useState<Record<number, string>>({});
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);

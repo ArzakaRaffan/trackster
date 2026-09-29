@@ -10,6 +10,7 @@ import {
 import { TelegramService } from './telegram.service';
 import { AiChatService } from '../ai/ai-chat.service';
 import { IncomeCheckinReminderService } from '../income-checkin/income-checkin-reminder.service';
+import { AiBudgetReminderService } from '../ai/ai-budget-reminder.service';
 
 @Controller('telegram')
 export class TelegramWebhookController {
@@ -19,6 +20,7 @@ export class TelegramWebhookController {
     private telegramService: TelegramService,
     private aiChatService: AiChatService,
     private incomeCheckinReminderService: IncomeCheckinReminderService,
+    private aiBudgetReminderService: AiBudgetReminderService,
   ) {}
 
   /** Public endpoint — TANPA JWT guard.
@@ -46,7 +48,11 @@ export class TelegramWebhookController {
         return { ok: true };
       }
       try {
-        await this.incomeCheckinReminderService.handleCallback(callbackQuery);
+        if (typeof callbackQuery.data === 'string' && callbackQuery.data.startsWith('ba:')) {
+          await this.aiBudgetReminderService.handleCallback(callbackQuery);
+        } else {
+          await this.incomeCheckinReminderService.handleCallback(callbackQuery);
+        }
       } catch (err: any) {
         this.logger.error(`Error handle callback_query check-in: ${err?.message}`);
       }

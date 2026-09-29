@@ -10,6 +10,7 @@ import { AiCaptionService } from './ai-caption.service';
 import { AiMemoryService } from './ai-memory.service';
 import { RetrievalService } from './retrieval.service';
 import { AnalyticsService } from '../analytics/analytics.service';
+import { BudgetAdvisorService } from '../budget/budget-advisor.service';
 import { Source, Category, MemoryKind } from '@prisma/client';
 import { addWibDays, startOfWibDay, wibDateKey } from '../../common/wib';
 
@@ -32,6 +33,7 @@ export class AiFinanceToolsService {
     private aiMemoryService: AiMemoryService,
     private retrievalService: RetrievalService,
     private analyticsService: AnalyticsService,
+    private budgetAdvisorService: BudgetAdvisorService,
   ) {}
 
   /** `ctx` = thread & window pesan yang sedang dikirim ulang ke model, dipakai
@@ -346,6 +348,35 @@ export class AiFinanceToolsService {
         handler: async (input: { name: string; target: number; deadline?: string; weeklyContribution?: number }): Promise<ToolCard> => ({
           card: { type: 'goal-proposal', ...input },
         }),
+      },
+      {
+        name: 'proposeBudget',
+        description: 'Usulkan budget harian minggu ini ke user berdasarkan konteks yang tidak ada di data (mis. "ada acara ultah Sabtu, geser jatah ke Sabtu"). TIDAK langsung mengubah budget — cuma menampilkan kartu dengan tombol "Terapkan" yang harus dikonfirmasi user sendiri. Angkanya dihitung ulang oleh engine (bukan kamu yang mengarang), total mingguan opsi tetap sama.',
+        input_schema: {
+          type: 'object',
+          properties: {
+            option: { type: 'string', enum: ['hemat', 'seimbang', 'longgar'], description: 'Default: opsi yang direkomendasikan sistem minggu ini' },
+            dayOverrides: {
+              type: 'array',
+              description: 'Hari yang jatahnya mau digeser, sisa hari lain otomatis menyesuaikan',
+              items: {
+                type: 'object',
+                properties: {
+                  dayOfWeek: { type: 'number', description: '0=Minggu..6=Sabtu' },
+                  amount: { type: 'number' },
+                },
+                required: ['dayOfWeek', 'amount'],
+              },
+            },
+            note: { type: 'string', description: 'Alasan singkat penyesuaian, ditampilkan di kartu' },
+          },
+          required: [],
+        },
+        handler: async (input: { option?: string; dayOverrides?: { dayOfWeek: number; amount: number }[]; note?: string }): Promise<ToolCard> => {
+          const option = (input.option as any) ?? 'seimbang';
+          const result = await this.budgetAdvisorService.proposeAdjusted(undefined, option, input.dayOverrides ?? []);
+          return { card: { type: 'budget-proposal', ...result, note: input.note ?? null } };
+        },
       },
       {
         name: 'logIncome',
