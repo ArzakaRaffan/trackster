@@ -174,6 +174,16 @@ export class GmailSyncService {
       onUnparsed: () => void;
     },
   ) {
+    // Dedup dulu di sini, sebelum parse ulang — createFromParsed cuma cek Transaction.emailId, yang
+    // hilang kalau user hapus transaksinya. EmailParseLog.status RECORDED tetap ada setelah dihapus,
+    // jadi ini satu-satunya penanda "email ini sudah pernah diproses" yang bertahan lewat delete.
+    // Tanpa ini, cron 5 menit (window 7 hari) bakal bikin ulang transaksi/income yang baru dihapus.
+    const existingLog = await this.prisma.emailParseLog.findUnique({ where: { emailId: id } });
+    if (existingLog?.status === ParseStatus.RECORDED) {
+      callbacks.onDuplicate();
+      return;
+    }
+
     const rawEmail = this.extractRawEmail(message);
     if (!rawEmail) {
       callbacks.onUnparsed();
