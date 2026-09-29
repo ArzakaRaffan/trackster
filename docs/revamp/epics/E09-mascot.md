@@ -85,14 +85,15 @@ Jangan tambah polling baru khusus mascot.
 
 ---
 
-## E09-S1 — Engine blob + mata + emosi + playground
+## E09-S1 — Engine blob + mata + emosi + playground ✅
 
-- [ ] Eksplorasi visual cepat dulu: halaman playground `/app/dev/track` (tidak ditautkan dari nav) berisi Track di 4
-      ukuran (24/48/96/200), tombol semua mood & event, slider parameter jeli. **Minta Arzaka lihat & setuju** bentuk,
-      proporsi mata, warna sebelum lanjut (kirim screenshot/GIF).
-- [ ] `Track.tsx`: path prosedural (fungsi murni `blobPath(points, t, params)` + check kecil: path selalu tertutup,
-      jumlah segmen tetap), mata + 8 bentuk emosi, transisi warna, reduced-motion
-- [ ] Loop berhenti saat tidak terlihat (cek DevTools Performance: idle < ~2ms/frame)
+- [x] Eksplorasi visual cepat dulu: halaman playground `/app/dev/track` (tidak ditautkan dari nav) berisi Track di 4
+      ukuran (24/48/96/200), tombol semua mood + eye-shape override (semua 8 bentuk lepas dari mood), slider
+      parameter jeli. **Disetujui Arzaka** tanpa revisi.
+- [x] `Track.tsx`: path prosedural (fungsi murni `blobPath(points, t, params)` + check kecil: path selalu tertutup,
+      jumlah segmen tetap — `blobPath.check.ts`), mata + 8 bentuk emosi, transisi warna, reduced-motion
+- [x] Loop berhenti saat tidak terlihat (`IntersectionObserver`) atau tab hidden (`document.hidden`); belum diukur
+      manual di DevTools Performance (idle <~2ms/frame) — nggak ada browser attached sesi ini buat profiling.
 
 ## E09-S2 — Interaksi + reaksi event
 

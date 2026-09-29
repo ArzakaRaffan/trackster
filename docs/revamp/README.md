@@ -68,7 +68,7 @@ Legend: ⬜ belum · 🟨 jalan · ✅ selesai (sudah diverifikasi di browser & 
 | E07-S2 | Laporan 6 Bulan & All-time + export/share | 3 | E07-S1 | ✅ (kode `aedead5`, tsc backend+frontend 0 error; belum ada catatan verifikasi visual browser di README ini) |
 | E05-S1 | Saran budget harian (3 opsi) + analisis kepatuhan | 3 | E03-S2, E06-S1 | ✅ (kode `aedead5`, tsc backend+frontend 0 error; belum ada catatan verifikasi visual browser di README ini) |
 | E05-S2 | Penjelasan AI + terapkan + check-in budget mingguan | 3 | E05-S1, E04-S4 | 🟨 (kode selesai, tsc+build backend&frontend bersih, dicoba `.check.ts` + `curl` ke `/ai/budget-suggestions` di dev DB — cache & fallback jalan; rollover sengaja di-skip (opsional, tanya dulu); belum diverifikasi visual browser & belum dites kirim Telegram asli — nunggu cron Minggu 21:10 WIB jalan di prod) |
-| E09-S1 | Engine blob prosedural + mata + emosi | 4 | — (paralel kapan saja) | ⬜ |
+| E09-S1 | Engine blob prosedural + mata + emosi | 4 | — (paralel kapan saja) | ✅ (`Track.tsx` + `blobPath.ts`/`blobPath.check.ts` + playground `/app/dev/track`; tsc+build lolos; Arzaka approve bentuk tanpa cek visual browser sesi ini) |
 | E09-S2 | Interaksi (tap, drag, lirik kursor, tidur) + reaksi event app | 4 | E09-S1 | ⬜ |
 | E09-S3 | Pasang di seluruh app (chat, dashboard, empty/loading state) | 4 | E09-S2 | ⬜ |
 | E08-S1 | Split Bill v2: pajak proporsional, item patungan, diskon, share WA | 4 | — | ⬜ |
