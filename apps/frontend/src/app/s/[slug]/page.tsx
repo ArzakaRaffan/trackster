@@ -11,12 +11,10 @@ import { AmountDisplay } from '@/components/ui/AmountDisplay';
 import { Button } from '@/components/ui/Button';
 import { TRANSITION_SLOW } from '@/lib/motion';
 import { PublicSplitBillSummary } from '@/lib/splitBillTypes';
-import { Check, Copy, Landmark, PartyPopper, Receipt } from 'lucide-react';
+import { Check, Copy, Landmark, PartyPopper, Receipt, Share2 } from 'lucide-react';
 
 const fetcher = (path: string) => api.get<PublicSplitBillSummary>(path);
 
-// Token-based tones only (no magic hex) — cycles through the app's four distinct status hues
-// so each peserta gets a stable, visually distinct avatar color.
 const AVATAR_TONES = [
   { bg: 'bg-status-under-bg', text: 'text-status-under' },
   { bg: 'bg-status-info-bg', text: 'text-status-info' },
@@ -39,6 +37,7 @@ export default function PublicSplitBillPage() {
   const { data, error, isLoading, mutate } = useSWR(slug ? `/split-bills/public/${slug}` : null, fetcher);
   const [participantListParent] = useAutoAnimate({ duration: 320, easing: 'cubic-bezier(.16,1,.3,1)' });
   const [copiedAccount, setCopiedAccount] = useState(false);
+  const [copiedAll, setCopiedAll] = useState(false);
 
   const handleCopyAccount = (accountNumber: string) => {
     navigator.clipboard.writeText(accountNumber);
@@ -71,11 +70,46 @@ export default function PublicSplitBillPage() {
     );
   }
 
-  const grandTotal =
-    data.items.reduce((sum, i) => sum + Number(i.amount) * i.quantity, 0) + Number(data.taxAmount) + Number(data.serviceFeeAmount);
+  const grandTotal = data.participants.reduce((sum, p) => sum + p.total, 0);
   const paidCount = data.participants.filter((p) => p.isPaid).length;
   const allPaid = data.participants.length > 0 && paidCount === data.participants.length;
   const hasPayerInfo = data.payerBankName || data.payerAccountNumber || data.payerAccountName;
+
+  const generateShareText = () => {
+    let text = `*Tagihan ${data.restaurantName}*\n`;
+    text += `${new Date(data.billDate).toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })}\n\n`;
+    
+    if (hasPayerInfo) {
+      text += `Transfer ke:\n`;
+      if (data.payerBankName) text += `${data.payerBankName}\n`;
+      if (data.payerAccountNumber) text += `${data.payerAccountNumber}\n`;
+      if (data.payerAccountName) text += `a.n ${data.payerAccountName}\n`;
+      text += `\n`;
+    }
+
+    data.participants.forEach(p => {
+      text += `*${p.name}*: ${formatRupiah(p.total)}\n`;
+      text += `(Subtotal: ${formatRupiah(p.subtotal)}, Pajak: ${formatRupiah(p.tax)}, Service: ${formatRupiah(p.service)}`;
+      if (p.discount > 0) text += `, Diskon: -${formatRupiah(p.discount)}`;
+      if (p.delivery > 0) text += `, Lainnya: ${formatRupiah(p.delivery)}`;
+      if (p.roundingDiff !== 0) text += `, Pembulatan: ${formatRupiah(p.roundingDiff)}`;
+      text += `)\n\n`;
+    });
+    
+    text += `Link: ${window.location.href}`;
+    return text;
+  };
+
+  const handleCopyAll = () => {
+    navigator.clipboard.writeText(generateShareText());
+    setCopiedAll(true);
+    setTimeout(() => setCopiedAll(false), 2000);
+  };
+
+  const handleWhatsApp = () => {
+    const text = encodeURIComponent(generateShareText());
+    window.open(`https://wa.me/?text=${text}`, '_blank');
+  };
 
   return (
     <div className="min-h-screen bg-base pb-16">
@@ -98,6 +132,15 @@ export default function PublicSplitBillPage() {
               <AmountDisplay value={grandTotal} size="hero" tone="base" />
             </div>
             <p className="mt-1 text-small text-ink-muted">Total tagihan</p>
+            
+            <div className="mt-4 flex gap-2 justify-center">
+              <Button size="sm" variant="outlined" icon={<Copy size={14} />} onClick={handleCopyAll}>
+                {copiedAll ? 'Tersalin' : 'Salin Semua'}
+              </Button>
+              <Button size="sm" variant="primary" icon={<Share2 size={14} />} onClick={handleWhatsApp}>
+                Share WA
+              </Button>
+            </div>
           </div>
 
           <div className="flex items-center gap-3 border-t border-line-subtle px-6 py-4">
@@ -160,48 +203,30 @@ export default function PublicSplitBillPage() {
           <h2 className="mb-2 px-1 text-heading font-semibold text-ink">Menu</h2>
           <ul className="flex flex-col gap-1 rounded-comfortable bg-surface p-2">
             {data.items.map((item) => (
-              <li key={item.id} className="flex items-center gap-3 rounded-standard px-2 py-2.5">
-                {item.participantName ? (
-                  <span
-                    className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-micro font-bold ${
-                      toneFor(data.participants.findIndex((p) => p.name === item.participantName)).bg
-                    } ${toneFor(data.participants.findIndex((p) => p.name === item.participantName)).text}`}
-                  >
-                    {initials(item.participantName)}
+              <li key={item.id} className="flex flex-col gap-1 rounded-standard px-2 py-2.5">
+                <div className="flex items-center gap-3">
+                  <span className="min-w-0 flex-1">
+                    <span className="block truncate text-body text-ink">
+                      {item.description}
+                      {item.quantity > 1 && <span className="text-ink-subtle"> ×{item.quantity}</span>}
+                    </span>
+                    <span className="text-small text-ink-muted mt-1 block">
+                      {item.shares.map((s, idx) => {
+                        const pName = data.participants.find(p => p.participantId === s.participantId)?.name || 'Unknown';
+                        return (
+                          <span key={idx} className="mr-1 mb-1 inline-block bg-surface-interactive rounded-full px-2 py-0.5 text-micro">
+                            {pName}
+                          </span>
+                        );
+                      })}
+                      {item.shares.length === 0 && 'Belum di-assign'}
+                    </span>
                   </span>
-                ) : (
-                  <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-surface-interactive text-micro text-ink-subtle">
-                    ?
-                  </span>
-                )}
-                <span className="min-w-0 flex-1">
-                  <span className="block truncate text-body text-ink">
-                    {item.description}
-                    {item.quantity > 1 && <span className="text-ink-subtle"> ×{item.quantity}</span>}
-                  </span>
-                  <span className="text-small text-ink-muted">{item.participantName ?? 'Belum di-assign'}</span>
-                </span>
-                <span className="shrink-0 text-body tabular-nums text-ink">{formatRupiah(Number(item.amount) * item.quantity)}</span>
+                  <span className="shrink-0 text-body tabular-nums text-ink">{formatRupiah(Number(item.amount) * item.quantity)}</span>
+                </div>
               </li>
             ))}
           </ul>
-
-          {(Number(data.taxAmount) > 0 || Number(data.serviceFeeAmount) > 0) && (
-            <div className="mt-2 flex flex-col gap-1 rounded-comfortable bg-surface px-4 py-3 text-small text-ink-muted">
-              {Number(data.taxAmount) > 0 && (
-                <div className="flex justify-between">
-                  <span>Pajak</span>
-                  <span className="tabular-nums">{formatRupiah(Number(data.taxAmount))}</span>
-                </div>
-              )}
-              {Number(data.serviceFeeAmount) > 0 && (
-                <div className="flex justify-between">
-                  <span>Service Fee</span>
-                  <span className="tabular-nums">{formatRupiah(Number(data.serviceFeeAmount))}</span>
-                </div>
-              )}
-            </div>
-          )}
         </section>
 
         <section className="mt-6">
@@ -211,26 +236,36 @@ export default function PublicSplitBillPage() {
               const tone = toneFor(i);
               return (
                 <li
-                  key={p.id}
-                  className={`flex items-center gap-3 rounded-comfortable p-3.5 transition-colors duration-base ease-standard ${
+                  key={p.participantId}
+                  className={`flex flex-col gap-2 rounded-comfortable p-3.5 transition-colors duration-base ease-standard ${
                     p.isPaid ? 'bg-status-under-bg' : 'bg-surface'
                   }`}
                 >
-                  <span className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-label font-bold ${tone.bg} ${tone.text}`}>
-                    {initials(p.name)}
-                  </span>
-                  <span className="min-w-0 flex-1">
-                    <span className="block text-body font-bold text-ink">{p.name}</span>
-                    <span className="text-small tabular-nums text-ink-muted">{formatRupiah(p.totalOwed)}</span>
-                  </span>
-                  <Button
-                    variant={p.isPaid ? 'dark' : 'primary'}
-                    size="sm"
-                    icon={p.isPaid ? <Check size={14} /> : undefined}
-                    onClick={() => handleMarkPaid(p.id)}
-                  >
-                    {p.isPaid ? 'Lunas' : 'Tandai Lunas'}
-                  </Button>
+                  <div className="flex items-center gap-3">
+                    <span className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-label font-bold ${tone.bg} ${tone.text}`}>
+                      {initials(p.name)}
+                    </span>
+                    <span className="min-w-0 flex-1">
+                      <span className="block text-body font-bold text-ink">{p.name}</span>
+                      <span className="text-small tabular-nums text-ink-muted">{formatRupiah(p.total)}</span>
+                    </span>
+                    <Button
+                      variant={p.isPaid ? 'dark' : 'primary'}
+                      size="sm"
+                      icon={p.isPaid ? <Check size={14} /> : undefined}
+                      onClick={() => handleMarkPaid(p.participantId)}
+                    >
+                      {p.isPaid ? 'Lunas' : 'Tandai Lunas'}
+                    </Button>
+                  </div>
+                  <div className="mt-1 pl-14 text-micro text-ink-muted grid grid-cols-2 gap-x-2 gap-y-1">
+                    <div className="flex justify-between"><span>Subtotal</span><span>{formatRupiah(p.subtotal)}</span></div>
+                    {p.discount > 0 && <div className="flex justify-between text-status-under"><span>Diskon</span><span>-{formatRupiah(p.discount)}</span></div>}
+                    {p.tax > 0 && <div className="flex justify-between"><span>Pajak</span><span>{formatRupiah(p.tax)}</span></div>}
+                    {p.service > 0 && <div className="flex justify-between"><span>Service</span><span>{formatRupiah(p.service)}</span></div>}
+                    {p.delivery > 0 && <div className="flex justify-between"><span>Lainnya</span><span>{formatRupiah(p.delivery)}</span></div>}
+                    {p.roundingDiff !== 0 && <div className="flex justify-between"><span>Pembulatan</span><span>{formatRupiah(p.roundingDiff)}</span></div>}
+                  </div>
                 </li>
               );
             })}

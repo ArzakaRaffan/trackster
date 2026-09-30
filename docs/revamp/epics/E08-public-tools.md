@@ -76,12 +76,12 @@ di `middleware.ts`.
   baris diskon, pajak %, service % (update `split-bill-ai.service.ts`).
 
 **Tasks**
-- [ ] `split-calc.ts` + check (termasuk kasus: 3 orang, 1 item patungan, pajak 10%, service 5%, diskon 20rb, pembulatan 500)
-- [ ] Migration shares + kolom baru + salin data lama
-- [ ] Backend service/DTO/endpoint assign multi-peserta (manage via ownerToken & via login)
-- [ ] UI create: pajak/service % atau nominal, diskon, ongkir, pembulatan; assign item ke banyak orang (chip multi-select)
-- [ ] UI publik: rincian per orang (subtotal, diskon, pajak, service, ongkir), tombol WA per orang, salin semua
-- [ ] localStorage riwayat + OG image
+- [x] `split-calc.ts` + check (termasuk kasus: 3 orang, 1 item patungan, pajak 10%, service 5%, diskon 20rb, pembulatan 500)
+- [x] Migration shares + kolom baru + salin data lama
+- [x] Backend service/DTO/endpoint assign multi-peserta (manage via ownerToken & via login)
+- [x] UI create: pajak/service % atau nominal, diskon, ongkir, pembulatan; assign item ke banyak orang (chip multi-select)
+- [x] UI publik: rincian per orang (subtotal, diskon, pajak, service, ongkir), tombol WA per orang, salin semua
+- [x] localStorage riwayat + OG image
 - [ ] Verifikasi dengan struk nyata (minta Arzaka foto 1 struk)
 
 ## E08-S2 — Kalkulator Target Tabungan v2

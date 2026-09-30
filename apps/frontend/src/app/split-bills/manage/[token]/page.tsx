@@ -10,9 +10,6 @@ import { AlertTriangle, Check, ChevronLeft, Copy, Link as LinkIcon } from 'lucid
 
 const fetcher = (path: string) => api.get<SplitBillDetail>(path);
 
-// Halaman kelola buat bill yang dibuat TANPA login (lihat SplitBillController.createPublicBill).
-// ownerToken di URL ini adalah pengganti login satu-satunya buat pembuat bill anonim — nggak
-// ada akun/password recovery kalau link ini ilang, makanya ada banner pengingat di atas.
 export default function ManageSplitBillPage() {
   const { token } = useParams<{ token: string }>();
   const router = useRouter();
@@ -20,8 +17,29 @@ export default function ManageSplitBillPage() {
   const [copiedShare, setCopiedShare] = useState(false);
   const [copiedManage, setCopiedManage] = useState(false);
 
-  const handleReassign = async (itemId: number, participantId: number | null) => {
-    await api.patch(`/split-bills/manage/${token}/items/${itemId}/assign`, { participantId });
+  const toggleParticipantForItem = async (itemId: number, participantId: number) => {
+    if (!data) return;
+    const item = data.items.find(i => i.id === itemId);
+    if (!item) return;
+
+    let newShares = [...item.shares];
+    const hasParticipant = newShares.some(s => s.participantId === participantId);
+
+    if (hasParticipant) {
+      newShares = newShares.filter(s => s.participantId !== participantId);
+    } else {
+      newShares.push({ id: 0, itemId, participantId, weight: 1 });
+    }
+
+    // Optimistic update
+    mutate({
+      ...data,
+      items: data.items.map(i => i.id === itemId ? { ...i, shares: newShares } : i)
+    }, false);
+
+    await api.patch(`/split-bills/manage/${token}/items/${itemId}/assign`, {
+      shares: newShares.map(s => ({ participantId: s.participantId, weight: 1 }))
+    });
     mutate();
   };
 
@@ -50,7 +68,7 @@ export default function ManageSplitBillPage() {
         </div>
       </header>
 
-      <div className="flex flex-col gap-3 px-4">
+      <div className="flex flex-col gap-3 px-4 pb-8">
         {isLoading ? (
           <div className="h-40 animate-pulse rounded-comfortable bg-track" />
         ) : error || !data ? (
@@ -80,47 +98,54 @@ export default function ManageSplitBillPage() {
               {copiedShare ? 'Link tersalin' : 'Salin link buat share ke temen'}
             </button>
 
-            <section className="rounded-comfortable bg-surface p-4">
+            <section className="rounded-comfortable bg-surface p-4 flex flex-col gap-2">
               <p className="text-small font-bold uppercase tracking-caps text-ink-muted">
                 {new Date(data.billDate).toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })}
               </p>
-              <div className="mt-2 flex justify-between text-small text-ink-muted">
-                <span>Pajak</span>
-                <span className="tabular-nums">{formatRupiah(Number(data.taxAmount))}</span>
-              </div>
-              <div className="flex justify-between text-small text-ink-muted">
-                <span>Service Fee</span>
-                <span className="tabular-nums">{formatRupiah(Number(data.serviceFeeAmount))}</span>
+              <div className="mt-2 grid grid-cols-2 gap-x-2 gap-y-1 text-small text-ink-muted">
+                {data.taxAmount > 0 && <div className="flex justify-between"><span>Pajak (Rp)</span><span className="tabular-nums">{formatRupiah(data.taxAmount)}</span></div>}
+                {data.taxPercent > 0 && <div className="flex justify-between"><span>Pajak (%)</span><span className="tabular-nums">{data.taxPercent}%</span></div>}
+                {data.serviceFeeAmount > 0 && <div className="flex justify-between"><span>Service (Rp)</span><span className="tabular-nums">{formatRupiah(data.serviceFeeAmount)}</span></div>}
+                {data.servicePercent > 0 && <div className="flex justify-between"><span>Service (%)</span><span className="tabular-nums">{data.servicePercent}%</span></div>}
+                {data.discountAmount > 0 && <div className="flex justify-between text-status-under"><span>Diskon (Rp)</span><span className="tabular-nums">-{formatRupiah(data.discountAmount)}</span></div>}
+                {data.discountPercent > 0 && <div className="flex justify-between text-status-under"><span>Diskon (%)</span><span className="tabular-nums">{data.discountPercent}%</span></div>}
+                {data.deliveryFee > 0 && <div className="flex justify-between"><span>Lainnya</span><span className="tabular-nums">{formatRupiah(data.deliveryFee)}</span></div>}
               </div>
             </section>
 
-            <h2 className="text-heading font-semibold text-ink">Item</h2>
+            <h2 className="text-heading font-semibold text-ink">Item & Pembagian</h2>
             <ul className="flex flex-col gap-2 rounded-comfortable bg-surface p-3">
               {data.items.map((item) => (
-                <li key={item.id} className="flex items-center gap-3">
-                  <span className="min-w-0 flex-1">
-                    <span className="block truncate text-body text-ink">
-                      {item.description}
-                      {item.quantity > 1 && <span className="text-ink-subtle"> ×{item.quantity}</span>}
+                <li key={item.id} className="flex flex-col gap-2 border-b border-line-subtle pb-3 last:border-b-0 last:pb-0">
+                  <div className="flex items-start justify-between gap-3">
+                    <span className="min-w-0 flex-1">
+                      <span className="block text-body font-medium text-ink">
+                        {item.description}
+                        {item.quantity > 1 && <span className="text-ink-subtle"> ×{item.quantity}</span>}
+                      </span>
                     </span>
-                    <span className="text-small tabular-nums text-ink-muted">
-                      {item.quantity > 1
-                        ? `${formatRupiah(Number(item.amount))} × ${item.quantity} = ${formatRupiah(Number(item.amount) * item.quantity)}`
-                        : formatRupiah(Number(item.amount))}
+                    <span className="shrink-0 text-body tabular-nums text-ink">
+                      {formatRupiah(Number(item.amount) * item.quantity)}
                     </span>
-                  </span>
-                  <select
-                    value={item.participantId ?? ''}
-                    onChange={(e) => handleReassign(item.id, e.target.value === '' ? null : parseInt(e.target.value, 10))}
-                    className="shrink-0 rounded-comfortable bg-surface-interactive px-3 py-2 text-small text-ink outline-none"
-                  >
-                    <option value="">Belum di-assign</option>
-                    {data.participants.map((p) => (
-                      <option key={p.id} value={p.id}>
-                        {p.name}
-                      </option>
-                    ))}
-                  </select>
+                  </div>
+                  <div className="flex flex-wrap gap-1.5">
+                    {data.participants.map(p => {
+                      const active = item.shares.some(s => s.participantId === p.id);
+                      return (
+                        <button
+                          key={p.id}
+                          onClick={() => toggleParticipantForItem(item.id, p.id)}
+                          className={`rounded-full border px-3 py-1 text-small transition-colors ${
+                            active
+                              ? 'border-brand bg-brand/10 text-brand'
+                              : 'border-line-subtle bg-surface-interactive text-ink-muted hover:border-line-strong hover:text-ink'
+                          }`}
+                        >
+                          {p.name}
+                        </button>
+                      );
+                    })}
+                  </div>
                 </li>
               ))}
             </ul>
@@ -128,14 +153,14 @@ export default function ManageSplitBillPage() {
             <h2 className="text-heading font-semibold text-ink">Kalkulasi per orang</h2>
             <ul className="flex flex-col gap-2 rounded-comfortable bg-surface p-2">
               {data.participantTotals.map((p) => (
-                <li key={p.id} className="flex items-center gap-3 rounded-standard px-3 py-2.5">
+                <li key={p.participantId} className="flex items-center gap-3 rounded-standard px-3 py-2.5">
                   <span className="min-w-0 flex-1">
                     <span className="block text-body font-bold text-ink">{p.name}</span>
                     <span className="text-small text-ink-muted">
-                      Item {formatRupiah(p.itemsTotal)} + pajak/fee {formatRupiah(p.taxShare + p.serviceFeeShare)}
+                      Subtotal {formatRupiah(p.subtotal)} + fee {formatRupiah(p.tax + p.service + p.delivery)}
                     </span>
                   </span>
-                  <span className="shrink-0 text-body font-bold tabular-nums text-ink">{formatRupiah(p.totalOwed)}</span>
+                  <span className="shrink-0 text-body font-bold tabular-nums text-ink">{formatRupiah(p.total)}</span>
                   <span
                     className={`shrink-0 rounded-subtle px-2 py-0.5 text-micro font-bold uppercase tracking-caps ${
                       p.isPaid ? 'bg-status-under-bg text-status-under' : 'bg-status-over-bg text-status-over'
