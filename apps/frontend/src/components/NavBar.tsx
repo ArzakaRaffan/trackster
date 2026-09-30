@@ -49,11 +49,11 @@ export default function NavBar() {
   return (
     <nav className="fixed inset-x-0 bottom-0 z-20 flex bg-base/[0.92] px-2 pb-[calc(8px+env(safe-area-inset-bottom))] pt-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.10)] backdrop-blur-md lg:static lg:h-screen lg:w-60 lg:shrink-0 lg:flex-col lg:gap-1 lg:bg-base lg:p-3 lg:shadow-none">
       <Image
-        src="/trackster-logo.png"
+        src="/trackster-logo.svg"
         alt="Trackster"
-        width={560}
-        height={260}
-        className="hidden h-14 w-auto lg:mb-5 lg:block lg:px-3 lg:pt-2"
+        width={350}
+        height={64}
+        className="hidden h-9 w-auto lg:mb-5 lg:block lg:px-3 lg:pt-2"
       />
       {LINKS.map(({ href, label, Icon }) => {
         const active =
