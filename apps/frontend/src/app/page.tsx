@@ -89,7 +89,7 @@ export default function LandingPage() {
   return (
     <div className="min-h-screen bg-base text-ink">
       <header className="flex items-center justify-between px-4 py-6">
-        <Image src="/trackster-logo.png" alt="Trackster" width={560} height={260} className="h-14 w-auto" priority />
+        <Image src="/trackster-logo.svg" alt="Trackster" width={350} height={64} className="h-9 w-auto" priority />
         <Link href="/app" className="text-small font-bold text-ink-muted transition-colors duration-base ease-standard hover:text-ink">
           Masuk
         </Link>

@@ -34,7 +34,7 @@ export default function LoginPage() {
     <div className="flex min-h-screen items-center justify-center bg-base px-4">
       <div className="w-full max-w-sm animate-fade-in-up">
         <div className="mb-8 text-center">
-          <Image src="/trackster-logo.png" alt="Trackster" width={560} height={260} className="mx-auto h-20 w-auto" priority />
+          <Image src="/trackster-logo.svg" alt="Trackster" width={350} height={64} className="mx-auto h-12 w-auto" priority />
           <p className="mt-2 text-label text-ink-muted">
             Tau persis budget harian kamu abis di mana, otomatis dari email bank.
           </p>
