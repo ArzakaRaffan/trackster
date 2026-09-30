@@ -1,12 +1,18 @@
 import type { Metadata } from 'next';
+import { Suspense } from 'react';
 import { SavingsCalculator } from './SavingsCalculator';
 
 export const metadata: Metadata = {
-  title: 'Kalkulator Target Tabungan - Trackster',
+  title: 'Perencana Target Tabungan - Trackster',
   description:
-    'Hitung berapa yang harus kamu tabung per bulan buat capai target — motor, iPhone, DP rumah, dana darurat, atau liburan. Gratis, tanpa perlu bikin akun.',
+    'Hitung setoran tabungan per minggu/bulan, bandingin instrumen (tabungan, deposito, reksa dana, emas), dan liat kapan target tercapai. Gratis, tanpa perlu bikin akun.',
 };
 
 export default function KalkulatorTabunganPage() {
-  return <SavingsCalculator />;
+  return (
+    // useSearchParams() di SavingsCalculator wajib dibungkus Suspense biar lolos next build.
+    <Suspense fallback={null}>
+      <SavingsCalculator />
+    </Suspense>
+  );
 }

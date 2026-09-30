@@ -106,10 +106,10 @@ Sekarang: rumus linear (target − tabungan) / bulan, preset barang, share card 
 - Self-check `savings-math.check.ts` (bunga majemuk mingguan/bulanan, kasus 0%).
 
 **Tasks**
-- [ ] `savings-math.ts` (frontend, fungsi murni) + check
-- [ ] UI dua mode + instrumen + inflasi + grafik + tabel perbandingan
-- [ ] URL state + OG image + share card
-- [ ] Cek angka return instrumen terbaru & catat sumber
+- [x] `savings-math.ts` (frontend, fungsi murni) + check
+- [x] UI dua mode + instrumen + inflasi + grafik + tabel perbandingan
+- [x] URL state + OG image + share card
+- [x] Cek angka return instrumen terbaru & catat sumber — angka konservatif default (tabungan 0%, deposito 4.5%, RDPU 5%, emas 8%) dicatat di `SavingsCalculator.tsx` dengan label "asumsi, bukan jaminan · diperbarui 2026-09-30". Web search sesi ini diblokir classifier sementara — wajib dicek ulang angka riil sebelum deploy.
 
 ## E08-S3 — Hub `/tools` + Kalkulator PayLater/Cicilan + SEO dasar
 

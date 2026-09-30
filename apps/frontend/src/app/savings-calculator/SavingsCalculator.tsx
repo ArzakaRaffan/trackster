@@ -1,86 +1,245 @@
 'use client';
 
-import { useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import Image from 'next/image';
 import { toPng } from 'html-to-image';
+import {
+  Area,
+  ComposedChart,
+  ReferenceLine,
+  ResponsiveContainer,
+  Tooltip,
+  XAxis,
+  YAxis,
+} from 'recharts';
 import { Input } from '@/components/ui/Input';
-import { AmountDisplay } from '@/components/ui/AmountDisplay';
 import { formatRupiah } from '@/lib/format';
-import { Bike, Camera, Download, Home, Palmtree, PartyPopper, PiggyBank, ShieldAlert, Sparkles } from 'lucide-react';
+import {
+  Frequency,
+  inflate,
+  milestones,
+  milestonesWithInflation,
+  periodicRate,
+  periodsToReachWithInflation,
+  projection,
+  requiredDeposit,
+  samplePoints,
+} from '@/lib/savings-math';
+import { Download, Link2, Landmark, PiggyBank, Coins, CircleDollarSign, CalendarClock, Check } from 'lucide-react';
 
-type Preset =
-  | { id: string; label: string; kind: 'fixed'; amount: number; goalName: string; Icon: typeof Bike }
-  | { id: string; label: string; kind: 'salary-multiple'; multiplier: number; goalName: string; Icon: typeof Bike }
-  | { id: 'custom'; label: string; kind: 'custom'; goalName: ''; Icon: typeof Bike };
+// ---------------------------------------------------------------------------
+// Instrumen & angka return — ASUSMSI, bukan jaminan, editable oleh user.
+// Angka konservatif per 2026-09 (sumber: kisaran umum produk bank/sekuritas,
+// wajib dicek ulang via web search saat sesi pengerjaan; label UI menampilkan
+// "asumsi, bukan jaminan · diperbarui <tanggal>").
+// ---------------------------------------------------------------------------
+const UPDATED_AT = '2026-09-30';
 
-// Nominal preset disesuaikan konteks harga pasar Indonesia 2026 (harga OTR motor matic
-// entry-level, iPhone base model generasi terbaru, DP starter-home, budget liburan domestik
-// buat 1-2 orang) — angka bulat biar gampang diingat/dikira-kira, bukan hasil ngarang.
-const PRESETS: Preset[] = [
-  { id: 'motor', label: 'Motor', kind: 'fixed', amount: 18_000_000, goalName: 'Motor', Icon: Bike },
-  { id: 'iphone', label: 'iPhone Terbaru', kind: 'fixed', amount: 15_000_000, goalName: 'iPhone Terbaru', Icon: Camera },
-  { id: 'darurat', label: 'Dana Darurat 6 Bulan Gaji', kind: 'salary-multiple', multiplier: 6, goalName: 'Dana Darurat', Icon: ShieldAlert },
-  { id: 'dp-rumah', label: 'DP Rumah', kind: 'fixed', amount: 50_000_000, goalName: 'DP Rumah', Icon: Home },
-  { id: 'liburan', label: 'Liburan', kind: 'fixed', amount: 5_000_000, goalName: 'Liburan', Icon: Palmtree },
-  { id: 'custom', label: 'Custom', kind: 'custom', goalName: '', Icon: Sparkles },
+type InstrumentId = 'tabungan' | 'deposito' | 'rdpu' | 'emas';
+
+interface Instrument {
+  id: InstrumentId;
+  label: string;
+  sub: string;
+  defaultRate: number;
+  Icon: typeof PiggyBank;
+}
+
+const INSTRUMENTS: Instrument[] = [
+  { id: 'tabungan', label: 'Tabungan biasa', sub: 'Bunga ~0%', defaultRate: 0, Icon: PiggyBank },
+  { id: 'deposito', label: 'Deposito', sub: 'Kisaran bank', defaultRate: 4.5, Icon: Landmark },
+  { id: 'rdpu', label: 'Reksa dana pasar uang', sub: 'Low risk', defaultRate: 5, Icon: CircleDollarSign },
+  { id: 'emas', label: 'Emas', sub: 'Logam mulia', defaultRate: 8, Icon: Coins },
 ];
 
-const targetDateLabel = (months: number) => {
-  const d = new Date();
-  d.setMonth(d.getMonth() + months);
-  return d.toLocaleDateString('id-ID', { month: 'long', year: 'numeric' });
+const DEFAULT_COMPARATOR = { label: 'kopi susu', amount: 25_000 };
+
+type Mode = 'deadline' | 'ability';
+
+const PPY: Record<Frequency, number> = { weekly: 52, monthly: 12 };
+const DAYS_PER_PERIOD: Record<Frequency, number> = { weekly: 7, monthly: 30.4375 };
+
+const num = (v: string) => {
+  const n = parseFloat(v);
+  return Number.isFinite(n) ? n : 0;
 };
 
+const periodLabel = (p: number, f: Frequency) => (f === 'weekly' ? `Mg ${p}` : `Bl ${p}`);
+
 export function SavingsCalculator() {
-  const [selectedPreset, setSelectedPreset] = useState('motor');
-  const [goalName, setGoalName] = useState('Motor');
-  const [nominalTarget, setNominalTarget] = useState('18000000');
-  const [currentSavings, setCurrentSavings] = useState('0');
+  const searchParams = useSearchParams();
+  const cardRef = useRef<HTMLDivElement>(null);
+
+  const [initialized, setInitialized] = useState(false);
+
+  const [mode, setMode] = useState<Mode>('deadline');
+  const [frequency, setFrequency] = useState<Frequency>('monthly');
+  const [goalName, setGoalName] = useState('');
+  const [target, setTarget] = useState('15000000');
+  const [existing, setExisting] = useState('0');
   const [months, setMonths] = useState('12');
-  const [monthlySalary, setMonthlySalary] = useState('');
+  const [deposit, setDeposit] = useState('500000');
+  const [instrumentId, setInstrumentId] = useState<InstrumentId>('tabungan');
+  const [rates, setRates] = useState<Record<InstrumentId, string>>(() =>
+    Object.fromEntries(INSTRUMENTS.map((i) => [i.id, String(i.defaultRate)])) as Record<InstrumentId, string>,
+  );
+
+  const [inflationPct, setInflationPct] = useState('3');  const [comparatorAmount, setComparatorAmount] = useState(String(DEFAULT_COMPARATOR.amount));
 
   const [downloading, setDownloading] = useState(false);
   const [downloadError, setDownloadError] = useState<string | null>(null);
-  const cardRef = useRef<HTMLDivElement>(null);
+  const [copied, setCopied] = useState(false);
 
-  const applyPreset = (preset: Preset) => {
-    setSelectedPreset(preset.id);
-    setGoalName(preset.goalName);
-    if (preset.kind === 'fixed') {
-      setNominalTarget(String(preset.amount));
-    } else if (preset.kind === 'salary-multiple') {
-      // Kosongin dulu — nominal dihitung otomatis begitu gaji diisi (lihat di bawah).
-      setNominalTarget(monthlySalary ? String((parseFloat(monthlySalary) || 0) * preset.multiplier) : '');
-    } else {
-      setNominalTarget('');
+  // --- Init state from URL (share link) once ---
+  useEffect(() => {
+    if (initialized) return;
+    const get = (k: string) => searchParams.get(k);
+    const s = (k: string, d: string) => get(k) ?? d;
+    const validModes: Mode[] = ['deadline', 'ability'];
+    const validFreqs: Frequency[] = ['weekly', 'monthly'];
+    const m = get('m');
+    const f = get('f');
+    const inst = get('i') as InstrumentId | null;
+    if (m && validModes.includes(m as Mode)) setMode(m as Mode);
+    if (f && validFreqs.includes(f as Frequency)) setFrequency(f as Frequency);
+    if (inst && INSTRUMENTS.some((x) => x.id === inst)) setInstrumentId(inst);
+    setGoalName(get('name') ?? '');
+    setTarget(s('target', '15000000'));
+    setExisting(s('existing', '0'));
+    setMonths(s('months', '12'));
+    setDeposit(s('deposit', '500000'));
+    setInflationPct(s('infl', '3'));
+    setComparatorAmount(s('cmp', String(DEFAULT_COMPARATOR.amount)));
+    if (get('r')) {
+      try {
+        const parsed = JSON.parse(get('r')!) as Partial<Record<InstrumentId, string | number>>;
+        setRates((prev) => {
+          const next: Record<InstrumentId, string> = { ...prev };
+          for (const [k, v] of Object.entries(parsed)) {
+            if (k in next) next[k as InstrumentId] = v == null ? '0' : String(v);
+          }
+          return next;
+        });
+      } catch {
+        // ignore malformed rate param
+      }
     }
-  };
+    setInitialized(true);
+  }, [searchParams, initialized]);
 
-  const handleSalaryChange = (value: string) => {
-    setMonthlySalary(value);
-    const darurat = PRESETS.find((p) => p.id === 'darurat');
-    if (selectedPreset === 'darurat' && darurat?.kind === 'salary-multiple') {
-      setNominalTarget(String((parseFloat(value) || 0) * darurat.multiplier));
-    }
-  };
+  // --- Sync state back to URL (shareable) without re-render/scroll ---
+  useEffect(() => {
+    if (!initialized) return;
+    const p = new URLSearchParams({
+      m: mode,
+      f: frequency,
+      i: instrumentId,
+      target,
+      existing,
+      months,
+      deposit,
+      infl: inflationPct,
+      cmp: comparatorAmount,
+      r: JSON.stringify(rates),
+    });
+    if (goalName) p.set('name', goalName);
+    window.history.replaceState(null, '', `?${p.toString()}`);
+  }, [initialized, mode, frequency, instrumentId, target, existing, months, deposit, inflationPct, comparatorAmount, rates, goalName]);
 
-  const numNominal = parseFloat(nominalTarget) || 0;
-  const numSavings = parseFloat(currentSavings) || 0;
-  const numMonths = parseInt(months, 10) || 0;
+  const instrument = INSTRUMENTS.find((i) => i.id === instrumentId)!;
+  const rate = periodicRate(num(rates[instrumentId]), frequency);
 
-  const sisaTarget = Math.max(numNominal - numSavings, 0);
-  const alreadyReached = numNominal > 0 && numSavings >= numNominal;
-  const perBulan = numMonths > 0 ? sisaTarget / numMonths : 0;
-  const perHari = perBulan / 30;
-  const canCalculate = numNominal > 0 && numMonths > 0;
+  const targetNum = num(target);
+  const existingNum = num(existing);
+  const monthsNum = Math.max(num(months), 0);
+  const depositNum = Math.max(num(deposit), 0);
+  const inflationNum = Math.max(num(inflationPct), 0);
+  const comparatorNum = Math.max(num(comparatorAmount), 0);
+
+  const ppy = PPY[frequency];
+  const periodsFloat = mode === 'deadline' ? monthsNum * (ppy / 12) : null;
+  const periods = Math.ceil(periodsFloat ?? 0);
+
+  const inflatedTarget = useMemo(
+    () => (mode === 'deadline' ? inflate(targetNum, inflationNum, monthsNum / 12) : targetNum),
+    [mode, targetNum, inflationNum, monthsNum],
+  );
+
+  const depositUsed =
+    mode === 'deadline' ? requiredDeposit(inflatedTarget, existingNum, rate, periodsFloat!) : depositNum;
+
+  const reachPeriods =
+    mode === 'ability'
+      ? periodsToReachWithInflation(targetNum, existingNum, depositNum, rate, inflationNum, frequency)
+      : periodsFloat!;
+  const reached = Number.isFinite(reachPeriods);
+  const reachDate = reached
+    ? new Date(Date.now() + reachPeriods * DAYS_PER_PERIOD[frequency] * 86_400_000)
+    : null;
+
+  const chartPeriods =
+    mode === 'ability' ? (reached ? Math.max(Math.ceil(reachPeriods), 12) : 120) : periods;
+  const chartData = useMemo(() => {
+    const proj = projection(existingNum, depositUsed, rate, chartPeriods);
+    return samplePoints(proj, 120).map((pt) => ({
+      label: periodLabel(pt.period, frequency),
+      period: pt.period,
+      Setoran: Math.round(pt.deposits),
+      Hasil: Math.round(pt.returns),
+    }));
+  }, [existingNum, depositUsed, rate, chartPeriods, frequency]);
+
+  // --- Perbandingan instrumen: setoran sama, instrumen beda ---
+  // Inflasi cuma dipakai saat target masih "hidup" (mode ability). Mode deadline target-nya
+  // sudah dibekukan ke inflatedTarget — jangan di-inflate dua kali.
+  const comparisonTarget = mode === 'deadline' ? inflatedTarget : targetNum;
+  const comparisonInflation = mode === 'deadline' ? 0 : inflationNum;
+  const comparison = useMemo(
+    () =>
+      INSTRUMENTS.map((i) => ({
+        ...i,
+        periods: periodsToReachWithInflation(
+          comparisonTarget,
+          existingNum,
+          depositUsed,
+          periodicRate(num(rates[i.id]), frequency),
+          comparisonInflation,
+          frequency,
+        ),
+      })),
+    [comparisonTarget, existingNum, depositUsed, rates, frequency, comparisonInflation],
+  );
+  const bestPeriods = Math.min(...comparison.map((c) => c.periods).filter((p) => Number.isFinite(p)));
+
+  const ms = useMemo(() => {
+    // Mode "kapan tercapai" target-nya ikut naik karena inflasi → milestone juga pakai
+    // target yang sama (dengan inflasi). Mode deadline target-nya sudah fixed (inflatedTarget).
+    const msTarget = mode === 'ability' ? targetNum : inflatedTarget;
+    return mode === 'ability'
+      ? milestonesWithInflation(msTarget, existingNum, depositUsed, rate, inflationNum, frequency)
+      : milestones(msTarget, existingNum, depositUsed, rate);
+  }, [mode, targetNum, inflatedTarget, existingNum, depositUsed, rate, inflationNum, frequency]);
+  const msReached = ms.filter((m) => Number.isFinite(m.period));
+
+  const perDay = depositUsed / DAYS_PER_PERIOD[frequency];
+  const relatable =
+    comparatorNum > 0 && perDay > 0
+      ? perDay >= comparatorNum
+        ? `≈ ${(perDay / comparatorNum).toFixed(1)} ${DEFAULT_COMPARATOR.label} per hari`
+        : `≈ 1 ${DEFAULT_COMPARATOR.label} setiap ${(comparatorNum / perDay).toFixed(1)} hari`
+      : null;
+
+  const canCalculate = targetNum > 0 && (mode === 'deadline' ? monthsNum > 0 : depositNum > 0);
+  const alreadyReached = mode === 'deadline' && existingNum >= inflatedTarget;
 
   const handleDownload = async () => {
     if (!cardRef.current) return;
     setDownloading(true);
     setDownloadError(null);
     try {
-      const dataUrl = await toPng(cardRef.current, { pixelRatio: 2, backgroundColor: '#181818' });
+      const dataUrl = await toPng(cardRef.current, { pixelRatio: 2, backgroundColor: '#121212' });
       const link = document.createElement('a');
       link.download = `target-tabungan-${(goalName || 'trackster').toLowerCase().replace(/\s+/g, '-')}.png`;
       link.href = dataUrl;
@@ -92,6 +251,18 @@ export function SavingsCalculator() {
     }
   };
 
+  const handleCopyLink = async () => {
+    try {
+      await navigator.clipboard.writeText(window.location.href);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1500);
+    } catch {
+      // clipboard gagal — abaikan
+    }
+  };
+
+  const chartTarget = Math.max(inflatedTarget, existingNum);
+
   return (
     <div className="min-h-screen bg-base pb-16 text-ink">
       <div className="mx-auto max-w-content px-4 pt-8">
@@ -99,140 +270,333 @@ export function SavingsCalculator() {
           <Link href="/" className="inline-block">
             <Image src="/trackster-logo.svg" alt="Trackster" width={350} height={64} className="h-9 w-auto" />
           </Link>
-          <h1 className="mt-4 font-title text-title font-bold text-ink">Kalkulator Target Tabungan</h1>
-          <p className="mt-1 text-body text-ink-muted">Pilih goal, isi target, langsung ketauan nabungnya berapa per bulan.</p>
+          <h1 className="mt-4 font-title text-title font-bold text-ink">Perencana Target Tabungan</h1>
+          <p className="mt-1 text-body text-ink-muted">
+            Hitung setoran, bandingin instrumen, dan liat target kamu kapan tercapai.
+          </p>
         </header>
 
-        {/* Preset chips */}
-        <div className="mb-4 flex flex-wrap justify-center gap-2">
-          {PRESETS.map((preset) => (
-            <button
-              key={preset.id}
-              onClick={() => applyPreset(preset)}
-              className={`flex items-center gap-1.5 rounded-pill px-3.5 py-2 text-small font-bold transition-colors duration-base ease-standard ${
-                selectedPreset === preset.id ? 'bg-brand text-base' : 'bg-surface-interactive text-ink-muted hover:text-ink'
-              }`}
-            >
-              <preset.Icon size={14} />
-              {preset.label}
-            </button>
-          ))}
+        {/* Mode & frekuensi */}
+        <div className="flex flex-col gap-2">
+          <div className="flex gap-1 rounded-full-pill bg-surface p-1">
+            {(
+              [
+                ['deadline', 'Harus nabung berapa?'],
+                ['ability', 'Kapan tercapai?'],
+              ] as [Mode, string][]
+            ).map(([m, label]) => (
+              <button
+                key={m}
+                onClick={() => setMode(m)}
+                className={`flex-1 rounded-full-pill py-2 text-label font-bold transition-colors duration-base ease-standard ${
+                  mode === m ? 'bg-brand text-base' : 'text-ink-muted'
+                }`}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+          <div className="flex gap-1 rounded-full-pill bg-surface p-1">
+            {(['weekly', 'monthly'] as Frequency[]).map((f) => (
+              <button
+                key={f}
+                onClick={() => setFrequency(f)}
+                className={`flex-1 rounded-full-pill py-1.5 text-small font-bold transition-colors duration-base ease-standard ${
+                  frequency === f ? 'bg-surface-alt text-ink' : 'text-ink-muted'
+                }`}
+              >
+                {f === 'weekly' ? 'Per minggu' : 'Per bulan'}
+              </button>
+            ))}
+          </div>
         </div>
 
-        {/* Form */}
-        <section className="flex flex-col gap-3 rounded-comfortable bg-surface p-4">
-          {selectedPreset === 'custom' && (
-            <Input label="Nama Goal" placeholder="Misal: Kamera baru" value={goalName} onChange={(e) => setGoalName(e.target.value)} />
-          )}
+        {/* Input */}
+        <section className="mt-3 flex flex-col gap-3 rounded-comfortable bg-surface p-4">
+          <Input label="Nama goal" placeholder="Misal: iPhone, DP rumah, dana darurat" value={goalName} onChange={(e) => setGoalName(e.target.value)} />
+          <Input label="Harga target hari ini" type="number" inputMode="numeric" prefix="Rp" value={target} onChange={(e) => setTarget(e.target.value)} />
+          <Input label="Sudah punya tabungan (opsional)" type="number" inputMode="numeric" prefix="Rp" value={existing} onChange={(e) => setExisting(e.target.value)} />
 
-          {selectedPreset === 'darurat' && (
+          {mode === 'deadline' ? (
+            <Input label="Mau selesai dalam" type="number" inputMode="numeric" suffix="bulan" value={months} onChange={(e) => setMonths(e.target.value)} />
+          ) : (
             <Input
-              label="Gaji bulanan kamu"
+              label={`Setoran ${frequency === 'weekly' ? 'per minggu' : 'per bulan'}`}
               type="number"
               inputMode="numeric"
               prefix="Rp"
-              hint="Target otomatis dihitung 6x dari angka ini, masih bisa diedit manual di bawah."
-              value={monthlySalary}
-              onChange={(e) => handleSalaryChange(e.target.value)}
+              value={deposit}
+              onChange={(e) => setDeposit(e.target.value)}
             />
           )}
 
+          <div className="flex flex-col gap-1.5 pt-1">
+            <span className="text-small font-bold uppercase tracking-caps text-text-subtle">Instrumen</span>
+            <div className="grid grid-cols-2 gap-2">
+              {INSTRUMENTS.map((i) => (
+                <button
+                  key={i.id}
+                  onClick={() => setInstrumentId(i.id)}
+                  className={`flex items-center gap-2 rounded-medium px-3 py-2.5 text-left transition-colors duration-fast ease-standard ${
+                    instrumentId === i.id ? 'bg-brand-subtle shadow-[inset_0_0_0_1px_theme(colors.brand.DEFAULT)]' : 'bg-neutral hover:bg-neutral-hover'
+                  }`}
+                >
+                  <i.Icon size={16} className={instrumentId === i.id ? 'text-brand' : 'text-ink-muted'} />
+                  <span className="min-w-0">
+                    <span className="block truncate text-small font-bold text-ink">{i.label}</span>
+                    <span className="block text-micro text-ink-subtle">{i.sub}</span>
+                  </span>
+                </button>
+              ))}
+            </div>
+            <div className="mt-1 flex items-center gap-2">
+              <span className="whitespace-nowrap text-small text-ink-muted">Return</span>
+              <Input
+                aria-label={`Return tahunan ${instrument.label}`}
+                type="number"
+                inputMode="decimal"
+                suffix="%/thn"
+                value={rates[instrumentId]}
+                onChange={(e) => setRates((r) => ({ ...r, [instrumentId]: e.target.value }))}
+              />
+            </div>
+            <p className="text-micro text-ink-subtle">
+              Asumsi, bukan jaminan · diperbarui {UPDATED_AT}. Return tahunan bisa diedit.
+            </p>
+          </div>
+
           <Input
-            label="Nominal Target"
+            label="Inflasi harga target (opsional)"
+            type="number"
+            inputMode="decimal"
+            suffix="%/thn"
+            hint="Harga target ikut naik seiring waktu. Kosongkan / 0 untuk nonaktif."
+            value={inflationPct}
+            onChange={(e) => setInflationPct(e.target.value)}
+          />
+          <Input
+            label={`Harga pembanding (1 ${DEFAULT_COMPARATOR.label})`}
             type="number"
             inputMode="numeric"
             prefix="Rp"
-            value={nominalTarget}
-            onChange={(e) => setNominalTarget(e.target.value)}
-          />
-          <Input
-            label="Sudah Punya Tabungan (opsional)"
-            type="number"
-            inputMode="numeric"
-            prefix="Rp"
-            value={currentSavings}
-            onChange={(e) => setCurrentSavings(e.target.value)}
-          />
-          <Input
-            label="Target Selesai Dalam (bulan)"
-            type="number"
-            inputMode="numeric"
-            suffix="bulan"
-            value={months}
-            onChange={(e) => setMonths(e.target.value)}
+            hint="Biar angka setoran terasa nyata."
+            value={comparatorAmount}
+            onChange={(e) => setComparatorAmount(e.target.value)}
           />
         </section>
 
-        {/* Result */}
         {canCalculate && (
-          <div className="mt-4 flex flex-col items-center gap-3">
-            {alreadyReached ? (
-              <div className="flex w-full flex-col items-center gap-2 rounded-panel bg-status-under-bg p-8 text-center">
-                <PartyPopper size={28} className="text-status-under" />
-                <p className="text-heading font-bold text-status-under">Target udah tercapai!</p>
-                <p className="text-small text-ink-muted">Tabungan kamu udah cukup buat {goalName || 'goal ini'}.</p>
+          <div className="mt-4 flex flex-col gap-3">
+            {/* Kartu hasil (dibagikan sebagai PNG) */}
+            <div ref={cardRef} className="w-full overflow-hidden rounded-panel bg-surface">
+              <div className="bg-gradient-to-b from-brand/[0.14] to-transparent px-6 pb-6 pt-8 text-center">
+                <span className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-brand text-base shadow-medium">
+                  <instrument.Icon size={22} />
+                </span>
+                <p className="mt-3 text-small font-bold uppercase tracking-caps text-ink-muted">
+                  {mode === 'deadline' ? 'Setoran target tabungan' : 'Estimasi tercapai'}
+                </p>
+                <h2 className="mt-1 font-title text-title font-bold text-ink">{goalName || 'Target Kamu'}</h2>
               </div>
-            ) : (
-              <div ref={cardRef} className="w-full overflow-hidden rounded-panel bg-surface">
-                <div className="bg-gradient-to-b from-brand/[0.14] to-transparent px-6 pb-6 pt-8 text-center">
-                  <span className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-brand text-base shadow-medium">
-                    <PiggyBank size={22} />
-                  </span>
-                  <p className="mt-3 text-small font-bold uppercase tracking-caps text-ink-muted">Target Tabungan</p>
-                  <h2 className="mt-1 font-title text-title font-bold text-ink">{goalName || 'Target Kamu'}</h2>
-                </div>
 
-                <div className="border-t border-line-subtle px-6 py-6 text-center">
-                  <p className="text-small font-bold uppercase tracking-caps text-ink-muted">Nabung per bulan</p>
-                  <div className="mt-1 flex justify-center">
-                    <AmountDisplay value={perBulan} size="large" tone="base" />
-                  </div>
-                  <p className="mt-1 text-small text-ink-muted">≈ {formatRupiah(perHari)} / hari (estimasi kasar)</p>
-                </div>
+              <div className="border-t border-line-subtle px-6 py-6 text-center">
+                {mode === 'deadline' ? (
+                  alreadyReached ? (
+                    <>
+                      <p className="text-small font-bold uppercase tracking-caps text-ink-muted">Status</p>
+                      <div className="mt-1 flex justify-center">
+                        <span className="font-title text-heading font-bold text-status-under">
+                          Target udah tercapai 🎉
+                        </span>
+                      </div>
+                      <p className="mt-1 text-small text-ink-muted">
+                        Tabungan kamu ({formatRupiah(existingNum)}) udah cukup buat {goalName || 'goal ini'}
+                        {inflationNum > 0 ? ` — bahkan setelah inflasi (${formatRupiah(inflatedTarget)})` : ''}.
+                      </p>
+                    </>
+                  ) : (
+                    <>
+                      <p className="text-small font-bold uppercase tracking-caps text-ink-muted">
+                        Nabung per {frequency === 'weekly' ? 'minggu' : 'bulan'}
+                      </p>
+                      <div className="mt-1 flex justify-center">
+                        <span className="font-title text-amount font-black tabular-nums text-ink">{formatRupiah(depositUsed)}</span>
+                      </div>
+                      {relatable && <p className="mt-1 text-small text-ink-muted">{relatable}</p>}
+                    </>
+                  )
+                ) : (
+                  <>
+                    {reached ? (
+                      <>
+                        <p className="text-small font-bold uppercase tracking-caps text-ink-muted">Target tercapai dalam</p>
+                        <div className="mt-1 flex justify-center">
+                          <span className="font-title text-amount font-black tabular-nums text-ink">
+                            {Math.ceil(reachPeriods)} {frequency === 'weekly' ? 'minggu' : 'bulan'}
+                          </span>
+                        </div>
+                        {reachDate && (
+                          <p className="mt-1 text-small text-ink-muted">
+                            ≈ {reachDate.toLocaleDateString('id-ID', { month: 'long', year: 'numeric' })}
+                          </p>
+                        )}
+                      </>
+                    ) : (
+                      <p className="font-title text-heading font-bold text-status-over">
+                        Nggak akan tercapai — setoran terlalu kecil atau inflasi terlalu tinggi.
+                      </p>
+                    )}
+                  </>
+                )}
+              </div>
 
+              {inflationNum > 0 && mode === 'deadline' && !alreadyReached && (
                 <div className="grid grid-cols-2 gap-3 border-t border-line-subtle px-6 py-5 text-center">
                   <div>
-                    <p className="text-micro font-bold uppercase tracking-caps text-ink-muted">Target</p>
-                    <p className="mt-1 text-label font-bold tabular-nums text-ink">{formatRupiah(numNominal)}</p>
+                    <p className="text-micro font-bold uppercase tracking-caps text-ink-muted">Target sekarang</p>
+                    <p className="mt-1 text-label font-bold tabular-nums text-ink">{formatRupiah(targetNum)}</p>
                   </div>
                   <div>
-                    <p className="text-micro font-bold uppercase tracking-caps text-ink-muted">Selesai</p>
-                    <p className="mt-1 text-label font-bold text-ink">
-                      {numMonths} bulan lagi
-                      <br />
-                      <span className="text-ink-muted">{targetDateLabel(numMonths)}</span>
-                    </p>
+                    <p className="text-micro font-bold uppercase tracking-caps text-ink-muted">Target saat selesai (inflasi)</p>
+                    <p className="mt-1 text-label font-bold tabular-nums text-ink">{formatRupiah(inflatedTarget)}</p>
                   </div>
                 </div>
+              )}
 
-                <p className="px-6 pb-5 text-center text-micro uppercase tracking-caps text-ink-subtle">Dibuat lewat Trackster</p>
+              <div className="flex flex-wrap items-center justify-between gap-2 border-t border-line-subtle px-6 py-4 text-small">
+                <span className="flex items-center gap-1.5 text-ink-muted">
+                  <instrument.Icon size={14} className="text-brand" />
+                  {instrument.label} · {num(rates[instrumentId]).toFixed(1)}%/thn
+                </span>
+                <span className="text-ink-subtle">Dibuat lewat Trackster</span>
               </div>
+            </div>
+
+            {/* Grafik proyeksi */}
+            {reached !== false && !alreadyReached && (
+              <section className="rounded-comfortable bg-surface p-4">
+                <h2 className="text-heading font-semibold text-ink">Proyeksi</h2>
+                <p className="mt-1 text-small text-ink-muted">Setoran (hijau) vs hasil/bunga (biru), garis putus-putus = target.</p>
+                <ResponsiveContainer width="100%" height={220} className="mt-3">
+                  <ComposedChart data={chartData} margin={{ top: 8, right: 8, left: 8, bottom: 0 }}>
+                    <XAxis dataKey="label" tick={{ fill: '#7c7c7c', fontSize: 10 }} axisLine={false} tickLine={false} interval="preserveStartEnd" minTickGap={24} />
+                    <YAxis hide />
+                    <Tooltip
+                      content={({ active, payload, label }: any) => {
+                        if (!active || !payload?.length) return null;
+                        const row = payload[0].payload;
+                        return (
+                          <div className="rounded-standard bg-surface-overlay px-3 py-2 text-small shadow-medium">
+                            <p className="font-bold text-ink">{label}</p>
+                            <p className="tabular-nums text-ink-muted">Total: {formatRupiah(row.Setoran + row.Hasil)}</p>
+                            <p className="tabular-nums text-ink-muted">Setoran: {formatRupiah(row.Setoran)}</p>
+                            <p className="tabular-nums text-status-info">Hasil: {formatRupiah(row.Hasil)}</p>
+                          </div>
+                        );
+                      }}
+                      cursor={{ fill: 'rgba(255,255,255,0.05)' }}
+                    />
+                    <Area dataKey="Setoran" stackId="s" fill="#1ed760" stroke="#1ed760" fillOpacity={0.85} />
+                    <Area dataKey="Hasil" stackId="s" fill="#539df5" stroke="#539df5" fillOpacity={0.9} />
+                    <ReferenceLine y={chartTarget} stroke="#b3b3b3" strokeDasharray="4 4" />
+                  </ComposedChart>
+                </ResponsiveContainer>
+              </section>
             )}
 
-            {!alreadyReached && (
-              <>
-                <button
-                  onClick={handleDownload}
-                  disabled={downloading}
-                  className="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-full bg-surface-interactive px-4 py-2.5 text-label font-bold text-ink transition-[transform,filter] duration-base ease-standard active:scale-[.97] disabled:opacity-40"
-                >
-                  <Download size={16} />
-                  {downloading ? 'Membuat gambar...' : 'Download sebagai gambar'}
-                </button>
-                {downloadError && <p className="text-small text-status-over">{downloadError}</p>}
-              </>
+            {/* Timeline milestone */}
+            {msReached.length > 0 && !alreadyReached && (
+              <section className="rounded-comfortable bg-surface p-4">
+                <h2 className="text-heading font-semibold text-ink">Timeline</h2>
+                <div className="mt-3 flex flex-col gap-2">
+                  {msReached.map((m) => (
+                    <div key={m.pct} className="flex items-center gap-3">
+                      <span className="w-10 shrink-0 text-small font-bold tabular-nums text-ink-muted">{m.pct}%</span>
+                      <div className="h-2 flex-1 overflow-hidden rounded-pill bg-track">
+                        <div
+                          className="h-full rounded-pill bg-brand transition-[width] duration-slow ease-expressive"
+                          style={{ width: `${m.pct}%` }}
+                        />
+                      </div>
+                      <span className="shrink-0 text-small tabular-nums text-ink-muted">
+                        {m.period} {frequency === 'weekly' ? 'mg' : 'bl'}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </section>
             )}
+
+            {/* Perbandingan instrumen */}
+            {!alreadyReached && (
+            <section className="rounded-comfortable bg-surface p-4">
+              <h2 className="text-heading font-semibold text-ink">Bandingin instrumen</h2>
+              <p className="mt-1 text-small text-ink-muted">Dengan setoran yang sama ({formatRupiah(depositUsed)}/{frequency === 'weekly' ? 'minggu' : 'bulan'}).</p>
+              <div className="mt-3 flex flex-col gap-2">
+                {comparison.map((c) => {
+                  const isBest = Number.isFinite(c.periods) && c.periods === bestPeriods;
+                  const delta = Number.isFinite(c.periods) && Number.isFinite(bestPeriods) ? c.periods - bestPeriods : null;
+                  return (
+                    <div key={c.id} className={`flex items-center justify-between gap-3 rounded-medium px-3 py-2.5 ${c.id === instrumentId ? 'bg-brand-subtle' : 'bg-neutral'}`}>
+                      <span className="flex min-w-0 items-center gap-2">
+                        <c.Icon size={14} className={c.id === instrumentId ? 'text-brand' : 'text-ink-muted'} />
+                        <span className="truncate text-small font-bold text-ink">{c.label}</span>
+                        <span className="text-micro text-ink-subtle">{num(rates[c.id]).toFixed(1)}%/thn</span>
+                      </span>
+                      {Number.isFinite(c.periods) ? (
+                        <span className="shrink-0 text-small tabular-nums text-ink-muted">
+                          {Math.ceil(c.periods)} {frequency === 'weekly' ? 'mg' : 'bl'}
+                          {isBest && <span className="ml-1.5 font-bold text-brand">paling cepat</span>}
+                          {!isBest && delta !== null && delta > 0 && (
+                            <span className="ml-1.5 text-ink-subtle">(+{delta.toFixed(0)} {frequency === 'weekly' ? 'mg' : 'bl'})</span>
+                          )}
+                        </span>
+                      ) : (
+                        <span className="shrink-0 text-small text-status-over">nggak tercapai</span>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            </section>
+            )}
+
+            {/* Aksi: download + share link */}
+            <div className="flex flex-col gap-2 sm:flex-row">
+              <button
+                onClick={handleDownload}
+                disabled={downloading}
+                className="inline-flex flex-1 items-center justify-center gap-2 whitespace-nowrap rounded-full bg-surface-interactive px-4 py-2.5 text-label font-bold text-ink transition-[transform,filter] duration-base ease-standard active:scale-[.97] disabled:opacity-40"
+              >
+                <Download size={16} />
+                {downloading ? 'Membuat gambar...' : 'Download gambar'}
+              </button>
+              <button
+                onClick={handleCopyLink}
+                className="inline-flex flex-1 items-center justify-center gap-2 whitespace-nowrap rounded-full bg-surface-interactive px-4 py-2.5 text-label font-bold text-ink transition-[transform,filter] duration-base ease-standard active:scale-[.97]"
+              >
+                {copied ? <Check size={16} className="text-brand" /> : <Link2 size={16} />}
+                {copied ? 'Link disalin' : 'Salin link hasil'}
+              </button>
+            </div>
+            {downloadError && <p className="text-small text-status-over">{downloadError}</p>}
           </div>
         )}
 
-        {/* Funnel — link ke fitur Target Tabungan (Kantong) */}
+        {!canCalculate && (
+          <p className="mt-4 rounded-medium bg-neutral px-4 py-3 text-small text-ink-muted">
+            Isi harga target dulu{' '}{mode === 'deadline' ? 'dan durasi' : 'dan setoran'} buat liat hasilnya.
+          </p>
+        )}
+
+        {/* Funnel — CTA ke Trackster */}
         <div className="mt-8 flex flex-wrap items-center justify-between gap-3 rounded-comfortable bg-surface-interactive p-4">
           <div className="flex items-center gap-3">
             <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-surface-alt text-brand">
-              <Sparkles size={16} />
+              <CalendarClock size={16} />
             </span>
             <p className="text-small text-ink-muted">
-              <span className="font-bold text-ink">Target Tabungan (Kantong)</span> sudah aktif di Trackster.
+              <span className="font-bold text-ink">Target Tabungan (Kantong)</span> di Trackster ngelacak progress-nya otomatis.
             </p>
           </div>
           <Link

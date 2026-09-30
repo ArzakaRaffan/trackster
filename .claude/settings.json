@@ -1,0 +1,7 @@
+{
+  "hooks": {
+    "SessionStart": [
+      { "hooks": [ { "type": "command", "command": "echo 'WAJIB sebelum melakukan apapun: baca docs/context/_Overview.md, Architecture.md, Decisions.md, Gotchas.md di root repo ini sekarang. Jangan eksplorasi kode dari nol kalau jawabannya sudah ada di sana.'" } ] }
+    ]
+  }
+}

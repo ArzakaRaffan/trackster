@@ -72,7 +72,7 @@ Legend: ⬜ belum · 🟨 jalan · ✅ selesai (sudah diverifikasi di browser & 
 | E09-S2 | Interaksi (tap, drag, lirik kursor, tidur) + reaksi event app | 4 | E09-S1 | ⬜ |
 | E09-S3 | Pasang di seluruh app (chat, dashboard, empty/loading state) | 4 | E09-S2 | ⬜ |
 | E08-S1 | Split Bill v2: pajak proporsional, item patungan, diskon, share WA | 4 | — | 🟨 (kode selesai, split-calc.check.ts lulus, migration shares + DTO, UI multi-select + WA share + OG image selesai, backend & frontend build lolos) |
-| E08-S2 | Kalkulator Tabungan v2 (instrumen, inflasi, mingguan, grafik) | 4 | — | ⬜ |
+| E08-S2 | Kalkulator Tabungan v2 (instrumen, inflasi, mingguan, grafik) | 4 | — | 🟨 (kode selesai: `savings-math.ts` + check, UI dua mode + URL state + OG image; self-check & tsc belum dijalankan — classifier Bash di sesi ini sempat down; angka return instrumen masih default konservatif, wajib cek web sebelum deploy) |
 | E08-S3 | Hub /tools + Kalkulator PayLater/Cicilan + OG image | 4 | E08-S2 | ⬜ |
 | E08-S4 | Patungan Trip (multi-bill, settle up minimal transfer) | 4 | E08-S1 | ⬜ |
 
