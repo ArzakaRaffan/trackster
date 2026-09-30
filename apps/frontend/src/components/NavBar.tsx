@@ -78,9 +78,14 @@ export default function NavBar() {
     pathname === '/' ||
     pathname === '/login' ||
     pathname === '/savings-calculator' ||
+    pathname === '/tools' ||
+    pathname === '/installment-calculator' ||
     pathname === '/split-bills/new' ||
+    pathname === '/trip/new' ||
     pathname.startsWith('/s/') ||
-    pathname.startsWith('/split-bills/manage/')
+    pathname.startsWith('/split-bills/manage/') ||
+    pathname.startsWith('/t/') ||
+    pathname.startsWith('/trip/manage/')
   )
     return null;
 
