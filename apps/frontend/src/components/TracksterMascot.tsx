@@ -1,6 +1,5 @@
 'use client';
 
-import { useId } from 'react';
 import { motion, useReducedMotion } from 'motion/react';
 import { EASE_EXPRESSIVE, EASE_STANDARD } from '@/lib/motion';
 
@@ -17,31 +16,27 @@ interface TracksterMascotProps {
   mood?: MascotMood;
   size?: MascotSize;
   className?: string;
-  /** Soft glow behind the blob (widget FAB). */
+  /** Deprecated: README v2 mascot is flat (no gradient/glow). Kept for call-site compat; ignored. */
   glow?: boolean;
 }
 
 /**
- * Animated blob mascot — Trackster's on-screen AI buddy.
- * Motion is limited to float / breathe / blink so the silhouette stays cute.
+ * Flat blob mascot — Trackster's on-screen AI buddy.
+ * Solid body (#1ED760, alert #FFA42B), no radial gradient or glow, eyes/mouth #121212.
+ * Motion limited to float / blink so the silhouette stays cute. Disabled on reduced motion.
  */
 export function TracksterMascot({
   mood = 'idle',
   size = 'md',
   className = '',
-  glow = false,
 }: TracksterMascotProps) {
   const reduceMotion = useReducedMotion();
-  const uid = useId().replace(/:/g, '');
-  const gradId = `tmBlob-${uid}`;
-  const filterId = `tmSoft-${uid}`;
   const px = SIZE_PX[size];
   const isAlert = mood === 'alert';
   const isThinking = mood === 'thinking';
   const isHappy = mood === 'happy' || mood === 'tip';
 
   const bodyColor = isAlert ? '#ffa42b' : '#1ed760';
-  const bodyDark = isAlert ? '#e08916' : '#1aa34a';
   const eyeY = isHappy ? 18.5 : isThinking ? 17 : 18;
   const mouthPath = isHappy
     ? 'M15.5 25.5c2.4 2.6 6.6 2.6 9 0'
@@ -82,40 +77,13 @@ export function TracksterMascot({
       style={{ width: px, height: px }}
       aria-hidden
     >
-      {glow && (
-        <span
-          className="absolute inset-[-18%] rounded-full opacity-35 blur-md"
-          style={{ background: bodyColor }}
-        />
-      )}
       <motion.span
         className="relative block"
         style={{ width: px, height: px, transformOrigin: '50% 70%' }}
         animate={floatAnim}
       >
         <svg viewBox="0 0 40 40" width={px} height={px} fill="none" xmlns="http://www.w3.org/2000/svg">
-          <defs>
-            <radialGradient id={gradId} cx="34%" cy="28%" r="72%">
-              <stop offset="0%" stopColor="#7dffa8" />
-              <stop offset="55%" stopColor={bodyColor} />
-              <stop offset="100%" stopColor={bodyDark} />
-            </radialGradient>
-            <filter id={filterId} x="-20%" y="-20%" width="140%" height="140%">
-              <feDropShadow dx="0" dy="1.5" stdDeviation="1.1" floodColor="#000" floodOpacity="0.32" />
-            </filter>
-          </defs>
-
-          <path filter={`url(#${filterId})`} fill={`url(#${gradId})`} d={BODY_PATH} />
-
-          <ellipse
-            cx="14.5"
-            cy="12.5"
-            rx="4"
-            ry="2.4"
-            fill="#fff"
-            opacity="0.3"
-            transform="rotate(-26 14.5 12.5)"
-          />
+          <path fill={bodyColor} d={BODY_PATH} />
 
           <motion.g style={{ originX: '20px', originY: `${eyeY}px` }} animate={blinkAnim}>
             <ellipse cx="14.5" cy={eyeY} rx="2.1" ry="2.45" fill="#121212" />

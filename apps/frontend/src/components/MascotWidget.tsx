@@ -5,7 +5,7 @@ import Link from 'next/link';
 import useSWR from 'swr';
 import { AnimatePresence, motion } from 'motion/react';
 import { api } from '@/lib/api';
-import { TRANSITION_BASE, TRANSITION_SLOW } from '@/lib/motion';
+import { EASE_ENTER, TRANSITION_BASE } from '@/lib/motion';
 import { MessageCircle, X } from 'lucide-react';
 import { TracksterMascot, type MascotMood } from '@/components/TracksterMascot';
 
@@ -61,11 +61,11 @@ export function MascotWidget() {
             initial={{ opacity: 0, y: 10, scale: 0.94 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: 8, scale: 0.96 }}
-            transition={TRANSITION_SLOW}
-            className="absolute bottom-full right-0 mb-3 w-[18.5rem] overflow-hidden rounded-panel bg-surface-overlay shadow-heavy"
+            transition={{ duration: 0.24, ease: EASE_ENTER }}
+            className="absolute bottom-full right-0 mb-3 w-[18.5rem] overflow-hidden rounded-panel bg-overlay shadow-overlay"
           >
             <div
-              className={`h-1 w-full ${isReminder ? 'bg-status-near' : 'bg-brand'}`}
+              className={`h-1 w-full ${isReminder ? 'bg-warning' : 'bg-brand'}`}
               aria-hidden
             />
             <div className="relative p-4 pt-3.5">
@@ -74,7 +74,7 @@ export function MascotWidget() {
                   setOpen(false);
                   setDismissed(true);
                 }}
-                className="absolute right-2.5 top-2.5 flex h-7 w-7 items-center justify-center rounded-full text-ink-subtle transition-colors hover:bg-white/[0.07] hover:text-ink"
+                className="absolute right-2.5 top-2.5 flex h-7 w-7 items-center justify-center rounded-full text-text-subtlest transition-colors hover:bg-hover hover:text-text"
                 aria-label="Tutup"
               >
                 <X size={14} />
@@ -83,19 +83,19 @@ export function MascotWidget() {
               <div className="mb-2.5 flex items-center gap-2.5 pr-7">
                 <TracksterMascot mood={isReminder ? 'alert' : 'happy'} size="sm" />
                 <div className="min-w-0">
-                  <p className="text-micro font-bold uppercase tracking-caps text-ink-muted">
+                  <p className="text-micro font-bold uppercase tracking-caps text-text-subtle">
                     {isReminder ? 'Pengingat' : 'Tips dari Track'}
                   </p>
-                  <p className="truncate text-small font-bold text-ink">Trackster AI</p>
+                  <p className="truncate text-small font-bold text-text">Trackster AI</p>
                 </div>
               </div>
 
-              <p className="text-small leading-relaxed text-ink-secondary">{data.message}</p>
+              <p className="text-small leading-relaxed text-text-subtle">{data.message}</p>
 
               <Link
                 href="/app/chat"
                 onClick={() => setOpen(false)}
-                className="mt-3.5 flex items-center justify-center gap-2 rounded-comfortable bg-surface-interactive px-3 py-2.5 text-small font-bold text-ink transition-colors hover:bg-surface-alt"
+                className="mt-3.5 flex items-center justify-center gap-2 rounded-medium bg-neutral px-3 py-2.5 text-small font-bold text-text transition-colors hover:bg-neutral-hover"
               >
                 <MessageCircle size={14} className="text-brand" />
                 Tanya lebih lanjut
@@ -113,11 +113,11 @@ export function MascotWidget() {
         aria-expanded={open}
         whileTap={{ scale: 0.92 }}
         transition={TRANSITION_BASE}
-        className="relative flex h-14 w-14 items-center justify-center rounded-full bg-surface-interactive shadow-medium ring-1 ring-white/[0.08] transition-colors hover:bg-surface-alt"
+        className="relative flex h-14 w-14 items-center justify-center rounded-full bg-card shadow-card ring-1 ring-border transition-colors hover:bg-card-hover"
       >
-        <TracksterMascot mood={mood} size="md" glow />
+        <TracksterMascot mood={mood} size="md" />
         {showBadge && (
-          <span className="absolute right-1 top-1 h-3 w-3 rounded-full bg-status-near ring-2 ring-base" />
+          <span className="absolute right-1 top-1 h-3 w-3 rounded-full bg-warning ring-2 ring-page" />
         )}
       </motion.button>
     </div>

@@ -5,3 +5,20 @@
 body {
   font-variant-numeric: tabular-nums;
 }
+
+/* Scrollbar tipis (README v2): 10px, thumb membulat border-bold, track transparan. */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: #5a5a5a transparent;
+}
+*::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+*::-webkit-scrollbar-thumb {
+  border-radius: 999px;
+  background: #5a5a5a;
+}
+*::-webkit-scrollbar-track {
+  background: transparent;
+}

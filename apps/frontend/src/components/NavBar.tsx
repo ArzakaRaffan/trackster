@@ -1,41 +1,79 @@
 'use client';
 
+import { useState } from 'react';
 import Link from 'next/link';
-import Image from 'next/image';
 import { usePathname } from 'next/navigation';
-import { LayoutDashboard, LineChart, MoreHorizontal, Receipt } from 'lucide-react';
+import {
+  BarChart3,
+  Bot,
+  ChevronDown,
+  LayoutDashboard,
+  LineChart,
+  ListChecks,
+  MoreHorizontal,
+  PiggyBank,
+  Receipt,
+  Repeat,
+  Settings,
+  Sparkles,
+  Sun,
+  Target,
+  Wallet,
+} from 'lucide-react';
 
-// Nav disederhanakan jadi 4 item utama — sisanya (Mingguan/Budget/Pemasukan/Analisis/Setting/Chat/Goals)
-// dipindah ke /app/more biar sidebar/bottom-bar nggak penuh. '/app' sekarang dashboard
-// ringkas (bukan detail "Hari Ini" langsung) — itu yang jadi landing pertama begitu login.
-const LINKS = [
+// Sidebar desktop (Redesign v2): 6 menu utama + grup "Lainnya" yang bisa dibuka-tutup,
+// plus status sinkron di bawah. Bottom nav mobile (4 item + /app/more) tetap dipertahankan
+// biar fungsi di HP nggak berubah.
+const MAIN_LINKS = [
+  { href: '/app', label: 'Dashboard', Icon: LayoutDashboard },
+  { href: '/app/today', label: 'Hari ini', Icon: Sun },
+  { href: '/app/weekly', label: 'Mingguan', Icon: BarChart3 },
+  { href: '/app/budget', label: 'Budget', Icon: Wallet },
+  { href: '/app/income', label: 'Pemasukan', Icon: PiggyBank },
+  { href: '/app/income/checkin', label: 'Check-in', Icon: ListChecks },
+];
+
+const MORE_LINKS = [
+  { href: '/split-bills', label: 'Split bill', Icon: Receipt },
+  { href: '/app/reports', label: 'Laporan', Icon: LineChart },
+  { href: '/app/chat', label: 'Tanya Track', Icon: Bot },
+  { href: '/app/subscriptions', label: 'Langganan', Icon: Repeat },
+  { href: '/app/goals', label: 'Target tabungan', Icon: Target },
+  { href: '/app/settings', label: 'Setting', Icon: Settings },
+  { href: '/app/insights', label: 'Analisis', Icon: Sparkles },
+  { href: '/app/categorize', label: 'Rapikan kategori', Icon: ListChecks },
+];
+
+// Bottom nav mobile: 4 item utama, sisanya di /app/more.
+const MOBILE_LINKS = [
   { href: '/app', label: 'Dashboard', Icon: LayoutDashboard },
   { href: '/split-bills', label: 'Split Bill', Icon: Receipt },
   { href: '/app/reports', label: 'Laporan', Icon: LineChart },
   { href: '/app/more', label: 'Lainnya', Icon: MoreHorizontal },
 ];
 
-// Sub-halaman yang keliatan aktif di tab "Dashboard"/"Lainnya" walau URL persisnya beda
-// dari href tab itu sendiri (drill-down dari dashboard, atau isi menu Lainnya).
-const DASHBOARD_SUBPATHS = ['/app/today'];
-const MORE_SUBPATHS = [
+const MOBILE_SUBPATHS = [
   '/app/weekly',
   '/app/budget',
   '/app/income',
+  '/app/income/checkin',
   '/app/insights',
+  '/app/categorize',
   '/app/settings',
   '/app/chat',
+  '/app/chat/memory',
   '/app/goals',
   '/app/subscriptions',
 ];
 
+const isPath = (pathname: string, href: string) =>
+  href === '/app/chat' ? pathname === '/app/chat' || pathname === '/app/chat/memory' : pathname === href;
+
 export default function NavBar() {
   const pathname = usePathname();
+  const moreActive = MORE_LINKS.some((l) => isPath(pathname, l.href));
+  const [moreOpen, setMoreOpen] = useState(moreActive);
 
-  // /split-bills/new dianggap "public-style" juga sekarang — bisa dipakai baik oleh kamu
-  // (login) maupun temen yang bikin bill sendiri tanpa akun, dan buat yang anonim, nav privat
-  // ini cuma nunjukin link yang bakal mental ke /login kalau diklik. Owner tetap bisa balik
-  // ke /split-bills lewat tombol back di step pertama form.
   if (
     pathname === '/' ||
     pathname === '/login' ||
@@ -47,35 +85,107 @@ export default function NavBar() {
     return null;
 
   return (
-    <nav className="fixed inset-x-0 bottom-0 z-20 flex bg-base/[0.92] px-2 pb-[calc(8px+env(safe-area-inset-bottom))] pt-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.10)] backdrop-blur-md lg:static lg:h-screen lg:w-60 lg:shrink-0 lg:flex-col lg:gap-1 lg:bg-base lg:p-3 lg:shadow-none">
-      <Image
-        src="/trackster-logo.svg"
-        alt="Trackster"
-        width={350}
-        height={64}
-        className="hidden h-9 w-auto lg:mb-5 lg:block lg:px-3 lg:pt-2"
-      />
-      {LINKS.map(({ href, label, Icon }) => {
-        const active =
-          href === '/app/more'
-            ? pathname === '/app/more' || MORE_SUBPATHS.includes(pathname)
-            : href === '/app'
-              ? pathname === '/app' || DASHBOARD_SUBPATHS.includes(pathname)
-              : pathname === href;
-        return (
-          <Link
-            key={href}
-            href={href}
-            className={`flex min-h-[48px] flex-1 flex-col items-center justify-center gap-1 rounded-comfortable px-1 py-1.5 transition-colors duration-base ease-standard lg:flex-none lg:flex-row lg:justify-start lg:gap-3 lg:rounded-subtle lg:px-3 lg:py-2.5 ${
-              active ? 'font-bold text-ink lg:bg-white/[0.07]' : 'font-normal text-ink-muted'
-            }`}
+    <>
+      {/* Sidebar desktop */}
+      <aside className="hidden h-screen w-[228px] shrink-0 flex-col gap-6 overflow-y-auto p-5 pl-3 lg:sticky lg:top-0 lg:flex">
+        <div className="flex items-center gap-2.5 px-2.5">
+          <span className="flex h-[30px] w-[30px] items-center justify-center rounded-[9px] bg-brand text-[16px] font-bold text-on-brand">
+            T
+          </span>
+          <span className="text-[17px] font-bold tracking-[-0.01em] text-text">Trackster</span>
+        </div>
+
+        <nav aria-label="Navigasi utama" className="flex flex-col gap-0.5">
+          {MAIN_LINKS.map(({ href, label, Icon }) => {
+            const active = isPath(pathname, href);
+            return (
+              <Link
+                key={href}
+                href={href}
+                aria-current={active ? 'page' : undefined}
+                className={`flex h-10 items-center gap-3 rounded-medium px-2.5 text-label transition-colors duration-fast ease-standard ${
+                  active ? 'bg-neutral font-bold text-text' : 'font-medium text-text-subtle hover:bg-hover hover:text-text'
+                }`}
+              >
+                <Icon size={20} />
+                <span className="flex-1">{label}</span>
+              </Link>
+            );
+          })}
+
+          <button
+            type="button"
+            onClick={() => setMoreOpen((v) => !v)}
+            aria-expanded={moreOpen}
+            className="mt-2 flex h-10 items-center gap-3 rounded-medium px-2.5 text-label font-medium text-text-subtle transition-colors duration-fast ease-standard hover:bg-hover hover:text-text"
           >
-            <Icon size={20} />
-            <span className="text-micro tracking-[0.2px] lg:text-label lg:tracking-normal">{label}</span>
-            {active && <span className="h-1 w-1 rounded-full bg-brand lg:hidden" />}
-          </Link>
-        );
-      })}
-    </nav>
+            <MoreHorizontal size={20} />
+            <span className="flex-1 text-left">Lainnya</span>
+            <ChevronDown
+              size={16}
+              className={`transition-transform duration-base ease-standard ${moreOpen ? 'rotate-180' : ''}`}
+            />
+          </button>
+
+          <div
+            className="grid transition-[grid-template-rows] duration-[250ms] ease-enter"
+            style={{ gridTemplateRows: moreOpen ? '1fr' : '0fr' }}
+          >
+            <div className="flex flex-col gap-0.5 overflow-hidden pl-8">
+              {MORE_LINKS.map(({ href, label }) => {
+                const active = isPath(pathname, href);
+                return (
+                  <Link
+                    key={href}
+                    href={href}
+                    tabIndex={moreOpen ? 0 : -1}
+                    aria-current={active ? 'page' : undefined}
+                    className={`flex h-[34px] items-center rounded-comfortable px-2.5 text-label transition-colors duration-fast ease-standard ${
+                      active
+                        ? 'bg-neutral font-bold text-text'
+                        : 'font-medium text-text-subtle hover:bg-hover hover:text-text'
+                    }`}
+                  >
+                    {label}
+                  </Link>
+                );
+              })}
+            </div>
+          </div>
+        </nav>
+
+        <div className="flex-1" />
+
+        <div className="flex items-center gap-2.5 px-2.5 text-[13px] leading-[18px] text-text-subtle">
+          <span className="h-[7px] w-[7px] shrink-0 rounded-full-pill bg-brand" />
+          <span>BCA, Jago · sinkron otomatis</span>
+        </div>
+      </aside>
+
+      {/* Bottom nav mobile */}
+      <nav className="fixed inset-x-0 bottom-0 z-20 flex bg-base/[0.92] px-2 pb-[calc(8px+env(safe-area-inset-bottom))] pt-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.10)] backdrop-blur-md lg:hidden">
+        {MOBILE_LINKS.map(({ href, label, Icon }) => {
+          const active =
+            href === '/app/more'
+              ? pathname === '/app/more' || MOBILE_SUBPATHS.includes(pathname)
+              : href === '/app'
+                ? pathname === '/app' || pathname === '/app/today'
+                : pathname === href;
+          return (
+            <Link
+              key={href}
+              href={href}
+              className={`flex min-h-[48px] flex-1 flex-col items-center justify-center gap-1 rounded-comfortable px-1 py-1.5 transition-colors duration-base ease-standard ${
+                active ? 'font-bold text-text' : 'font-normal text-text-subtle'
+              }`}
+            >
+              <Icon size={20} />
+              <span className="text-micro tracking-[0.2px]">{label}</span>
+              {active && <span className="h-1 w-1 rounded-full bg-brand lg:hidden" />}
+            </Link>
+          );
+        })}
+      </nav>
+    </>
   );
 }

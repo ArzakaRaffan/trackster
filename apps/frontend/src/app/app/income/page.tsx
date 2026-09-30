@@ -12,8 +12,8 @@ import { Button } from '@/components/ui/Button';
 import { SourceTag } from '@/components/ui/SourceTag';
 import { AnimatedAmount } from '@/components/ui/AnimatedAmount';
 import { StatTile } from '@/components/ui/StatTile';
-import { TRANSITION_BASE, TRANSITION_SLOW } from '@/lib/motion';
-import { ChevronLeft, Inbox, Pencil, Plus, Sparkles, Trash2, X } from 'lucide-react';
+import { EASE_ENTER, TRANSITION_BASE } from '@/lib/motion';
+import { ChevronDown, ChevronLeft, Inbox, Pencil, Plus, Sparkles, Trash2, X } from 'lucide-react';
 
 type IncomeKind = 'FIXED' | 'SESSION' | 'DEDUCTION' | 'VARIABLE' | 'IRREGULAR';
 type IncomeCadence = 'WEEKLY' | 'MONTHLY' | 'NONE';
@@ -66,6 +66,7 @@ interface WeekForecast {
 }
 
 type Period = 'week' | 'month' | 'all';
+type Tab = 'history' | 'sources' | 'forecast';
 
 const fetcher = (path: string) => api.get<Income[]>(path);
 const streamsFetcher = (path: string) => api.get<IncomeStream[]>(path);
@@ -112,7 +113,7 @@ const STATUS_LABEL: Record<StreamStatus, string> = {
 const STATUS_TONE: Record<StreamStatus, string> = {
   RECEIVED: 'bg-status-under-bg text-status-under',
   PARTIAL: 'bg-status-near-bg text-status-near',
-  PENDING: 'bg-track text-ink-muted',
+  PENDING: 'bg-track text-text-subtle',
   MISSED: 'bg-status-over-bg text-status-over',
 };
 
@@ -222,8 +223,15 @@ const PERIODS: { id: Period; label: string }[] = [
   { id: 'all', label: 'Semua' },
 ];
 
+const TABS: { id: Tab; label: string }[] = [
+  { id: 'history', label: 'Riwayat' },
+  { id: 'sources', label: 'Sumber' },
+  { id: 'forecast', label: 'Perkiraan' },
+];
+
 export default function IncomePage() {
   const [period, setPeriod] = useState<Period>('month');
+  const [tab, setTab] = useState<Tab>('history');
 
   const listPath = useMemo(() => {
     if (period === 'all') return '/income';
@@ -398,551 +406,630 @@ export default function IncomePage() {
   const activeStreams = (streams ?? []).filter((s) => s.isActive && s.kind !== 'IRREGULAR');
   const irregularStreams = (streams ?? []).filter((s) => s.kind === 'IRREGULAR');
   const inactiveStreams = (streams ?? []).filter((s) => !s.isActive);
+  const [forecastHorizon, setForecastHorizon] = useState<'week' | 'month'>('week');
 
   return (
-    <div className="pb-navbar animate-fade-in-up">
-      <header className="sticky top-0 z-10 flex items-center gap-3 bg-base/[0.86] px-4 py-4 backdrop-blur-md">
-        <Link href="/app/more" aria-label="Kembali" className="text-ink-muted hover:text-ink">
+    <div className="flex flex-col gap-5 px-4 pt-2 lg:px-0">
+      {/* Top bar */}
+      <header className="flex items-center gap-3">
+        <Link href="/app" aria-label="Kembali" className="text-text-subtle hover:text-text">
           <ChevronLeft size={22} />
         </Link>
         <div className="min-w-0 flex-1">
-          <p className="text-small font-bold uppercase tracking-caps text-ink-muted">Kelola arus masuk</p>
-          <h1 className="font-title text-title font-bold text-ink">Pemasukan</h1>
+          <h1 className="font-title text-[32px] font-bold tracking-[-0.02em] text-text">Pemasukan</h1>
+          <p className="text-[15px] text-text-subtle">Kelola arus masuk</p>
         </div>
       </header>
 
-      <div className="flex flex-col gap-3 px-4">
-        {/* Hero: minggu ini */}
-        {week && (
-          <section className="flex flex-col gap-3 rounded-medium bg-surface p-5">
-            <div>
-              <p className="text-small font-bold uppercase tracking-caps text-ink-muted">
-                Minggu ini ({new Date(week.weekStart).toLocaleDateString('id-ID', { day: 'numeric', month: 'short' })})
-              </p>
-              <div className="flex items-baseline gap-1.5">
-                <AnimatedAmount
-                  value={week.totals.received}
-                  className="font-title text-amount font-black tracking-[-1px] tabular-nums text-status-under"
-                />
-                <span className="text-small text-ink-muted">masuk dari perkiraan {formatRupiah(week.totals.expected)}</span>
-              </div>
-            </div>
-            <div className="h-2 overflow-hidden rounded-full bg-track">
-              <div
-                className="h-full rounded-full bg-status-under transition-[width] duration-slow ease-expressive"
-                style={{ width: `${Math.round(weekReceivedRatio * 100)}%` }}
-              />
-            </div>
-            <div className="flex flex-col gap-1.5">
-              {week.streams
-                .filter((s) => s.kind !== 'IRREGULAR')
-                .map((s) => (
-                  <div key={s.id} className="flex items-center justify-between gap-2 rounded-standard px-1 py-1.5">
-                    <span className="min-w-0 truncate text-small font-bold text-ink">{s.name}</span>
-                    <div className="flex shrink-0 items-center gap-2">
-                      <span className="text-small tabular-nums text-ink-muted">
-                        {formatRupiah(s.received)}
-                        {s.expected > 0 ? ` / ${formatRupiah(s.expected)}` : ''}
-                      </span>
-                      <span className={`whitespace-nowrap rounded-subtle px-1.5 py-0.5 text-micro font-bold uppercase tracking-caps ${STATUS_TONE[s.status]}`}>
-                        {STATUS_LABEL[s.status]}
-                      </span>
-                    </div>
-                  </div>
-                ))}
-            </div>
-            <Link
-              href="/app/income/checkin"
-              className="flex items-center justify-center rounded-comfortable bg-surface-interactive px-4 py-2.5 text-small font-bold text-ink hover:bg-surface-alt"
-            >
-              Check-in pemasukan minggu ini
-            </Link>
-          </section>
-        )}
-
-        {/* Perlu dicek: income PENDING dari auto-capture (E02-S1) — bukan cocok stream & bukan internal */}
-        {pending && pending.length > 0 && (
-          <section className="flex flex-col gap-3 rounded-medium bg-surface p-5">
-            <p className="text-small font-bold uppercase tracking-caps text-ink-muted">
-              Perlu dicek ({pending.length})
-            </p>
-            <div ref={pendingParent} className="flex flex-col gap-3">
-              {pending.map((income) => (
-                <div key={income.id} className="flex flex-col gap-2 rounded-comfortable bg-surface-interactive p-3.5">
-                  <p className="text-small leading-relaxed text-ink">
-                    <span className="font-bold tabular-nums text-status-under">+{formatRupiah(income.amount)}</span> dari{' '}
-                    <span className="font-bold">{income.description}</span> — ini pemasukan apa?
-                  </p>
-                  <div className="flex flex-wrap items-center gap-2">
-                    <select
-                      value={pendingStreamPick[income.id] ?? ''}
-                      onChange={(e) => setPendingStreamPick((m) => ({ ...m, [income.id]: e.target.value }))}
-                      className="min-w-0 flex-1 appearance-none rounded-subtle bg-surface px-3 py-2 text-small text-ink shadow-field outline-none"
-                    >
-                      <option value="">Pilih sumber…</option>
-                      {(streams ?? []).map((s) => (
-                        <option key={s.id} value={s.id}>
-                          {s.name}
-                        </option>
-                      ))}
-                    </select>
-                    <Button
-                      variant="dark"
-                      onClick={() => handleConfirmStream(income.id)}
-                      disabled={resolvingId === income.id || !pendingStreamPick[income.id]}
-                    >
-                      Simpan
-                    </Button>
-                    <button
-                      onClick={() => handleMarkInternal(income.id)}
-                      disabled={resolvingId === income.id}
-                      className="text-small font-bold text-ink-muted hover:text-ink"
-                    >
-                      Bukan pemasukan (internal)
-                    </button>
+      {/* Hero: minggu ini */}
+      {week && (
+        <section className="rounded-card-lg bg-card p-6 shadow-card">
+          <p className="text-small font-bold uppercase tracking-caps text-text-subtle">
+            Minggu ini ({new Date(week.weekStart).toLocaleDateString('id-ID', { day: 'numeric', month: 'short' })})
+          </p>
+          <div className="mt-1 flex items-baseline gap-2">
+            <AnimatedAmount
+              value={week.totals.received}
+              className="font-title text-amount font-black tracking-[-1px] tabular-nums text-status-under"
+            />
+            <span className="text-small text-text-subtle">masuk dari perkiraan {formatRupiah(week.totals.expected)}</span>
+          </div>
+          <div className="mt-4 h-2 overflow-hidden rounded-pill bg-track">
+            <div
+              className="h-full rounded-pill bg-status-under transition-[width] duration-slow ease-expressive"
+              style={{ width: `${Math.round(weekReceivedRatio * 100)}%` }}
+            />
+          </div>
+          <div className="mt-4 flex flex-col gap-1.5">
+            {week.streams
+              .filter((s) => s.kind !== 'IRREGULAR')
+              .map((s) => (
+                <div key={s.id} className="flex items-center justify-between gap-2 rounded-row px-1 py-1.5">
+                  <span className="min-w-0 truncate text-small font-bold text-text">{s.name}</span>
+                  <div className="flex shrink-0 items-center gap-2">
+                    <span className="text-small tabular-nums text-text-subtle">
+                      {formatRupiah(s.received)}
+                      {s.expected > 0 ? ` / ${formatRupiah(s.expected)}` : ''}
+                    </span>
+                    <span className={`whitespace-nowrap rounded-subtle px-1.5 py-0.5 text-micro font-bold uppercase tracking-caps ${STATUS_TONE[s.status]}`}>
+                      {STATUS_LABEL[s.status]}
+                    </span>
                   </div>
                 </div>
               ))}
-            </div>
-          </section>
-        )}
-
-        {/* Perkiraan: konservatif / ekspektasi / maks */}
-        {week && (
-          <section className="flex flex-col gap-3 rounded-medium bg-surface p-5">
-            <p className="text-small font-bold uppercase tracking-caps text-ink-muted">Perkiraan minggu ini</p>
-            <div className="grid grid-cols-3 gap-2">
-              <StatTile label="Konservatif" value={formatRupiah(week.totals.conservative)} tone="muted" size="body" />
-              <StatTile label="Ekspektasi" value={formatRupiah(week.totals.expected)} tone="under" size="body" />
-              <StatTile label="Maks" value={formatRupiah(week.totals.max)} tone="base" size="body" />
-            </div>
-            <p className="text-small leading-relaxed text-ink-muted">
-              Konservatif = skenario terburuk (absen/sesi paling sedikit). Maks = semua sumber penuh. Ekspektasi = perkiraan paling realistis.
-            </p>
-            {monthlyTotals && (
-              <>
-                <div className="my-1 h-px bg-line" />
-                <p className="text-small font-bold uppercase tracking-caps text-ink-muted">Perkiraan ~4 minggu ke depan</p>
-                <div className="grid grid-cols-3 gap-2">
-                  <StatTile label="Konservatif" value={formatRupiah(monthlyTotals.conservative)} tone="muted" size="body" />
-                  <StatTile label="Ekspektasi" value={formatRupiah(monthlyTotals.expected)} tone="under" size="body" />
-                  <StatTile label="Maks" value={formatRupiah(monthlyTotals.max)} tone="base" size="body" />
-                </div>
-              </>
-            )}
-            {week.upsideMonthly > 0 && (
-              <div className="flex items-start gap-2.5 rounded-comfortable bg-surface-interactive p-3.5">
-                <Sparkles size={16} className="mt-0.5 shrink-0 text-brand" />
-                <p className="text-small leading-relaxed text-ink-muted">
-                  Ada tambahan rata-rata <span className="font-bold text-ink">{formatRupiah(week.upsideMonthly)}/bulan</span> dari pemasukan tak terduga
-                  ({irregularStreams.map((s) => s.name).join(', ') || 'project'}) — tidak dihitung di angka di atas karena tidak bisa diandalkan.
-                </p>
-              </div>
-            )}
-          </section>
-        )}
-
-        {/* Kelola sumber pemasukan */}
-        <section className="flex flex-col gap-3 rounded-medium bg-surface p-5">
-          <div className="flex items-center justify-between">
-            <p className="text-small font-bold uppercase tracking-caps text-ink-muted">Sumber pemasukan</p>
-            <button onClick={openCreateStreamForm} className="flex items-center gap-1 text-small font-bold text-brand hover:brightness-110">
-              <Plus size={14} /> Tambah
-            </button>
           </div>
+          <Link
+            href="/app/income/checkin"
+            className="mt-4 flex items-center justify-center rounded-medium bg-neutral px-4 py-2.5 text-small font-bold text-text transition-colors hover:bg-neutral-hover"
+          >
+            Check-in pemasukan minggu ini
+          </Link>
+        </section>
+      )}
 
-          <div className="flex flex-col gap-1">
-            {[...activeStreams, ...irregularStreams, ...inactiveStreams].map((s) => (
-              <div
-                key={s.id}
-                className={`flex items-center gap-3 rounded-standard px-2 py-2.5 transition-colors duration-fast ease-standard hover:bg-white/[0.07] ${
-                  !s.isActive ? 'opacity-50' : ''
-                }`}
-              >
-                <span className="min-w-0 flex-1">
-                  <span className="flex items-center gap-1.5">
-                    <span className="truncate text-body font-bold text-ink">{s.name}</span>
-                    <span className="whitespace-nowrap rounded-subtle bg-track px-1.5 py-0.5 text-micro font-bold uppercase tracking-caps text-ink-muted">
-                      {KIND_LABEL[s.kind]}
-                    </span>
-                    {!s.isActive && <span className="whitespace-nowrap text-micro font-bold uppercase tracking-caps text-ink-subtle">nonaktif</span>}
-                  </span>
-                  <span className="mt-0.5 block truncate text-small text-ink-muted">{streamSummary(s)}</span>
-                </span>
-                <button
-                  onClick={() => openEditStreamForm(s)}
-                  aria-label="Edit sumber"
-                  className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-ink-muted hover:text-ink"
-                >
-                  <Pencil size={14} />
-                </button>
-                <button
-                  onClick={() => handleDeleteStream(s.id)}
-                  aria-label="Hapus sumber"
-                  className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-ink-muted hover:text-status-over"
-                >
-                  <Trash2 size={14} />
-                </button>
+      {/* Perlu dicek */}
+      {pending && pending.length > 0 && (
+        <section className="rounded-card-lg bg-card p-6 shadow-card">
+          <p className="text-small font-bold uppercase tracking-caps text-text-subtle">Perlu dicek ({pending.length})</p>
+          <div ref={pendingParent} className="mt-3 flex flex-col gap-3">
+            {pending.map((income) => (
+              <div key={income.id} className="flex flex-col gap-2 rounded-card bg-neutral p-3.5">
+                <p className="text-small leading-relaxed text-text">
+                  <span className="font-bold tabular-nums text-status-under">+{formatRupiah(income.amount)}</span> dari{' '}
+                  <span className="font-bold">{income.description}</span> — ini pemasukan apa?
+                </p>
+                <div className="flex flex-wrap items-center gap-2">
+                  <select
+                    value={pendingStreamPick[income.id] ?? ''}
+                    onChange={(e) => setPendingStreamPick((m) => ({ ...m, [income.id]: e.target.value }))}
+                    className="min-w-0 flex-1 appearance-none rounded-subtle bg-card px-3 py-2 text-small text-text shadow-field outline-none"
+                  >
+                    <option value="">Pilih sumber…</option>
+                    {(streams ?? []).map((s) => (
+                      <option key={s.id} value={s.id}>
+                        {s.name}
+                      </option>
+                    ))}
+                  </select>
+                  <Button
+                    variant="dark"
+                    onClick={() => handleConfirmStream(income.id)}
+                    disabled={resolvingId === income.id || !pendingStreamPick[income.id]}
+                  >
+                    Simpan
+                  </Button>
+                  <button
+                    onClick={() => handleMarkInternal(income.id)}
+                    disabled={resolvingId === income.id}
+                    className="text-small font-bold text-text-subtle transition-colors hover:text-text"
+                  >
+                    Bukan pemasukan (internal)
+                  </button>
+                </div>
               </div>
             ))}
-            {streams && streams.length === 0 && <p className="px-2 py-3 text-small text-ink-muted">Belum ada sumber pemasukan.</p>}
           </div>
-
-          <AnimatePresence initial={false}>
-            {streamFormOpen && (
-              <motion.div
-                initial={{ opacity: 0, height: 0 }}
-                animate={{ opacity: 1, height: 'auto' }}
-                exit={{ opacity: 0, height: 0 }}
-                transition={TRANSITION_SLOW}
-                className="overflow-hidden rounded-comfortable bg-surface-interactive"
-              >
-                <div className="flex flex-col gap-3 p-4">
-                  <div className="flex items-center justify-between">
-                    <h2 className="text-label font-bold text-ink">{editingStreamId ? 'Edit sumber' : 'Tambah sumber'}</h2>
-                    <button onClick={closeStreamForm} aria-label="Tutup" className="text-ink-muted hover:text-ink">
-                      <X size={18} />
-                    </button>
-                  </div>
-
-                  <Input
-                    label="Nama"
-                    placeholder="Les Privat, Gaji, dll"
-                    value={streamForm.name}
-                    onChange={(e) => setStreamForm((f) => ({ ...f, name: e.target.value }))}
-                  />
-
-                  <div className="grid grid-cols-2 gap-3">
-                    <label className="flex flex-col gap-2">
-                      <span className="text-small font-bold uppercase tracking-caps text-ink-muted">Jenis</span>
-                      <select
-                        value={streamForm.kind}
-                        onChange={(e) => {
-                          const kind = e.target.value as IncomeKind;
-                          setStreamForm((f) => ({
-                            ...f,
-                            kind,
-                            cadence: kind === 'VARIABLE' ? 'MONTHLY' : kind === 'IRREGULAR' ? 'NONE' : 'WEEKLY',
-                          }));
-                        }}
-                        className="w-full appearance-none rounded-comfortable bg-surface px-3.5 py-3 text-body text-ink shadow-field outline-none"
-                      >
-                        {(Object.keys(KIND_LABEL) as IncomeKind[]).map((k) => (
-                          <option key={k} value={k}>
-                            {KIND_LABEL[k]}
-                          </option>
-                        ))}
-                      </select>
-                    </label>
-                    <label className="flex flex-col gap-2">
-                      <span className="text-small font-bold uppercase tracking-caps text-ink-muted">Jadwal</span>
-                      <select
-                        value={streamForm.cadence}
-                        onChange={(e) => setStreamForm((f) => ({ ...f, cadence: e.target.value as IncomeCadence }))}
-                        disabled={streamForm.kind === 'IRREGULAR' || streamForm.kind === 'VARIABLE'}
-                        className="w-full appearance-none rounded-comfortable bg-surface px-3.5 py-3 text-body text-ink shadow-field outline-none disabled:opacity-50"
-                      >
-                        {(Object.keys(CADENCE_LABEL) as IncomeCadence[]).map((c) => (
-                          <option key={c} value={c}>
-                            {CADENCE_LABEL[c]}
-                          </option>
-                        ))}
-                      </select>
-                    </label>
-                  </div>
-
-                  <label className="flex flex-col gap-2">
-                    <span className="text-small font-bold uppercase tracking-caps text-ink-muted">Rekening tujuan</span>
-                    <select
-                      value={streamForm.source}
-                      onChange={(e) => setStreamForm((f) => ({ ...f, source: e.target.value as 'BCA' | 'JAGO' }))}
-                      className="w-full appearance-none rounded-comfortable bg-surface px-3.5 py-3 text-body text-ink shadow-field outline-none"
-                    >
-                      <option value="BCA">BCA</option>
-                      <option value="JAGO">Jago</option>
-                    </select>
-                  </label>
-
-                  {streamForm.cadence === 'WEEKLY' && (
-                    <label className="flex flex-col gap-2">
-                      <span className="text-small font-bold uppercase tracking-caps text-ink-muted">Hari biasa diterima</span>
-                      <select
-                        value={streamForm.payDayOfWeek}
-                        onChange={(e) => setStreamForm((f) => ({ ...f, payDayOfWeek: e.target.value }))}
-                        className="w-full appearance-none rounded-comfortable bg-surface px-3.5 py-3 text-body text-ink shadow-field outline-none"
-                      >
-                        <option value="">— tidak tentu —</option>
-                        {DAY_NAMES.map((d, i) => (
-                          <option key={i} value={i}>
-                            {d}
-                          </option>
-                        ))}
-                      </select>
-                    </label>
-                  )}
-
-                  {streamForm.cadence === 'MONTHLY' && (
-                    <Input
-                      label="Tanggal biasa diterima (1-31)"
-                      type="number"
-                      inputMode="numeric"
-                      value={streamForm.payDayOfMonth}
-                      onChange={(e) => setStreamForm((f) => ({ ...f, payDayOfMonth: e.target.value }))}
-                    />
-                  )}
-
-                  {(streamForm.kind === 'FIXED' || streamForm.kind === 'DEDUCTION' || streamForm.kind === 'VARIABLE') && (
-                    <Input
-                      label={streamForm.kind === 'DEDUCTION' ? 'Nominal maks (tanpa absen)' : streamForm.kind === 'VARIABLE' ? 'Estimasi nominal bulanan' : 'Nominal'}
-                      type="number"
-                      inputMode="numeric"
-                      prefix="Rp"
-                      value={streamForm.amount}
-                      onChange={(e) => setStreamForm((f) => ({ ...f, amount: e.target.value }))}
-                    />
-                  )}
-
-                  {streamForm.kind === 'SESSION' && (
-                    <>
-                      <div className="grid grid-cols-2 gap-3">
-                        <Input
-                          label="Rate per sesi"
-                          type="number"
-                          inputMode="numeric"
-                          prefix="Rp"
-                          value={streamForm.sessionRate}
-                          onChange={(e) => setStreamForm((f) => ({ ...f, sessionRate: e.target.value }))}
-                        />
-                        <Input
-                          label="Ekstra sesi offline"
-                          type="number"
-                          inputMode="numeric"
-                          prefix="Rp"
-                          value={streamForm.sessionExtra}
-                          onChange={(e) => setStreamForm((f) => ({ ...f, sessionExtra: e.target.value }))}
-                        />
-                      </div>
-                      <div className="grid grid-cols-2 gap-3">
-                        <Input
-                          label="Maks sesi/minggu"
-                          type="number"
-                          inputMode="numeric"
-                          value={streamForm.maxUnits}
-                          onChange={(e) => setStreamForm((f) => ({ ...f, maxUnits: e.target.value }))}
-                        />
-                        <Input
-                          label="Biasanya berapa sesi"
-                          type="number"
-                          inputMode="numeric"
-                          value={streamForm.typicalUnits}
-                          onChange={(e) => setStreamForm((f) => ({ ...f, typicalUnits: e.target.value }))}
-                        />
-                      </div>
-                    </>
-                  )}
-
-                  {streamForm.kind === 'DEDUCTION' && (
-                    <div className="grid grid-cols-2 gap-3">
-                      <Input
-                        label="Potongan per hari absen"
-                        type="number"
-                        inputMode="numeric"
-                        prefix="Rp"
-                        value={streamForm.deductionPerUnit}
-                        onChange={(e) => setStreamForm((f) => ({ ...f, deductionPerUnit: e.target.value }))}
-                      />
-                      <Input
-                        label="Hari kerja/minggu"
-                        type="number"
-                        inputMode="numeric"
-                        value={streamForm.maxUnits}
-                        onChange={(e) => setStreamForm((f) => ({ ...f, maxUnits: e.target.value }))}
-                      />
-                    </div>
-                  )}
-
-                  <Input
-                    label="Kata kunci pengirim (opsional, pisah koma)"
-                    placeholder="mis. NAMA ORTU"
-                    value={streamForm.matchKeywords}
-                    onChange={(e) => setStreamForm((f) => ({ ...f, matchKeywords: e.target.value }))}
-                    hint="Dipakai nanti buat auto-link notifikasi masuk ke sumber ini."
-                  />
-
-                  <label className="flex items-center justify-between rounded-comfortable bg-surface px-3.5 py-3">
-                    <span className="text-small font-bold text-ink">Aktif</span>
-                    <input
-                      type="checkbox"
-                      checked={streamForm.isActive}
-                      onChange={(e) => setStreamForm((f) => ({ ...f, isActive: e.target.checked }))}
-                      className="h-5 w-5 accent-brand"
-                    />
-                  </label>
-
-                  <Button variant="primary" fullWidth onClick={handleStreamSubmit} disabled={savingStream || !streamForm.name}>
-                    {savingStream ? 'Menyimpan...' : editingStreamId ? 'Simpan perubahan' : 'Tambah sumber'}
-                  </Button>
-                </div>
-              </motion.div>
-            )}
-          </AnimatePresence>
         </section>
+      )}
 
-        {/* Entri manual */}
-        <div className="flex gap-1 rounded-comfortable bg-surface p-1">
-          {PERIODS.map((p) => (
+      {/* Card bertab */}
+      <section className="rounded-card-lg bg-card shadow-card">
+        <div className="flex gap-1 border-b border-border p-2">
+          {TABS.map((t) => (
             <button
-              key={p.id}
+              key={t.id}
               type="button"
-              onClick={() => setPeriod(p.id)}
-              className={`flex-1 rounded-subtle px-2 py-2 text-small font-bold transition-colors ${
-                period === p.id ? 'bg-surface-interactive text-ink' : 'text-ink-muted hover:text-ink'
+              onClick={() => setTab(t.id)}
+              className={`relative flex-1 rounded-medium px-2 py-2 text-small font-bold transition-colors duration-fast ease-standard ${
+                tab === t.id ? 'text-text' : 'text-text-subtle hover:text-text'
               }`}
             >
-              {p.label}
+              {tab === t.id && (
+                <motion.span layoutId="income-tab" className="absolute inset-0 rounded-medium bg-neutral" transition={TRANSITION_BASE} />
+              )}
+              <span className="relative">{t.label}</span>
             </button>
           ))}
         </div>
 
-        <AnimatePresence initial={false}>
-          {formOpen ? (
-            <motion.section
-              key="form"
-              initial={{ opacity: 0, height: 0 }}
-              animate={{ opacity: 1, height: 'auto' }}
-              exit={{ opacity: 0, height: 0 }}
-              transition={TRANSITION_SLOW}
-              className="overflow-hidden rounded-comfortable bg-surface"
+        <div className="p-6">
+          <AnimatePresence mode="wait" initial={false}>
+            <motion.div
+              key={tab}
+              initial={{ opacity: 0, y: 6 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -6 }}
+              transition={{ ...TRANSITION_BASE, ease: EASE_ENTER }}
+              className="flex flex-col gap-4"
             >
-              <div className="flex flex-col gap-3 p-4">
-                <div className="flex items-center justify-between">
-                  <h2 className="text-label font-bold text-ink">{editingId ? 'Edit pemasukan' : 'Tambah pemasukan manual'}</h2>
-                  <button onClick={closeForm} aria-label="Tutup" className="text-ink-muted hover:text-ink">
-                    <X size={18} />
-                  </button>
-                </div>
-                <Input
-                  label="Nominal"
-                  type="number"
-                  inputMode="numeric"
-                  prefix="Rp"
-                  value={form.amount}
-                  onChange={(e) => setForm((f) => ({ ...f, amount: e.target.value }))}
-                />
-                <Input
-                  label="Deskripsi"
-                  placeholder="Gaji, transfer, freelance…"
-                  value={form.description}
-                  onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))}
-                />
-                <label className="flex flex-col gap-2">
-                  <span className="text-small font-bold uppercase tracking-caps text-ink-muted">Sumber</span>
-                  <span className="relative flex items-center">
-                    <select
-                      value={form.source}
-                      onChange={(e) => setForm((f) => ({ ...f, source: e.target.value as 'BCA' | 'JAGO' }))}
-                      className="w-full appearance-none rounded-comfortable bg-surface-interactive px-3.5 py-3 pr-9 text-body text-ink shadow-field outline-none transition-shadow duration-base ease-standard focus:shadow-field-focus"
-                    >
-                      <option value="BCA">BCA</option>
-                      <option value="JAGO">Jago</option>
-                    </select>
-                    <span className="pointer-events-none absolute right-3.5 text-small text-ink-muted">▾</span>
-                  </span>
-                </label>
-                <Input
-                  label="Tanggal"
-                  type="date"
-                  value={form.receivedAt}
-                  onChange={(e) => setForm((f) => ({ ...f, receivedAt: e.target.value }))}
-                />
-                <Button variant="primary" fullWidth onClick={handleSubmit} disabled={saving || !form.amount || !form.description}>
-                  {saving ? 'Menyimpan...' : editingId ? 'Simpan perubahan' : 'Tambah pemasukan'}
-                </Button>
-              </div>
-            </motion.section>
-          ) : (
-            <motion.div key="trigger" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={TRANSITION_BASE}>
-              <Button variant="dark" fullWidth icon={<Plus size={18} />} onClick={openCreateForm}>
-                Tambah pemasukan manual
-              </Button>
-            </motion.div>
-          )}
-        </AnimatePresence>
+              {tab === 'history' && (
+                <>
+                  {/* Periode + Tambah manual */}
+                  <div className="flex flex-wrap items-center gap-3">
+                    <div className="relative">
+                      <select
+                        value={period}
+                        onChange={(e) => setPeriod(e.target.value as Period)}
+                        className="h-[34px] appearance-none rounded-full-pill bg-neutral pl-3 pr-9 text-small font-medium text-text outline-none transition-colors hover:bg-neutral-hover"
+                      >
+                        {PERIODS.map((p) => (
+                          <option key={p.id} value={p.id}>
+                            {p.label}
+                          </option>
+                        ))}
+                      </select>
+                      <ChevronDown size={14} className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-text-subtle" />
+                    </div>
+                    <Button variant="dark" icon={<Plus size={18} />} onClick={openCreateForm}>
+                      Tambah manual
+                    </Button>
+                  </div>
 
-        <h2 className="text-heading font-semibold text-ink">Riwayat</h2>
+                  <AnimatePresence initial={false}>
+                    {formOpen && (
+                      <motion.section
+                        initial={{ opacity: 0, height: 0 }}
+                        animate={{ opacity: 1, height: 'auto' }}
+                        exit={{ opacity: 0, height: 0 }}
+                        transition={TRANSITION_BASE}
+                        className="overflow-hidden rounded-card bg-neutral"
+                      >
+                        <div className="flex flex-col gap-3 p-4">
+                          <div className="flex items-center justify-between">
+                            <h2 className="text-label font-bold text-text">
+                              {editingId ? 'Edit pemasukan' : 'Tambah pemasukan manual'}
+                            </h2>
+                            <button onClick={closeForm} aria-label="Tutup" className="text-text-subtle hover:text-text">
+                              <X size={18} />
+                            </button>
+                          </div>
+                          <Input
+                            label="Nominal"
+                            type="number"
+                            inputMode="numeric"
+                            prefix="Rp"
+                            value={form.amount}
+                            onChange={(e) => setForm((f) => ({ ...f, amount: e.target.value }))}
+                          />
+                          <Input
+                            label="Deskripsi"
+                            placeholder="Gaji, transfer, freelance…"
+                            value={form.description}
+                            onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))}
+                          />
+                          <label className="flex flex-col gap-2">
+                            <span className="text-small font-bold uppercase tracking-caps text-text-subtle">Sumber</span>
+                            <span className="relative flex items-center">
+                              <select
+                                value={form.source}
+                                onChange={(e) => setForm((f) => ({ ...f, source: e.target.value as 'BCA' | 'JAGO' }))}
+                                className="w-full appearance-none rounded-medium bg-card px-3.5 py-3 pr-9 text-body text-text shadow-field outline-none transition-shadow duration-base ease-standard focus:shadow-field-focus"
+                              >
+                                <option value="BCA">BCA</option>
+                                <option value="JAGO">Jago</option>
+                              </select>
+                              <span className="pointer-events-none absolute right-3.5 text-small text-text-subtle">▾</span>
+                            </span>
+                          </label>
+                          <Input
+                            label="Tanggal"
+                            type="date"
+                            value={form.receivedAt}
+                            onChange={(e) => setForm((f) => ({ ...f, receivedAt: e.target.value }))}
+                          />
+                          <Button
+                            variant="primary"
+                            fullWidth
+                            onClick={handleSubmit}
+                            disabled={saving || !form.amount || !form.description}
+                          >
+                            {saving ? 'Menyimpan...' : editingId ? 'Simpan perubahan' : 'Tambah pemasukan'}
+                          </Button>
+                        </div>
+                      </motion.section>
+                    )}
+                  </AnimatePresence>
 
-        {isLoading ? (
-          <div className="flex flex-col gap-2">
-            {[0, 1, 2].map((i) => (
-              <div key={i} className="h-16 animate-pulse rounded-comfortable bg-track" />
-            ))}
-          </div>
-        ) : error ? (
-          <p className="text-label text-status-over">Gagal memuat data.</p>
-        ) : !data || data.length === 0 ? (
-          <div className="flex flex-col items-center gap-3 rounded-comfortable p-8 text-center shadow-hairline">
-            <span className="flex h-12 w-12 items-center justify-center rounded-full bg-surface-interactive text-ink-muted">
-              <Inbox size={22} />
-            </span>
-            <p className="text-body font-bold text-ink">Belum ada pemasukan</p>
-            <p className="max-w-[280px] text-small leading-relaxed text-ink-muted">Catat gaji, transfer masuk, atau freelance yang nggak lewat notifikasi email.</p>
-          </div>
-        ) : (
-          <div ref={listParent} className="flex flex-col gap-3">
-            {grouped.map((g) => (
-              <section key={g.key} className="rounded-comfortable bg-surface p-2">
-                <div className="flex items-center justify-between px-3 py-2">
-                  <p className="text-small font-bold uppercase tracking-caps text-ink-muted">{g.label}</p>
-                  <p className="text-small font-bold tabular-nums text-status-under">+{formatRupiah(g.sum)}</p>
-                </div>
-                <ul>
-                  {g.items.map((income) => (
-                    <li
-                      key={income.id}
-                      className="flex min-h-[56px] items-center gap-3 rounded-standard px-3 py-2.5 transition-colors duration-fast ease-standard hover:bg-white/[0.07]"
-                    >
-                      <span className="min-w-0 flex-1">
-                        <span className="block truncate text-body font-bold text-ink">{income.description}</span>
-                        <span className="mt-0.75 flex flex-wrap items-center gap-2">
-                          <SourceTag source={income.source} size="sm" />
-                          {income.stream && (
-                            <span className="whitespace-nowrap rounded-subtle bg-track px-1.5 py-0.5 text-micro font-bold uppercase tracking-caps text-ink-muted">
-                              {income.stream.name}
-                            </span>
-                          )}
-                          {income.status && income.status !== 'CONFIRMED' && (
-                            <span className="whitespace-nowrap rounded-subtle bg-status-near-bg px-1.5 py-0.5 text-micro font-bold uppercase tracking-caps text-status-near">
-                              {income.status}
-                            </span>
-                          )}
-                          <span className="text-small tabular-nums text-ink-muted">
-                            {new Date(income.receivedAt).toLocaleDateString('id-ID', { day: 'numeric', month: 'short' })}
-                          </span>
-                        </span>
+                  {/* Riwayat */}
+                  {isLoading ? (
+                    <div className="flex flex-col gap-2">
+                      {[0, 1, 2].map((i) => (
+                        <div key={i} className="h-16 animate-pulse rounded-medium bg-track" />
+                      ))}
+                    </div>
+                  ) : error ? (
+                    <p className="text-label text-status-over">Gagal memuat data.</p>
+                  ) : !data || data.length === 0 ? (
+                    <div className="flex flex-col items-center gap-3 rounded-card p-8 text-center shadow-card">
+                      <span className="flex h-12 w-12 items-center justify-center rounded-full bg-neutral text-text-subtle">
+                        <Inbox size={22} />
                       </span>
-                      <span className="shrink-0 text-body font-bold tabular-nums text-status-under">+{formatRupiah(income.amount)}</span>
-                      <button
-                        onClick={() => openEditForm(income)}
-                        aria-label="Edit"
-                        className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-ink-muted hover:text-ink"
+                      <p className="text-body font-bold text-text">Belum ada pemasukan</p>
+                      <p className="max-w-[280px] text-small leading-relaxed text-text-subtle">
+                        Catat gaji, transfer masuk, atau freelance yang nggak lewat notifikasi email.
+                      </p>
+                    </div>
+                  ) : (
+                    <div ref={listParent} className="flex flex-col gap-3">
+                      {grouped.map((g) => (
+                        <section key={g.key} className="rounded-card bg-neutral p-2">
+                          <div className="flex items-center justify-between px-3 py-2">
+                            <p className="text-small font-bold uppercase tracking-caps text-text-subtle">{g.label}</p>
+                            <p className="text-small font-bold tabular-nums text-status-under">+{formatRupiah(g.sum)}</p>
+                          </div>
+                          <ul>
+                            {g.items.map((income) => (
+                              <li
+                                key={income.id}
+                                className="flex min-h-[56px] items-center gap-3 rounded-row px-3 py-2.5 transition-colors duration-fast ease-standard hover:bg-hover"
+                              >
+                                <span className="min-w-0 flex-1">
+                                  <span className="block truncate text-body font-bold text-text">{income.description}</span>
+                                  <span className="mt-0.75 flex flex-wrap items-center gap-2">
+                                    <SourceTag source={income.source} size="sm" />
+                                    {income.stream && (
+                                      <span className="whitespace-nowrap rounded-subtle bg-track px-1.5 py-0.5 text-micro font-bold uppercase tracking-caps text-text-subtle">
+                                        {income.stream.name}
+                                      </span>
+                                    )}
+                                    {income.status && income.status !== 'CONFIRMED' && (
+                                      <span className="whitespace-nowrap rounded-subtle bg-status-near-bg px-1.5 py-0.5 text-micro font-bold uppercase tracking-caps text-status-near">
+                                        {income.status}
+                                      </span>
+                                    )}
+                                    <span className="text-small tabular-nums text-text-subtle">
+                                      {new Date(income.receivedAt).toLocaleDateString('id-ID', { day: 'numeric', month: 'short' })}
+                                    </span>
+                                  </span>
+                                </span>
+                                <span className="shrink-0 text-body font-bold tabular-nums text-status-under">
+                                  +{formatRupiah(income.amount)}
+                                </span>
+                                <button
+                                  onClick={() => openEditForm(income)}
+                                  aria-label="Edit"
+                                  className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-text-subtle hover:text-text"
+                                >
+                                  <Pencil size={14} />
+                                </button>
+                                <button
+                                  onClick={() => handleDelete(income.id)}
+                                  aria-label="Hapus"
+                                  className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-text-subtle hover:text-status-over"
+                                >
+                                  <Trash2 size={14} />
+                                </button>
+                              </li>
+                            ))}
+                          </ul>
+                        </section>
+                      ))}
+                    </div>
+                  )}
+                </>
+              )}
+
+              {tab === 'sources' && (
+                <>
+                  <div className="flex items-center justify-between">
+                    <p className="text-small font-bold uppercase tracking-caps text-text-subtle">Sumber pemasukan</p>
+                    <button
+                      onClick={openCreateStreamForm}
+                      className="flex items-center gap-1 text-small font-bold text-brand transition hover:brightness-110"
+                    >
+                      <Plus size={14} /> Tambah
+                    </button>
+                  </div>
+
+                  <div className="flex flex-col gap-1">
+                    {[...activeStreams, ...irregularStreams, ...inactiveStreams].map((s) => (
+                      <div
+                        key={s.id}
+                        className={`flex items-center gap-3 rounded-row px-2 py-2.5 transition-colors duration-fast ease-standard hover:bg-hover ${
+                          !s.isActive ? 'opacity-50' : ''
+                        }`}
                       >
-                        <Pencil size={14} />
-                      </button>
-                      <button
-                        onClick={() => handleDelete(income.id)}
-                        aria-label="Hapus"
-                        className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-ink-muted hover:text-status-over"
+                        <span className="min-w-0 flex-1">
+                          <span className="flex items-center gap-1.5">
+                            <span className="truncate text-body font-bold text-text">{s.name}</span>
+                            <span className="whitespace-nowrap rounded-subtle bg-track px-1.5 py-0.5 text-micro font-bold uppercase tracking-caps text-text-subtle">
+                              {KIND_LABEL[s.kind]}
+                            </span>
+                            {!s.isActive && (
+                              <span className="whitespace-nowrap text-micro font-bold uppercase tracking-caps text-text-subtlest">
+                                nonaktif
+                              </span>
+                            )}
+                          </span>
+                          <span className="mt-0.5 block truncate text-small text-text-subtle">{streamSummary(s)}</span>
+                        </span>
+                        <button
+                          onClick={() => openEditStreamForm(s)}
+                          aria-label="Edit sumber"
+                          className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-text-subtle hover:text-text"
+                        >
+                          <Pencil size={14} />
+                        </button>
+                        <button
+                          onClick={() => handleDeleteStream(s.id)}
+                          aria-label="Hapus sumber"
+                          className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-text-subtle hover:text-status-over"
+                        >
+                          <Trash2 size={14} />
+                        </button>
+                      </div>
+                    ))}
+                    {streams && streams.length === 0 && (
+                      <p className="px-2 py-3 text-small text-text-subtle">Belum ada sumber pemasukan.</p>
+                    )}
+                  </div>
+
+                  <AnimatePresence initial={false}>
+                    {streamFormOpen && (
+                      <motion.div
+                        initial={{ opacity: 0, height: 0 }}
+                        animate={{ opacity: 1, height: 'auto' }}
+                        exit={{ opacity: 0, height: 0 }}
+                        transition={TRANSITION_BASE}
+                        className="overflow-hidden rounded-card bg-neutral"
                       >
-                        <Trash2 size={14} />
+                        <div className="flex flex-col gap-3 p-4">
+                          <div className="flex items-center justify-between">
+                            <h2 className="text-label font-bold text-text">{editingStreamId ? 'Edit sumber' : 'Tambah sumber'}</h2>
+                            <button onClick={closeStreamForm} aria-label="Tutup" className="text-text-subtle hover:text-text">
+                              <X size={18} />
+                            </button>
+                          </div>
+
+                          <Input
+                            label="Nama"
+                            placeholder="Les Privat, Gaji, dll"
+                            value={streamForm.name}
+                            onChange={(e) => setStreamForm((f) => ({ ...f, name: e.target.value }))}
+                          />
+
+                          <div className="grid grid-cols-2 gap-3">
+                            <label className="flex flex-col gap-2">
+                              <span className="text-small font-bold uppercase tracking-caps text-text-subtle">Jenis</span>
+                              <select
+                                value={streamForm.kind}
+                                onChange={(e) => {
+                                  const kind = e.target.value as IncomeKind;
+                                  setStreamForm((f) => ({
+                                    ...f,
+                                    kind,
+                                    cadence: kind === 'VARIABLE' ? 'MONTHLY' : kind === 'IRREGULAR' ? 'NONE' : 'WEEKLY',
+                                  }));
+                                }}
+                                className="w-full appearance-none rounded-medium bg-card px-3.5 py-3 text-body text-text shadow-field outline-none"
+                              >
+                                {(Object.keys(KIND_LABEL) as IncomeKind[]).map((k) => (
+                                  <option key={k} value={k}>
+                                    {KIND_LABEL[k]}
+                                  </option>
+                                ))}
+                              </select>
+                            </label>
+                            <label className="flex flex-col gap-2">
+                              <span className="text-small font-bold uppercase tracking-caps text-text-subtle">Jadwal</span>
+                              <select
+                                value={streamForm.cadence}
+                                onChange={(e) => setStreamForm((f) => ({ ...f, cadence: e.target.value as IncomeCadence }))}
+                                disabled={streamForm.kind === 'IRREGULAR' || streamForm.kind === 'VARIABLE'}
+                                className="w-full appearance-none rounded-medium bg-card px-3.5 py-3 text-body text-text shadow-field outline-none disabled:opacity-50"
+                              >
+                                {(Object.keys(CADENCE_LABEL) as IncomeCadence[]).map((c) => (
+                                  <option key={c} value={c}>
+                                    {CADENCE_LABEL[c]}
+                                  </option>
+                                ))}
+                              </select>
+                            </label>
+                          </div>
+
+                          <label className="flex flex-col gap-2">
+                            <span className="text-small font-bold uppercase tracking-caps text-text-subtle">Rekening tujuan</span>
+                            <select
+                              value={streamForm.source}
+                              onChange={(e) => setStreamForm((f) => ({ ...f, source: e.target.value as 'BCA' | 'JAGO' }))}
+                              className="w-full appearance-none rounded-medium bg-card px-3.5 py-3 text-body text-text shadow-field outline-none"
+                            >
+                              <option value="BCA">BCA</option>
+                              <option value="JAGO">Jago</option>
+                            </select>
+                          </label>
+
+                          {streamForm.cadence === 'WEEKLY' && (
+                            <label className="flex flex-col gap-2">
+                              <span className="text-small font-bold uppercase tracking-caps text-text-subtle">Hari biasa diterima</span>
+                              <select
+                                value={streamForm.payDayOfWeek}
+                                onChange={(e) => setStreamForm((f) => ({ ...f, payDayOfWeek: e.target.value }))}
+                                className="w-full appearance-none rounded-medium bg-card px-3.5 py-3 text-body text-text shadow-field outline-none"
+                              >
+                                <option value="">— tidak tentu —</option>
+                                {DAY_NAMES.map((d, i) => (
+                                  <option key={i} value={i}>
+                                    {d}
+                                  </option>
+                                ))}
+                              </select>
+                            </label>
+                          )}
+
+                          {streamForm.cadence === 'MONTHLY' && (
+                            <Input
+                              label="Tanggal biasa diterima (1-31)"
+                              type="number"
+                              inputMode="numeric"
+                              value={streamForm.payDayOfMonth}
+                              onChange={(e) => setStreamForm((f) => ({ ...f, payDayOfMonth: e.target.value }))}
+                            />
+                          )}
+
+                          {(streamForm.kind === 'FIXED' || streamForm.kind === 'DEDUCTION' || streamForm.kind === 'VARIABLE') && (
+                            <Input
+                              label={
+                                streamForm.kind === 'DEDUCTION'
+                                  ? 'Nominal maks (tanpa absen)'
+                                  : streamForm.kind === 'VARIABLE'
+                                    ? 'Estimasi nominal bulanan'
+                                    : 'Nominal'
+                              }
+                              type="number"
+                              inputMode="numeric"
+                              prefix="Rp"
+                              value={streamForm.amount}
+                              onChange={(e) => setStreamForm((f) => ({ ...f, amount: e.target.value }))}
+                            />
+                          )}
+
+                          {streamForm.kind === 'SESSION' && (
+                            <>
+                              <div className="grid grid-cols-2 gap-3">
+                                <Input
+                                  label="Rate per sesi"
+                                  type="number"
+                                  inputMode="numeric"
+                                  prefix="Rp"
+                                  value={streamForm.sessionRate}
+                                  onChange={(e) => setStreamForm((f) => ({ ...f, sessionRate: e.target.value }))}
+                                />
+                                <Input
+                                  label="Ekstra sesi offline"
+                                  type="number"
+                                  inputMode="numeric"
+                                  prefix="Rp"
+                                  value={streamForm.sessionExtra}
+                                  onChange={(e) => setStreamForm((f) => ({ ...f, sessionExtra: e.target.value }))}
+                                />
+                              </div>
+                              <div className="grid grid-cols-2 gap-3">
+                                <Input
+                                  label="Maks sesi/minggu"
+                                  type="number"
+                                  inputMode="numeric"
+                                  value={streamForm.maxUnits}
+                                  onChange={(e) => setStreamForm((f) => ({ ...f, maxUnits: e.target.value }))}
+                                />
+                                <Input
+                                  label="Biasanya berapa sesi"
+                                  type="number"
+                                  inputMode="numeric"
+                                  value={streamForm.typicalUnits}
+                                  onChange={(e) => setStreamForm((f) => ({ ...f, typicalUnits: e.target.value }))}
+                                />
+                              </div>
+                            </>
+                          )}
+
+                          {streamForm.kind === 'DEDUCTION' && (
+                            <div className="grid grid-cols-2 gap-3">
+                              <Input
+                                label="Potongan per hari absen"
+                                type="number"
+                                inputMode="numeric"
+                                prefix="Rp"
+                                value={streamForm.deductionPerUnit}
+                                onChange={(e) => setStreamForm((f) => ({ ...f, deductionPerUnit: e.target.value }))}
+                              />
+                              <Input
+                                label="Hari kerja/minggu"
+                                type="number"
+                                inputMode="numeric"
+                                value={streamForm.maxUnits}
+                                onChange={(e) => setStreamForm((f) => ({ ...f, maxUnits: e.target.value }))}
+                              />
+                            </div>
+                          )}
+
+                          <Input
+                            label="Kata kunci pengirim (opsional, pisah koma)"
+                            placeholder="mis. NAMA ORTU"
+                            value={streamForm.matchKeywords}
+                            onChange={(e) => setStreamForm((f) => ({ ...f, matchKeywords: e.target.value }))}
+                            hint="Dipakai nanti buat auto-link notifikasi masuk ke sumber ini."
+                          />
+
+                          <label className="flex items-center justify-between rounded-medium bg-card px-3.5 py-3">
+                            <span className="text-small font-bold text-text">Aktif</span>
+                            <input
+                              type="checkbox"
+                              checked={streamForm.isActive}
+                              onChange={(e) => setStreamForm((f) => ({ ...f, isActive: e.target.checked }))}
+                              className="h-5 w-5 accent-brand"
+                            />
+                          </label>
+
+                          <Button variant="primary" fullWidth onClick={handleStreamSubmit} disabled={savingStream || !streamForm.name}>
+                            {savingStream ? 'Menyimpan...' : editingStreamId ? 'Simpan perubahan' : 'Tambah sumber'}
+                          </Button>
+                        </div>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+                </>
+              )}
+
+              {tab === 'forecast' && (
+                <>
+                  {/* Segmented Minggu ini / ~4 minggu */}
+                  <div className="flex w-fit gap-1 rounded-full-pill bg-neutral p-1">
+                    {(['week', 'month'] as const).map((h) => (
+                      <button
+                        key={h}
+                        type="button"
+                        onClick={() => setForecastHorizon(h)}
+                        className={`rounded-full-pill px-3 py-1.5 text-small font-bold transition-colors duration-fast ease-standard ${
+                          forecastHorizon === h ? 'bg-card text-text shadow-card' : 'text-text-subtle hover:text-text'
+                        }`}
+                      >
+                        {h === 'week' ? 'Minggu ini' : '~4 minggu'}
                       </button>
-                    </li>
-                  ))}
-                </ul>
-              </section>
-            ))}
-          </div>
-        )}
-      </div>
+                    ))}
+                  </div>
+
+                  {forecastHorizon === 'week' && week ? (
+                    <>
+                      <div className="grid grid-cols-3 gap-2">
+                        <StatTile label="Konservatif" value={formatRupiah(week.totals.conservative)} tone="muted" size="body" />
+                        <StatTile label="Ekspektasi" value={formatRupiah(week.totals.expected)} tone="under" size="body" />
+                        <StatTile label="Maks" value={formatRupiah(week.totals.max)} tone="base" size="body" />
+                      </div>
+                      <p className="text-small leading-relaxed text-text-subtle">
+                        Konservatif = skenario terburuk (absen/sesi paling sedikit). Maks = semua sumber penuh. Ekspektasi = perkiraan paling realistis.
+                      </p>
+                      {week.upsideMonthly > 0 && (
+                        <div className="flex items-start gap-2.5 rounded-medium bg-neutral p-3.5">
+                          <Sparkles size={16} className="mt-0.5 shrink-0 text-brand" />
+                          <p className="text-small leading-relaxed text-text-subtle">
+                            Ada tambahan rata-rata <span className="font-bold text-text">{formatRupiah(week.upsideMonthly)}/bulan</span>{' '}
+                            dari pemasukan tak terduga ({irregularStreams.map((s) => s.name).join(', ') || 'project'}) — tidak dihitung
+                            di angka di atas karena tidak bisa diandalkan.
+                          </p>
+                        </div>
+                      )}
+                    </>
+                  ) : monthlyTotals ? (
+                    <>
+                      <div className="grid grid-cols-3 gap-2">
+                        <StatTile label="Konservatif" value={formatRupiah(monthlyTotals.conservative)} tone="muted" size="body" />
+                        <StatTile label="Ekspektasi" value={formatRupiah(monthlyTotals.expected)} tone="under" size="body" />
+                        <StatTile label="Maks" value={formatRupiah(monthlyTotals.max)} tone="base" size="body" />
+                      </div>
+                      <p className="text-small leading-relaxed text-text-subtle">
+                        Perkiraan 4 minggu ke depan dari semua sumber pemasukan aktif.
+                      </p>
+                    </>
+                  ) : (
+                    <p className="text-small text-text-subtle">Memuat perkiraan...</p>
+                  )}
+                </>
+              )}
+            </motion.div>
+          </AnimatePresence>
+        </div>
+      </section>
     </div>
   );
 }

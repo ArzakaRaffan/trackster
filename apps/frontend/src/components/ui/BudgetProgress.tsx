@@ -34,7 +34,7 @@ export function BudgetProgress({
       {showLegend && (
         <div className="flex items-baseline justify-between gap-3 tabular-nums">
           <span className={`text-small font-bold ${textColor}`}>{Math.round(ratio * 100)}% terpakai</span>
-          <span className="text-small text-ink-muted">
+          <span className="text-small text-text-subtle">
             {over ? `lewat ${rp(spent - budget)}` : `${rp(budget - spent)} sisa`}
           </span>
         </div>
