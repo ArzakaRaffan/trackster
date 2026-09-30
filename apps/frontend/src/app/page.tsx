@@ -38,9 +38,9 @@ const PILLARS = [
     Icon: Target,
     badge: 'Gratis · tanpa akun',
     badgeTone: 'live' as const,
-    title: 'Kalkulator Target Tabungan',
-    description: 'Mau nabung buat motor, HP baru, atau DP rumah? Langsung ketauan nabungnya berapa per bulan.',
-    bullets: ['Preset goal ala Indonesia', 'Kalkulasi real-time, nggak perlu submit', 'Hasil bisa didownload buat di-share'],
+    title: 'Perencana Target Tabungan',
+    description: 'Mau nabung buat motor, HP baru, atau DP rumah? Ketauan setoran per minggu/bulan, kapan tercapai, dan instrumen mana yang paling cepat.',
+    bullets: ['Dua mode: harus nabung berapa / kapan tercapai', 'Bandingin tabungan, deposito, reksa dana, emas', 'Link hasil bisa dibagikan'],
     href: '/savings-calculator',
     cta: 'Coba Kalkulator',
   },
@@ -122,8 +122,7 @@ export default function LandingPage() {
             <Link href="/savings-calculator">
               <Button variant="outlined" size="lg" icon={<Target size={18} />}>
                 Coba Kalkulator Tabungan
-              </Button>
-            </Link>
+              </Button>            </Link>
           </div>
         </motion.section>
 
