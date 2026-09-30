@@ -1,2 +1,10 @@
 User-agent: *
 Allow: /
+Disallow: /app/
+Disallow: /login
+Disallow: /s/
+Disallow: /split-bills/manage/
+Disallow: /t/
+Disallow: /trip/manage/
+
+Sitemap: https://trackster.dev/sitemap.xml

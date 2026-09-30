@@ -119,10 +119,11 @@ export default function LandingPage() {
                 Buat Split Bill
               </Button>
             </Link>
-            <Link href="/savings-calculator">
+            <Link href="/tools">
               <Button variant="outlined" size="lg" icon={<Target size={18} />}>
-                Coba Kalkulator Tabungan
-              </Button>            </Link>
+                Semua Tools
+              </Button>
+            </Link>
           </div>
         </motion.section>
 
@@ -240,6 +241,10 @@ export default function LandingPage() {
 
       <footer className="border-t border-line-subtle px-4 py-8 text-center">
         <p className="text-small text-ink-muted">
+          <Link href="/tools" className="font-bold text-ink transition-colors duration-base ease-standard hover:text-brand">
+            Semua tools gratis
+          </Link>
+          {' · '}
           Udah punya akses Finance Tracker?{' '}
           <Link href="/app" className="font-bold text-ink transition-colors duration-base ease-standard hover:text-brand">
             Masuk di sini

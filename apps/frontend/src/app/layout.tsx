@@ -9,8 +9,20 @@ import { MotionProvider } from '@/components/MotionProvider';
 const ui = Figtree({ subsets: ['latin'], weight: ['400', '600', '700', '800', '900'] });
 
 export const metadata: Metadata = {
-  title: 'Trackster',
-  description: 'Personal finance expense tracker',
+  title: {
+    default: 'Trackster — Finance Tracker & Tools Keuangan Gratis',
+    template: '%s — Trackster',
+  },
+  description:
+    'Trackster adalah finance tracker & kumpulan tools keuangan gratis: split bill patungan, kalkulator target tabungan, kalkulator PayLater/cicilan, dan patungan trip. Tanpa perlu daftar.',
+  metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL || 'https://trackster.dev'),
+  openGraph: {
+    title: 'Trackster — Finance Tracker & Tools Keuangan Gratis',
+    description:
+      'Split bill, target tabungan, PayLater, patungan trip — gratis tanpa akun. Catat pengeluaran otomatis dari email bank.',
+    url: '/',
+    siteName: 'Trackster',
+  },
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
