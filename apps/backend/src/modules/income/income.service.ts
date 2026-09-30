@@ -262,29 +262,6 @@ export class IncomeService {
     });
   }
 
-  /** Smoothed daily allowance: total forecast ekspektasi (E03-S2) untuk `windowDays` ke depan / windowDays,
-   *  dikali faktor tabungan. Diganti dari rata-rata historis mentah ke forecast per stream — forward-looking,
-   *  jadi tidak rusak kalau user berhenti mencatat manual.
-   *  Faktor 0.7 = asumsi 30% income disisihkan untuk tabungan/darurat — bisa di-tuning. */
-  async getSmoothedDailyAllowance(windowDays = 30) {
-    const weeks = Math.max(1, Math.ceil(windowDays / 7));
-    const horizon = await this.incomeForecastService.getHorizon(weeks);
-    const totalIncome = horizon.reduce((sum, w) => sum + w.totals.expected, 0);
-    const averageDailyIncome = totalIncome / (weeks * 7);
-
-    // 0.7 = faktor tabungan. Asumsi: 30% income disisihkan untuk tabungan/darurat.
-    // Angka ini keputusan produk sederhana — dokumentasikan di sini biar tidak jadi magic number.
-    const SAVINGS_FACTOR = 0.7;
-    const suggestedDailyAllowance = averageDailyIncome * SAVINGS_FACTOR;
-
-    return {
-      windowDays,
-      totalIncome: Math.round(totalIncome),
-      averageDailyIncome: Math.round(averageDailyIncome),
-      suggestedDailyAllowance: Math.round(suggestedDailyAllowance),
-      savingsFactor: SAVINGS_FACTOR,
-    };
-  }
 
   /** Rekomendasi alokasi mingguan: forecast ekspektasi minggu ini (E03-S2) dikurangi target budget
    *  mingguan (jumlah 7 DailyBudget) = leftover, lalu leftover dibagi tabung/invest/jajan-bebas.

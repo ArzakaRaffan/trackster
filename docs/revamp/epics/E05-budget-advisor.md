@@ -64,12 +64,12 @@ flag "budget ini jauh di bawah kebiasaanmu (rata-rata Rp X/hari) — kemungkinan
 
 ## E05-S2 — AI: pilih, jelaskan, sesuaikan
 
-- [ ] `AiBudgetService.explain(week)`: input = 3 opsi + snapshot + memory → output `{ recommended: 'hemat'|'seimbang'|'longgar', reason, tip }`
+- [x] `AiBudgetService.explain(week)`: input = 3 opsi + snapshot + memory → output `{ recommended: 'hemat'|'seimbang'|'longgar', reason, tip }`
       (validasi JSON; gagal → default Seimbang tanpa narasi). Cache per minggu.
-- [ ] Tampilkan di kartu saran: badge "Saran Track" + alasan 2 kalimat + tips
-- [ ] Tool `proposeBudget({option?, dayOverrides?: {dayOfWeek, amount}[], note?})` → kartu di chat dengan tombol Terapkan
+- [x] Tampilkan di kartu saran: badge "Saran Track" + alasan 2 kalimat + tips
+- [x] Tool `proposeBudget({option?, dayOverrides?: {dayOfWeek, amount}[], note?})` → kartu di chat dengan tombol Terapkan
       (engine menghitung ulang sisa hari supaya total mingguan tetap)
-- [ ] Check-in Minggu malam (E03-S3) ditutup dengan: "Saran budget minggu depan: Seimbang Rp45rb/hari Sen–Jum,
+- [x] Check-in Minggu malam (E03-S3) ditutup dengan: "Saran budget minggu depan: Seimbang Rp45rb/hari Sen–Jum,
       Rp60rb Sab–Min. [Terapkan] [Lihat opsi]" (callback_query Telegram)
 - [ ] (opsional) setting rollover: sisa budget kemarin ditambahkan ke hari ini — tanya Arzaka dulu, default off
 
