@@ -124,10 +124,10 @@ Sekarang: rumus linear (target − tabungan) / bulan, preset barang, share card 
 - SEO: `metadata` per halaman (title, description, openGraph), `app/sitemap.ts`, `app/robots.ts`.
 
 **Tasks**
-- [ ] Halaman `/tools` + link dari landing
-- [ ] Kalkulator PayLater/Cicilan + check
-- [ ] Metadata + sitemap + robots
-- [ ] Daftar path publik baru di `middleware.ts`
+- [x] Halaman `/tools` + link dari landing
+- [x] Kalkulator PayLater/Cicilan + check
+- [x] Metadata + sitemap + robots
+- [x] Daftar path publik baru di `middleware.ts`
 
 ## E08-S4 — Patungan Trip (group expense ala Splitwise)
 
@@ -144,9 +144,9 @@ Untuk liburan/kos/acara: banyak pengeluaran, banyak pembayar, akhir cukup transf
 - Kirim WA per orang: "Kamu transfer Rp X ke Budi (BCA …)".
 
 **Tasks**
-- [ ] Migration + modul `trip`
-- [ ] `settle.ts` + check
-- [ ] UI create/manage/publik mobile-first + WA share + OG image
+- [x] Migration + modul `trip`
+- [x] `settle.ts` + check
+- [x] UI create/manage/publik mobile-first + WA share + OG image
 
 ## Backlog ide (belum dijadwalkan, jangan dikerjakan tanpa permintaan)
 

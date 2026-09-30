@@ -277,8 +277,23 @@ menggagalkan simpan snapshot kalau cuma narasinya yang gagal). **Belum diverifik
 Halaman lolos render tanpa error server (curl shell HTML 200, dev log bersih, tab label ketemu di HTML) tapi bagian
 yang butuh JS (hero/chart/narasi via `useSWR`) belum dikonfirmasi visual — cek manual sebelum push.
 
-## YYYY-MM-DD — <judul>
-**Konteks:**
+## 2026-10-01 — E08-S3 (Hub /tools, PayLater, SEO) + E08-S4 (Patungan Trip)
+**Konteks:** Sesi lanjutan mengerjakan sisa E08. Classifier Bash (auto safety) down hampir sepanjang sesi,
+jadi self-check (`settle.check.ts`, `installment-math.check.ts`), `prisma generate`, dan build belum bisa dijalankan.
 **Keputusan:**
-**Alasan:**
-**Konsekuensi:**
+- E08-S4: model terpisah `Trip`/`TripMember`/`TripExpense`/`TripExpenseShare` (pola `publicSlug` + `ownerToken`
+  sama seperti SplitBill, tidak tersambung ke `Transaction`/`BankBalance`). Settle-up greedy terbesar-ke-terbesar
+  (maks n−1 transfer) di `settle.ts`, dan `ownerToken` **tidak** dikembalikan endpoint publik (anti-bocor secret).
+  "Anggota boleh tambah pengeluaran" sengaja tidak dibangun (sesuai spec, default owner-only).
+- E08-S3: bunga efektif = IRR bulanan Newton-Raphson **dengan fallback bisection** (Newton saja divergen untuk
+  kasus bunga 0%). Perbandingan "nabung dulu" mengabaikan bunga tabungan (YAGNI, cukup bandingan kasar).
+- SEO: `app/sitemap.ts` + `app/robots.ts` + `public/robots.txt` statis (yang statis tetap menang di Next, isinya
+  sudah menunjuk sitemap). `NEXT_PUBLIC_SITE_URL` dipakai buat URL absolut (default `https://trackster.dev`),
+  ditambahkan ke `.env.example` + `.env.production.example` + Dockerfile frontend.
+- Bookkeeping: checkbox E02-S2 (E02-income-auto-capture.md), E05-S1 "hapus allowance-suggestion", dan E03-S1
+  "link income lama ke stream" dicentang (endpoint allowance-suggestion ternyata sudah tidak ada di kode —
+  sudah dihapus di commit `6f7f3ee`).
+**Alasan:** URL publik baru `/tools`, `/installment-calculator`, `/trip/new`, `/t/`, `/trip/manage/` didaftarkan
+di `middleware.ts` + NavBar supaya visitor tanpa login tidak kena redirect (konvensi public tools).
+**Konsekuensi:** Wajib `npx prisma generate` sebelum `tsc`/build backend (client belum punya model Trip).
+Self-check & build belum dijalankan sesi ini (classifier down) — jalankan sebelum deploy.

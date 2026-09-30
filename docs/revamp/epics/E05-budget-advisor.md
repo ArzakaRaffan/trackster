@@ -59,7 +59,7 @@ flag "budget ini jauh di bawah kebiasaanmu (rata-rata Rp X/hari) — kemungkinan
 - [x] Halaman `/app/budget` v2: hero total, 3 kartu opsi (Hemat/Seimbang/Longgar), mini bar chart per opsi,
       dasar perhitungan collapsible, edit manual di bawah, satu CTA "Terapkan opsi X"
 - [x] `tsc --noEmit` backend + frontend lolos bersih
-- [ ] Hapus `/income/allowance-suggestion` lama (atau arahkan ke engine) — ditunda ke E05-S2
+- [x] Hapus `/income/allowance-suggestion` lama (atau arahkan ke engine) — ditunda ke E05-S2
 
 
 ## E05-S2 — AI: pilih, jelaskan, sesuaikan

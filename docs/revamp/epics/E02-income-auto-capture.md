@@ -100,10 +100,10 @@ murid) transfer ke **rekening Jago** — itu satu-satunya bank yang kirim email 
 **Kalau tidak memuat nominal / tidak jalan otomatis:** tutup eksperimen, dokumentasikan, andalkan E02-S1 + E03-S3.
 
 **Tasks**
-- [ ] Endpoint ingest + IngestLog + env `INGEST_TOKEN` (`.env.example`, ingatkan edit `.env` VPS)
-- [ ] Panduan Shortcut step-by-step di Settings (copyable URL & token ditampilkan sekali)
-- [ ] Eksperimen bersama Arzaka, hasil dicatat di `research/income-notifications.md`
-- [ ] (kondisional) parser notifikasi + check script
+- [x] Endpoint ingest + IngestLog + env `INGEST_TOKEN` (`.env.example`, ingatkan edit `.env` VPS)
+- [x] Panduan Shortcut step-by-step di Settings (copyable URL & token ditampilkan sekali)
+- [x] Eksperimen bersama Arzaka, hasil dicatat di `research/income-notifications.md`
+- [x] (kondisional) parser notifikasi + check script
 
 **Keamanan:** endpoint ingest publik (tanpa cookie) → token panjang random, throttle, payload dibatasi
 (≤ 2 KB), tidak pernah mengembalikan data finansial, tidak menggerakkan saldo sampai status CONFIRMED.

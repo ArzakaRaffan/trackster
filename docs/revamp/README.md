@@ -73,8 +73,8 @@ Legend: ⬜ belum · 🟨 jalan · ✅ selesai (sudah diverifikasi di browser & 
 | E09-S3 | Pasang di seluruh app (chat, dashboard, empty/loading state) | 4 | E09-S2 | ⬜ |
 | E08-S1 | Split Bill v2: pajak proporsional, item patungan, diskon, share WA | 4 | — | 🟨 (kode selesai, split-calc.check.ts lulus, migration shares + DTO, UI multi-select + WA share + OG image selesai, backend & frontend build lolos) |
 | E08-S2 | Kalkulator Tabungan v2 (instrumen, inflasi, mingguan, grafik) | 4 | — | 🟨 (kode selesai: `savings-math.ts` + check, UI dua mode + URL state + OG image; self-check & tsc belum dijalankan — classifier Bash di sesi ini sempat down; angka return instrumen masih default konservatif, wajib cek web sebelum deploy) |
-| E08-S3 | Hub /tools + Kalkulator PayLater/Cicilan + OG image | 4 | E08-S2 | ⬜ |
-| E08-S4 | Patungan Trip (multi-bill, settle up minimal transfer) | 4 | E08-S1 | ⬜ |
+| E08-S3 | Hub /tools + Kalkulator PayLater/Cicilan + OG image | 4 | E08-S2 | 🟨 (kode selesai: hub `/tools`, `installment-math.ts` + check (IRR Newton-Raphson), kalkulator PayLater, metadata/sitemap/robots, middleware path; self-check & tsc/build belum dijalankan — classifier Bash down sesi ini) |
+| E08-S4 | Patungan Trip (multi-bill, settle up minimal transfer) | 4 | E08-S1 | 🟨 (kode selesai: migration `add_trip`, modul `trip` (Trip/TripMember/TripExpense/TripExpenseShare), `settle.ts` greedy + check, UI create/manage/publik + WA share + OG image; self-check & build belum dijalankan — classifier Bash down sesi ini) |
 
 Urutan & alasannya ada di [`00-ROADMAP.md`](00-ROADMAP.md).
 
