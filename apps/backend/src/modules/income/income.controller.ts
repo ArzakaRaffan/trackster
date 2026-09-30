@@ -61,12 +61,6 @@ export class IncomeController {
     return this.incomeService.findAll({ startDate, endDate, status });
   }
 
-  @UseGuards(JwtAuthGuard)
-  @Get('allowance-suggestion')
-  async getAllowanceSuggestion(@Query('windowDays') windowDays?: string) {
-    const days = windowDays ? parseInt(windowDays, 10) : 30;
-    return this.incomeService.getSmoothedDailyAllowance(days);
-  }
 
   @UseGuards(JwtAuthGuard)
   @Get('allocation')
