@@ -312,6 +312,61 @@ model SplitBillItemShare {
   @@unique([itemId, participantId])
 }
 
+// Patungan Trip (E08-S4): group expense ala Splitwise. Banyak pengeluaran, banyak pembayar,
+// akhir cukup transfer seminimal mungkin. Pola publicSlug (lihat + tandai) vs ownerToken (kelola)
+// sama seperti SplitBill, sengaja terpisah & tidak terhubung ke Transaction/BankBalance.
+model Trip {
+  id              Int      @id @default(autoincrement())
+  publicSlug      String   @unique
+  ownerToken      String?  @unique
+  name            String
+  currency        String   @default("IDR")
+  createdByUserId Int?
+  createdAt       DateTime @default(now())
+
+  members   TripMember[]
+  expenses  TripExpense[]
+}
+
+model TripMember {
+  id     Int  @id @default(autoincrement())
+  tripId Int
+  trip   Trip @relation(fields: [tripId], references: [id], onDelete: Cascade)
+  name   String
+
+  expensesPaid TripExpense[]
+  shares       TripExpenseShare[]
+
+  @@index([tripId])
+}
+
+model TripExpense {
+  id            Int    @id @default(autoincrement())
+  tripId        Int
+  trip          Trip   @relation(fields: [tripId], references: [id], onDelete: Cascade)
+  paidByMemberId Int
+  paidBy        TripMember @relation(fields: [paidByMemberId], references: [id], onDelete: Cascade)
+  amount        Decimal @db.Decimal(12, 2)
+  description   String
+  date          DateTime @default(now())
+
+  shares TripExpenseShare[]
+
+  @@index([tripId])
+  @@index([paidByMemberId])
+}
+
+model TripExpenseShare {
+  id        Int         @id @default(autoincrement())
+  expenseId Int
+  expense   TripExpense @relation(fields: [expenseId], references: [id], onDelete: Cascade)
+  memberId  Int
+  member    TripMember  @relation(fields: [memberId], references: [id], onDelete: Cascade)
+  weight    Decimal     @default(1) @db.Decimal(6, 2)
+
+  @@unique([expenseId, memberId])
+}
+
 model HealthScoreLog {
   id                 Int      @id @default(autoincrement())
   weekStart          DateTime @db.Date @unique

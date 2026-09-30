@@ -15,6 +15,7 @@ import { IncomeCheckinModule } from './modules/income-checkin/income-checkin.mod
 import { BudgetAllocationModule } from './modules/budget-allocation/budget-allocation.module';
 import { MerchantAliasModule } from './modules/merchant-alias/merchant-alias.module';
 import { SplitBillModule } from './modules/split-bill/split-bill.module';
+import { TripModule } from './modules/trip/trip.module';
 import { AiModule } from './modules/ai/ai.module';
 import { GoalModule } from './modules/goal/goal.module';
 import { SubscriptionModule } from './modules/subscription/subscription.module';
@@ -39,6 +40,7 @@ import { ReportModule } from './modules/report/report.module';
     BudgetAllocationModule,
     MerchantAliasModule,
     SplitBillModule,
+    TripModule,
     AiModule,
     GoalModule,
     SubscriptionModule,
