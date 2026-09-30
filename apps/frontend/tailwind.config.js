@@ -8,10 +8,22 @@ module.exports = {
     extend: {
       colors: {
         base: '#121212',
+        page: '#121212',
         surface: { DEFAULT: '#181818', interactive: '#1f1f1f', alt: '#252525', overlay: '#272727', light: '#eeeeee' },
-        brand: { DEFAULT: '#1ed760', border: '#1db954', press: '#1aa34a' },
+        brand: { DEFAULT: '#1ed760', border: '#1db954', press: '#1aa34a', hover: '#3be477', 'on-brand': '#04120a', text: '#1ed760', subtle: 'rgba(30,215,96,0.12)' },
         ink: { DEFAULT: '#ffffff', bright: '#fdfdfd', secondary: '#cbcbcb', muted: '#b3b3b3', subtle: '#7c7c7c' },
         line: { subtle: 'rgba(255,255,255,0.10)', DEFAULT: '#4d4d4d', strong: '#7c7c7c' },
+        card: { DEFAULT: '#181818', hover: '#1f1f1f' },
+        overlay: '#272727',
+        neutral: { DEFAULT: '#232323', hover: '#2c2c2c' },
+        hover: 'rgba(255,255,255,0.07)',
+        text: { DEFAULT: '#ffffff', subtle: '#b3b3b3', subtlest: '#8c8c8c' },
+        border: { DEFAULT: 'rgba(255,255,255,0.08)', bold: '#5a5a5a' },
+        focus: '#ffffff',
+        'on-brand': '#04120a',
+        success: { DEFAULT: '#1ed760', subtle: 'rgba(30,215,96,0.12)' },
+        warning: { DEFAULT: '#ffa42b', subtle: 'rgba(255,164,43,0.13)' },
+        danger: { DEFAULT: '#f3727f', subtle: 'rgba(243,114,127,0.13)' },
         status: {
           under: '#1ed760', 'under-bg': 'rgba(30,215,96,0.12)',
           near: '#ffa42b', 'near-bg': 'rgba(255,164,43,0.12)',
@@ -42,7 +54,7 @@ module.exports = {
       },
       letterSpacing: { button: '0.14px', caps: '1.4px', 'caps-wide': '2px', amount: '-1.5px' },
       spacing: { px: '1px', 0.5: '2px', 0.75: '3px', 1: '4px', 1.25: '5px', 1.5: '6px', 2: '8px', 2.5: '10px', 3: '12px', 3.5: '14px', 3.75: '15px', 4: '16px', 5: '20px', 6: '24px', 8: '32px', 10: '40px', 12: '48px', navbar: '64px' },
-      borderRadius: { minimal: '2px', subtle: '4px', standard: '6px', comfortable: '8px', medium: '10px', panel: '20px', large: '100px', pill: '500px', 'full-pill': '9999px' },
+      borderRadius: { minimal: '2px', subtle: '4px', standard: '6px', comfortable: '8px', medium: '10px', row: '12px', card: '14px', 'card-lg': '16px', panel: '20px', large: '100px', pill: '500px', 'full-pill': '9999px' },
       boxShadow: {
         medium: 'rgba(0,0,0,0.3) 0px 8px 8px',
         heavy: 'rgba(0,0,0,0.5) 0px 8px 24px',
@@ -50,10 +62,12 @@ module.exports = {
         'field-focus': 'rgb(18,18,18) 0px 1px 0px, #1ed760 0px 0px 0px 1px inset',
         'field-error': 'rgb(18,18,18) 0px 1px 0px, #f3727f 0px 0px 0px 1px inset',
         hairline: 'inset 0 0 0 1px rgba(255,255,255,0.10)',
+        card: '0 0 0 1px rgba(255,255,255,0.04)',
+        overlay: '0 16px 40px rgba(0,0,0,0.55), 0 0 0 1px rgba(255,255,255,0.06)',
       },
-      transitionDuration: { fast: '120ms', base: '200ms', slow: '320ms' },
-      transitionTimingFunction: { standard: 'cubic-bezier(.3,0,.4,1)', expressive: 'cubic-bezier(.16,1,.3,1)' },
-      maxWidth: { content: '720px' },
+      transitionDuration: { fast: '150ms', base: '200ms', slow: '320ms' },
+      transitionTimingFunction: { standard: 'cubic-bezier(.3,0,.4,1)', expressive: 'cubic-bezier(.16,1,.3,1)', enter: 'cubic-bezier(.2,0,0,1)' },
+      maxWidth: { content: '1040px' },
       screens: { xs: '425px', sm: '576px', md: '768px', 'md-lg': '896px', lg: '1024px', xl: '1280px' },
       // Motion stays within the existing --motion-slow (320ms) / --ease-out vocabulary — no new
       // durations invented, just applied to page entrances and sheet transitions.

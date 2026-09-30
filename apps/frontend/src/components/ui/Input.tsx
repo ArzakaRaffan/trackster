@@ -17,15 +17,15 @@ export function Input({ label, prefix, suffix, invalid = false, pill = false, hi
 
   return (
     <label className="flex flex-col gap-2">
-      {label && <span className="text-small font-bold uppercase tracking-caps text-ink-muted">{label}</span>}
+      {label && <span className="text-small font-bold uppercase tracking-caps text-text-subtle">{label}</span>}
       <span
-        className={`flex items-center gap-2.5 bg-surface-interactive px-3.5 py-3 transition-shadow duration-base ease-standard ${
-          pill ? 'rounded-pill px-5' : 'rounded-comfortable'
+        className={`flex items-center gap-2.5 bg-neutral px-3.5 py-3 transition-shadow duration-base ease-standard ${
+          pill ? 'rounded-pill px-5' : 'rounded-medium'
         } ${shadow}`}
       >
-        {prefix && <span className="inline-flex text-ink-muted">{prefix}</span>}
+        {prefix && <span className="inline-flex text-text-subtle">{prefix}</span>}
         <input
-          className={`min-w-0 flex-1 bg-transparent text-body font-normal text-ink outline-none tabular-nums placeholder:text-ink-subtle disabled:opacity-50 ${className}`}
+          className={`min-w-0 flex-1 bg-transparent text-body font-normal text-text outline-none tabular-nums placeholder:text-text-subtlest disabled:opacity-50 focus-visible:outline-none ${className}`}
           onFocus={(e) => {
             setFocus(true);
             rest.onFocus?.(e);
@@ -36,9 +36,9 @@ export function Input({ label, prefix, suffix, invalid = false, pill = false, hi
           }}
           {...rest}
         />
-        {suffix && <span className="inline-flex text-ink-muted">{suffix}</span>}
+        {suffix && <span className="inline-flex text-text-subtle">{suffix}</span>}
       </span>
-      {hint && <span className={`text-small ${invalid ? 'text-status-over' : 'text-ink-muted'}`}>{hint}</span>}
+      {hint && <span className={`text-small ${invalid ? 'text-danger' : 'text-text-subtle'}`}>{hint}</span>}
     </label>
   );
 }

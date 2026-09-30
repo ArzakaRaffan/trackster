@@ -13,8 +13,8 @@ const SIZES = {
 } as const;
 
 const TONES = {
-  base: 'text-ink',
-  muted: 'text-ink-muted',
+  base: 'text-text',
+  muted: 'text-text-subtle',
   under: 'text-status-under',
   near: 'text-status-near',
   over: 'text-status-over',
@@ -43,9 +43,9 @@ export function AmountDisplay({
 
   return (
     <div className="flex flex-col gap-1">
-      {label && <span className="text-small font-bold uppercase tracking-caps text-ink-muted">{label}</span>}
+      {label && <span className="text-small font-bold uppercase tracking-caps text-text-subtle">{label}</span>}
       <span className={`font-title leading-tight tabular-nums ${SIZES[size]} ${TONES[tone]}`}>{formatted}</span>
-      {caption && <span className="text-label tabular-nums text-ink-muted">{caption}</span>}
+      {caption && <span className="text-label tabular-nums text-text-subtle">{caption}</span>}
     </div>
   );
 }

@@ -53,17 +53,17 @@ function Stepper({ value, onChange, min = 0, max }: { value: number; onChange: (
         type="button"
         onClick={() => onChange(Math.max(min, value - 1))}
         disabled={value <= min}
-        className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-surface-interactive text-ink disabled:opacity-40"
+        className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-neutral text-text transition-colors hover:bg-neutral-hover disabled:opacity-40"
         aria-label="Kurangi"
       >
         <Minus size={16} />
       </button>
-      <span className="w-8 text-center text-body font-bold tabular-nums text-ink">{value}</span>
+      <span className="w-8 text-center text-body font-bold tabular-nums text-text">{value}</span>
       <button
         type="button"
         onClick={() => onChange(max != null ? Math.min(max, value + 1) : value + 1)}
         disabled={max != null && value >= max}
-        className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-surface-interactive text-ink disabled:opacity-40"
+        className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-neutral text-text transition-colors hover:bg-neutral-hover disabled:opacity-40"
         aria-label="Tambah"
       >
         <Plus size={16} />
@@ -154,33 +154,40 @@ function CheckinPageInner() {
     }
   };
 
+  const liveTotal = useMemo(
+    () => (draft ? editableStreams.reduce((sum, s) => sum + computeAmount(s, getEntry(s.id)), 0) : 0),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [draft, entries],
+  );
+
   return (
-    <div className="pb-navbar animate-fade-in-up">
-      <header className="sticky top-0 z-10 flex items-center gap-3 bg-base/[0.86] px-4 py-4 backdrop-blur-md">
-        <Link href="/app/income" aria-label="Kembali" className="text-ink-muted hover:text-ink">
+    <div className="flex flex-col gap-5 px-4 pt-2 lg:px-0">
+      <header className="flex items-center gap-3">
+        <Link href="/app/income" aria-label="Kembali" className="text-text-subtle hover:text-text">
           <ChevronLeft size={22} />
         </Link>
         <div className="min-w-0 flex-1">
-          <p className="text-small font-bold uppercase tracking-caps text-ink-muted">Jaring pengaman mingguan</p>
-          <h1 className="font-title text-title font-bold text-ink">Check-in Pemasukan</h1>
+          <h1 className="font-title text-[32px] font-bold tracking-[-0.02em] text-text">Check-in Pemasukan</h1>
+          <p className="text-[15px] text-text-subtle">Jaring pengaman mingguan</p>
         </div>
       </header>
 
-      <div className="flex flex-col gap-3 px-4">
-        {!draft ? (
-          <div className="flex flex-col gap-2">
-            {[0, 1, 2].map((i) => (
-              <div key={i} className="h-24 animate-pulse rounded-comfortable bg-track" />
-            ))}
-          </div>
-        ) : (
-          <>
-            <section className="flex flex-col gap-1 rounded-medium bg-surface p-5">
-              <p className="text-small font-bold uppercase tracking-caps text-ink-muted">
+      {!draft ? (
+        <div className="flex flex-col gap-2">
+          {[0, 1, 2].map((i) => (
+            <div key={i} className="h-24 animate-pulse rounded-card bg-track" />
+          ))}
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 items-start gap-5 lg:grid-cols-[1fr_300px]">
+          {/* Kolom kiri: kartu per stream */}
+          <div className="flex flex-col gap-3">
+            <section className="flex flex-col gap-1 rounded-card-lg bg-card p-6 shadow-card">
+              <p className="text-small font-bold uppercase tracking-caps text-text-subtle">
                 Minggu {new Date(`${draft.weekStart}T00:00:00+07:00`).toLocaleDateString('id-ID', { day: 'numeric', month: 'short' })} –{' '}
                 {new Date(`${draft.weekEndLabel}T00:00:00+07:00`).toLocaleDateString('id-ID', { day: 'numeric', month: 'short' })}
               </p>
-              <p className="text-small text-ink-muted">
+              <p className="text-small text-text-subtle">
                 Perkiraan {formatRupiah(draft.totalExpected)} · Tercatat {formatRupiah(draft.totalRecorded)}
               </p>
             </section>
@@ -190,10 +197,10 @@ function CheckinPageInner() {
               .map((s) => {
                 if (s.alreadyFilled) {
                   return (
-                    <section key={s.id} className="flex items-center justify-between gap-3 rounded-medium bg-surface p-4 opacity-70">
+                    <section key={s.id} className="flex items-center justify-between gap-3 rounded-card bg-card p-4 opacity-70 shadow-card">
                       <div>
-                        <p className="text-body font-bold text-ink">{s.name}</p>
-                        <p className="text-small text-ink-muted">{KIND_LABEL[s.kind]}</p>
+                        <p className="text-body font-bold text-text">{s.name}</p>
+                        <p className="text-small text-text-subtle">{KIND_LABEL[s.kind]}</p>
                       </div>
                       <p className="text-body font-bold tabular-nums text-status-under">✓ {formatRupiah(s.recordedAmount)}</p>
                     </section>
@@ -204,19 +211,19 @@ function CheckinPageInner() {
                 const computed = computeAmount(s, entry);
 
                 return (
-                  <section key={s.id} className="flex flex-col gap-3 rounded-medium bg-surface p-4">
+                  <section key={s.id} className="flex flex-col gap-3 rounded-card bg-card p-4 shadow-card">
                     <div className="flex items-center justify-between">
-                      <p className="text-body font-bold text-ink">{s.name}</p>
-                      <span className="whitespace-nowrap rounded-subtle bg-track px-1.5 py-0.5 text-micro font-bold uppercase tracking-caps text-ink-muted">
+                      <p className="text-body font-bold text-text">{s.name}</p>
+                      <span className="whitespace-nowrap rounded-subtle bg-track px-1.5 py-0.5 text-micro font-bold uppercase tracking-caps text-text-subtle">
                         {KIND_LABEL[s.kind]}
                       </span>
                     </div>
 
-                    {s.kind === 'FIXED' && <p className="text-small text-ink-muted">Otomatis tercatat {formatRupiah(s.amount ?? 0)} saat disimpan.</p>}
+                    {s.kind === 'FIXED' && <p className="text-small text-text-subtle">Otomatis tercatat {formatRupiah(s.amount ?? 0)} saat disimpan.</p>}
 
                     {s.kind === 'DEDUCTION' && (
                       <div className="flex items-center justify-between">
-                        <span className="text-small font-bold text-ink-muted">Berapa hari absen?</span>
+                        <span className="text-small font-bold text-text-subtle">Berapa hari absen?</span>
                         <Stepper value={entry.units} onChange={(v) => setEntry(s.id, { units: v })} max={s.maxUnits ?? undefined} />
                       </div>
                     )}
@@ -224,11 +231,11 @@ function CheckinPageInner() {
                     {s.kind === 'SESSION' && (
                       <>
                         <div className="flex items-center justify-between">
-                          <span className="text-small font-bold text-ink-muted">Jumlah sesi</span>
+                          <span className="text-small font-bold text-text-subtle">Jumlah sesi</span>
                           <Stepper value={entry.units} onChange={(v) => setEntry(s.id, { units: v, extraUnits: Math.min(entry.extraUnits, v) })} max={s.maxUnits ?? undefined} />
                         </div>
                         <div className="flex items-center justify-between">
-                          <span className="text-small font-bold text-ink-muted">Sesi offline (dapat transport)</span>
+                          <span className="text-small font-bold text-text-subtle">Sesi offline (dapat transport)</span>
                           <Stepper value={entry.extraUnits} onChange={(v) => setEntry(s.id, { extraUnits: v })} max={entry.units} />
                         </div>
                       </>
@@ -247,14 +254,33 @@ function CheckinPageInner() {
                     )}
 
                     {s.kind !== 'IRREGULAR' && s.kind !== 'VARIABLE' && (
-                      <p className="text-small tabular-nums text-ink-muted">Tercatat: {formatRupiah(computed)}</p>
+                      <p className="text-small tabular-nums text-text-subtle">Tercatat: {formatRupiah(computed)}</p>
                     )}
                   </section>
                 );
               })}
+          </div>
+
+          {/* Panel kanan sticky */}
+          <aside className="flex flex-col gap-3 rounded-panel bg-card p-5 shadow-overlay lg:sticky lg:top-4">
+            <p className="text-small font-bold uppercase tracking-caps text-text-subtle">Ringkasan</p>
+            <div className="flex flex-col gap-2">
+              <div className="flex items-baseline justify-between">
+                <span className="text-small text-text-subtle">Total live</span>
+                <span className="font-title text-title font-bold tabular-nums text-status-under">{formatRupiah(liveTotal)}</span>
+              </div>
+              <div className="flex items-baseline justify-between">
+                <span className="text-small text-text-subtle">Perkiraan</span>
+                <span className="text-body font-bold tabular-nums text-text">{formatRupiah(draft.totalExpected)}</span>
+              </div>
+              <div className="flex items-baseline justify-between">
+                <span className="text-small text-text-subtle">Tercatat</span>
+                <span className="text-body font-bold tabular-nums text-text">{formatRupiah(draft.totalRecorded)}</span>
+              </div>
+            </div>
 
             {editableStreams.length === 0 ? (
-              <p className="rounded-comfortable bg-surface p-4 text-center text-small text-ink-muted">Semua sumber minggu ini sudah tercatat.</p>
+              <p className="rounded-medium bg-neutral p-4 text-center text-small text-text-subtle">Semua sumber minggu ini sudah tercatat.</p>
             ) : (
               <Button variant="primary" fullWidth onClick={handleSubmit} disabled={saving}>
                 {saving ? 'Menyimpan...' : 'Simpan semua'}
@@ -262,16 +288,16 @@ function CheckinPageInner() {
             )}
 
             {done && (
-              <div className="flex flex-col gap-2 rounded-comfortable bg-status-under-bg p-4 text-center">
+              <div className="flex flex-col gap-2 rounded-medium bg-status-under-bg p-4 text-center">
                 <p className="text-body font-bold text-status-under">Tersimpan!</p>
                 <Button variant="dark" fullWidth onClick={() => router.push('/app/income')}>
                   Lihat Pemasukan
                 </Button>
               </div>
             )}
-          </>
-        )}
-      </div>
+          </aside>
+        </div>
+      )}
     </div>
   );
 }

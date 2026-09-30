@@ -1,13 +1,15 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import useSWR from 'swr';
+import { AnimatePresence, motion } from 'motion/react';
 import { api } from '@/lib/api';
 import { formatRupiah } from '@/lib/format';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
-import { ChevronLeft, CalendarDays, Pencil, Plus, Trash2, X } from 'lucide-react';
+import { EASE_ENTER, TRANSITION_FAST } from '@/lib/motion';
+import { CalendarDays, ChevronDown, ChevronLeft, Pencil, Plus, Trash2, X } from 'lucide-react';
 
 interface SubscriptionItem {
   id: number;
@@ -56,6 +58,8 @@ export default function SubscriptionsPage() {
   const [form, setForm] = useState<FormState>(emptyForm);
   const [saving, setSaving] = useState(false);
   const [banner, setBanner] = useState<string | null>(null);
+  const [showInactive, setShowInactive] = useState(false);
+  const [showAdvanced, setShowAdvanced] = useState(false);
 
   const active = useMemo(() => (subs ?? []).filter((s) => s.isActive), [subs]);
   const inactive = useMemo(() => (subs ?? []).filter((s) => !s.isActive), [subs]);
@@ -64,9 +68,17 @@ export default function SubscriptionsPage() {
     0,
   );
 
+  useEffect(() => {
+    if (!formOpen) return;
+    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && closeForm();
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [formOpen]);
+
   const openCreate = () => {
     setEditingId(null);
     setForm(emptyForm());
+    setShowAdvanced(false);
     setFormOpen(true);
     setBanner(null);
   };
@@ -83,6 +95,7 @@ export default function SubscriptionsPage() {
       reminderDaysBefore: String(s.reminderDaysBefore ?? 3),
       isActive: s.isActive,
     });
+    setShowAdvanced(false);
     setFormOpen(true);
     setBanner(null);
   };
@@ -141,12 +154,12 @@ export default function SubscriptionsPage() {
     const isDueToday = daysLeft === 0;
     const isDueSoon = daysLeft > 0 && daysLeft <= s.reminderDaysBefore;
     const dueBadgeClass = !s.isActive
-      ? 'bg-surface-interactive text-ink-subtle'
+      ? 'bg-neutral text-text-subtlest'
       : isDueToday
         ? 'bg-status-over-bg text-status-over'
         : isDueSoon
           ? 'bg-status-near-bg text-status-near'
-          : 'bg-surface-interactive text-ink-muted';
+          : 'bg-neutral text-text-subtle';
     const dueLabel = !s.isActive
       ? 'Nonaktif'
       : isDueToday
@@ -158,31 +171,32 @@ export default function SubscriptionsPage() {
     return (
       <li
         key={s.id}
-        className="flex flex-col gap-2.5 rounded-comfortable bg-surface p-4 transition-colors duration-base ease-standard hover:bg-surface-alt"
+        className="flex flex-col gap-2.5 rounded-row bg-neutral p-4 transition-colors duration-fast ease-standard hover:bg-neutral-hover"
       >
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0 flex-1">
-            <p className="truncate text-body font-bold text-ink">{s.name}</p>
-            <p className="mt-0.5 text-micro text-ink-muted">
+            <p className="truncate text-body font-bold text-text">{s.name}</p>
+            <p className="mt-0.5 text-micro text-text-subtle">
               {s.cycle === 'YEARLY' ? 'Tahunan' : 'Bulanan'}
               {s.source ? ` · ${s.source}` : ''}
               {s.googleCalendarEventId ? ' · Calendar ✓' : ' · Calendar belum sync'}
+              {s.notes ? ` · ${s.notes}` : ''}
             </p>
           </div>
           <div className="text-right shrink-0">
-            <p className="text-body font-bold tabular-nums text-ink">{formatRupiah(s.amount)}</p>
-            <p className="text-micro text-ink-muted">{s.cycle === 'YEARLY' ? '/tahun' : '/bulan'}</p>
+            <p className="text-body font-bold tabular-nums text-text">{formatRupiah(s.amount)}</p>
+            <p className="text-micro text-text-subtle">{s.cycle === 'YEARLY' ? '/tahun' : '/bulan'}</p>
           </div>
         </div>
 
-        <div className="flex items-center justify-between border-t border-line-subtle pt-2 text-micro">
-          <span className={`rounded-full px-2 py-0.5 font-bold ${dueBadgeClass}`}>{dueLabel}</span>
+        <div className="flex items-center justify-between border-t border-border pt-2 text-micro">
+          <span className={`rounded-pill px-2 py-0.5 font-bold ${dueBadgeClass}`}>{dueLabel}</span>
           <span className="flex items-center gap-1">
             <button
               type="button"
               onClick={() => openEdit(s)}
               aria-label="Edit"
-              className="flex h-8 w-8 items-center justify-center rounded-full text-ink-muted hover:text-ink"
+              className="flex h-8 w-8 items-center justify-center rounded-full text-text-subtle hover:text-text"
             >
               <Pencil size={14} />
             </button>
@@ -190,7 +204,7 @@ export default function SubscriptionsPage() {
               type="button"
               onClick={() => handleDelete(s.id)}
               aria-label="Hapus"
-              className="flex h-8 w-8 items-center justify-center rounded-full text-ink-muted hover:text-status-over"
+              className="flex h-8 w-8 items-center justify-center rounded-full text-text-subtle hover:text-status-over"
             >
               <Trash2 size={14} />
             </button>
@@ -201,171 +215,235 @@ export default function SubscriptionsPage() {
   };
 
   return (
-    <div className="pb-navbar animate-fade-in-up">
-      <header className="sticky top-0 z-10 flex items-center gap-3 bg-base/[0.86] px-4 py-4 backdrop-blur-md">
-        <Link href="/app/more" aria-label="Kembali" className="text-ink-muted hover:text-ink">
+    <div className="flex flex-col gap-5 px-4 pt-2 lg:px-0">
+      <header className="flex items-center gap-3">
+        <Link href="/app/more" aria-label="Kembali" className="text-text-subtle hover:text-text">
           <ChevronLeft size={22} />
         </Link>
         <div className="min-w-0 flex-1">
-          <p className="text-small font-bold uppercase tracking-caps text-ink-muted">Kelola manual</p>
-          <h1 className="font-title text-title font-bold text-ink">Langganan</h1>
+          <h1 className="font-title text-[32px] font-bold tracking-[-0.02em] text-text">Langganan</h1>
+          <p className="text-[15px] text-text-subtle">Kelola manual</p>
         </div>
       </header>
 
-      <div className="flex flex-col gap-3 px-4">
-        <section className="rounded-medium bg-surface p-5">
-          <div className="flex items-start justify-between gap-3">
-            <div>
-              <p className="text-small font-bold uppercase tracking-caps text-ink-muted">
-                Estimasi pengeluaran bulanan
-              </p>
-              <div className="mt-1 flex items-baseline gap-1">
-                <span className="font-title text-amount-hero font-extrabold tabular-nums text-ink">
-                  {formatRupiah(Math.round(monthlyBurn))}
-                </span>
-                <span className="text-body font-normal text-ink-muted">/bln</span>
-              </div>
+      {/* Hero */}
+      <section className="rounded-card-lg bg-card p-6 shadow-card">
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <p className="text-small font-bold uppercase tracking-caps text-text-subtle">Estimasi pengeluaran bulanan</p>
+            <div className="mt-1 flex items-baseline gap-1">
+              <span className="font-title text-amount-hero font-extrabold tabular-nums text-text">
+                {formatRupiah(Math.round(monthlyBurn))}
+              </span>
+              <span className="text-body font-normal text-text-subtle">/bln</span>
             </div>
-            <span className="shrink-0 rounded-full bg-surface-interactive px-2.5 py-1 text-badge font-semibold text-ink-muted">
-              {active.length} Aktif
-            </span>
           </div>
-          <p className="mt-3 flex items-start gap-2 text-small leading-relaxed text-ink-muted">
-            <CalendarDays size={15} className="mt-0.5 shrink-0 text-brand" />
+          <span className="shrink-0 rounded-pill bg-neutral px-2.5 py-1 text-badge font-semibold text-text-subtle">
+            {active.length} Aktif
+          </span>
+        </div>
+        <div className="mt-4 flex items-start gap-2 rounded-medium bg-neutral p-3.5">
+          <CalendarDays size={15} className="mt-0.5 shrink-0 text-brand" />
+          <p className="text-small leading-relaxed text-text-subtle">
             Reminder lewat Google Calendar: popup di hari-H dan N hari sebelumnya. Reconnect Google di Setting supaya sync jalan.
           </p>
-        </section>
+        </div>
+      </section>
 
-        {banner && (
-          <div className="rounded-comfortable bg-surface-interactive p-3 text-small leading-relaxed text-ink-secondary">
-            {banner}
-          </div>
-        )}
+      {banner && (
+        <div className="rounded-medium bg-neutral p-3 text-small leading-relaxed text-text">{banner}</div>
+      )}
 
-        {!formOpen ? (
-          <Button variant="dark" fullWidth icon={<Plus size={18} />} onClick={openCreate}>
-            Tambah langganan
-          </Button>
-        ) : (
-          <form onSubmit={handleSubmit} className="flex flex-col gap-3 rounded-comfortable bg-surface p-4">
-            <div className="flex items-center justify-between">
-              <h2 className="text-label font-bold text-ink">{editingId ? 'Edit langganan' : 'Tambah langganan'}</h2>
-              <button type="button" onClick={closeForm} aria-label="Tutup" className="text-ink-muted hover:text-ink">
-                <X size={18} />
-              </button>
+      <Button variant="dark" fullWidth icon={<Plus size={18} />} onClick={openCreate}>
+        Tambah langganan
+      </Button>
+
+      {isLoading ? (
+        <div className="flex flex-col gap-2">
+          {[0, 1, 2].map((i) => (
+            <div key={i} className="h-20 animate-pulse rounded-card bg-track" />
+          ))}
+        </div>
+      ) : error ? (
+        <div className="rounded-card bg-card p-4 shadow-card">
+          <p className="text-label text-status-over">Gagal memuat langganan.</p>
+        </div>
+      ) : !subs || subs.length === 0 ? (
+        <div className="flex flex-col items-center gap-3 rounded-card bg-card p-8 text-center shadow-card">
+          <span className="flex h-12 w-12 items-center justify-center rounded-full bg-neutral text-text-subtle">
+            <CalendarDays size={22} />
+          </span>
+          <p className="text-body font-bold text-text">Belum ada langganan</p>
+          <p className="max-w-[280px] text-small leading-relaxed text-text-subtle">
+            Tambah manual layanan berulang kamu. Trackster akan bikin event di Google Calendar dengan reminder.
+          </p>
+        </div>
+      ) : (
+        <>
+          {active.length > 0 && (
+            <div className="flex flex-col gap-2">
+              <p className="px-1 text-small font-bold uppercase tracking-caps text-text-subtle">Aktif ({active.length})</p>
+              <ul className="flex flex-col gap-2">{active.map(renderRow)}</ul>
             </div>
-            <Input
-              label="Nama"
-              placeholder="Spotify, Netflix, iCloud…"
-              value={form.name}
-              onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
-              required
-            />
-            <Input
-              label="Nominal"
-              type="number"
-              inputMode="numeric"
-              prefix="Rp"
-              value={form.amount}
-              onChange={(e) => setForm((f) => ({ ...f, amount: e.target.value }))}
-              required
-            />
-            <label className="flex flex-col gap-2">
-              <span className="text-small font-bold uppercase tracking-caps text-ink-muted">Siklus</span>
-              <select
-                value={form.cycle}
-                onChange={(e) => setForm((f) => ({ ...f, cycle: e.target.value as 'MONTHLY' | 'YEARLY' }))}
-                className="w-full appearance-none rounded-comfortable bg-surface-interactive px-3.5 py-3 text-body text-ink shadow-field outline-none focus:shadow-field-focus"
-              >
-                <option value="MONTHLY">Bulanan</option>
-                <option value="YEARLY">Tahunan</option>
-              </select>
-            </label>
-            <Input
-              label="Jatuh tempo berikutnya"
-              type="date"
-              value={form.nextDueDate}
-              onChange={(e) => setForm((f) => ({ ...f, nextDueDate: e.target.value }))}
-              required
-            />
-            <Input
-              label="Reminder (hari sebelum)"
-              type="number"
-              inputMode="numeric"
-              value={form.reminderDaysBefore}
-              onChange={(e) => setForm((f) => ({ ...f, reminderDaysBefore: e.target.value }))}
-            />
-            <label className="flex flex-col gap-2">
-              <span className="text-small font-bold uppercase tracking-caps text-ink-muted">Rekening (opsional)</span>
-              <select
-                value={form.source}
-                onChange={(e) => setForm((f) => ({ ...f, source: e.target.value as FormState['source'] }))}
-                className="w-full appearance-none rounded-comfortable bg-surface-interactive px-3.5 py-3 text-body text-ink shadow-field outline-none focus:shadow-field-focus"
-              >
-                <option value="">—</option>
-                <option value="BCA">BCA</option>
-                <option value="JAGO">Jago</option>
-              </select>
-            </label>
-            <Input
-              label="Catatan (opsional)"
-              placeholder="Family plan, dibayar bareng…"
-              value={form.notes}
-              onChange={(e) => setForm((f) => ({ ...f, notes: e.target.value }))}
-            />
-            <label className="flex items-center gap-2 text-small text-ink">
-              <input
-                type="checkbox"
-                checked={form.isActive}
-                onChange={(e) => setForm((f) => ({ ...f, isActive: e.target.checked }))}
-              />
-              Aktif (nonaktif = hapus event Calendar)
-            </label>
-            <Button type="submit" variant="primary" fullWidth disabled={saving || !form.name.trim() || !form.amount}>
-              {saving ? 'Menyimpan…' : editingId ? 'Simpan perubahan' : 'Tambah & sync Calendar'}
-            </Button>
-          </form>
-        )}
+          )}
 
-        {isLoading ? (
-          <div className="flex flex-col gap-2">
-            {[0, 1, 2].map((i) => (
-              <div key={i} className="h-20 animate-pulse rounded-comfortable bg-track" />
-            ))}
-          </div>
-        ) : error ? (
-          <div className="rounded-comfortable bg-surface p-4">
-            <p className="text-label text-status-over">Gagal memuat langganan.</p>
-          </div>
-        ) : !subs || subs.length === 0 ? (
-          <div className="flex flex-col items-center gap-3 rounded-comfortable p-8 text-center shadow-hairline">
-            <span className="flex h-12 w-12 items-center justify-center rounded-full bg-surface-interactive text-ink-muted">
-              <CalendarDays size={22} />
-            </span>
-            <p className="text-body font-bold text-ink">Belum ada langganan</p>
-            <p className="max-w-[280px] text-small leading-relaxed text-ink-muted">
-              Tambah manual layanan berulang kamu. Trackster akan bikin event di Google Calendar dengan reminder.
-            </p>
-          </div>
-        ) : (
-          <>
-            {active.length > 0 && (
-              <div className="flex flex-col gap-2">
-                <p className="px-1 text-small font-bold uppercase tracking-caps text-ink-muted">Aktif ({active.length})</p>
-                <ul className="flex flex-col gap-2">{active.map(renderRow)}</ul>
-              </div>
-            )}
-            {inactive.length > 0 && (
-              <div className="flex flex-col gap-2">
-                <p className="px-1 text-small font-bold uppercase tracking-caps text-ink-muted">
+          {inactive.length > 0 && (
+            <div className="rounded-card bg-card shadow-card">
+              <button
+                type="button"
+                onClick={() => setShowInactive((v) => !v)}
+                aria-expanded={showInactive}
+                className="flex min-h-[48px] w-full items-center gap-3 px-4 py-3 text-left"
+              >
+                <span className="flex-1 text-small font-bold uppercase tracking-caps text-text-subtle">
                   Nonaktif ({inactive.length})
-                </p>
-                <ul className="flex flex-col gap-2">{inactive.map(renderRow)}</ul>
+                </span>
+                <ChevronDown
+                  size={18}
+                  className={`shrink-0 text-text-subtle transition-transform duration-base ease-standard ${
+                    showInactive ? 'rotate-180' : ''
+                  }`}
+                />
+              </button>
+              <div
+                className="grid transition-[grid-template-rows] duration-[250ms] ease-enter"
+                style={{ gridTemplateRows: showInactive ? '1fr' : '0fr' }}
+              >
+                <div className="overflow-hidden">
+                  <ul className="flex flex-col gap-2 px-4 pb-4">{inactive.map(renderRow)}</ul>
+                </div>
               </div>
-            )}
-          </>
+            </div>
+          )}
+        </>
+      )}
+
+      {/* Modal tambah/edit */}
+      <AnimatePresence>
+        {formOpen && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={TRANSITION_FAST}
+            onClick={closeForm}
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4"
+          >
+            <motion.form
+              onSubmit={handleSubmit}
+              onClick={(e) => e.stopPropagation()}
+              initial={{ opacity: 0, y: 12, scale: 0.98 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: 8, scale: 0.98 }}
+              transition={{ duration: 0.24, ease: EASE_ENTER }}
+              className="flex max-h-[85vh] w-full max-w-[480px] flex-col gap-3 overflow-y-auto rounded-panel bg-card p-6 shadow-overlay"
+            >
+              <div className="flex items-center justify-between">
+                <h2 className="text-label font-bold text-text">{editingId ? 'Edit langganan' : 'Tambah langganan'}</h2>
+                <button type="button" onClick={closeForm} aria-label="Tutup" className="text-text-subtle hover:text-text">
+                  <X size={18} />
+                </button>
+              </div>
+
+              <Input
+                label="Nama"
+                placeholder="Spotify, Netflix, iCloud…"
+                value={form.name}
+                onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
+                required
+              />
+              <Input
+                label="Nominal"
+                type="number"
+                inputMode="numeric"
+                prefix="Rp"
+                value={form.amount}
+                onChange={(e) => setForm((f) => ({ ...f, amount: e.target.value }))}
+                required
+              />
+              <label className="flex flex-col gap-2">
+                <span className="text-small font-bold uppercase tracking-caps text-text-subtle">Siklus</span>
+                <select
+                  value={form.cycle}
+                  onChange={(e) => setForm((f) => ({ ...f, cycle: e.target.value as 'MONTHLY' | 'YEARLY' }))}
+                  className="w-full appearance-none rounded-medium bg-neutral px-3.5 py-3 text-body text-text shadow-field outline-none focus:shadow-field-focus"
+                >
+                  <option value="MONTHLY">Bulanan</option>
+                  <option value="YEARLY">Tahunan</option>
+                </select>
+              </label>
+              <Input
+                label="Jatuh tempo berikutnya"
+                type="date"
+                value={form.nextDueDate}
+                onChange={(e) => setForm((f) => ({ ...f, nextDueDate: e.target.value }))}
+                required
+              />
+              <Input
+                label="Reminder (hari sebelum)"
+                type="number"
+                inputMode="numeric"
+                value={form.reminderDaysBefore}
+                onChange={(e) => setForm((f) => ({ ...f, reminderDaysBefore: e.target.value }))}
+              />
+
+              {/* Rekening / catatan / aktif — collapsible */}
+              <button
+                type="button"
+                onClick={() => setShowAdvanced((v) => !v)}
+                aria-expanded={showAdvanced}
+                className="flex w-fit items-center gap-1.5 text-small font-bold text-text-subtle transition-colors hover:text-text"
+              >
+                <span>Lainnya</span>
+                <ChevronDown
+                  size={14}
+                  className={`transition-transform duration-base ease-standard ${showAdvanced ? 'rotate-180' : ''}`}
+                />
+              </button>
+              <div
+                className="grid transition-[grid-template-rows] duration-[250ms] ease-enter"
+                style={{ gridTemplateRows: showAdvanced ? '1fr' : '0fr' }}
+              >
+                <div className="overflow-hidden">
+                  <div className="flex flex-col gap-3 pt-1">
+                    <label className="flex flex-col gap-2">
+                      <span className="text-small font-bold uppercase tracking-caps text-text-subtle">Rekening (opsional)</span>
+                      <select
+                        value={form.source}
+                        onChange={(e) => setForm((f) => ({ ...f, source: e.target.value as FormState['source'] }))}
+                        className="w-full appearance-none rounded-medium bg-neutral px-3.5 py-3 text-body text-text shadow-field outline-none focus:shadow-field-focus"
+                      >
+                        <option value="">—</option>
+                        <option value="BCA">BCA</option>
+                        <option value="JAGO">Jago</option>
+                      </select>
+                    </label>
+                    <Input
+                      label="Catatan (opsional)"
+                      placeholder="Family plan, dibayar bareng…"
+                      value={form.notes}
+                      onChange={(e) => setForm((f) => ({ ...f, notes: e.target.value }))}
+                    />
+                    <label className="flex items-center gap-2 text-small text-text">
+                      <input
+                        type="checkbox"
+                        checked={form.isActive}
+                        onChange={(e) => setForm((f) => ({ ...f, isActive: e.target.checked }))}
+                        className="h-5 w-5 accent-brand"
+                      />
+                      Aktif (nonaktif = hapus event Calendar)
+                    </label>
+                  </div>
+                </div>
+              </div>
+
+              <Button type="submit" variant="primary" fullWidth disabled={saving || !form.name.trim() || !form.amount}>
+                {saving ? 'Menyimpan…' : editingId ? 'Simpan perubahan' : 'Tambah & sync Calendar'}
+              </Button>
+            </motion.form>
+          </motion.div>
         )}
-      </div>
+      </AnimatePresence>
     </div>
   );
 }

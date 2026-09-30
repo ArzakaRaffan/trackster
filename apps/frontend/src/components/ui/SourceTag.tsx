@@ -9,7 +9,7 @@ export function SourceTag({ source, size = 'sm' }: { source: string; size?: 'sm'
   return (
     <span
       className={`inline-flex items-center whitespace-nowrap rounded-subtle font-bold uppercase tracking-caps ${dims} ${
-        SOURCE_STYLE[source] || 'bg-track text-ink-muted'
+        SOURCE_STYLE[source] || 'bg-track text-text-subtle'
       }`}
     >
       {sourceLabel(source)}

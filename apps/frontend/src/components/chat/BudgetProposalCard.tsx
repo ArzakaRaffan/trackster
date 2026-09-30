@@ -34,28 +34,28 @@ export function BudgetProposalCard({ card }: { card: BudgetProposalCardData }) {
   };
 
   return (
-    <div className="mt-2 flex items-start gap-3 rounded-panel bg-surface p-4 shadow-hairline">
-      <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-surface-interactive text-brand">
+    <div className="mt-2 flex items-start gap-3 rounded-panel bg-card p-4 shadow-card">
+      <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-neutral text-brand">
         <Wallet size={16} />
       </span>
       <div className="min-w-0 flex-1">
-        <p className="font-title text-small font-bold text-ink">
+        <p className="font-title text-small font-bold text-text">
           Budget {OPTION_LABEL[card.option]} · {formatRupiah(card.totalWeekly)}/minggu
         </p>
-        {card.note && <p className="text-micro text-ink-muted">{card.note}</p>}
+        {card.note && <p className="text-micro text-text-subtle">{card.note}</p>}
         <div className="mt-1.5 flex gap-2 overflow-x-auto text-micro">
           {card.dailyAmounts.map((a, i) => (
-            <span key={i} className="whitespace-nowrap text-ink-muted">
-              {DAY_SHORT[i]} <span className="font-bold text-ink">{formatRupiah(a)}</span>
+            <span key={i} className="whitespace-nowrap text-text-subtle">
+              {DAY_SHORT[i]} <span className="font-bold text-text">{formatRupiah(a)}</span>
             </span>
           ))}
         </div>
-        {card.realismFlag && <p className="mt-1 text-micro text-[#ff6b35]">{card.realismFlag}</p>}
+        {card.realismFlag && <p className="mt-1 text-micro text-warning">{card.realismFlag}</p>}
         <button
           type="button"
           onClick={apply}
           disabled={state !== 'idle'}
-          className="mt-2.5 flex items-center gap-1.5 rounded-comfortable bg-brand px-3.5 py-2 text-micro font-bold text-base transition-all hover:brightness-108 active:scale-[.96] disabled:opacity-60"
+          className="mt-2.5 flex items-center gap-1.5 rounded-medium bg-brand px-3.5 py-2 text-micro font-bold text-on-brand transition-all duration-fast ease-standard hover:bg-brand-hover active:scale-[.96] disabled:opacity-60"
         >
           {state === 'done' ? (
             <>

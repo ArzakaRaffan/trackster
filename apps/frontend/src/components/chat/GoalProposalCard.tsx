@@ -31,13 +31,13 @@ export function GoalProposalCard({ card }: { card: GoalProposalCardData }) {
   };
 
   return (
-    <div className="mt-2 flex items-start gap-3 rounded-panel bg-surface p-4 shadow-hairline">
-      <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-surface-interactive text-brand">
+    <div className="mt-2 flex items-start gap-3 rounded-panel bg-card p-4 shadow-card">
+      <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-neutral text-brand">
         <Target size={16} />
       </span>
       <div className="min-w-0 flex-1">
-        <p className="font-title text-small font-bold text-ink">{card.name}</p>
-        <p className="text-micro text-ink-muted">
+        <p className="font-title text-small font-bold text-text">{card.name}</p>
+        <p className="text-micro text-text-subtle">
           Target {formatRupiah(card.target)}
           {card.deadline && ` · sebelum ${new Date(card.deadline).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' })}`}
           {card.weeklyContribution ? ` · ~${formatRupiah(card.weeklyContribution)}/minggu` : ''}
@@ -46,7 +46,7 @@ export function GoalProposalCard({ card }: { card: GoalProposalCardData }) {
           type="button"
           onClick={create}
           disabled={state !== 'idle'}
-          className="mt-2.5 flex items-center gap-1.5 rounded-comfortable bg-brand px-3.5 py-2 text-micro font-bold text-base transition-all hover:brightness-108 active:scale-[.96] disabled:opacity-60"
+          className="mt-2.5 flex items-center gap-1.5 rounded-medium bg-brand px-3.5 py-2 text-micro font-bold text-on-brand transition-all duration-fast ease-standard hover:bg-brand-hover active:scale-[.96] disabled:opacity-60"
         >
           {state === 'done' ? (
             <>
