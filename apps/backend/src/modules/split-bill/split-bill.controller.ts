@@ -5,7 +5,7 @@ import { SplitBillService } from './split-bill.service';
 import { SplitBillAiService } from './split-bill-ai.service';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { CreateSplitBillDto } from './dto/create-split-bill.dto';
-import { AssignItemDto } from './dto/assign-item.dto';
+import { AssignSharesDto } from './dto/assign-shares.dto';
 import { ScanReceiptDto } from './dto/scan-receipt.dto';
 
 @Controller('split-bills')
@@ -38,14 +38,14 @@ export class SplitBillController {
 
   @UseGuards(JwtAuthGuard)
   @Patch(':id/items/:itemId/assign')
-  async assignItem(
+  async assignShares(
     @Req() req: Request,
     @Param('id', ParseIntPipe) id: number,
     @Param('itemId', ParseIntPipe) itemId: number,
-    @Body() dto: AssignItemDto,
+    @Body() dto: AssignSharesDto,
   ) {
     const userId = (req as any).user.sub;
-    return this.splitBillService.assignItem(id, itemId, userId, dto.participantId ?? null);
+    return this.splitBillService.assignShares(id, itemId, userId, dto);
   }
 
   // Scan struk TETAP login-only meskipun create bill sekarang publik — ini manggil AI API
@@ -75,12 +75,12 @@ export class SplitBillController {
   }
 
   @Patch('manage/:ownerToken/items/:itemId/assign')
-  async assignItemByOwnerToken(
+  async assignSharesByOwnerToken(
     @Param('ownerToken') ownerToken: string,
     @Param('itemId', ParseIntPipe) itemId: number,
-    @Body() dto: AssignItemDto,
+    @Body() dto: AssignSharesDto,
   ) {
-    return this.splitBillService.assignItemByOwnerToken(ownerToken, itemId, dto.participantId ?? null);
+    return this.splitBillService.assignSharesByOwnerToken(ownerToken, itemId, dto);
   }
 
   // Tanpa JwtAuthGuard — dipakai temen yang nggak punya akun Trackster lewat link share.
@@ -95,3 +95,4 @@ export class SplitBillController {
     return this.splitBillService.togglePaidPublic(slug, participantId);
   }
 }
+

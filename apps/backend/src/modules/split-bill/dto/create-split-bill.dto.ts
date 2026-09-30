@@ -20,6 +20,10 @@ class ItemInputDto {
   @IsInt()
   @Min(1)
   quantity?: number;
+
+  @IsOptional()
+  @IsArray()
+  shares?: any[];
 }
 
 export class CreateSplitBillDto {
@@ -39,6 +43,38 @@ export class CreateSplitBillDto {
   @IsNumber()
   @Min(0)
   serviceFeeAmount?: number;
+
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
+  taxPercent?: number;
+
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
+  servicePercent?: number;
+
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
+  discountAmount?: number;
+
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
+  discountPercent?: number;
+
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
+  deliveryFee?: number;
+
+  @IsOptional()
+  @IsInt()
+  roundingUnit?: number;
+
+  @IsOptional()
+  taxAfterService?: boolean;
 
   @IsOptional()
   @IsString()

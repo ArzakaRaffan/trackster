@@ -8,7 +8,8 @@ import { formatRupiah } from '@/lib/format';
 import { Input } from '@/components/ui/Input';
 import { Button } from '@/components/ui/Button';
 import { Switch } from '@/components/ui/Switch';
-import { AlertTriangle, Camera, Check, CheckCircle2, ChevronDown, ChevronLeft, Plus, Trash2, X } from 'lucide-react';
+import { AlertTriangle, Camera, CheckCircle2, ChevronLeft, Plus, Trash2, X } from 'lucide-react';
+import { calculate, SplitInput } from '@/lib/split-calc';
 
 const todayISO = () => new Date().toISOString().slice(0, 10);
 const genId = () => (typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : `id-${Math.random().toString(36).slice(2)}`);
@@ -18,6 +19,7 @@ interface ItemRow {
   description: string;
   amount: string;
   quantity: string;
+  assignedTo: string[]; // array of participant ids
 }
 
 interface ParticipantRow {
@@ -25,7 +27,7 @@ interface ParticipantRow {
   name: string;
 }
 
-const STEP_LABELS = ['Info Resto', 'Menu & Peserta', 'Pajak & Fee'];
+const STEP_LABELS = ['Info & Peserta', 'Menu & Pembagian', 'Pajak, Fee & Ringkasan'];
 
 export default function NewSplitBillPage() {
   const router = useRouter();
@@ -35,8 +37,6 @@ export default function NewSplitBillPage() {
   const [submitting, setSubmitting] = useState(false);
   const [scanning, setScanning] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
-  // null = belum ketauan. Halaman ini diakses baik oleh kamu (login) maupun temen yang bikin
-  // bill sendiri (tanpa akun) — endpoint create & redirect setelahnya beda tergantung ini.
   const [isOwner, setIsOwner] = useState<boolean | null>(null);
 
   useEffect(() => {
@@ -46,68 +46,73 @@ export default function NewSplitBillPage() {
       .catch(() => setIsOwner(false));
   }, []);
 
+  // Form State
   const [restaurantName, setRestaurantName] = useState('');
   const [billDate, setBillDate] = useState(todayISO());
   const [payerBankName, setPayerBankName] = useState('');
   const [payerAccountNumber, setPayerAccountNumber] = useState('');
   const [payerAccountName, setPayerAccountName] = useState('');
 
-  const [items, setItems] = useState<ItemRow[]>([{ id: genId(), description: '', amount: '', quantity: '1' }]);
-  // Bukan dikirim ke backend — cuma alat bantu cross-check manual di sisi client, supaya
-  // ketauan kalau ada item yang kelewat/salah ketik SEBELUM lanjut ke pajak/service fee.
-  const [subtotalCheck, setSubtotalCheck] = useState('');
   const [participants, setParticipants] = useState<ParticipantRow[]>([{ id: genId(), name: '' }]);
-  // itemId -> participantId. Satu item cuma bisa punya satu pemilik (checklist toggle
-  // otomatis mindahin kepemilikan, bukan nambah — sesuai model data participantId tunggal).
-  const [assignments, setAssignments] = useState<Record<string, string>>({});
-  // Checklist pesanan per peserta HARUS diklik dulu buat kebuka — kalau auto-expand tiap
-  // nambah nama, halaman jadi kepanjangan begitu peserta udah banyak.
-  const [expandedParticipantId, setExpandedParticipantId] = useState<string | null>(null);
+  const [items, setItems] = useState<ItemRow[]>([{ id: genId(), description: '', amount: '', quantity: '1', assignedTo: [] }]);
+  const [subtotalCheck, setSubtotalCheck] = useState('');
 
-  const [hasTax, setHasTax] = useState(false);
+  // Settings
   const [taxAmount, setTaxAmount] = useState('');
-  const [hasServiceFee, setHasServiceFee] = useState(false);
+  const [taxPercent, setTaxPercent] = useState('');
   const [serviceFeeAmount, setServiceFeeAmount] = useState('');
+  const [servicePercent, setServicePercent] = useState('');
+  const [discountAmount, setDiscountAmount] = useState('');
+  const [discountPercent, setDiscountPercent] = useState('');
+  const [deliveryFee, setDeliveryFee] = useState('');
+  const [roundingUnit, setRoundingUnit] = useState<0 | 100 | 500 | 1000>(0);
+  const [taxAfterService, setTaxAfterService] = useState(false);
+
+  // Load from localStorage history if any
+  useEffect(() => {
+    const history = localStorage.getItem('splitBillHistory');
+    if (history) {
+      try {
+        const parsed = JSON.parse(history);
+        if (parsed.payerBankName) setPayerBankName(parsed.payerBankName);
+        if (parsed.payerAccountNumber) setPayerAccountNumber(parsed.payerAccountNumber);
+        if (parsed.payerAccountName) setPayerAccountName(parsed.payerAccountName);
+      } catch (e) {
+        // ignore
+      }
+    }
+  }, []);
 
   const [itemListParent] = useAutoAnimate({ duration: 200, easing: 'cubic-bezier(.3,0,.4,1)' });
   const [participantListParent] = useAutoAnimate({ duration: 200, easing: 'cubic-bezier(.3,0,.4,1)' });
 
-  const addItem = () => setItems((rows) => [...rows, { id: genId(), description: '', amount: '', quantity: '1' }]);
-  const removeItem = (id: string) => {
-    setItems((rows) => rows.filter((r) => r.id !== id));
-    setAssignments((a) => {
-      const next = { ...a };
-      delete next[id];
-      return next;
-    });
-  };
-  const updateItem = (id: string, field: 'description' | 'amount' | 'quantity', value: string) =>
-    setItems((rows) => rows.map((row) => (row.id === id ? { ...row, [field]: value } : row)));
-
   const addParticipant = () => setParticipants((p) => [...p, { id: genId(), name: '' }]);
   const removeParticipant = (id: string) => {
     setParticipants((p) => p.filter((row) => row.id !== id));
-    setAssignments((a) => {
-      const next = { ...a };
-      for (const itemId of Object.keys(next)) {
-        if (next[itemId] === id) delete next[itemId];
-      }
-      return next;
-    });
-    setExpandedParticipantId((current) => (current === id ? null : current));
+    setItems((items) => items.map(item => ({
+      ...item,
+      assignedTo: item.assignedTo.filter(pid => pid !== id)
+    })));
   };
   const updateParticipant = (id: string, value: string) =>
     setParticipants((p) => p.map((row) => (row.id === id ? { ...row, name: value } : row)));
-  const toggleExpandParticipant = (id: string) =>
-    setExpandedParticipantId((current) => (current === id ? null : id));
 
-  const toggleAssignment = (itemId: string, participantId: string) => {
-    setAssignments((a) => {
-      const next = { ...a };
-      if (next[itemId] === participantId) delete next[itemId];
-      else next[itemId] = participantId;
-      return next;
-    });
+  const addItem = () => setItems((rows) => [...rows, { id: genId(), description: '', amount: '', quantity: '1', assignedTo: [] }]);
+  const removeItem = (id: string) => setItems((rows) => rows.filter((r) => r.id !== id));
+  const updateItem = (id: string, field: 'description' | 'amount' | 'quantity', value: string) =>
+    setItems((rows) => rows.map((row) => (row.id === id ? { ...row, [field]: value } : row)));
+
+  const toggleParticipantForItem = (itemId: string, participantId: string) => {
+    setItems((rows) => rows.map((row) => {
+      if (row.id === itemId) {
+        const has = row.assignedTo.includes(participantId);
+        return {
+          ...row,
+          assignedTo: has ? row.assignedTo.filter(p => p !== participantId) : [...row.assignedTo, participantId]
+        };
+      }
+      return row;
+    }));
   };
 
   const handleScanReceipt = async (file: File) => {
@@ -132,7 +137,7 @@ export default function NewSplitBillPage() {
         const cleaned = rows.filter((r) => r.description.trim() || r.amount.trim());
         return [
           ...cleaned,
-          ...scanned.map((s) => ({ id: genId(), description: s.description, amount: String(s.amount), quantity: String(s.quantity || 1) })),
+          ...scanned.map((s) => ({ id: genId(), description: s.description, amount: String(s.amount), quantity: String(s.quantity || 1), assignedTo: [] })),
         ];
       });
     } catch (e) {
@@ -142,19 +147,17 @@ export default function NewSplitBillPage() {
     }
   };
 
-  const validItems = items.filter((r) => r.description.trim() && parseFloat(r.amount) > 0);
   const validParticipants = participants.filter((p) => p.name.trim().length > 0);
+  const validItems = items.filter((r) => r.description.trim() && parseFloat(r.amount) > 0);
 
   const lineTotal = (r: ItemRow) => (parseFloat(r.amount) || 0) * (parseInt(r.quantity, 10) || 1);
   const itemsSubtotal = validItems.reduce((sum, r) => sum + lineTotal(r), 0);
   const subtotalCheckValue = parseFloat(subtotalCheck) || 0;
-  // Sengaja SEBELUM pajak/service fee (yang baru diisi di step selanjutnya) — struk biasanya
-  // nyantumin "Subtotal" sebagai baris terpisah persis buat ini, jadi tinggal dicontek.
   const subtotalDiff = subtotalCheckValue > 0 ? itemsSubtotal - subtotalCheckValue : 0;
 
   const canGoStep = (target: number) => {
-    if (target === 1) return restaurantName.trim().length > 0 && billDate.length > 0;
-    if (target === 2) return validItems.length > 0 && validParticipants.length >= 1;
+    if (target === 1) return restaurantName.trim().length > 0 && billDate.length > 0 && validParticipants.length > 0;
+    if (target === 2) return validItems.length > 0;
     return true;
   };
 
@@ -168,23 +171,43 @@ export default function NewSplitBillPage() {
     setSubmitting(true);
     setErrorMsg(null);
     try {
+      localStorage.setItem('splitBillHistory', JSON.stringify({
+        payerBankName: payerBankName.trim(),
+        payerAccountNumber: payerAccountNumber.trim(),
+        payerAccountName: payerAccountName.trim()
+      }));
+
       const body = {
         restaurantName: restaurantName.trim(),
         billDate: new Date(billDate).toISOString(),
-        taxAmount: hasTax ? parseFloat(taxAmount) || 0 : 0,
-        serviceFeeAmount: hasServiceFee ? parseFloat(serviceFeeAmount) || 0 : 0,
+        taxAmount: parseFloat(taxAmount) || 0,
+        taxPercent: parseFloat(taxPercent) || 0,
+        serviceFeeAmount: parseFloat(serviceFeeAmount) || 0,
+        servicePercent: parseFloat(servicePercent) || 0,
+        discountAmount: parseFloat(discountAmount) || 0,
+        discountPercent: parseFloat(discountPercent) || 0,
+        deliveryFee: parseFloat(deliveryFee) || 0,
+        roundingUnit: roundingUnit,
+        taxAfterService,
         payerBankName: payerBankName.trim() || undefined,
         payerAccountNumber: payerAccountNumber.trim() || undefined,
         payerAccountName: payerAccountName.trim() || undefined,
         participants: validParticipants.map((p) => ({ name: p.name.trim() })),
-        items: validItems.map((r) => ({
-          description: r.description.trim(),
-          amount: parseFloat(r.amount),
-          quantity: parseInt(r.quantity, 10) || 1,
-        })),
+        items: validItems.map((r) => {
+          const shares = r.assignedTo.map(pid => {
+            const pIndex = validParticipants.findIndex(p => p.id === pid);
+            return { participantIndex: pIndex, weight: 1 };
+          }).filter(s => s.participantIndex !== -1);
+
+          return {
+            description: r.description.trim(),
+            amount: parseFloat(r.amount),
+            quantity: parseInt(r.quantity, 10) || 1,
+            shares: shares.length > 0 ? shares : undefined,
+          };
+        }),
       };
-      // Cek ulang di titik submit (bukan cuma andelin state dari mount) — kalau session
-      // ternyata expired di tengah jalan ngisi form, ini yang nentuin endpoint mana yang bener.
+
       const owner = await api
         .get('/auth/me')
         .then(() => true)
@@ -193,27 +216,7 @@ export default function NewSplitBillPage() {
       const created = await api.post<{
         id: number;
         ownerToken?: string | null;
-        items: { id: number }[];
-        participants: { id: number }[];
       }>(owner ? '/split-bills' : '/split-bills/public', body);
-
-      const assignUrlFor = (itemId: number) =>
-        owner ? `/split-bills/${created.id}/items/${itemId}/assign` : `/split-bills/manage/${created.ownerToken}/items/${itemId}/assign`;
-
-      // Assignment dilakukan sebagai step terpisah setelah bill dibuat, karena item & peserta
-      // baru punya id definitif setelah create — dipetakan lewat urutan array yang sama persis
-      // dengan urutan validItems/validParticipants yang disubmit di body.
-      const assignPromises = validItems.map((item, idx) => {
-        const participantClientId = assignments[item.id];
-        if (!participantClientId) return null;
-        const participantIdx = validParticipants.findIndex((p) => p.id === participantClientId);
-        if (participantIdx === -1) return null;
-        const createdItemId = created.items[idx]?.id;
-        const createdParticipantId = created.participants[participantIdx]?.id;
-        if (createdItemId === undefined || createdParticipantId === undefined) return null;
-        return api.patch(assignUrlFor(createdItemId), { participantId: createdParticipantId });
-      });
-      await Promise.all(assignPromises.filter(Boolean));
 
       router.push(owner ? `/split-bills/${created.id}` : `/split-bills/manage/${created.ownerToken}`);
     } catch (e) {
@@ -222,6 +225,31 @@ export default function NewSplitBillPage() {
       setSubmitting(false);
     }
   };
+
+  // Preview Calculation
+  const splitInput: SplitInput = {
+    items: validItems.map(i => ({
+      id: parseInt(i.id.replace('id-', ''), 36) || Math.random(),
+      price: parseFloat(i.amount) || 0,
+      qty: parseInt(i.quantity, 10) || 1,
+      shares: i.assignedTo.map(pid => {
+        const pIndex = validParticipants.findIndex(p => p.id === pid);
+        return { participantId: pIndex, weight: 1 };
+      }).filter(s => s.participantId !== -1)
+    })),
+    participants: validParticipants.map((p, i) => ({ id: i, name: p.name })),
+    taxAmount: parseFloat(taxAmount) || 0,
+    taxPercent: parseFloat(taxPercent) || 0,
+    serviceAmount: parseFloat(serviceFeeAmount) || 0,
+    servicePercent: parseFloat(servicePercent) || 0,
+    discountAmount: parseFloat(discountAmount) || 0,
+    discountPercent: parseFloat(discountPercent) || 0,
+    deliveryFee: parseFloat(deliveryFee) || 0,
+    roundingUnit: roundingUnit,
+    taxAfterService: taxAfterService,
+  };
+
+  const preview = step === 2 ? calculate(splitInput) : null;
 
   return (
     <div className="pb-navbar animate-fade-in-up">
@@ -241,7 +269,7 @@ export default function NewSplitBillPage() {
         </div>
       </header>
 
-      <div className="flex flex-col gap-3 px-4">
+      <div className="flex flex-col gap-3 px-4 pb-8">
         {errorMsg && (
           <div className="rounded-comfortable bg-status-over-bg px-4 py-3 text-small text-status-over">{errorMsg}</div>
         )}
@@ -268,13 +296,52 @@ export default function NewSplitBillPage() {
               />
               <Input label="Atas Nama" value={payerAccountName} onChange={(e) => setPayerAccountName(e.target.value)} />
             </div>
+            
+            <div className="flex flex-col gap-3 rounded-comfortable bg-surface p-4">
+              <div>
+                <h2 className="text-heading font-semibold text-ink">Peserta</h2>
+                <p className="mt-1 text-small text-ink-muted">
+                  Siapa aja yang ikut makan?
+                </p>
+              </div>
+              <div ref={participantListParent} className="flex flex-col gap-2">
+                {participants.map((p, i) => (
+                  <div key={p.id} className="flex items-center gap-2">
+                    <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-surface-interactive text-small font-bold text-ink-muted">
+                      {i + 1}
+                    </span>
+                    <input
+                      placeholder={`Nama peserta ${i + 1}`}
+                      value={p.name}
+                      onChange={(e) => updateParticipant(p.id, e.target.value)}
+                      className="min-w-0 flex-1 rounded-comfortable bg-surface-interactive px-3.5 py-2.5 text-body text-ink outline-none placeholder:text-ink-subtle"
+                    />
+                    {participants.length > 1 && (
+                      <button
+                        onClick={() => removeParticipant(p.id)}
+                        className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-ink-muted hover:text-status-over"
+                      >
+                        <X size={14} />
+                      </button>
+                    )}
+                  </div>
+                ))}
+              </div>
+              <Button variant="ghost" size="sm" icon={<Plus size={14} />} onClick={addParticipant}>
+                Tambah peserta
+              </Button>
+            </div>
           </section>
         )}
 
         {step === 1 && (
           <section className="flex flex-col gap-4">
             <div>
-              <h2 className="mb-2 px-1 text-heading font-semibold text-ink">Menu</h2>
+              <h2 className="mb-2 px-1 text-heading font-semibold text-ink">Menu & Pembagian</h2>
+              <p className="mb-4 px-1 text-small text-ink-muted">
+                Pilih siapa aja yang pesen menu ini. Klik nama untuk assign (bisa multi-select).
+              </p>
+              
               {isOwner === true ? (
                 <>
                   <input
@@ -295,19 +362,20 @@ export default function NewSplitBillPage() {
                     icon={<Camera size={18} />}
                     onClick={() => fileInputRef.current?.click()}
                     disabled={scanning}
+                    className="mb-4"
                   >
                     {scanning ? 'Memindai struk...' : 'Scan Struk'}
                   </Button>
                 </>
               ) : isOwner === false ? (
-                <p className="rounded-comfortable bg-surface-interactive px-4 py-3 text-small text-ink-muted">
-                  Scan struk otomatis cuma buat yang login ke Trackster — masukin item manual di bawah aja, tetep bisa kok.
+                <p className="mb-4 rounded-comfortable bg-surface-interactive px-4 py-3 text-small text-ink-muted">
+                  Scan struk otomatis cuma buat yang login ke Trackster.
                 </p>
               ) : null}
 
-              <div ref={itemListParent} className="mt-3 flex flex-col gap-3 rounded-comfortable bg-surface p-3">
+              <div ref={itemListParent} className="flex flex-col gap-3 rounded-comfortable bg-surface p-3">
                 {items.map((row) => (
-                  <div key={row.id} className="flex flex-col gap-1.5 border-b border-line-subtle pb-3 last:border-b-0 last:pb-0">
+                  <div key={row.id} className="flex flex-col gap-2 border-b border-line-subtle pb-4 last:border-b-0 last:pb-0">
                     <div className="flex items-center gap-2">
                       <input
                         placeholder="Deskripsi item"
@@ -317,7 +385,6 @@ export default function NewSplitBillPage() {
                       />
                       <button
                         onClick={() => removeItem(row.id)}
-                        aria-label="Hapus item"
                         className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-ink-muted hover:text-status-over"
                       >
                         <Trash2 size={14} />
@@ -346,6 +413,25 @@ export default function NewSplitBillPage() {
                         <span className="shrink-0 text-small tabular-nums text-ink-muted">= {formatRupiah(lineTotal(row))}</span>
                       )}
                     </div>
+                    
+                    <div className="mt-1 flex flex-wrap gap-1.5">
+                      {validParticipants.map(p => {
+                        const active = row.assignedTo.includes(p.id);
+                        return (
+                          <button
+                            key={p.id}
+                            onClick={() => toggleParticipantForItem(row.id, p.id)}
+                            className={`rounded-full border px-3 py-1 text-small transition-colors ${
+                              active
+                                ? 'border-brand bg-brand/10 text-brand'
+                                : 'border-line-subtle bg-surface-interactive text-ink-muted hover:border-line-strong hover:text-ink'
+                            }`}
+                          >
+                            {p.name}
+                          </button>
+                        );
+                      })}
+                    </div>
                   </div>
                 ))}
                 <Button variant="ghost" size="sm" icon={<Plus size={14} />} onClick={addItem}>
@@ -359,7 +445,6 @@ export default function NewSplitBillPage() {
                   </div>
                   <Input
                     label="Subtotal di Struk (opsional)"
-                    hint="Sebelum pajak/service fee — buat cross-check biar gak ada item yang kelewat/salah ketik."
                     type="number"
                     inputMode="numeric"
                     prefix="Rp"
@@ -367,167 +452,77 @@ export default function NewSplitBillPage() {
                     onChange={(e) => setSubtotalCheck(e.target.value)}
                   />
                   {subtotalCheckValue > 0 && (
-                    <p
-                      className={`flex items-center gap-1.5 px-1 text-small ${
-                        subtotalDiff === 0 ? 'text-status-under' : 'text-status-over'
-                      }`}
-                    >
+                    <p className={`flex items-center gap-1.5 px-1 text-small ${subtotalDiff === 0 ? 'text-status-under' : 'text-status-over'}`}>
                       {subtotalDiff === 0 ? (
-                        <>
-                          <CheckCircle2 size={14} /> Cocok sama struk
-                        </>
+                        <><CheckCircle2 size={14} /> Cocok sama struk</>
                       ) : (
-                        <>
-                          <AlertTriangle size={14} />
-                          {subtotalDiff > 0
-                            ? `Total menu lebih Rp${subtotalDiff.toLocaleString('id-ID')} dari struk`
-                            : `Total menu kurang Rp${Math.abs(subtotalDiff).toLocaleString('id-ID')} dari struk`}
-                        </>
+                        <><AlertTriangle size={14} /> {subtotalDiff > 0 ? `Lebih Rp${subtotalDiff.toLocaleString('id-ID')}` : `Kurang Rp${Math.abs(subtotalDiff).toLocaleString('id-ID')}`}</>
                       )}
                     </p>
                   )}
                 </div>
               </div>
             </div>
+          </section>
+        )}
 
-            <div>
-              <h2 className="mb-2 px-1 text-heading font-semibold text-ink">Peserta & Pesanan</h2>
-              <p className="mb-2 px-1 text-small text-ink-muted">
-                Tambah nama, lalu klik buat buka checklist pesanan orang itu. Menu yang udah dicentang orang lain kelihatan pudar.
-              </p>
-              <div ref={participantListParent} className="flex flex-col gap-3">
-                {participants.map((participant, pIdx) => {
-                  const isExpanded = expandedParticipantId === participant.id;
-                  const myItems = validItems.filter((item) => assignments[item.id] === participant.id);
-                  const myTotal = myItems.reduce((sum, item) => sum + lineTotal(item), 0);
-
+        {step === 2 && preview && (
+          <section className="flex flex-col gap-4">
+            <div className="rounded-comfortable bg-surface p-4 flex flex-col gap-4">
+              <h2 className="text-heading font-semibold text-ink">Pajak & Fee</h2>
+              <div className="flex gap-2">
+                <Input label="Diskon (%)" type="number" inputMode="numeric" value={discountPercent} onChange={(e) => setDiscountPercent(e.target.value)} />
+                <Input label="Diskon (Rp)" type="number" inputMode="numeric" value={discountAmount} onChange={(e) => setDiscountAmount(e.target.value)} />
+              </div>
+              <div className="flex gap-2">
+                <Input label="Service (%)" type="number" inputMode="numeric" value={servicePercent} onChange={(e) => setServicePercent(e.target.value)} />
+                <Input label="Service (Rp)" type="number" inputMode="numeric" value={serviceFeeAmount} onChange={(e) => setServiceFeeAmount(e.target.value)} />
+              </div>
+              <div className="flex gap-2">
+                <Input label="Pajak (%)" type="number" inputMode="numeric" value={taxPercent} onChange={(e) => setTaxPercent(e.target.value)} />
+                <Input label="Pajak (Rp)" type="number" inputMode="numeric" value={taxAmount} onChange={(e) => setTaxAmount(e.target.value)} />
+              </div>
+              <Switch checked={taxAfterService} onChange={setTaxAfterService} label="Pajak setelah Service?" description="Hitung pajak dari subtotal + service fee" />
+              <div className="flex gap-2 mt-2 pt-4 border-t border-line-subtle">
+                <Input label="Ongkir/Lainnya (Rp)" type="number" inputMode="numeric" value={deliveryFee} onChange={(e) => setDeliveryFee(e.target.value)} />
+                <div className="flex-1">
+                  <label className="mb-1 block text-small font-semibold text-ink">Pembulatan</label>
+                  <select
+                    className="w-full rounded-standard border border-line-strong bg-surface p-2 text-body"
+                    value={roundingUnit}
+                    onChange={(e) => setRoundingUnit(parseInt(e.target.value) as 0 | 100 | 500 | 1000)}
+                  >
+                    <option value={0}>Tidak ada</option>
+                    <option value={100}>Ratusan (100)</option>
+                    <option value={500}>Go-Pay (500)</option>
+                    <option value={1000}>Ribuan (1000)</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+            
+            <div className="rounded-comfortable bg-surface p-4">
+              <h2 className="mb-3 text-heading font-semibold text-ink">Preview Tagihan</h2>
+              <div className="flex flex-col gap-2">
+                {preview.participants.map(p => {
+                  const pName = validParticipants.find(x => x.id === validParticipants[p.participantId]?.id)?.name || '?';
                   return (
-                    <div key={participant.id} className="rounded-comfortable bg-surface p-3">
-                      <div className="flex items-center gap-2">
-                        <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-surface-interactive text-small font-bold text-ink-muted">
-                          {pIdx + 1}
-                        </span>
-                        <input
-                          placeholder={`Nama peserta ${pIdx + 1}`}
-                          value={participant.name}
-                          onChange={(e) => updateParticipant(participant.id, e.target.value)}
-                          className="min-w-0 flex-1 rounded-comfortable bg-surface-interactive px-3.5 py-2.5 text-body text-ink outline-none placeholder:text-ink-subtle"
-                        />
-                        <button
-                          onClick={() => toggleExpandParticipant(participant.id)}
-                          aria-label={isExpanded ? 'Tutup checklist pesanan' : 'Buka checklist pesanan'}
-                          aria-expanded={isExpanded}
-                          disabled={!participant.name.trim() || validItems.length === 0}
-                          className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-ink-muted hover:text-ink disabled:opacity-30"
-                        >
-                          <ChevronDown
-                            size={16}
-                            className={`transition-transform duration-base ease-standard ${isExpanded ? 'rotate-180' : ''}`}
-                          />
-                        </button>
-                        {participants.length > 1 && (
-                          <button
-                            onClick={() => removeParticipant(participant.id)}
-                            aria-label="Hapus peserta"
-                            className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-ink-muted hover:text-status-over"
-                          >
-                            <X size={14} />
-                          </button>
-                        )}
-                      </div>
-
-                      {!isExpanded && participant.name.trim() && myItems.length > 0 && (
-                        <p className="mt-1.5 pl-9 text-small text-ink-muted">
-                          {myItems.length} item · {formatRupiah(myTotal)}
-                        </p>
-                      )}
-
-                      {isExpanded && participant.name.trim() && validItems.length > 0 && (
-                        <ul className="mt-3 flex flex-col gap-1 border-t border-line-subtle pt-3">
-                          {validItems.map((item) => {
-                            const ownerId = assignments[item.id];
-                            const isMine = ownerId === participant.id;
-                            const ownerName = ownerId && !isMine ? participants.find((p) => p.id === ownerId)?.name : null;
-                            const qty = parseInt(item.quantity, 10) || 1;
-                            return (
-                              <li key={item.id}>
-                                <button
-                                  onClick={() => toggleAssignment(item.id, participant.id)}
-                                  className={`flex w-full items-center gap-3 rounded-standard px-2 py-2 text-left transition-opacity duration-base ease-standard hover:bg-white/[0.05] ${
-                                    ownerId && !isMine ? 'opacity-40' : 'opacity-100'
-                                  }`}
-                                >
-                                  <span
-                                    className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-subtle transition-colors duration-fast ease-standard ${
-                                      isMine ? 'bg-brand text-base' : 'shadow-[inset_0_0_0_1px_theme(colors.line.strong)] text-transparent'
-                                    }`}
-                                  >
-                                    <Check size={13} strokeWidth={3} />
-                                  </span>
-                                  <span className="min-w-0 flex-1 truncate text-small text-ink">
-                                    {item.description}
-                                    {qty > 1 && <span className="text-ink-subtle"> ×{qty}</span>}
-                                  </span>
-                                  {ownerName && <span className="shrink-0 text-micro text-ink-subtle">{ownerName}</span>}
-                                  <span className="shrink-0 text-small tabular-nums text-ink-muted">{formatRupiah(lineTotal(item))}</span>
-                                </button>
-                              </li>
-                            );
-                          })}
-                        </ul>
-                      )}
+                    <div key={p.participantId} className="flex justify-between items-center py-1 border-b border-line-subtle last:border-b-0">
+                      <span className="text-body text-ink">{pName}</span>
+                      <span className="text-body font-bold tabular-nums text-ink">{formatRupiah(p.total)}</span>
                     </div>
                   );
                 })}
-                <Button variant="ghost" size="sm" icon={<Plus size={14} />} onClick={addParticipant}>
-                  Tambah peserta
-                </Button>
+                <div className="flex justify-between items-center pt-2 font-bold border-t-2 border-line-strong">
+                  <span>Grand Total</span>
+                  <span className="tabular-nums text-brand">{formatRupiah(preview.grandTotal)}</span>
+                </div>
               </div>
             </div>
           </section>
         )}
 
-        {step === 2 && (
-          <section className="flex flex-col gap-3">
-            <div className="rounded-comfortable bg-surface p-4">
-              <Switch checked={hasTax} onChange={setHasTax} label="Ada pajak?" description="Dibagi rata ke semua peserta" />
-              {hasTax && (
-                <div className="mt-3">
-                  <Input
-                    label="Nominal Pajak"
-                    type="number"
-                    inputMode="numeric"
-                    prefix="Rp"
-                    value={taxAmount}
-                    onChange={(e) => setTaxAmount(e.target.value)}
-                  />
-                </div>
-              )}
-            </div>
-            <div className="rounded-comfortable bg-surface p-4">
-              <Switch
-                checked={hasServiceFee}
-                onChange={setHasServiceFee}
-                label="Ada service fee?"
-                description="Dibagi rata ke semua peserta"
-              />
-              {hasServiceFee && (
-                <div className="mt-3">
-                  <Input
-                    label="Nominal Service Fee"
-                    type="number"
-                    inputMode="numeric"
-                    prefix="Rp"
-                    value={serviceFeeAmount}
-                    onChange={(e) => setServiceFeeAmount(e.target.value)}
-                  />
-                </div>
-              )}
-            </div>
-          </section>
-        )}
-
-        <div className="flex gap-2">
+        <div className="mt-4 flex gap-2">
           {step < STEP_LABELS.length - 1 ? (
             <Button variant="primary" fullWidth onClick={goNext} disabled={!canGoStep(step + 1)}>
               Lanjut
