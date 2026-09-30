@@ -151,7 +151,7 @@ export default function PublicTripPage() {
           </ul>
         </section>
 
-        <p className="mt-8 text-center text-micro uppercase tracking-caps text-ink-subtlest">Dibuat lewat Trackster</p>
+        <p className="mt-8 text-center text-micro uppercase tracking-caps text-text-subtlest">Dibuat lewat Trackster</p>
       </div>
     </div>
   );
