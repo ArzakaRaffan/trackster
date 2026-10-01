@@ -4,6 +4,29 @@
 
 ---
 
+## 2026-10-02 — Redesign landing/login plek-ketiplek + verifikasi E08-S2/S3/S4
+**Konteks:** Arzaka minta landing page & login page diimplementasikan persis sama dengan
+`docs/Redesign UI/Trackster Landing (standalone).html` (semua animasi, CTA, perubahan state), plus
+mengerjakan `docs/revamp` yang butuh fix/belum diverifikasi.
+**Keputusan:** (1) Standalone yang dipakai adalah bundle renderer; template asli diekstrak dari
+`script[type="__bundler/template"]` lalu di-port ke React/Next (bukan copy runtime standalone-nya).
+(2) Animasi pencatatan di blok kanan dibuat stateful 1:1: email notifikasi muncul, transaksi masuk
+berurutan (TX 6 item), angka sisa budget di-tween 700ms ease-out-cubic, status chip/angka/bar berubah
+Aman → Mendekati batas (≥90%) → Lewat budget (negatif), alert Telegram muncul saat melewati budget,
+lalu loop reset. (3) Demo Tanya Track dibuat interaktif penuh: 4 chip prompt, typing bebas,
+thinking dots, jawaban streaming per-kata, 4 kartu jawaban (simulasi grafik, bar budget, pemicu boros,
+target tabungan), toggle asumsi, tombol Buat target, dan Mulai ulang. (4) Login aside bubble berputar
+tiap 3.8 detik; bug "login nempel di kiri" di-root-cause: body memakai `lg:flex` sehingga
+`main.ts-page` perlu `flex:1 1 100%` agar full-bleed. (5) Root layout dipindah ke `AppShell`
+(pathname-aware): halaman publik full-bleed tanpa sidebar, `/app` tetap pakai NavBar+MotionProvider.
+(6) E08-S2/S3/S4 yang tadinya "kode selesai, belum diverifikasi" diverifikasi: backend build (butuh
+`NODE_OPTIONS=--max-old-space-size=2048`), frontend build+tsc, semua self-check lolos. Fix 1 bug
+assertion nyata di `savings-math.check.ts` (deposit 0 → 1_000_000).
+**Alasan:** Kesetiaan visual lebih penting daripada DRY untuk halaman marketing; interaksi demo AI
+dibuat stateful supaya sesuai referensi meski tetap data contoh.
+**Konsekuensi:** Commit + push ke main. E09-S2/S3 (interaksi mascot + pemasangan) masih ⬜ dan
+sengaja tidak dikerjakan di sesi ini karena butuh verifikasi browser/touch.
+
 ## 2026-09-27 — E04-S5: Persona konsultan + mode cepat, eval 10/10 dengan AI ASLI + fix bug tanggal memory
 **Konteks:** Lanjutan sesi E04-S4 (masih di VPS produksi, jadi masih bisa akses AI asli). Ganti system
 prompt "financial buddy" generik (E04-S1..S4) jadi persona konsultan dengan alur 7 langkah eksplisit
