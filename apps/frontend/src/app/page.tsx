@@ -88,32 +88,32 @@ const SPLIT_BILL_DETAILS = [
 export default function LandingPage() {
   return (
     <div className="min-h-screen bg-base text-ink">
-      <header className="flex items-center justify-between px-4 py-6">
+      <header className="mx-auto flex max-w-[1120px] items-center justify-between px-4 py-4 sm:px-6">
         <Image src="/trackster-logo.svg" alt="Trackster" width={350} height={64} className="h-9 w-auto" priority />
         <Link href="/app" className="text-small font-bold text-ink-muted transition-colors duration-base ease-standard hover:text-ink">
           Masuk
         </Link>
       </header>
 
-      <div className="px-4">
+      <main className="mx-auto max-w-[1120px] px-4 sm:px-6">
         <motion.section
           initial={{ opacity: 0, y: 8 }}
           animate={{ opacity: 1, y: 0 }}
           transition={TRANSITION_SLOW}
-          className="flex flex-col items-center gap-6 py-16 text-center lg:py-24"
+          className="flex flex-col items-center gap-6 py-14 text-center sm:py-16 lg:py-20"
         >
           <span className="flex items-center gap-1.5 rounded-full bg-surface-interactive px-3 py-1 text-micro font-bold uppercase tracking-caps text-ink-muted">
             <Sparkles size={12} className="text-brand" />
             Temen ngatur duit kamu
           </span>
-          <h1 className="max-w-[720px] font-title text-[36px] font-black leading-[1.1] tracking-[-1px] text-ink lg:text-[56px]">
+          <h1 className="max-w-[780px] font-title text-[clamp(36px,6vw,56px)] font-black leading-[1.07] tracking-[-0.04em] text-ink [text-wrap:balance]">
             Kenalan sama Trackster, <span className="text-brand">finance buddy</span> kamu.
           </h1>
-          <p className="max-w-[600px] text-body leading-relaxed text-ink-muted lg:text-heading">
+          <p className="max-w-[600px] text-body leading-relaxed text-ink-muted sm:text-heading [text-wrap:pretty]">
             Dari bagi tagihan bareng temen, itung target tabungan, sampai — segera — nge-track tiap rupiah otomatis
             dari email bank kamu. Trackster ada buat semua itu, bukan cuma satu hal doang.
           </p>
-          <div className="flex flex-col gap-3 sm:flex-row">
+          <div className="flex w-full flex-col gap-3 sm:w-auto sm:flex-row">
             <Link href="/split-bills/new">
               <Button variant="primary" size="lg" icon={<Receipt size={18} />}>
                 Buat Split Bill
@@ -237,7 +237,7 @@ export default function LandingPage() {
             </div>
           </div>
         </section>
-      </div>
+      </main>
 
       <footer className="border-t border-line-subtle px-4 py-8 text-center">
         <p className="text-small text-ink-muted">
