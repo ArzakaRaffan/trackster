@@ -134,6 +134,14 @@ input::placeholder {
     transform: rotate(360deg);
   }
 }
+@keyframes tsDraw {
+  from {
+    stroke-dashoffset: 1;
+  }
+  to {
+    stroke-dashoffset: 0;
+  }
+}
 
 /* ============ Shared ============ */
 
@@ -145,6 +153,12 @@ input::placeholder {
   font-size: 16px;
   line-height: 24px;
   font-variant-numeric: tabular-nums;
+  /* body memakai `lg:flex` (layout app), jadi halaman publik yang dirender
+     full-bleed harus mengisi lebar penuh sebagai flex item — kalau tidak,
+     login page hanya selebar kontennya dan "nempel di kiri". */
+  flex: 1 1 100%;
+  width: 100%;
+  min-width: 0;
 }
 
 .ts-header {
@@ -193,6 +207,9 @@ input::placeholder {
   display: flex;
   flex-wrap: wrap;
   gap: 10px;
+}
+.ts-waitlist-center {
+  justify-content: center;
 }
 .ts-waitlist input {
   flex: 1 1 220px;
@@ -277,6 +294,9 @@ input::placeholder {
   gap: 6px 18px;
   font-size: 14px;
   color: var(--text-subtle);
+}
+.ts-trust-center {
+  justify-content: center;
 }
 .ts-trust li {
   display: flex;
@@ -518,7 +538,7 @@ input::placeholder {
   line-height: 18px;
   color: var(--text-subtle);
 }
-.ts-demo-head > strong {
+.ts-demo-head .ts-demo-chip {
   height: 26px;
   padding: 0 10px 0 8px;
   border-radius: 999px;
@@ -527,8 +547,19 @@ input::placeholder {
   gap: 5px;
   font-size: 13px;
   font-weight: 600;
+  transition: background 400ms, color 400ms;
+}
+.ts-demo-head .ts-demo-chip.is-ok {
   background: var(--success-subtle);
   color: var(--success-text);
+}
+.ts-demo-head .ts-demo-chip.is-near {
+  background: var(--warning-subtle);
+  color: var(--warning-text);
+}
+.ts-demo-head .ts-demo-chip.is-over {
+  background: var(--danger-subtle);
+  color: var(--danger-text);
 }
 
 .ts-budget {
@@ -552,6 +583,13 @@ input::placeholder {
   line-height: 50px;
   font-weight: 700;
   letter-spacing: -0.03em;
+  transition: color 400ms;
+}
+.ts-budget > div b.is-near {
+  color: var(--warning-text);
+}
+.ts-budget > div b.is-over {
+  color: var(--danger-text);
 }
 .ts-budget > div small {
   font-size: 14px;
@@ -576,6 +614,13 @@ input::placeholder {
   left: 0;
   top: 0;
   width: 84%;
+  transition: width 700ms cubic-bezier(0.16, 1, 0.3, 1), background 400ms;
+}
+.ts-budget u.is-near {
+  background: var(--warning-bold);
+}
+.ts-budget u.is-over {
+  background: var(--danger-bold);
 }
 
 .ts-transactions {
@@ -591,6 +636,10 @@ input::placeholder {
   display: flex;
   align-items: center;
   gap: 12px;
+  padding: 0 8px;
+  margin: 0 -8px;
+  border-radius: 12px;
+  transition: background 1200ms ease-out;
 }
 .ts-transactions li > span {
   width: 36px;
@@ -631,13 +680,14 @@ input::placeholder {
   box-sizing: border-box;
   padding: 0 14px;
   border-radius: 12px;
-  background: var(--success-subtle);
-  color: var(--success-text);
+  background: var(--danger-subtle);
+  color: var(--danger-text);
   display: flex;
   align-items: center;
   gap: 10px;
   font-size: 14px;
   font-weight: 600;
+  transition: opacity 500ms, transform 500ms cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 /* ============ Landing — Benefits ============ */
@@ -1172,20 +1222,30 @@ input::placeholder {
   font-weight: 600;
   cursor: pointer;
 }
-.ts-faq-item > button > span {
+.ts-faq-chev {
   display: flex;
   flex: none;
   color: var(--text-subtle);
+  transform: rotate(0deg);
+  transition: transform 250ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+.ts-faq-item.open .ts-faq-chev {
+  transform: rotate(180deg);
 }
 .ts-faq-a {
   display: grid;
   grid-template-rows: 0fr;
   transition: grid-template-rows 300ms cubic-bezier(0.16, 1, 0.3, 1);
 }
-.ts-faq-a > p {
+.ts-faq-item.open .ts-faq-a {
+  grid-template-rows: 1fr;
+}
+.ts-faq-a > div {
   overflow: hidden;
+}
+.ts-faq-a p {
   margin: 0;
-  padding: 0 40px 0 0;
+  padding: 0 40px 20px 0;
   font-size: 16px;
   line-height: 26px;
   color: var(--text-subtle);
@@ -1212,6 +1272,332 @@ input::placeholder {
   padding: 24px;
   font-size: 14px;
   color: var(--text-subtle);
+}
+
+/* ============ Toast ============ */
+
+.ts-toast {
+  position: fixed;
+  left: 50%;
+  bottom: 24px;
+  z-index: 50;
+  padding: 12px 18px;
+  border-radius: 12px;
+  background: var(--overlay);
+  box-shadow: var(--shadow-overlay);
+  font-size: 14px;
+  font-weight: 600;
+  pointer-events: none;
+  transition: opacity 250ms, transform 300ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* ============ Chat (Tanya Track demo) ============ */
+
+.ts-chat-reset {
+  height: 32px;
+  padding: 0 12px;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--text-subtle);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 150ms, color 150ms;
+}
+.ts-chat-reset:hover {
+  background: var(--hover);
+  color: var(--text);
+}
+
+.ts-chat-msg {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.ts-chat-msg-user {
+  align-self: flex-end;
+  max-width: 82%;
+  padding: 10px 14px;
+  border-radius: 16px 16px 4px 16px;
+  background: var(--text);
+  color: var(--page);
+  font-size: 15px;
+  line-height: 22px;
+  text-wrap: pretty;
+  animation: tsIn 400ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+.ts-chat-msg-bot {
+  align-self: flex-start;
+  max-width: 90%;
+  padding: 12px 14px;
+  border-radius: 16px 16px 16px 4px;
+  background: var(--neutral);
+  font-size: 15px;
+  line-height: 23px;
+  text-wrap: pretty;
+}
+.ts-chat-thinking {
+  align-self: flex-start;
+  display: flex;
+  gap: 5px;
+  padding: 14px 16px;
+  border-radius: 16px 16px 16px 4px;
+  background: var(--neutral);
+  animation: tsIn 300ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+.ts-chat-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 999px;
+  background: var(--brand);
+  animation: tsDot 1s infinite;
+}
+.ts-chat-dot:nth-child(2) {
+  animation-delay: 0.15s;
+}
+.ts-chat-dot:nth-child(3) {
+  animation-delay: 0.3s;
+}
+.ts-chat-chip {
+  opacity: 1;
+}
+.ts-chat-chip:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+.ts-chat-form button:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.ts-card {
+  align-self: flex-start;
+  width: min(100%, 380px);
+  box-sizing: border-box;
+  padding: 14px;
+  border-radius: 14px;
+  background: var(--overlay);
+  box-shadow: var(--shadow-overlay);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  animation: tsIn 500ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+.ts-card-title {
+  font-size: 14px;
+  font-weight: 700;
+}
+.ts-draw {
+  stroke-dasharray: 1;
+  animation: tsDraw 1100ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+.ts-card-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 18px;
+  font-size: 13px;
+}
+.ts-card-legend span {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--text-subtle);
+}
+.ts-card-legend b {
+  color: var(--text);
+}
+.ts-card-legend b.is-brand {
+  color: var(--brand-text);
+}
+.ts-legend-dash {
+  width: 14px;
+  height: 0;
+  border-top: 2px dashed var(--text-subtlest);
+}
+.ts-legend-bar {
+  width: 14px;
+  height: 3px;
+  border-radius: 2px;
+  background: var(--brand);
+}
+.ts-card-chip {
+  align-self: flex-start;
+  height: 28px;
+  padding: 0 12px;
+  border-radius: 999px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  font-weight: 600;
+  background: var(--warning-subtle);
+  color: var(--warning-text);
+}
+.ts-card-assume-toggle {
+  align-self: flex-start;
+  height: 28px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--text-subtle);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.ts-card-assume {
+  display: grid;
+  grid-template-rows: 0fr;
+  transition: grid-template-rows 300ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+.ts-card-assume.open {
+  grid-template-rows: 1fr;
+}
+.ts-card-assume ul {
+  overflow: hidden;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 13px;
+  line-height: 19px;
+  color: var(--text-subtle);
+}
+
+.ts-bars-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 14px;
+}
+.ts-bars {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 6px;
+  align-items: end;
+  height: 84px;
+}
+.ts-bar-col {
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 4px;
+  height: 84px;
+}
+.ts-bar-val {
+  font-size: 11px;
+  line-height: 14px;
+  color: var(--text-subtle);
+}
+.ts-bar {
+  display: block;
+  width: 100%;
+  border-radius: 4px;
+}
+.ts-bars-labels {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 6px;
+  font-size: 12px;
+  color: var(--text-subtlest);
+  text-align: center;
+}
+.ts-bars-note {
+  font-size: 13px;
+  color: var(--text-subtle);
+}
+
+.ts-boros-row {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.ts-boros-row-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 14px;
+}
+.ts-boros-meta {
+  display: flex;
+  flex-direction: column;
+}
+.ts-boros-day {
+  font-size: 12px;
+  color: var(--text-subtle);
+}
+.ts-boros-track {
+  height: 6px;
+  border-radius: 3px;
+  background: var(--neutral);
+  overflow: hidden;
+}
+.ts-boros-fill {
+  display: block;
+  height: 6px;
+  border-radius: 3px;
+  background: var(--warning-bold);
+}
+
+.ts-goal-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.ts-goal-icon {
+  width: 34px;
+  height: 34px;
+  border-radius: 10px;
+  background: var(--brand-subtle);
+  color: var(--brand-text);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.ts-goal-meta {
+  display: flex;
+  flex-direction: column;
+}
+.ts-goal-meta b {
+  font-size: 15px;
+}
+.ts-goal-meta small {
+  font-size: 13px;
+  color: var(--text-subtle);
+}
+.ts-goal-note {
+  font-size: 13px;
+  color: var(--text-subtle);
+}
+.ts-goal-note b {
+  color: var(--text);
+}
+.ts-goal-btn {
+  height: 40px;
+  border: 0;
+  border-radius: 999px;
+  background: var(--brand);
+  color: var(--on-brand);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background 200ms, color 200ms;
+}
+.ts-goal-btn:active {
+  transform: scale(0.98);
+}
+.ts-goal-btn.done {
+  background: var(--success-subtle);
+  color: var(--success-text);
 }
 
 /* ============ Login ============ */
