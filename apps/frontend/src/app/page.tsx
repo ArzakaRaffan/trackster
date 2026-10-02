@@ -50,39 +50,6 @@ function Icon({ d, size = 18, sw = 2.25 }: { d: string; size?: number; sw?: numb
   );
 }
 
-type Mood = 'idle' | 'alert' | 'happy';
-
-function Mascot({ px, mood = 'idle' }: { px: number; mood?: Mood }) {
-  const body = mood === 'alert' ? '#FFA42B' : '#1ED760';
-  const eyeY = mood === 'happy' ? 18.5 : 18;
-  const mouth =
-    mood === 'happy'
-      ? 'M15.5 25.5c2.4 2.6 6.6 2.6 9 0'
-      : mood === 'alert'
-        ? 'M16.5 26.5c1.6-1.5 5.4-1.5 7 0'
-        : 'M16.5 25.8c2 1.5 5 1.5 7 0';
-  return (
-    <span
-      aria-hidden="true"
-      className="ts-mascot"
-      style={{ display: 'inline-flex', width: px, height: px, transformOrigin: '50% 70%' }}
-    >
-      <svg viewBox="0 0 40 40" width={px} height={px} fill="none">
-        <path
-          d="M20 5c7.2 0 13 5.4 13 12.2 0 7.2-5.4 12.8-13 12.8S7 24.4 7 17.2C7 10.4 12.8 5 20 5Z"
-          fill={body}
-        />
-        <ellipse cx={14.5} cy={12.5} rx={3.6} ry={2} fill="#fff" opacity={0.35} transform="rotate(-26 14.5 12.5)" />
-        <g className="ts-mascot-eyes">
-          <ellipse cx={14.5} cy={eyeY} rx={2.1} ry={2.45} fill="#121212" />
-          <ellipse cx={25.5} cy={eyeY} rx={2.1} ry={2.45} fill="#121212" />
-        </g>
-        <path d={mouth} stroke="#121212" strokeWidth={1.6} strokeLinecap="round" />
-      </svg>
-    </span>
-  );
-}
-
 function Logo() {
   return (
     <div className="ts-logo">
@@ -482,7 +449,7 @@ export default function LandingPage() {
 
           <div className="ts-demo-card">
             <div className="ts-demo-head">
-              <Mascot px={44} mood={over || near ? 'alert' : 'idle'} />
+              <Track mood={over || near ? 'alert' : 'idle'} size={44} still />
               <span>
                 <b>Hari ini</b>
                 <small>Rabu, 30 September</small>
@@ -582,7 +549,7 @@ export default function LandingPage() {
         <div className="ts-chat-layout">
           <div className="ts-chat-card">
             <div className="ts-chat-head">
-              <Mascot px={32} mood="happy" />
+              <Track mood={thinking ? 'think' : 'happy'} size={32} speaking={!!stream} />
               <span>
                 <b>Tanya Track</b>
                 <small style={{ color: busy ? 'var(--brand-text)' : 'var(--text-subtle)' }}>
@@ -599,7 +566,7 @@ export default function LandingPage() {
             <div className="ts-chat-body" ref={chatBodyRef}>
               {msgs.length === 0 && !thinking && (
                 <div className="ts-chat-empty">
-                  <Mascot px={64} mood="happy" />
+                  <Track mood="happy" size={64} />
                   <b>Mau tanya apa ke Track?</b>
                   <span>Pilih pertanyaan di bawah atau ketik sendiri. Jawabannya memakai data contoh.</span>
                 </div>
