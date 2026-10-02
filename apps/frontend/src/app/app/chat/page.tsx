@@ -21,7 +21,8 @@ import {
 } from 'lucide-react';
 import { AnimatePresence, motion } from 'motion/react';
 import { EASE_ENTER, TRANSITION_BASE, TRANSITION_SLOW } from '@/lib/motion';
-import { TracksterMascot } from '@/components/TracksterMascot';
+import { Track } from '@/components/track/Track';
+import { emitTrack } from '@/components/track/trackBus';
 import { SimulationCard, SimulationCardData } from '@/components/chat/SimulationCard';
 import { GoalProposalCard, GoalProposalCardData } from '@/components/chat/GoalProposalCard';
 import { BudgetProposalCard, BudgetProposalCardData } from '@/components/chat/BudgetProposalCard';
@@ -158,6 +159,7 @@ export default function ChatPage() {
     setInput('');
     setSending(true);
     setPendingUser(text);
+    emitTrack('ai:thinking');
 
     try {
       let threadId = activeThreadId;
@@ -182,6 +184,7 @@ export default function ChatPage() {
 
     setPendingUser(null);
     setSending(false);
+    emitTrack('ai:reply');
     inputRef.current?.focus();
   };
 
@@ -210,7 +213,7 @@ export default function ChatPage() {
         <Link href="/app/more" aria-label="Kembali" className="text-text-subtle transition-colors hover:text-text">
           <ChevronLeft size={22} />
         </Link>
-        <TracksterMascot mood={sending ? 'thinking' : 'happy'} size="md" glow />
+        <Track mood={sending ? 'thinking' : 'happy'} size={44} />
         <div className="min-w-0 flex-1">
           <h1 className="truncate font-title text-heading font-bold text-text">Tanya Track</h1>
           <p className="text-micro text-text-subtle">{sending ? 'Lagi mikir…' : 'AI Financial Buddy · online'}</p>
@@ -249,7 +252,7 @@ export default function ChatPage() {
               transition={TRANSITION_SLOW}
               className="mb-2 flex flex-col items-center gap-3 rounded-panel bg-card px-5 py-8 text-center shadow-card"
             >
-              <TracksterMascot mood="happy" size="lg" glow />
+              <Track mood="happy" size={64} />
               <div>
                 <p className="font-title text-heading font-bold text-text">Mau bahas apa hari ini?</p>
                 <p className="mt-1 text-small leading-relaxed text-text-subtle">
@@ -270,7 +273,7 @@ export default function ChatPage() {
               >
                 {m.role === 'assistant' ? (
                   <span className="mb-0.5 shrink-0">
-                    <TracksterMascot mood="idle" size="sm" />
+                    <Track mood="idle" size={28} />
                   </span>
                 ) : (
                   <span className="mb-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-brand text-micro font-bold text-on-brand">
@@ -304,7 +307,7 @@ export default function ChatPage() {
 
           {sending && (
             <motion.div initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} className="flex items-end gap-2.5">
-              <TracksterMascot mood="thinking" size="sm" />
+              <Track mood="thinking" size={28} />
               <div className="flex items-center gap-2 rounded-panel rounded-bl-subtle bg-card px-4 py-3 shadow-card">
                 <span className="flex gap-1">
                   {[0, 1, 2].map((i) => (

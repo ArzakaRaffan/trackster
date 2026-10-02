@@ -5,37 +5,13 @@ import { useRouter } from 'next/navigation';
 import { AlertTriangle, ArrowLeft, Eye, EyeOff, LoaderCircle } from 'lucide-react';
 import { api } from '@/lib/api';
 import { TracksterLogo } from '@/components/TracksterLogo';
+import { Track } from '@/components/track/Track';
 
 function Logo() {
   return (
     <div className="ts-logo">
       <TracksterLogo height={28} />
     </div>
-  );
-}
-
-function Mascot({ px, mood = 'happy' }: { px: number; mood?: 'happy' }) {
-  const body = '#1ED760';
-  const mouth = mood === 'happy' ? 'M15.5 25.5c2.4 2.6 6.6 2.6 9 0' : 'M16.5 25.8c2 1.5 5 1.5 7 0';
-  return (
-    <span
-      aria-hidden="true"
-      className="ts-mascot"
-      style={{ display: 'inline-flex', width: px, height: px, transformOrigin: '50% 70%' }}
-    >
-      <svg viewBox="0 0 40 40" width={px} height={px} fill="none">
-        <path
-          d="M20 5c7.2 0 13 5.4 13 12.2 0 7.2-5.4 12.8-13 12.8S7 24.4 7 17.2C7 10.4 12.8 5 20 5Z"
-          fill={body}
-        />
-        <ellipse cx={14.5} cy={12.5} rx={3.6} ry={2} fill="#fff" opacity={0.35} transform="rotate(-26 14.5 12.5)" />
-        <g className="ts-mascot-eyes">
-          <ellipse cx={14.5} cy={18.5} rx={2.1} ry={2.45} fill="#121212" />
-          <ellipse cx={25.5} cy={18.5} rx={2.1} ry={2.45} fill="#121212" />
-        </g>
-        <path d={mouth} stroke="#121212" strokeWidth={1.6} strokeLinecap="round" />
-      </svg>
-    </span>
   );
 }
 
@@ -52,6 +28,7 @@ export default function LoginPage() {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [bubble, setBubble] = useState(0);
+  const [passwordFocused, setPasswordFocused] = useState(false);
   const router = useRouter();
 
   useEffect(() => {
@@ -73,6 +50,9 @@ export default function LoginPage() {
       setLoading(false);
     }
   };
+
+  // Track di aside: mata nutup saat user isi password (🙈), lirik kursor saat username.
+  const hideEyes = passwordFocused || password.length > 0;
 
   return (
     <main className="ts-page ts-login-page">
@@ -116,6 +96,8 @@ export default function LoginPage() {
                       setPassword(e.target.value);
                       setError('');
                     }}
+                    onFocus={() => setPasswordFocused(true)}
+                    onBlur={() => setPasswordFocused(false)}
                     autoComplete="current-password"
                     aria-invalid={!!error}
                   />
@@ -178,7 +160,7 @@ export default function LoginPage() {
               );
             })}
           </div>
-          <Mascot px={88} />
+          <Track mood="happy" size={88} interactive hideEyes={hideEyes} />
         </div>
       </aside>
     </main>

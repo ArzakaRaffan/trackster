@@ -1,13 +1,14 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import useSWR from 'swr';
 import { AnimatePresence, motion } from 'motion/react';
 import { api } from '@/lib/api';
 import { EASE_ENTER, TRANSITION_BASE } from '@/lib/motion';
 import { MessageCircle, X } from 'lucide-react';
-import { TracksterMascot, type MascotMood } from '@/components/TracksterMascot';
+import { Track, type TrackMood } from '@/components/track/Track';
+import { subscribeTrackAll } from '@/components/track/trackBus';
 
 interface MascotTip {
   kind: 'reminder' | 'fact';
@@ -17,15 +18,40 @@ interface MascotTip {
 const fetcher = (path: string) => api.get<MascotTip>(path);
 const REFRESH_MS = 10 * 60 * 1000;
 const AUTO_HIDE_MS = 10000;
+const POS_KEY = 'trackster:floating-track-pos';
+
+type Pos = { x: number; y: number };
+
+function loadPos(): Pos | null {
+  try {
+    const raw = localStorage.getItem(POS_KEY);
+    if (!raw) return null;
+    const p = JSON.parse(raw) as Pos;
+    if (typeof p.x !== 'number' || typeof p.y !== 'number') return null;
+    const vw = window.innerWidth;
+    const vh = window.innerHeight;
+    return { x: Math.min(Math.max(p.x, 0), vw - 64), y: Math.min(Math.max(p.y, 0), vh - 64) };
+  } catch {
+    return null;
+  }
+}
 
 export function MascotWidget() {
   const [open, setOpen] = useState(false);
   const [dismissed, setDismissed] = useState(false);
+  const [eventMood, setEventMood] = useState<TrackMood>('idle');
+  const [pos, setPos] = useState<Pos | null>(null);
   const lastMessageRef = useRef<string | null>(null);
+  const dragRef = useRef<{ startX: number; startY: number; baseX: number; baseY: number } | null>(null);
   const { data, isLoading } = useSWR('/ai/mascot-tip', fetcher, {
     refreshInterval: REFRESH_MS,
     revalidateOnFocus: false,
   });
+
+  // posisi default + hydrate dari localStorage (hanya client)
+  useEffect(() => {
+    setPos((p) => p ?? loadPos() ?? { x: window.innerWidth - 88, y: window.innerHeight - 120 });
+  }, []);
 
   useEffect(() => {
     if (!data || data.message === lastMessageRef.current) return;
@@ -40,21 +66,79 @@ export function MascotWidget() {
     return () => clearTimeout(timer);
   }, [open, data?.message]);
 
+  // event bus: reaksi Track ke event app (E09-S2)
+  useEffect(() => {
+    return subscribeTrackAll({
+      'budget:over': () => setEventMood('alarm'),
+      'budget:near': () => setEventMood('worried'),
+      'transaction:new': () => setEventMood('excited'),
+      'income:in': () => setEventMood('excited'),
+      'goal:reached': () => setEventMood('excited'),
+      'sync:start': () => setEventMood('thinking'),
+      'sync:end': () => setEventMood('idle'),
+      'ai:thinking': () => setEventMood('thinking'),
+      'ai:reply': () => setEventMood('happy'),
+    });
+  }, []);
+
   const isReminder = data?.kind === 'reminder';
   const showBadge = isReminder && !open && !dismissed;
+  const effectiveMood: TrackMood =
+    eventMood !== 'idle'
+      ? eventMood
+      : isLoading
+        ? 'thinking'
+        : open
+          ? isReminder
+            ? 'alarm'
+            : 'happy'
+          : showBadge
+            ? 'alarm'
+            : 'idle';
 
-  const mood: MascotMood = isLoading
-    ? 'thinking'
-    : open
-      ? isReminder
-        ? 'alert'
-        : 'tip'
-      : showBadge
-        ? 'alert'
-        : 'idle';
+  const onPointerDown = useCallback(
+    (e: React.PointerEvent) => {
+      if (e.pointerType === 'mouse' && e.button !== 0) return;
+      dragRef.current = { startX: e.clientX, startY: e.clientY, baseX: pos?.x ?? 0, baseY: pos?.y ?? 0 };
+    },
+    [pos],
+  );
+
+  const onPointerMove = useCallback((e: React.PointerEvent) => {
+    const drag = dragRef.current;
+    if (!drag) return;
+    const nx = drag.baseX + (e.clientX - drag.startX);
+    const ny = drag.baseY + (e.clientY - drag.startY);
+    setPos({ x: Math.min(Math.max(nx, 0), window.innerWidth - 64), y: Math.min(Math.max(ny, 0), window.innerHeight - 64) });
+  }, []);
+
+  const onPointerUp = useCallback(() => {
+    if (!dragRef.current) return;
+    dragRef.current = null;
+    setPos((p) => {
+      if (p) {
+        try {
+          localStorage.setItem(POS_KEY, JSON.stringify(p));
+        } catch {
+          /* private mode / full */
+        }
+      }
+      return p;
+    });
+  }, []);
+
+  if (!pos) {
+    return null;
+  }
 
   return (
-    <div className="fixed bottom-24 right-4 z-30 lg:bottom-6 lg:right-6">
+    <div
+      className="fixed z-30"
+      style={{ left: pos.x, top: pos.y }}
+      onPointerDown={onPointerDown}
+      onPointerMove={onPointerMove}
+      onPointerUp={onPointerUp}
+    >
       <AnimatePresence>
         {open && data && (
           <motion.div
@@ -64,10 +148,7 @@ export function MascotWidget() {
             transition={{ duration: 0.24, ease: EASE_ENTER }}
             className="absolute bottom-full right-0 mb-3 w-[18.5rem] overflow-hidden rounded-panel bg-overlay shadow-overlay"
           >
-            <div
-              className={`h-1 w-full ${isReminder ? 'bg-warning' : 'bg-brand'}`}
-              aria-hidden
-            />
+            <div className={`h-1 w-full ${isReminder ? 'bg-warning' : 'bg-brand'}`} aria-hidden />
             <div className="relative p-4 pt-3.5">
               <button
                 onClick={() => {
@@ -81,7 +162,7 @@ export function MascotWidget() {
               </button>
 
               <div className="mb-2.5 flex items-center gap-2.5 pr-7">
-                <TracksterMascot mood={isReminder ? 'alert' : 'happy'} size="sm" />
+                <Track mood={isReminder ? 'alarm' : 'happy'} size={28} />
                 <div className="min-w-0">
                   <p className="text-micro font-bold uppercase tracking-caps text-text-subtle">
                     {isReminder ? 'Pengingat' : 'Tips dari Track'}
@@ -115,10 +196,8 @@ export function MascotWidget() {
         transition={TRANSITION_BASE}
         className="relative flex h-14 w-14 items-center justify-center rounded-full bg-card shadow-card ring-1 ring-border transition-colors hover:bg-card-hover"
       >
-        <TracksterMascot mood={mood} size="md" />
-        {showBadge && (
-          <span className="absolute right-1 top-1 h-3 w-3 rounded-full bg-warning ring-2 ring-page" />
-        )}
+        <Track mood={effectiveMood} size={44} interactive />
+        {showBadge && <span className="absolute right-1 top-1 h-3 w-3 rounded-full bg-warning ring-2 ring-page" />}
       </motion.button>
     </div>
   );

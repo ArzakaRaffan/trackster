@@ -1,13 +1,14 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import useSWR from 'swr';
 import Link from 'next/link';
 import { api } from '@/lib/api';
 import { AmountDisplay } from '@/components/ui/AmountDisplay';
 import { BudgetProgress } from '@/components/ui/BudgetProgress';
 import { formatRupiah } from '@/lib/format';
-import { TracksterMascot } from '@/components/TracksterMascot';
+import { Track } from '@/components/track/Track';
+import { emitTrack } from '@/components/track/trackBus';
 import {
   ArrowRight,
   LineChart,
@@ -64,6 +65,11 @@ export default function DashboardPage() {
 
   const ratio = data && data.budget > 0 ? data.totalSpent / data.budget : 0;
   const status = data?.isOverBudget ? 'over' : ratio >= 0.8 ? 'near' : 'under';
+
+  useEffect(() => {
+    if (status === 'over') emitTrack('budget:over');
+    else if (status === 'near') emitTrack('budget:near');
+  }, [status]);
   const activeSubs = (subs ?? []).filter((s) => s.isActive);
   const monthlyBurn = activeSubs.reduce(
     (sum, s) => sum + (s.cycle === 'YEARLY' ? s.amount / 12 : s.amount),
@@ -89,7 +95,7 @@ export default function DashboardPage() {
           aria-label="Tanya Track"
           className="flex h-11 w-11 items-center justify-center rounded-full bg-card shadow-card ring-1 ring-border transition-colors hover:bg-card-hover"
         >
-          <TracksterMascot mood="idle" size="sm" />
+          <Track mood="idle" size={28} />
         </Link>
       </header>
 

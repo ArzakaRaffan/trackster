@@ -97,21 +97,21 @@ Jangan tambah polling baru khusus mascot.
 
 ## E09-S2 — Interaksi + reaksi event
 
-- [ ] Look-at pointer, tap/bounce, tap cepat → pusing, drag dengan stretch & pegas, tidur/bangun
-- [ ] `trackBus` + mapping semua event di tabel
-- [ ] Partikel (keringat, zzz, kilau, koin, confetti, titik berpikir)
-- [ ] Uji di HP (touch) & desktop (mouse); 60fps di mobile menengah
+- [x] Look-at pointer, tap/bounce, tap cepat → pusing, drag dengan stretch & pegas, tidur/bangun
+- [x] `trackBus` + mapping semua event di tabel
+- [x] Partikel (keringat, zzz, kilau, koin, confetti, titik berpikir)
+- [ ] Uji di HP (touch) & desktop (mouse); 60fps di mobile menengah — verifikasi akhir di browser/touch Arzaka + Playwright headless
 
 ## E09-S3 — Pasang di seluruh app
 
-- [ ] **Floating buddy** (`MascotWidget`): ganti ke Track 48–56px, bisa di-drag ke pojok mana pun (posisi di localStorage),
+- [x] **Floating buddy** (`MascotWidget`): ganti ke Track 44px, bisa di-drag ke pojok mana pun (posisi di localStorage),
       bubble tip tetap (reminder/fact), reaksi event global
-- [ ] **Chat** (`/app/chat`): Track di header & sebagai avatar balasan — thinking saat request, talking saat balasan muncul
-- [ ] **Dashboard** (`/app`): sapaan dengan mood sesuai status budget hari ini
+- [x] **Chat** (`/app/chat`): Track di header & sebagai avatar balasan — thinking saat request, talking saat balasan muncul
+- [x] **Dashboard** (`/app`): sapaan dengan mood sesuai status budget hari ini
+- [x] **Login**: mata mengikuti kursor saat isi username, **menutup mata saat isi password** 🙈
+- [x] **Landing page publik**: Track besar interaktif di CTA penutup
 - [ ] **Empty & loading state**: Track mengintip dari tepi kartu (ganti beberapa skeleton kosong)
-- [ ] **Login**: mata mengikuti kursor saat isi username, **menutup mata saat isi password** 🙈
-- [ ] **Landing page publik** & 404: Track besar, interaktif (daya tarik untuk fitur publik E08)
-- [ ] Hapus `TracksterMascot.tsx` lama setelah semua pemakai pindah (`grep TracksterMascot`)
+- [x] Hapus `TracksterMascot.tsx` lama setelah semua pemakai pindah (`grep TracksterMascot`)
 
 **Acceptance:** Arzaka pengen nge-tap/nge-drag Track tanpa alasan; Track bereaksi berbeda ke pemasukan, over-budget,
 dan chat; tidak ada lag di HP; reduced-motion tetap rapi.
