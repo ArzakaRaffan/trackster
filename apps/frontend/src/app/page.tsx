@@ -870,7 +870,7 @@ export default function LandingPage() {
           <p>Alat bantu keuangan yang terbuka untuk siapa saja. Tidak perlu masuk antrean.</p>
         </div>
         <div className="ts-tool-grid">
-          <Link className="ts-tool" href="/split-bills">
+          <Link className="ts-tool" href="/split-bills/new">
             <span className="ts-tool-title">
               <span className="ts-tool-icon">
                 <Icon d={I.receipt} size={20} sw={2} />
@@ -879,7 +879,7 @@ export default function LandingPage() {
             </span>
             <small>Bagi tagihan sesuai pesanan masing-masing.</small>
           </Link>
-          <Link className="ts-tool" href="/app/goals">
+          <Link className="ts-tool" href="/savings-calculator">
             <span className="ts-tool-title">
               <span className="ts-tool-icon">
                 <Icon d={I.target} size={20} sw={2} />
