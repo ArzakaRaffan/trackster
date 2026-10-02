@@ -208,22 +208,30 @@ export default function ChatPage() {
   const showQuick = activeThreadId === null && !sending;
 
   return (
-    <div className="relative flex h-screen flex-col pb-navbar lg:pl-2">
-      <header className="sticky top-0 z-10 flex items-center gap-3 border-b border-border bg-page/[0.9] px-4 py-3.5 backdrop-blur-md">
-        <Link href="/app/more" aria-label="Kembali" className="text-text-subtle transition-colors hover:text-text">
-          <ChevronLeft size={22} />
+    // h-dvh (bukan h-screen) + kompensasi padding `main` AppShell di desktop
+    // (py-4 = 32px). Tanpa ini total tinggi konten > viewport → body ikut scroll
+    // padahal area chat sudah punya scroll sendiri (double scrollbar).
+    <div className="relative flex h-dvh flex-col overflow-hidden pb-navbar lg:h-[calc(100dvh-2rem)] lg:pl-2">
+      <header className="flex items-center gap-2.5 border-b border-border bg-page px-4 py-3 lg:rounded-t-panel lg:border lg:border-b-0 lg:bg-card">
+        <Link href="/app/more" aria-label="Kembali" className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-text-subtle transition-colors hover:bg-hover hover:text-text lg:hidden">
+          <ChevronLeft size={20} />
         </Link>
-        <Track mood={sending ? 'think' : 'happy'} size={44} speaking={sending} />
+        <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-neutral">
+          <Track mood={sending ? 'think' : 'happy'} size={32} />
+        </span>
         <div className="min-w-0 flex-1">
-          <h1 className="truncate font-title text-heading font-bold text-text">Tanya Track</h1>
-          <p className="text-micro text-text-subtle">{sending ? 'Lagi mikir…' : 'AI Financial Buddy · online'}</p>
+          <h1 className="truncate font-title text-heading font-bold leading-tight text-text">Tanya Track</h1>
+          <p className="flex items-center gap-1.5 text-micro text-text-subtle">
+            <span className={`h-1.5 w-1.5 rounded-full ${sending ? 'bg-warning' : 'bg-brand'}`} aria-hidden />
+            {sending ? 'Lagi mikir…' : 'AI Financial Buddy · online'}
+          </p>
         </div>
         <Link
           href="/app/chat/memory"
           aria-label="Yang Track ingat"
           className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-text-subtle transition-colors hover:bg-hover hover:text-text"
         >
-          <Brain size={19} />
+          <Brain size={18} />
         </Link>
         <button
           type="button"
@@ -231,7 +239,7 @@ export default function ChatPage() {
           aria-label="Chat baru"
           className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-text-subtle transition-colors hover:bg-hover hover:text-text"
         >
-          <Plus size={19} />
+          <Plus size={18} />
         </button>
         <button
           type="button"
@@ -239,12 +247,15 @@ export default function ChatPage() {
           aria-label="Riwayat chat"
           className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-text-subtle transition-colors hover:bg-hover hover:text-text"
         >
-          <History size={19} />
+          <History size={18} />
         </button>
       </header>
 
-      <div className="mx-auto flex w-full max-w-content flex-1 flex-col overflow-hidden">
-        <div className="flex-1 space-y-4 overflow-y-auto px-4 py-4">
+      {/* Di desktop halaman chat tampil sebagai satu "kartu" aplikasi (bordered
+          panel) alih-alih kolom mengambang, jadi posisi header/pesan/input terasa
+          satu kesatuan dan nggak acak. */}
+      <div className="mx-auto flex w-full max-w-content flex-1 flex-col overflow-hidden lg:rounded-b-panel lg:border lg:border-t-0 lg:border-border lg:bg-card">
+        <div className="flex-1 space-y-4 overflow-y-auto overscroll-contain px-4 py-4">
           {displayMessages.length === 1 && (
             <motion.div
               initial={{ opacity: 0, y: 8 }}
@@ -348,7 +359,7 @@ export default function ChatPage() {
           </div>
         )}
 
-        <div className="border-t border-border bg-page/[0.9] p-3 backdrop-blur-md sm:p-4">
+        <div className="border-t border-border bg-page p-3 lg:bg-card sm:p-4">
           <form
             onSubmit={(e) => {
               e.preventDefault();
