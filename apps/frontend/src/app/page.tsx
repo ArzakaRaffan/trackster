@@ -944,7 +944,7 @@ export default function LandingPage() {
 
       {/* ============ CTA penutup ============ */}
       <section className="ts-cta-final">
-        <Track mood="happy" size={88} interactive />
+        <Track mood="happy" size={88} pointer />
         <h2>Jajan tenang. Sisanya urusan Trackster.</h2>
         <p>Akses dibuka bertahap. Masuk antrean beta, kami kabari saat giliranmu tiba.</p>
         <div className="ts-cta-final-form">{waitlistForm(true)}</div>

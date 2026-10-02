@@ -160,7 +160,7 @@ export default function LoginPage() {
               );
             })}
           </div>
-          <Track mood="happy" size={88} interactive hideEyes={hideEyes} />
+          <Track mood="idle" size={88} pointer hideEyes={hideEyes} />
         </div>
       </aside>
     </main>
