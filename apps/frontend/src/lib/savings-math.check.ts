@@ -52,7 +52,7 @@ approx(requiredDeposit(10_000_000, 12_000_000, r, 24), 0);
 
 // --- periodsToReach ---
 approx(periodsToReach(10_000_000, 0, 1_000_000, 0), 10);
-approx(periodsToReach(10_000_000, 5_000_000, 0, 0), 5);
+approx(periodsToReach(10_000_000, 5_000_000, 1_000_000, 0), 5);
 assert.strictEqual(periodsToReach(10_000_000, 10_000_000, 1_000_000, 0), 0);
 assert.strictEqual(periodsToReach(10_000_000, 0, 0, 0), Infinity);
 // Invers dari requiredDeposit.

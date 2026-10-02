@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
+import { TracksterLogo } from '@/components/TracksterLogo';
 import {
   BarChart3,
   Bot,
@@ -94,10 +95,7 @@ export default function NavBar() {
       {/* Sidebar desktop */}
       <aside className="hidden h-screen w-[228px] shrink-0 flex-col gap-6 overflow-y-auto p-5 pl-3 lg:sticky lg:top-0 lg:flex">
         <div className="flex items-center gap-2.5 px-2.5">
-          <span className="flex h-[30px] w-[30px] items-center justify-center rounded-[9px] bg-brand text-[16px] font-bold text-on-brand">
-            T
-          </span>
-          <span className="text-[17px] font-bold tracking-[-0.01em] text-text">Trackster</span>
+          <TracksterLogo height={28} />
         </div>
 
         <nav aria-label="Navigasi utama" className="flex flex-col gap-0.5">
