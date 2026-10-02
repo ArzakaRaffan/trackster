@@ -12,8 +12,9 @@ import { Button } from '@/components/ui/Button';
 import { SourceTag } from '@/components/ui/SourceTag';
 import { AnimatedAmount } from '@/components/ui/AnimatedAmount';
 import { StatTile } from '@/components/ui/StatTile';
+import { EmptyState } from '@/components/EmptyState';
 import { EASE_ENTER, TRANSITION_BASE } from '@/lib/motion';
-import { ChevronDown, ChevronLeft, Inbox, Pencil, Plus, Sparkles, Trash2, X } from 'lucide-react';
+import { ChevronDown, ChevronLeft, Pencil, Plus, Sparkles, Trash2, X } from 'lucide-react';
 
 type IncomeKind = 'FIXED' | 'SESSION' | 'DEDUCTION' | 'VARIABLE' | 'IRREGULAR';
 type IncomeCadence = 'WEEKLY' | 'MONTHLY' | 'NONE';
@@ -640,15 +641,11 @@ export default function IncomePage() {
                   ) : error ? (
                     <p className="text-label text-status-over">Gagal memuat data.</p>
                   ) : !data || data.length === 0 ? (
-                    <div className="flex flex-col items-center gap-3 rounded-card p-8 text-center shadow-card">
-                      <span className="flex h-12 w-12 items-center justify-center rounded-full bg-neutral text-text-subtle">
-                        <Inbox size={22} />
-                      </span>
-                      <p className="text-body font-bold text-text">Belum ada pemasukan</p>
-                      <p className="max-w-[280px] text-small leading-relaxed text-text-subtle">
-                        Catat gaji, transfer masuk, atau freelance yang nggak lewat notifikasi email.
-                      </p>
-                    </div>
+                    <EmptyState
+                      mood="idle"
+                      title="Belum ada pemasukan"
+                      description="Catat gaji, transfer masuk, atau freelance yang nggak lewat notifikasi email."
+                    />
                   ) : (
                     <div ref={listParent} className="flex flex-col gap-3">
                       {grouped.map((g) => (

@@ -5,12 +5,13 @@ import Link from 'next/link';
 import useSWR from 'swr';
 import { AnimatePresence, motion } from 'motion/react';
 import { api } from '@/lib/api';
-import { AlertTriangle, Bell, ChevronDown, ChevronLeft, Inbox, Mail, Plus, RefreshCw, X } from 'lucide-react';
+import { AlertTriangle, Bell, ChevronDown, ChevronLeft, Mail, Plus, RefreshCw, X } from 'lucide-react';
 import { TransactionNoteRow, CATEGORY_LABELS } from '@/components/ui/TransactionNoteRow';
 import { AmountDisplay } from '@/components/ui/AmountDisplay';
 import { BudgetProgress } from '@/components/ui/BudgetProgress';
 import { Input } from '@/components/ui/Input';
 import { Button } from '@/components/ui/Button';
+import { EmptyState } from '@/components/EmptyState';
 import { EASE_ENTER, TRANSITION_BASE } from '@/lib/motion';
 import { formatRupiah } from '@/lib/format';
 
@@ -253,15 +254,11 @@ export default function TodayPage() {
       </div>
 
       {data.transactions.length === 0 ? (
-        <div className="flex flex-col items-center gap-3 rounded-card p-8 text-center shadow-card">
-          <span className="flex h-12 w-12 items-center justify-center rounded-full bg-neutral text-text-subtle">
-            <Inbox size={22} />
-          </span>
-          <p className="text-body font-bold text-text">Belum ada transaksi</p>
-          <p className="max-w-[280px] text-small leading-relaxed text-text-subtle">
-            Begitu ada email notifikasi dari BCA atau Jago, transaksinya muncul di sini otomatis.
-          </p>
-        </div>
+        <EmptyState
+          mood="idle"
+          title="Belum ada transaksi"
+          description="Begitu ada email notifikasi dari BCA atau Jago, transaksinya muncul di sini otomatis."
+        />
       ) : (
         <ul className="rounded-card bg-card p-2 shadow-card">
           {data.transactions.map((t) => (

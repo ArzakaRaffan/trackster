@@ -8,6 +8,7 @@ import { api } from '@/lib/api';
 import { formatRupiah } from '@/lib/format';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
+import { EmptyState } from '@/components/EmptyState';
 import { EASE_ENTER, TRANSITION_FAST } from '@/lib/motion';
 import { CalendarDays, ChevronDown, ChevronLeft, Pencil, Plus, Trash2, X } from 'lucide-react';
 
@@ -269,15 +270,11 @@ export default function SubscriptionsPage() {
           <p className="text-label text-status-over">Gagal memuat langganan.</p>
         </div>
       ) : !subs || subs.length === 0 ? (
-        <div className="flex flex-col items-center gap-3 rounded-card bg-card p-8 text-center shadow-card">
-          <span className="flex h-12 w-12 items-center justify-center rounded-full bg-neutral text-text-subtle">
-            <CalendarDays size={22} />
-          </span>
-          <p className="text-body font-bold text-text">Belum ada langganan</p>
-          <p className="max-w-[280px] text-small leading-relaxed text-text-subtle">
-            Tambah manual layanan berulang kamu. Trackster akan bikin event di Google Calendar dengan reminder.
-          </p>
-        </div>
+        <EmptyState
+          mood="think"
+          title="Belum ada langganan"
+          description="Tambah manual layanan berulang kamu. Trackster akan bikin event di Google Calendar dengan reminder."
+        />
       ) : (
         <>
           {active.length > 0 && (
