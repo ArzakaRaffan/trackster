@@ -19,6 +19,7 @@ import {
 } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
+import { EmptyState } from '@/components/EmptyState';
 import { EASE_ENTER, TRANSITION_FAST } from '@/lib/motion';
 
 interface Goal {
@@ -174,20 +175,15 @@ export default function GoalsPage() {
       ) : error ? (
         <div className="rounded-card bg-card p-6 text-center text-status-over shadow-card">Gagal memuat target tabungan.</div>
       ) : !goals || goals.length === 0 ? (
-        <div className="rounded-card bg-card p-8 text-center shadow-card">
-          <span className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-neutral text-text-subtle">
-            <Target size={24} />
-          </span>
-          <p className="text-body font-bold text-text">Belum ada target tabungan</p>
-          <p className="mt-1 text-small text-text-subtle">
-            Bikin kantong tabungan baru untuk gadget, liburan, atau dana darurat.
-          </p>
-          <div className="mt-4">
-            <Button variant="primary" icon={<Plus size={16} />} onClick={() => setCreateModalOpen(true)}>
-              Buat Target Baru
-            </Button>
-          </div>
-        </div>
+        <EmptyState
+          mood="happy"
+          title="Belum ada target tabungan"
+          description="Bikin kantong tabungan baru untuk gadget, liburan, atau dana darurat."
+        >
+          <Button variant="primary" icon={<Plus size={16} />} onClick={() => setCreateModalOpen(true)}>
+            Buat Target Baru
+          </Button>
+        </EmptyState>
       ) : (
         <div className="space-y-3">
           {goals.map((goal) => {
