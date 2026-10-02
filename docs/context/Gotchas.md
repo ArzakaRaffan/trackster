@@ -1,5 +1,10 @@
 # trackster — Gotchas
 
+- **Self-check frontend (`*.check.ts` di apps/frontend) tidak jalan dengan `npx ts-node`** — error
+  `ERR_UNKNOWN_FILE_EXTENSION`. Jalanin pakai `npx tsx <file>` (tsx auto-install oleh npx).
+  Backend self-check tetap pakai `npx ts-node`.
+- **Backend `npm run build` bisa OOM di VPS 2GB** (`Ineffective mark-compacts near heap limit`) kalau
+  ada proses lain jalan. Fix: `NODE_OPTIONS=--max-old-space-size=2048 npm run build`.
 - **Push ke `main` lalu langsung jalanin dev-testing lokal di VPS ini (dev Postgres, `node dist/main.js`
   lokal, dll) bisa bikin CD (`deploy.yml`) gagal diam-diam** — kejadian nyata 2026-09-27 sesi E04-S4/S5:
   push commit lalu (di sesi yang sama, VPS yang sama) langsung `docker compose -p trackster-dev up -d

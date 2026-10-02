@@ -1,8 +1,7 @@
 import type { Metadata } from 'next';
 import { Figtree } from 'next/font/google';
 import './globals.css';
-import NavBar from '@/components/NavBar';
-import { MotionProvider } from '@/components/MotionProvider';
+import { AppShell } from '@/components/AppShell';
 
 // Substituted for the proprietary SpotifyMixUI/CircularSp — swap for licensed
 // @font-face binaries when available (see design_system/readme.md, Gaps & substitutions).
@@ -29,10 +28,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="id">
       <body className={`${ui.className} min-h-screen bg-page text-text lg:flex`}>
-        <MotionProvider>
-          <NavBar />
-          <main className="mx-auto w-full max-w-content lg:flex-1 lg:py-4 lg:pl-2 lg:pr-24 lg:pb-28">{children}</main>
-        </MotionProvider>
+        <AppShell>{children}</AppShell>
       </body>
     </html>
   );

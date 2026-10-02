@@ -69,12 +69,12 @@ Legend: ⬜ belum · 🟨 jalan · ✅ selesai (sudah diverifikasi di browser & 
 | E05-S1 | Saran budget harian (3 opsi) + analisis kepatuhan | 3 | E03-S2, E06-S1 | ✅ (kode `aedead5`, tsc backend+frontend 0 error; belum ada catatan verifikasi visual browser di README ini) |
 | E05-S2 | Penjelasan AI + terapkan + check-in budget mingguan | 3 | E05-S1, E04-S4 | 🟨 (kode selesai, tsc+build backend&frontend bersih, dicoba `.check.ts` + `curl` ke `/ai/budget-suggestions` di dev DB — cache & fallback jalan; rollover sengaja di-skip (opsional, tanya dulu); belum diverifikasi visual browser & belum dites kirim Telegram asli — nunggu cron Minggu 21:10 WIB jalan di prod) |
 | E09-S1 | Engine blob prosedural + mata + emosi | 4 | — (paralel kapan saja) | ✅ (`Track.tsx` + `blobPath.ts`/`blobPath.check.ts` + playground `/app/dev/track`; tsc+build lolos; Arzaka approve bentuk tanpa cek visual browser sesi ini) |
-| E09-S2 | Interaksi (tap, drag, lirik kursor, tidur) + reaksi event app | 4 | E09-S1 | ⬜ |
-| E09-S3 | Pasang di seluruh app (chat, dashboard, empty/loading state) | 4 | E09-S2 | ⬜ |
+| E09-S2 | Interaksi (tap, drag, lirik kursor, tidur) + reaksi event app | 4 | E09-S1 | 🟨 (kode selesai: look-at, tap/bounce, tap cepat→pusing, drag+stretch+pegas, tidur/bangun, partikel, trackBus + mapping event; tsc/build lolos; verifikasi visual/touch & Playwright masih pending) |
+| E09-S3 | Pasang di seluruh app (chat, dashboard, empty/loading state) | 4 | E09-S2 | 🟨 (floating buddy draggable+localStorage, chat, dashboard, login 🙈, landing CTA — selesai; empty/loading state belum digarap; verifikasi visual/touch pending) |
 | E08-S1 | Split Bill v2: pajak proporsional, item patungan, diskon, share WA | 4 | — | 🟨 (kode selesai, split-calc.check.ts lulus, migration shares + DTO, UI multi-select + WA share + OG image selesai, backend & frontend build lolos) |
-| E08-S2 | Kalkulator Tabungan v2 (instrumen, inflasi, mingguan, grafik) | 4 | — | 🟨 (kode selesai: `savings-math.ts` + check, UI dua mode + URL state + OG image; self-check & tsc belum dijalankan — classifier Bash di sesi ini sempat down; angka return instrumen masih default konservatif, wajib cek web sebelum deploy) |
-| E08-S3 | Hub /tools + Kalkulator PayLater/Cicilan + OG image | 4 | E08-S2 | 🟨 (kode selesai: hub `/tools`, `installment-math.ts` + check (IRR Newton-Raphson), kalkulator PayLater, metadata/sitemap/robots, middleware path; self-check & tsc/build belum dijalankan — classifier Bash down sesi ini) |
-| E08-S4 | Patungan Trip (multi-bill, settle up minimal transfer) | 4 | E08-S1 | 🟨 (kode selesai: migration `add_trip`, modul `trip` (Trip/TripMember/TripExpense/TripExpenseShare), `settle.ts` greedy + check, UI create/manage/publik + WA share + OG image; self-check & build belum dijalankan — classifier Bash down sesi ini) |
+| E08-S2 | Kalkulator Tabungan v2 (instrumen, inflasi, mingguan, grafik) | 4 | — | ✅ (kode selesai + diverifikasi: `savings-math.check.ts` fix 1 assertion bug deposit 0→1jt; frontend build & tsc lolos; angka return instrumen masih default konservatif) |
+| E08-S3 | Hub /tools + Kalkulator PayLater/Cicilan + OG image | 4 | E08-S2 | ✅ (kode selesai + diverifikasi: `installment-math.check.ts` lolos via tsx, frontend build & tsc lolos) |
+| E08-S4 | Patungan Trip (multi-bill, settle up minimal transfer) | 4 | E08-S1 | ✅ (kode selesai + diverifikasi: `settle.check.ts` lolos, backend build (NODE_OPTIONS=2048) & frontend build/tsc lolos) |
 
 Urutan & alasannya ada di [`00-ROADMAP.md`](00-ROADMAP.md).
 
