@@ -1,4 +1,5 @@
 import type { Metadata } from 'next';
+import Script from 'next/script';
 import { Figtree } from 'next/font/google';
 import './globals.css';
 import { AppShell } from '@/components/AppShell';
@@ -29,6 +30,8 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     <html lang="id">
       <body className={`${ui.className} min-h-screen bg-page text-text lg:flex`}>
         <AppShell>{children}</AppShell>
+        {/* <track-mascot> web component — single source of truth for the mascot (Track Struk). */}
+        <Script src="/track-mascot.js" strategy="afterInteractive" />
       </body>
     </html>
   );

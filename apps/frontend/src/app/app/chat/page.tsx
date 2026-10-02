@@ -213,7 +213,7 @@ export default function ChatPage() {
         <Link href="/app/more" aria-label="Kembali" className="text-text-subtle transition-colors hover:text-text">
           <ChevronLeft size={22} />
         </Link>
-        <Track mood={sending ? 'thinking' : 'happy'} size={44} />
+        <Track mood={sending ? 'think' : 'happy'} size={44} speaking={sending} />
         <div className="min-w-0 flex-1">
           <h1 className="truncate font-title text-heading font-bold text-text">Tanya Track</h1>
           <p className="text-micro text-text-subtle">{sending ? 'Lagi mikir…' : 'AI Financial Buddy · online'}</p>
@@ -307,7 +307,7 @@ export default function ChatPage() {
 
           {sending && (
             <motion.div initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} className="flex items-end gap-2.5">
-              <Track mood="thinking" size={28} />
+              <Track mood="think" size={28} />
               <div className="flex items-center gap-2 rounded-panel rounded-bl-subtle bg-card px-4 py-3 shadow-card">
                 <span className="flex gap-1">
                   {[0, 1, 2].map((i) => (

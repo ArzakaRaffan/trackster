@@ -7,7 +7,7 @@ import { AnimatePresence, motion } from 'motion/react';
 import { api } from '@/lib/api';
 import { EASE_ENTER, TRANSITION_BASE } from '@/lib/motion';
 import { MessageCircle, X } from 'lucide-react';
-import { Track, type TrackMood } from '@/components/track/Track';
+import { Track, type TrackHandle, type TrackMood } from '@/components/track/Track';
 import { subscribeTrackAll } from '@/components/track/trackBus';
 
 interface MascotTip {
@@ -43,6 +43,7 @@ export function MascotWidget() {
   const [pos, setPos] = useState<Pos | null>(null);
   const lastMessageRef = useRef<string | null>(null);
   const dragRef = useRef<{ startX: number; startY: number; baseX: number; baseY: number } | null>(null);
+  const trackRef = useRef<TrackHandle | null>(null);
   const { data, isLoading } = useSWR('/ai/mascot-tip', fetcher, {
     refreshInterval: REFRESH_MS,
     revalidateOnFocus: false,
@@ -66,17 +67,29 @@ export function MascotWidget() {
     return () => clearTimeout(timer);
   }, [open, data?.message]);
 
-  // event bus: reaksi Track ke event app (E09-S2)
+  // event bus: reaksi Track ke event app (E09-S2) — mood + reaksi sesaat via el.react()
   useEffect(() => {
     return subscribeTrackAll({
-      'budget:over': () => setEventMood('alarm'),
-      'budget:near': () => setEventMood('worried'),
-      'transaction:new': () => setEventMood('excited'),
-      'income:in': () => setEventMood('excited'),
-      'goal:reached': () => setEventMood('excited'),
-      'sync:start': () => setEventMood('thinking'),
+      'budget:over': () => {
+        setEventMood('alert');
+        trackRef.current?.react('shake');
+      },
+      'budget:near': () => setEventMood('alert'),
+      'transaction:new': () => {
+        setEventMood('happy');
+        trackRef.current?.react('receive');
+      },
+      'income:in': () => {
+        setEventMood('happy');
+        trackRef.current?.react('receive');
+      },
+      'goal:reached': () => {
+        setEventMood('happy');
+        trackRef.current?.react('receive');
+      },
+      'sync:start': () => setEventMood('think'),
       'sync:end': () => setEventMood('idle'),
-      'ai:thinking': () => setEventMood('thinking'),
+      'ai:thinking': () => setEventMood('think'),
       'ai:reply': () => setEventMood('happy'),
     });
   }, []);
@@ -87,13 +100,13 @@ export function MascotWidget() {
     eventMood !== 'idle'
       ? eventMood
       : isLoading
-        ? 'thinking'
+        ? 'think'
         : open
           ? isReminder
-            ? 'alarm'
+            ? 'alert'
             : 'happy'
           : showBadge
-            ? 'alarm'
+            ? 'alert'
             : 'idle';
 
   const onPointerDown = useCallback(
@@ -162,7 +175,7 @@ export function MascotWidget() {
               </button>
 
               <div className="mb-2.5 flex items-center gap-2.5 pr-7">
-                <Track mood={isReminder ? 'alarm' : 'happy'} size={28} />
+                <Track mood={isReminder ? 'alert' : 'happy'} size={28} still />
                 <div className="min-w-0">
                   <p className="text-micro font-bold uppercase tracking-caps text-text-subtle">
                     {isReminder ? 'Pengingat' : 'Tips dari Track'}
@@ -196,7 +209,7 @@ export function MascotWidget() {
         transition={TRANSITION_BASE}
         className="relative flex h-14 w-14 items-center justify-center rounded-full bg-card shadow-card ring-1 ring-border transition-colors hover:bg-card-hover"
       >
-        <Track mood={effectiveMood} size={44} interactive />
+        <Track ref={trackRef} mood={effectiveMood} size={44} pointer />
         {showBadge && <span className="absolute right-1 top-1 h-3 w-3 rounded-full bg-warning ring-2 ring-page" />}
       </motion.button>
     </div>
