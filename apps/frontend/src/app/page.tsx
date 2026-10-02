@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { FormEvent, useEffect, useRef, useState } from 'react';
 import { useReducedMotion } from 'motion/react';
+import { TracksterLogo } from '@/components/TracksterLogo';
 
 /* ============================================================
    Landing page — port 1:1 dari "Trackster Landing (standalone).html"
@@ -81,13 +82,10 @@ function Mascot({ px, mood = 'idle' }: { px: number; mood?: Mood }) {
   );
 }
 
-function Logo({ px = 30 }: { px?: number }) {
+function Logo() {
   return (
     <div className="ts-logo">
-      <span className="ts-logo-mark" style={{ width: px, height: px }}>
-        T
-      </span>
-      <b>Trackster</b>
+      <TracksterLogo height={30} />
     </div>
   );
 }

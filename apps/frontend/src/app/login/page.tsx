@@ -4,14 +4,12 @@ import { FormEvent, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { AlertTriangle, ArrowLeft, Eye, EyeOff, LoaderCircle } from 'lucide-react';
 import { api } from '@/lib/api';
+import { TracksterLogo } from '@/components/TracksterLogo';
 
 function Logo() {
   return (
     <div className="ts-logo">
-      <span className="ts-logo-mark" style={{ width: 28, height: 28 }}>
-        T
-      </span>
-      <b>Trackster</b>
+      <TracksterLogo height={28} />
     </div>
   );
 }
