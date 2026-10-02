@@ -1,0 +1,22 @@
+INFORMASI TRANSAKSI
+Halo, Kak Andi Wijaya Putra.
+Kamu baru aja ngajuin transaksi kirim uang via Flip. Ini detail transaksinya:
+ID Transaksi
+#ST261001094813005GLOWJ
+Tujuan
+ANDI WIJAYA PUTRA
+Bank Tujuan
+Blu/BCA Digital
+Nomor Rekening Tujuan
+009988776655
+Jumlah Transfer
+Rp 25.000
+Supaya transaksinya bisa diproses, yuk transfer ke rekening Flip dengan jumlah berikut.
+Jumlah Transfer
+Rp 25.362
+Transfer ke Bank
+BCA
+Nomor Rekening
+5465220225
+Atas Nama
+PT Fliptech Lentera IP
