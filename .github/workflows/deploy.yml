@@ -19,8 +19,10 @@ jobs:
             cd ~/trackster
             git fetch origin
             git reset --hard origin/main
+            # Build berurutan (VPS 1.9GB RAM — paralel bikin OOM Next.js)
             docker compose -f docker-compose.prod.yml build backend
             docker compose -f docker-compose.prod.yml build frontend
             docker compose -f docker-compose.prod.yml up -d
+            # Bebaskan memori build sebelum container baru jalan
             docker image prune -f
             docker builder prune -f --filter until=24h
