@@ -70,26 +70,6 @@ input::placeholder {
   color: var(--text-subtlest, #8c8c8c);
 }
 
-@keyframes tsFloat {
-  0%,
-  100% {
-    transform: translateY(0) rotate(0);
-  }
-  50% {
-    transform: translateY(-2px) rotate(1.5deg);
-  }
-}
-@keyframes tsBlink {
-  0%,
-  86%,
-  94%,
-  100% {
-    transform: scaleY(1);
-  }
-  90% {
-    transform: scaleY(0.1);
-  }
-}
 @keyframes tsWord {
   from {
     opacity: 0;
@@ -181,14 +161,6 @@ input::placeholder {
   display: block;
 }
 
-.ts-mascot {
-  animation: tsFloat 3.6s cubic-bezier(0.16, 1, 0.3, 1) infinite;
-}
-.ts-mascot-eyes {
-  transform-box: fill-box;
-  transform-origin: center;
-  animation: tsBlink 4.5s infinite;
-}
 
 .ts-waitlist {
   width: 100%;
@@ -1812,10 +1784,6 @@ input::placeholder {
   text-wrap: balance;
   transition: opacity 700ms cubic-bezier(0.16, 1, 0.3, 1),
     filter 700ms cubic-bezier(0.16, 1, 0.3, 1), transform 700ms cubic-bezier(0.16, 1, 0.3, 1);
-}
-.ts-login-aside .ts-mascot {
-  border-radius: 28px;
-  font-size: 42px;
 }
 
 /* ============ Responsive ============ */
