@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { FormEvent, useEffect, useRef, useState } from 'react';
 import { useReducedMotion } from 'motion/react';
 import { TracksterLogo } from '@/components/TracksterLogo';
+import { Track } from '@/components/track/Track';
 
 /* ============================================================
    Landing page — port 1:1 dari "Trackster Landing (standalone).html"
@@ -943,7 +944,7 @@ export default function LandingPage() {
 
       {/* ============ CTA penutup ============ */}
       <section className="ts-cta-final">
-        <Mascot px={64} mood="happy" />
+        <Track mood="happy" size={88} interactive />
         <h2>Jajan tenang. Sisanya urusan Trackster.</h2>
         <p>Akses dibuka bertahap. Masuk antrean beta, kami kabari saat giliranmu tiba.</p>
         <div className="ts-cta-final-form">{waitlistForm(true)}</div>
