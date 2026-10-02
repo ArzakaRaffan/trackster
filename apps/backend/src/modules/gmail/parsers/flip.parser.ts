@@ -27,7 +27,13 @@ export class FlipParser implements EmailParser {
   }
 
   parse(email: RawEmail): ParseResult | null {
+    // Email instruksi bayar ke rekening Flip — belum expense final (uang baru keluar
+    // begitu SoF BCA memotong saldo; tercatat dari sisi BCA). Subject bisa Inggris
+    // ("Transaction information...") atau Indonesia ("Informasi transfer ke ...").
     if (/transaction information/i.test(email.subject)) return null;
+    if (/^informasi transfer ke /i.test(email.subject.trim())) return null;
+    // Fallback lewat pola body kalau subject berubah lagi
+    if (/baru aja ngajuin transaksi kirim uang via Flip/i.test(email.body)) return null;
 
     const body = email.body;
 

@@ -317,6 +317,12 @@ check('Flip instruksi "Transaction information...": return null', () => {
   assert.strictEqual(result, null);
 });
 
+check('Flip instruksi ID "Informasi transfer ke ...": return null', () => {
+  const body = loadFixture('flip-instruction-id.txt');
+  const result = flipParser.parse(fakeFlipEmail(body, 'Informasi transfer ke ARZAKA RAFFAN MAWARDI'));
+  assert.strictEqual(result, null);
+});
+
 // --- Receipt ke orang lain → expense final ---
 check('Flip receipt eksternal: amount = 64000', () => {
   const body = loadFixture('flip-receipt.txt');
