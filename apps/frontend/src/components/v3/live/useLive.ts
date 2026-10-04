@@ -5,7 +5,7 @@ import useSWR, { useSWRConfig } from 'swr';
 import { API_URL, api } from '@/lib/api';
 import { addDaysISO, buildDates, wibHHMM, wibISO, wibLogDate } from './dates';
 import { buildAggregateReport, buildPeriodReport, dayLabelOf } from './reports';
-import { RPf, mapGoal, mapIncome, mapMem, mapMsg, mapStream, mapSub, streamPayload } from './map';
+import { RPf, mapBill, mapGoal, mapIncome, mapMem, mapMsg, mapStream, mapSub, streamPayload } from './map';
 
 const fetcher = (u: string) => api.get<any>(u);
 const useGet = (key: string | null, opts: Record<string, unknown> = {}) => useSWR<any>(key, fetcher, opts);
@@ -66,6 +66,8 @@ export function useLive(enabled: boolean, path: string, chatActive: number | nul
   const msgsRes = useGet(enabled && chatActive ? `/ai/threads/${chatActive}/messages` : null);
   const memRes = useGet(k('/ai/memory'));
   const tipRes = useGet(k('/ai/mascot-tip'));
+  const tidyRes = useGet(k('/transactions/uncategorized-merchants'));
+  const billsRes = useGet(k('/split-bills'));
   const sugRes = useGet(enabled && path.startsWith('/app/budget') ? '/ai/budget-suggestions' : null);
 
   const manual = useMemo(() => {
@@ -181,6 +183,40 @@ export function useLive(enabled: boolean, path: string, chatActive: number | nul
   const mem = useMemo(() => (memRes.data ?? []).map(mapMem), [memRes.data]);
   const tip = useMemo(() => (tipRes.data?.message ? { kind: tipRes.data.kind, msg: tipRes.data.message } : null), [tipRes.data]);
 
+  const tidy = useMemo(() => (tidyRes.data ?? []).map((g: any) => ({ name: g.description, count: g.count, total: Number(g.totalAmount), repId: g.representativeId })), [tidyRes.data]);
+
+  const split = useMemo(() => ({ bills: (billsRes.data ?? []).map(mapBill) }), [billsRes.data]);
+
+  // ---- sumber data (status email per bank + log) ----
+  const srcInfo = useMemo(() => {
+    const logs: any[] = parseLogRes.data ?? [];
+    const now = Date.now(), monthStart = wibISO().slice(0, 7);
+    const agoMs = (iso: string | null) => (iso ? now - new Date(iso).getTime() : null);
+    const short = (ms: number | null) => (ms === null ? 'menunggu' : ms < 90_000 ? 'baru saja' : ms < 3600e3 ? Math.round(ms / 60e3) + ' mnt lalu' : ms < 86400e3 ? Math.round(ms / 3600e3) + ' jam lalu' : Math.round(ms / 86400e3) + ' hari lalu');
+    const long = (ms: number | null) => (ms === null ? '' : ms < 90_000 ? 'baru saja' : ms < 3600e3 ? Math.round(ms / 60e3) + ' menit lalu' : ms < 86400e3 ? Math.round(ms / 3600e3) + ' jam lalu' : Math.round(ms / 86400e3) + ' hari lalu');
+    const bankOf = (l: any) => { const f = String(l.from ?? '').toLowerCase() + ' ' + String(l.parser ?? '').toLowerCase(); return f.includes('flip') ? 'FLIP' : f.includes('jago') ? 'JAGO' : f.includes('bca') ? 'BCA' : null; };
+    const connected = !!gmailRes.data?.connected;
+    const out: Record<string, any> = {};
+    for (const b of ['BCA', 'JAGO', 'FLIP']) {
+      const mine = logs.filter((l) => bankOf(l) === b);
+      const lastIso = mine.length ? mine.reduce((a, l) => (new Date(l.receivedAt) > new Date(a) ? l.receivedAt : a), mine[0].receivedAt) : null;
+      const recorded = mine.filter((l) => l.status === 'RECORDED' && wibISO(new Date(l.receivedAt).getTime()).startsWith(monthStart)).length;
+      const unparsed = mine.filter((l) => (l.status === 'UNPARSED' || l.status === 'ERROR') && now - new Date(l.receivedAt).getTime() < 14 * 86400e3).length;
+      const ms = agoMs(lastIso);
+      const cond = !connected ? 'putus' : lastIso === null ? 'menunggu' : unparsed > 0 ? 'cek' : ms! > 8 * 86400e3 ? 'sepi' : 'aktif';
+      out[b] = { cond, short: short(ms), long: long(ms), recorded, unparsed, days: ms === null ? 0 : Math.round(ms / 86400e3) };
+    }
+    return out;
+  }, [parseLogRes.data, gmailRes.data]);
+  const srcLog = useMemo(() => {
+    const today = wibISO(), yday = addDaysISO(today, -1);
+    return ((parseLogRes.data ?? []) as any[]).slice(0, 12).map((l) => {
+      const iso = wibISO(new Date(l.receivedAt).getTime());
+      const when = (iso === today ? 'Hari ini' : iso === yday ? 'Kemarin' : wibLogDate(l.receivedAt).split(',')[0]) + ', ' + wibHHMM(l.receivedAt);
+      return [l.from, when, l.status === 'RECORDED' ? 'TERCATAT' : l.status === 'EXCLUDED' || l.status === 'DUPLICATE' ? 'DIABAIKAN' : 'PERLU DICEK'];
+    });
+  }, [parseLogRes.data]);
+
   // ---- notifikasi (bel) ----
   const notifs = useMemo(() => {
     const out: any[] = [];
@@ -219,6 +255,8 @@ export function useLive(enabled: boolean, path: string, chatActive: number | nul
         const records = tab === 3 ? await api.get<any>('/reports/records') : null;
         return buildAggregateReport(tab as 2 | 3, agg, records, Number(wibISO().slice(0, 4)));
       },
+      anaStats: (range: string) => api.get<any>(`/analytics/stats?range=${range}`),
+      setBig: (id: number, isBig: boolean | null) => api.patch(`/transactions/${id}/big`, { isBig }),
       dayTxs: async (iso: string) => ((await api.get<any>(`/transactions/day/${iso}`)).transactions ?? []).map(mapAnyTx),
       searchTx: async (q: string, cat: string, src: string) => {
         const p = new URLSearchParams({ limit: '100' });
@@ -251,6 +289,15 @@ export function useLive(enabled: boolean, path: string, chatActive: number | nul
       memCreate: (b: any) => api.post('/ai/memory', b),
       memUpdate: (id: number, b: any) => api.patch(`/ai/memory/${id}`, b),
       memDelete: (id: number) => api.delete(`/ai/memory/${id}`),
+      splitCreate: async (body: any) => {
+        const created = await api.post<any>('/split-bills', body);
+        const payer = created.participants?.[0]; // peserta pertama = yang menalangi, otomatis dianggap lunas
+        if (payer) await api.patch(`/split-bills/public/${created.publicSlug}/participants/${payer.id}/mark-paid`, {});
+        return created.id as number;
+      },
+      splitPaid: (slug: string, pid: number) => api.patch(`/split-bills/public/${slug}/participants/${pid}/mark-paid`, {}),
+      splitAssign: (billId: number, itemId: number, pids: number[]) => api.patch(`/split-bills/${billId}/items/${itemId}/assign`, { shares: pids.map((participantId) => ({ participantId, weight: 1 })) }),
+      scanReceipt: (imageBase64: string) => api.post<{ items: { description: string; amount: number; quantity: number }[] }>('/split-bills/scan-receipt', { imageBase64 }),
       saveAlias: (id: number, displayName: string) => api.put(`/merchant-aliases/${id}`, { displayName }),
       delAlias: (id: number) => api.delete(`/merchant-aliases/${id}`),
       // pemasukan
@@ -281,8 +328,9 @@ export function useLive(enabled: boolean, path: string, chatActive: number | nul
     todayISO,
     st,
     chat,
+    split,
     flat: {
-      synced, mem, tip,
+      synced, mem, tip, tidy, srcInfo, srcLog,
       txs, manual, incomes, streams, subs, goals, notifs,
       todayBudget: today.data ? Number(today.data.budget) : undefined,
       todayIncome: today.data ? Number(today.data.totalIncome) : undefined,
