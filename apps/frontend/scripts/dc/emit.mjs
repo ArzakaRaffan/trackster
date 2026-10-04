@@ -180,6 +180,7 @@ export function createEmitter() {
     if (style != null || styleExtras.length) {
       let s;
       if (style == null) s = '{}';
+      else if (/^\s*\{\{[\s\S]+?\}\}\s*$/.test(style)) s = `css(${expr(style.trim().slice(2, -2), scope)})`;
       else if (hasHole(style)) s = `css(${tpl(style, scope)})`;
       else s = cssObjLiteral(style);
       if (styleExtras.length) s = style != null && hasHole(style) ? `{...${s},${styleExtras.join(',')}}` : s === '{}' ? `{${styleExtras.join(',')}}` : `{...${s},${styleExtras.join(',')}}`;

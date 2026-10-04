@@ -2,7 +2,6 @@ import type { Metadata } from 'next';
 import Script from 'next/script';
 import { Figtree } from 'next/font/google';
 import './globals.css';
-import { AppShell } from '@/components/AppShell';
 
 // Substituted for the proprietary SpotifyMixUI/CircularSp — swap for licensed
 // @font-face binaries when available (see design_system/readme.md, Gaps & substitutions).
@@ -29,7 +28,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="id">
       <body className={`${ui.className} min-h-screen bg-page text-text lg:flex`}>
-        <AppShell>{children}</AppShell>
+        {children}
         {/* <track-mascot> web component — single source of truth for the mascot (Track Struk). */}
         <Script src="/track-mascot.js" strategy="afterInteractive" />
       </body>

@@ -1,5 +1,5 @@
-'use client';
 // @ts-nocheck
+'use client';
 /* eslint-disable */
 // Bootstrapped from the Claude Design prototype ("Trackster v3 App.dc.html", <script data-dc-script>, lines 1283-2285).
 // This file is hand-maintained from here on: server data / actions are wired in below (see V3 data adapters).
@@ -7,6 +7,8 @@ import React from 'react';
 import { V3Tree } from './V3Tree';
 import './v3.css';
 import './pseudo.css';
+import { api } from '@/lib/api';
+import { stateToPath, pathToState } from '@/lib/v3-routes';
 
 const I = {
   chevR:'M9 18l6-6-6-6', chevL:'M15 18l-6-6 6-6', chevD:'M6 9l6 6 6-6', plus:'M12 5v14M5 12h14', minus:'M5 12h14', x:'M18 6 6 18M6 6l12 12', tick:'M20 6 9 17l-5-5',
@@ -106,7 +108,7 @@ const fmtIn = v => { const n = digits(v); return n ? Number(n).toLocaleString('i
 const V3SHAPE = { BCA:'border-radius:2px', Jago:'border-radius:50%', Flip:'transform:rotate(45deg)' };
 export class V3Logic extends React.Component {
   chatInputRef = React.createRef(); rootRef = React.createRef(); mascotRef = React.createRef(); chatScrollRef = React.createRef(); lpRef = React.createRef(); lpBoxRef = React.createRef();
-  componentDidUpdate(pp) { if (pp && pp.mulai !== this.props.mulai) this.v3start(this.props.mulai); this.v3tr(); this.lpScan(); { const bx = this.lpBoxRef.current, k = (this.state.lpChat || []).length + (this.state.lpTyping ? .5 : 0); if (bx && this._boxN !== k) { this._boxN = k; bx.scrollTop = bx.scrollHeight; } } const el = this.chatScrollRef.current; if (el && this.state.page === 'chat') { const n = el.scrollHeight; if (n !== this._lastH) { this._lastH = n; el.scrollTop = n; } } }
+  componentDidUpdate(pp, ps) { this.syncPath(pp); this.persistPrefs(ps); if (pp && pp.mulai !== this.props.mulai) this.v3start(this.props.mulai); this.v3tr(); this.lpScan(); { const bx = this.lpBoxRef.current, k = (this.state.lpChat || []).length + (this.state.lpTyping ? .5 : 0); if (bx && this._boxN !== k) { this._boxN = k; bx.scrollTop = bx.scrollHeight; } } const el = this.chatScrollRef.current; if (el && this.state.page === 'chat') { const n = el.scrollHeight; if (n !== this._lastH) { this._lastH = n; el.scrollTop = n; } } }
   state = { pre:null, bp:'d', page:'dash', more:true, car:0, txs:TX0, runway:false, openDay:6, opt:'seimbang', basis:false, applyState:'idle', manual:[250000,180000,180000,180000,200000,200000,250000], manualOpen:false, saveState:'idle',
     streams:STREAMS0, incomes:INCOMES0, pending:true, pick:'', incTab:0, period:'month', periodOpen:false, fc:0, rowMenu:null,
     ci:{ 2:{ units:0, extra:0, amount:'' }, 3:{ units:0, extra:0, amount:'' }, 4:{ units:0, extra:0, amount:'' }, 5:{ units:0, extra:0, amount:'' } }, ciState:'open',
@@ -134,7 +136,7 @@ export class V3Logic extends React.Component {
       balances:{ BCA:{ balance:3120000, updated:Date.now() - 55 * 60000, adj:[{ delta:-45000, note:'Biaya admin bulanan', at:Date.now() - 6 * 86400000 }] }, JAGO:{ balance:1110000, updated:Date.now() - 3 * 3600000, adj:[] } },
       aliases:[{ id:1, name:'Kopi Kenangan', raw:'KOPI KENANGAN GRAND IND' }, { id:2, name:'Gojek', raw:'GOJEK *GORIDE' }, { id:3, name:'Grab', raw:'GRAB* A-5XK2' }, { id:4, name:'Sushi Tei', raw:'SUSHI TEI PLAZA SNY' }, { id:5, name:'Bioskop XXI', raw:'CGV XXI GANDARIA' }] } };
 
-  v3mount() { const el = this.rootRef.current; if (el) { this.v3ro = new ResizeObserver(es => { const w = es[0].contentRect.width, bp = w < 720 ? 'm' : w < 1024 ? 't' : 'd'; if (bp !== this.state.bp) this.setState({ bp }); }); this.v3ro.observe(el); } this.v3start(this.props.mulai); this.kd = e => { if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') { e.preventDefault(); this.go('chat'); } }; window.addEventListener('keydown', this.kd); this.v3tr(); }
+  v3mount() { const el = this.rootRef.current; if (el) { this.v3ro = new ResizeObserver(es => { const w = es[0].contentRect.width, bp = w < 720 ? 'm' : w < 1024 ? 't' : 'd'; if (bp !== this.state.bp) this.setState({ bp }); }); this.v3ro.observe(el); } this.v3start(this.props.mulai); this.applyPath(this.props.path); this.restorePrefs(); this.kd = e => { if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') { e.preventDefault(); this.go('chat'); } }; window.addEventListener('keydown', this.kd); this.v3tr(); }
   v3start(m) { const M = { landing:{ pre:'landing' }, masuk:{ pre:'auth' }, wizard:{ pre:'wizard', wiz:0 }, beranda:{ pre:null, page:'dash' }, transaksi:{ pre:null, page:'today' }, rencana:{ pre:null, page:'budget' }, kamu:{ pre:null, page:'me' }, analisis:{ pre:null, page:'analysis' }, laporan:{ pre:null, page:'reports' }, 'tanya track':{ pre:null, page:'chat' }, 'sumber data':{ pre:null, page:'sources' }, privasi:{ pre:null, page:'privacy' } }; const t = M[m || 'beranda']; if (t) this.setState(t); }
   lpScan() { const el = this.lpRef.current; if (!el || this.state.pre !== 'landing') return; const vh = window.innerHeight, seen = { ...(this.state.lpSeen || {}) }; let ch = false;
     el.querySelectorAll('[data-rv]').forEach(n => { const k = n.getAttribute('data-rv'); if (!seen[k] && n.getBoundingClientRect().top < vh * .88) { seen[k] = 1; ch = true; } });
@@ -142,6 +144,10 @@ export class V3Logic extends React.Component {
     if (seen[0] && !this._emailAuto) { this._emailAuto = 1; this.runEmail(); }
     if (ch || sec !== (this.state.lpSec || 'hero')) this.setState({ lpSeen:seen, lpSec:sec }); }
   runEmail() { if (this.state.lpEmail === 1) return; if (this.props.reducedMotion) { this.setState({ lpEmail:2 }); return; } this.setState({ lpEmail:1 }); this.later(() => this.setState({ lpEmail:2 }), 1400); }
+  applyPath(path) { if (path == null) return; const t = pathToState(this.props.base || '/app', path); this._lastPath = path; if (t && (t.page !== this.state.page || t.pre !== (this.state.pre ?? null))) this.setState(t); }
+  syncPath() { const path = this.props.path; if (path == null) return; if (this._lastPath !== path) { this.applyPath(path); return; } const want = stateToPath(this.props.base || '/app', { pre:this.state.pre ?? null, page:this.state.page }); if (want && want !== path) { this._lastPath = want; this.props.onNavigate && this.props.onNavigate(want); } }
+  restorePrefs() { try { const th = localStorage.getItem('v3-theme'), lg = localStorage.getItem('v3-lang'); if (th === 'dark' || th === 'light') this.setState({ themeOv:th }); if (lg === 'id' || lg === 'en') this.setState({ lang:lg }, () => this.v3tr()); } catch (e) {} }
+  persistPrefs(ps) { if (!ps) return; try { if (ps.themeOv !== this.state.themeOv && this.state.themeOv) localStorage.setItem('v3-theme', this.state.themeOv); if (ps.lang !== this.state.lang && this.state.lang) localStorage.setItem('v3-lang', this.state.lang); } catch (e) {} }
   later(fn, ms) { (this.tms = this.tms || []).push(setTimeout(fn, ms)); }
   spent() { return this.state.txs.filter(t => t.d === 6).reduce((a, t) => a + t.amt, 0); }
   addTx(n, time, amt, src, back) { const id = Date.now() + Math.floor(Math.random() * 1000); this.setState(st => ({ txs:[...st.txs, { id, d:6 - back, raw:n.toUpperCase(), alias:n, cap:null, src, time, cat:'MAKANAN', amt, note:'' }] })); }
@@ -233,7 +239,7 @@ export class V3Logic extends React.Component {
       isSettings:s.page === 'settings',
       setTabs:tabs.map((l, i) => ({ label:l, selected:String(t.tab === i), bg: t.tab === i ? 'var(--text)' : 'var(--neutral)', fg: t.tab === i ? 'var(--page)' : 'var(--text)', hover: t.tab === i ? 'var(--text)' : 'var(--neutral-hover)', onClick:() => setT({ tab:i }) })),
       setConn:t.tab === 0, setSync:t.tab === 1, setBal:t.tab === 2, setAlias:t.tab === 3,
-      askLogout:() => this.confirm({ title:'Keluar dari Trackster?', body:'Kamu perlu login lagi untuk buka dashboard.', primary:'Keluar', secondary:'Batal', danger:true, onPrimary:() => this.toast('Keluar… mengarahkan ke halaman login.') }),
+      askLogout:() => this.confirm({ title:'Keluar dari Trackster?', body:'Kamu perlu login lagi untuk buka dashboard.', primary:'Keluar', secondary:'Batal', danger:true, onPrimary:() => { if (this.props.live !== undefined) { api.post('/auth/logout').catch(() => {}).then(() => { window.location.href = '/login'; }); } else this.toast('Keluar… mengarahkan ke halaman login.'); } }),
       gm: t.gmail ? { connected:true, notConnected:false, status:'Terhubung', color:'var(--success-text)', bg:'var(--success-subtle)', sub:'rizky.arzaka@gmail.com' } : { connected:false, notConnected:true, status:'Belum terhubung', color:'var(--text-subtle)', bg:'var(--neutral)', sub:'Transaksi nggak akan tercatat otomatis' },
       askDisconnect:() => this.confirm({ title:'Putuskan Google?', body:'Trackster berhenti membaca email bank dan reminder Calendar nggak di-sync lagi.', primary:'Putuskan', secondary:'Batal', danger:true, onPrimary:() => { setT({ gmail:false }); this.toast('Google diputuskan.'); } }),
       connectGmail:() => { setT({ gmail:true }); this.toast('Google terhubung.'); },
@@ -484,7 +490,7 @@ export class V3Logic extends React.Component {
     if (st.kind === 'DEDUCTION') return Math.max(0, n(st.amount) - e.units * n(st.ded));
     return Number(digits(e.amount)) || 0;
   }
-  renderVals() { const v = this.rv0(); for (const k of Object.getOwnPropertyNames(Object.getPrototypeOf(this))) if (k.startsWith('rv_')) Object.assign(v, this[k](this.state, this.props, v)); return v; }
+  renderVals() { const L = this.props.live; this.S = L ? { ...this.state, ...(L.flat || {}), chat:{ ...this.state.chat, ...(L.chat || {}) }, st:{ ...this.state.st, ...(L.st || {}) }, split:{ ...this.state.split, ...(L.split || {}) } } : this.state; const v = this.rv0(); for (const k of Object.getOwnPropertyNames(Object.getPrototypeOf(this))) if (k.startsWith('rv_')) Object.assign(v, this[k](this.S, this.props, v)); return v; }
   rv_pre(s0, props) { const h = this.v3h(s0); const s = { ...s0, ckS:s0.ckS ?? {}, budget:s0.wzBudget ?? 150000 };
     const { RP, NUM, seg, isMob, isDesk, isTab } = h;
     const PRE = ['landing', 'auth', 'wizard'];
@@ -511,7 +517,7 @@ export class V3Logic extends React.Component {
       lpad:isMob ? '16px 16px 40px' : '24px 40px 56px', lgap:isMob ? '28px' : '56px', heroCols:isDesk || isTab ? '1.1fr .9fr' : '1fr', h1Size:isMob ? '42px' : '64px', h2Size:isMob ? '28px' : '38px', twoCols:isMob ? '1fr' : '1fr 1fr', twoColsW:isMob ? '1fr' : '1fr 1fr',
       lpSteps:[{ no:'1', t:'Terima alamat penerusmu', b:'Satu alamat email pribadi, dibuat saat kamu mendaftar.' }, { no:'2', t:'Teruskan email bank dari Gmail', b:'Sekali saja, dari Gmail di laptop: tambahkan alamat itu dan buat filter untuk BCA, Jago, Flip.' }, { no:'3', t:'Lihat sisa hari ini', b:'Setiap notifikasi bank jadi transaksi. Track menghitung sisa budgetmu dan memberi tahu kalau hampir jebol.' }],
       toAuthMasuk:() => this.setState({ pre:'auth', authMode:'masuk', authErr:'' }), toAuthDaftar:() => this.setState({ pre:'auth', authMode:'daftar', authErr:'' }), toLanding:() => this.setState({ pre:'landing' }),
-      tryDemo:() => this.setState({ pre:null, page:'dash', demo:true }),
+      tryDemo:() => (this.props.onNavigate ? this.props.onNavigate('/demo') : this.setState({ pre:null, page:'dash', demo:true })),
       wlDone:!!s.wlDone, wlOpen:!s.wlDone, wlErr:!!s.wlErr, wlEmail:s.wlEmail ?? '', onWl:e => this.setState({ wlEmail:e.target.value, wlErr:false }),
       joinWl:e => { e.preventDefault(); if (/^\S+@\S+\.\S+$/.test(s.wlEmail ?? '')) this.setState({ wlDone:true, wlErr:false }); else this.setState({ wlErr:true }); },
       tools:[['Split Bill', 'Split Bill'], ['Patungan Trip', 'Patungan Trip'], ['Kalkulator tabungan', 'Kalkulator tabungan'], ['Kalkulator cicilan', 'Kalkulator cicilan']].map(([l, n]) => ({ l, go:() => this.toast(n + ' terbuka di /tools (prototipe ini tidak menyertakannya).') })),
@@ -521,7 +527,7 @@ export class V3Logic extends React.Component {
       email:A.email, pw:A.pw, pwType:A.show ? 'text' : 'password', pwLabel:A.show ? 'Sembunyikan password' : 'Tampilkan password', pwBtn:A.show ? 'SEMBUNYI' : 'LIHAT', pwFocus:() => this.setState({ pwFocus:true }), pwBlur:() => this.setState({ pwFocus:false }),
       emailBd:A.err && !emOk ? 'var(--bad)' : 'var(--line)', pwBd:A.err && A.pw.length < 8 ? 'var(--bad)' : 'var(--line)', authErr:A.err,
       onEmail:e => this.setState({ email:e.target.value, authErr:'' }), onPw:e => this.setState({ pw:e.target.value, authErr:'' }), togglePw:() => this.setState(st => ({ showPw:!st.showPw })),
-      submitAuth:e => { e.preventDefault(); if (!emOk) return this.setState({ authErr:'Emailnya belum lengkap. Contoh: nama@gmail.com' }); if (A.pw.length < 8) return this.setState({ authErr:'Password minimal 8 karakter.' });
+      submitAuth:e => { e.preventDefault(); if (A.mode === 'masuk' && this.props.live !== undefined) { const u = A.email.trim(); if (!u || !A.pw) return this.setState({ authErr:'Isi email dan password dulu.' }); this.setState({ authErr:'' }); api.post('/auth/login', { username:u, password:A.pw }).then(() => this.setState({ pre:null, page:'dash', demo:false, authErr:'' })).catch(err => this.setState({ authErr:(err && err.message) || 'Login gagal' })); return; } if (!emOk) return this.setState({ authErr:'Emailnya belum lengkap. Contoh: nama@gmail.com' }); if (A.pw.length < 8) return this.setState({ authErr:'Password minimal 8 karakter.' });
         if (A.mode === 'daftar') this.setState({ pre:'wizard', demo:false, wiz:0, authErr:'', testSt:'wait', oldPulled:0 });
         else this.setState({ pre:null, page:'dash', demo:false, authErr:'' }); },
       forgot:() => this.setState({ forgot:true }), backLogin:() => this.setState({ forgot:false }), sendReset:() => { if (!emOk) return this.toast('Isi emailmu dulu.'); this.setState({ forgot:false }); this.toast('Tautan reset dikirim ke ' + em); },
@@ -841,7 +847,7 @@ export class V3Logic extends React.Component {
   }
 
   rv0() {
-    const s = this.state, h = React.createElement;
+    const s = this.S, h = React.createElement;
     const dark = (this.state.themeOv ?? this.props.theme ?? 'dark') === 'dark', presence = this.props.mascot ?? 'aktif', sisa = (this.props.heroFocus ?? 'sisa') === 'sisa';
     const neutral = (on, label) => on;
     const PAGES = { tidy:['Rapikan kategori','Satu merchant, satu kategori'], calc:['Kalkulator','Tabungan dan cicilan'], me:['Menu','Semua fitur Trackster'], analysis:['Analisis','Kebiasaan, anomali, dan pembelian besar'], sources:['Sumber data','Email, alamat penerus, integrasi'], privacy:['Privasi dan data kamu','Yang masuk, yang tidak, dan kendalimu'], dash:['Dashboard','Rabu, 30 September'], today:['Hari ini','Rabu, 30 September'], weekly:['Mingguan','7 hari terakhir'], budget:['Budget','Atur budget harian'], income:['Pemasukan','Kelola arus masuk'], checkin:['Check-in pemasukan','Jaring pengaman mingguan'], subs:['Langganan','Kelola manual + reminder Google Calendar'], settings:['Setting','Akun & sinkronisasi'], chat:['Tanya Track','AI financial buddy'], reports:['Laporan','Analisis pengeluaran'], split:['Split bill','Bagi tagihan bareng teman'], splitNew:['Buat split bill','3 langkah'], splitDetail:[(this.state.split.bills.find(x => x.id === this.state.split.activeId) || {}).resto || 'Split bill','Detail split bill'], memory:['Yang Track ingat','Tanya Track'], goals:['Target tabungan','Kantong untuk tiap tujuan'] };

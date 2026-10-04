@@ -4,6 +4,7 @@ const kebabToCamel = (s: string) => s.replace(/-([a-z])/g, (_, c: string) => c.t
 
 /** Inline-CSS string → React style object (same rules as the design prototype's runtime). */
 export function css(src: unknown): CSSProperties {
+  if (src && typeof src === 'object') return src as CSSProperties;
   const o: Record<string, string> = {};
   if (typeof src !== 'string') return o;
   for (const decl of src.split(';')) {
