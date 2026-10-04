@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import Link from 'next/link';
 import useSWR from 'swr';
 import { motion } from 'motion/react';
 import { Bar, BarChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
@@ -57,6 +58,15 @@ const BUCKETS: { key: TimeBucket; label: string }[] = [
   { key: 'malam', label: 'Malam' },
   { key: 'larut', label: 'Larut' },
 ];
+
+// Rentang periode → kunci tanggal WIB (YYYY-MM-DD); `end` dari API eksklusif, jadi mundur 1 ms.
+const wibKey = (ms: number) => new Date(ms + 7 * 3600_000).toISOString().slice(0, 10);
+function drillHref(range: PeriodStats['range'], filter: { category?: string; search?: string }) {
+  const qs = new URLSearchParams(filter as Record<string, string>);
+  qs.set('startDate', wibKey(new Date(range.start).getTime()));
+  qs.set('endDate', wibKey(new Date(range.end).getTime() - 1));
+  return `/app/transactions?${qs}`;
+}
 
 function pctChange(curr: number, prev: number): number {
   if (prev === 0) return curr === 0 ? 0 : 100;
@@ -122,8 +132,8 @@ export default function InsightsPage() {
           <AnimatedTabContent tabKey={range}>
             <InsightCardSection range={range} />
             <KpiGrid stats={data} />
-            <HabitsCard habits={data.habits} />
-            <CategoryCard categories={data.byCategory} />
+            <HabitsCard habits={data.habits} range={data.range} />
+            <CategoryCard categories={data.byCategory} range={data.range} />
             <TimeHeatmapCard heatmap={data.timeHeatmap} />
             {(range === '90d' || range === 'all') && <TrendCard byDay={data.byDay} />}
             <BigPurchasesCard items={data.bigPurchases} onMarkRoutine={markRoutine} />
@@ -213,7 +223,7 @@ function KpiGrid({ stats }: { stats: PeriodStats }) {
   );
 }
 
-function HabitsCard({ habits }: { habits: PeriodStats['habits'] }) {
+function HabitsCard({ habits, range }: { habits: PeriodStats['habits']; range: PeriodStats['range'] }) {
   const top = habits.slice(0, 5);
   return (
     <section className="rounded-comfortable bg-surface p-5">
@@ -223,12 +233,16 @@ function HabitsCard({ habits }: { habits: PeriodStats['habits'] }) {
       ) : (
         <div className="mt-3 flex flex-col gap-3">
           {top.map((h) => (
-            <div key={h.merchantKey} className="flex items-baseline justify-between gap-3 text-small">
+            <Link
+              key={h.merchantKey}
+              href={drillHref(range, { search: h.displayName })}
+              className="flex items-baseline justify-between gap-3 text-small"
+            >
               <p className="min-w-0 truncate font-bold text-ink">{h.displayName}</p>
               <p className="shrink-0 tabular-nums text-ink-muted">
                 {h.count}× · {formatRupiahCompact(h.total)} · ≈ {formatRupiahCompact(h.annualized)}/thn
               </p>
-            </div>
+            </Link>
           ))}
         </div>
       )}
@@ -236,7 +250,7 @@ function HabitsCard({ habits }: { habits: PeriodStats['habits'] }) {
   );
 }
 
-function CategoryCard({ categories }: { categories: PeriodStats['byCategory'] }) {
+function CategoryCard({ categories, range }: { categories: PeriodStats['byCategory']; range: PeriodStats['range'] }) {
   const top = categories.filter((c) => c.total > 0).slice(0, 8);
   const max = Math.max(1, ...top.map((c) => Math.max(c.total, c.prevTotal ?? 0)));
   return (
@@ -252,7 +266,7 @@ function CategoryCard({ categories }: { categories: PeriodStats['byCategory'] })
           className="mt-3 flex flex-col gap-3"
         >
           {top.map((c) => (
-            <div key={c.category}>
+            <Link key={c.category} href={drillHref(range, { category: c.category })} className="block">
               <div className="flex items-baseline justify-between text-small">
                 <span className="text-ink-muted">{CATEGORY_LABELS[c.category] ?? c.category}</span>
                 <span className="tabular-nums font-bold text-ink">{formatRupiah(c.total)}</span>
@@ -270,7 +284,7 @@ function CategoryCard({ categories }: { categories: PeriodStats['byCategory'] })
                   </div>
                 )}
               </div>
-            </div>
+            </Link>
           ))}
         </motion.div>
       )}

@@ -59,6 +59,7 @@ const MOBILE_SUBPATHS = [
   '/app/income',
   '/app/income/checkin',
   '/app/insights',
+  '/app/transactions',
   '/app/categorize',
   '/app/settings',
   '/app/chat',
