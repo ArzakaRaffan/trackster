@@ -37,9 +37,39 @@ model Transaction {
   // Override manual "pembelian besar" (E06-S1). null = pakai aturan otomatis
   // (>= max(300rb, 5x median 90 hari)); true/false = ditandai eksplisit lewat tombol di detail transaksi.
   isBig       Boolean?
+  // Total patungan yang SUDAH diterima (Reimbursement RECEIVED) — didenormalisasi biar _sum/groupBy
+  // SQL tetap jalan. `amount` tetap bruto (= uang keluar dari bank); pengeluaran efektif = amount - reimbursedAmount.
+  reimbursedAmount Decimal @default(0) @db.Decimal(12, 2)
+  reimbursements   Reimbursement[]
 
   @@index([occurredAt])
   @@index([merchantKey])
+}
+
+enum ReimbursementStatus {
+  PENDING
+  RECEIVED
+}
+
+// Patungan: orang lain menggantikan sebagian transaksi yang kita talangi. BUKAN Income — tidak
+// masuk statistik/forecast pemasukan. PENDING = cuma piutang (tidak ngubah pengeluaran/saldo);
+// RECEIVED = ngurangin pengeluaran efektif transaksinya + nambah saldo `receivedSource`.
+model Reimbursement {
+  id             Int                 @id @default(autoincrement())
+  transactionId  Int
+  transaction    Transaction         @relation(fields: [transactionId], references: [id], onDelete: Cascade)
+  personName     String
+  amount         Decimal             @db.Decimal(12, 2)
+  status         ReimbursementStatus @default(PENDING)
+  receivedAt     DateTime?
+  receivedSource Source?
+  // Apakah saldo benar-benar digerakkan saat RECEIVED (aturan baseline bisa skip) — dipakai
+  // supaya pembalikan (batal / hapus transaksi) persis simetris.
+  balanceApplied Boolean             @default(false)
+  createdAt      DateTime            @default(now())
+
+  @@index([transactionId])
+  @@index([status])
 }
 
 enum Source {

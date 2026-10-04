@@ -126,6 +126,13 @@ export class TransactionService {
    * createFromParsed). */
   async remove(id: number) {
     return this.prisma.$transaction(async (tx) => {
+      // Reimbursement ikut terhapus (cascade) — balikkan dulu saldo dari patungan yang sudah diterima.
+      const received = await tx.reimbursement.findMany({
+        where: { transactionId: id, status: 'RECEIVED', balanceApplied: true },
+      });
+      for (const r of received) {
+        if (r.receivedSource) await this.balanceService.adjustBalance(tx, r.receivedSource, -Number(r.amount));
+      }
       const deleted = await tx.transaction.delete({ where: { id } });
       const lastAdjustmentAt = await this.balanceService.getLastManualAdjustmentAt(tx, deleted.source);
       if (shouldAdjustBalance(deleted.occurredAt, lastAdjustmentAt)) {
