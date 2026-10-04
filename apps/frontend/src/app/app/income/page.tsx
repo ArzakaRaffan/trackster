@@ -453,7 +453,7 @@ export default function IncomePage() {
                       {s.expected > 0 ? ` / ${formatRupiah(s.expected)}` : ''}
                     </span>
                     <span className={`whitespace-nowrap rounded-subtle px-1.5 py-0.5 text-micro font-bold uppercase tracking-caps ${STATUS_TONE[s.status]}`}>
-                      {STATUS_LABEL[s.status]}
+                      {s.expected === 0 && s.received === 0 ? 'Bukan minggu ini' : STATUS_LABEL[s.status]}
                     </span>
                   </div>
                 </div>

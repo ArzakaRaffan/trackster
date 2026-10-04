@@ -166,7 +166,6 @@ export class IncomeForecastService {
     const { start: weekStart, end: weekEnd } = wibRange('week', anchor);
     const { year, month } = wibParts(weekStart);
     const monthStart = startOfWibMonth(year, month);
-    const monthEnd = month === 12 ? startOfWibMonth(year + 1, 1) : startOfWibMonth(year, month + 1);
     const now = new Date();
     const weekEnded = now.getTime() >= weekEnd.getTime();
 
@@ -192,7 +191,7 @@ export class IncomeForecastService {
         },
         { historicalAmounts, historicalAbsences, isScheduledThisWeek: scheduled },
       );
-      const received = await this.fetchReceived(stream, weekStart, weekEnd, monthStart, monthEnd);
+      const received = await this.fetchReceived(stream, weekStart, weekEnd);
       const status = deriveStreamStatus(received, amounts.expected, weekEnded);
       results.push({ id: stream.id, name: stream.name, kind: stream.kind, ...amounts, received: round(received), status });
     }
@@ -248,25 +247,16 @@ export class IncomeForecastService {
    * `receivedAt`-nya jatuh di minggu ini — biar forecast tidak buta terhadap data historis yang belum
    * di-backfill (lihat catatan "Link income lama ke stream" di E03-S1, ditunda ke UI edit income).
    *
-   * Untuk stream MONTHLY: check-in mingguan selalu nulis `periodStart` = awal MINGGU (bukan awal
-   * bulan) — lihat `IncomeCheckinService`. Match pakai range sebulan penuh, bukan exact-equality ke
-   * `monthStart`, kalau nggak received selalu 0 walau sudah di-checkin (bug nyata 2026-09-28: Ruangguru
-   * ke-checkin Rp120.000 tapi status tetap MENUNGGU di halaman Pemasukan). */
-  private async fetchReceived(
-    stream: { id: number; cadence: IncomeCadence },
-    weekStart: Date,
-    weekEnd: Date,
-    monthStart: Date,
-    monthEnd: Date,
-  ): Promise<number> {
-    const periodMatch =
-      stream.cadence === 'MONTHLY' ? { periodStart: { gte: monthStart, lt: monthEnd } } : { periodStart: { gte: weekStart, lt: weekEnd } };
+   * Semua cadence dicocokkan per MINGGU — check-in menulis `periodStart` = awal minggu. Untuk stream
+   * MONTHLY, minggu non-payday memang harus 0. Dulu dicocokkan sebulan penuh sehingga Ruangguru
+   * (cair tgl 25) tampil "Diterima" di setiap minggu bulan itu (bug 2026-10-04). */
+  private async fetchReceived(stream: { id: number }, weekStart: Date, weekEnd: Date): Promise<number> {
     const agg = await this.prisma.income.aggregate({
       _sum: { amount: true },
       where: {
         streamId: stream.id,
         status: 'CONFIRMED',
-        OR: [periodMatch, { periodStart: null, receivedAt: { gte: weekStart, lt: weekEnd } }],
+        OR: [{ periodStart: { gte: weekStart, lt: weekEnd } }, { periodStart: null, receivedAt: { gte: weekStart, lt: weekEnd } }],
       },
     });
     return Number(agg._sum.amount ?? 0);
