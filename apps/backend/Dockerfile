@@ -6,7 +6,8 @@ COPY prisma ./prisma
 RUN npm install
 COPY . .
 RUN npx prisma generate
-ENV NODE_OPTIONS=--max-old-space-size=1280
+ARG NODE_HEAP_MB=1280
+ENV NODE_OPTIONS=--max-old-space-size=$NODE_HEAP_MB
 RUN npm run build
 
 FROM node:20-alpine AS runner

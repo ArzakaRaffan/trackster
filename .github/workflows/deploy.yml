@@ -27,6 +27,7 @@ jobs:
         with:
           context: ./apps/backend
           push: true
+          build-args: NODE_HEAP_MB=4096
           tags: |
             ${{ env.REGISTRY }}/trackster-backend:latest
             ${{ env.REGISTRY }}/trackster-backend:${{ github.sha }}
@@ -38,6 +39,7 @@ jobs:
           context: ./apps/frontend
           push: true
           build-args: |
+            NODE_HEAP_MB=4096
             NEXT_PUBLIC_API_URL=${{ vars.NEXT_PUBLIC_API_URL || 'https://api.trackster.dev' }}
             NEXT_PUBLIC_SITE_URL=${{ vars.NEXT_PUBLIC_SITE_URL || 'https://trackster.dev' }}
           tags: |
