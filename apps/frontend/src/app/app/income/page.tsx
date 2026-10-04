@@ -6,7 +6,7 @@ import useSWR from 'swr';
 import { useAutoAnimate } from '@formkit/auto-animate/react';
 import { AnimatePresence, motion } from 'motion/react';
 import { api } from '@/lib/api';
-import { formatRupiah, DAY_NAMES } from '@/lib/format';
+import { formatRupiah, DAY_NAMES, WEEK_ORDER } from '@/lib/format';
 import { Input } from '@/components/ui/Input';
 import { Button } from '@/components/ui/Button';
 import { SourceTag } from '@/components/ui/SourceTag';
@@ -845,9 +845,9 @@ export default function IncomePage() {
                                 className="w-full appearance-none rounded-medium bg-card px-3.5 py-3 text-body text-text shadow-field outline-none"
                               >
                                 <option value="">— tidak tentu —</option>
-                                {DAY_NAMES.map((d, i) => (
+                                {WEEK_ORDER.map((i) => (
                                   <option key={i} value={i}>
-                                    {d}
+                                    {DAY_NAMES[i]}
                                   </option>
                                 ))}
                               </select>

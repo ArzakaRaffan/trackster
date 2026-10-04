@@ -5,7 +5,7 @@ import { TelegramService } from '../telegram/telegram.service';
 import { BudgetService } from '../budget/budget.service';
 import { BudgetAdvisorService } from '../budget/budget-advisor.service';
 import { AiBudgetService } from './ai-budget.service';
-import { addWibDays, startOfWibWeek, wibDateKey } from '../../common/wib';
+import { WEEK_ORDER, addWibDays, startOfWibWeek, wibDateKey } from '../../common/wib';
 
 const OPTION_LABEL: Record<string, string> = { hemat: 'Hemat', seimbang: 'Seimbang', longgar: 'Longgar' };
 
@@ -91,7 +91,7 @@ export class AiBudgetReminderService {
       const text = [
         `✅ <b>Budget ${OPTION_LABEL[chosen.option]} diterapkan</b> (minggu ${parsed.weekStart})`,
         ``,
-        ...chosen.dailyAmounts.map((a, i) => `${dayNames[i]}: ${fmt(a)}`),
+        ...WEEK_ORDER.map((i) => `${dayNames[i]}: ${fmt(chosen.dailyAmounts[i])}`),
       ].join('\n');
       await this.telegramService.editMessage(String(callbackQuery.message.chat.id), callbackQuery.message.message_id, text);
     }

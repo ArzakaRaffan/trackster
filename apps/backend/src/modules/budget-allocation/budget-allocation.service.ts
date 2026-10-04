@@ -3,7 +3,7 @@ import { Cron } from '@nestjs/schedule';
 import { PrismaService } from '../../prisma.service';
 import { BudgetService } from '../budget/budget.service';
 import { TelegramService } from '../telegram/telegram.service';
-import { startOfWibWeek, wibDateKey, wibRange } from '../../common/wib';
+import { WEEK_ORDER, startOfWibWeek, wibDateKey, wibRange } from '../../common/wib';
 
 export interface WeeklyAllocation {
   needs: number;
@@ -14,7 +14,7 @@ export interface WeeklyAllocation {
 
 /** Fungsi murni: pecah total pemasukan minggu ini jadi 50% kebutuhan / 30% keinginan / 20%
  * tabungan, lalu ratakan pool kebutuhan+keinginan ke 7 hari. Sisa pembulatan dari 50/30 masuk
- * ke savings (bukan pool harian), sisa pembagian 7 hari masuk ke hari terakhir (Sabtu) — supaya
+ * ke savings (bukan pool harian), sisa pembagian 7 hari masuk ke hari terakhir (Minggu, karena minggu = Senin–Minggu) — supaya
  * total selalu persis sama dengan totalIncome. */
 export function calcWeeklyAllocation(totalIncome: number): WeeklyAllocation {
   const needs = Math.round(totalIncome * 0.5);
@@ -25,7 +25,7 @@ export function calcWeeklyAllocation(totalIncome: number): WeeklyAllocation {
   const base = Math.floor(dailyPool / 7);
   const remainder = dailyPool - base * 7;
   const dailyAmounts = new Array(7).fill(base);
-  dailyAmounts[6] += remainder; // Sabtu
+  dailyAmounts[0] += remainder; // index 0 = Minggu = hari terakhir minggu Senin–Minggu
 
   return { needs, wants, savings, dailyAmounts };
 }
@@ -126,7 +126,7 @@ export class BudgetAllocationService {
   ): string {
     const fmt = (n: number) => `Rp${Math.round(n).toLocaleString('id-ID')}`;
     const dayNames = ['Min', 'Sen', 'Sel', 'Rab', 'Kam', 'Jum', 'Sab'];
-    const dailyLines = alloc.dailyAmounts.map((a, i) => `  ${dayNames[i]}: ${fmt(a)}`).join('\n');
+    const dailyLines = WEEK_ORDER.map((i) => `  ${dayNames[i]}: ${fmt(alloc.dailyAmounts[i])}`).join('\n');
 
     const lines = [
       `<b>Alokasi 50/30/20 — minggu ${wibDateKey(weekStart)}</b>`,

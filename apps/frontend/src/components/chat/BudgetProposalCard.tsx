@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { api } from '@/lib/api';
-import { formatRupiah } from '@/lib/format';
+import { WEEK_ORDER, formatRupiah } from '@/lib/format';
 import { Check, Wallet } from 'lucide-react';
 
 const OPTION_LABEL: Record<string, string> = { hemat: 'Hemat', seimbang: 'Seimbang', longgar: 'Longgar' };
@@ -44,7 +44,7 @@ export function BudgetProposalCard({ card }: { card: BudgetProposalCardData }) {
         </p>
         {card.note && <p className="text-micro text-text-subtle">{card.note}</p>}
         <div className="mt-1.5 flex gap-2 overflow-x-auto text-micro">
-          {card.dailyAmounts.map((a, i) => (
+          {WEEK_ORDER.map((i) => [i, card.dailyAmounts[i]] as const).map(([i, a]) => (
             <span key={i} className="whitespace-nowrap text-text-subtle">
               {DAY_SHORT[i]} <span className="font-bold text-text">{formatRupiah(a)}</span>
             </span>

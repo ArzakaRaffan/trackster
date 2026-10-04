@@ -46,8 +46,8 @@ check('Pembagian tidak bulat (1.000.000): dailyAmounts tetap jumlah persis, sisa
   const total = alloc.dailyAmounts.reduce((a, b) => a + b, 0);
   assert.strictEqual(total, alloc.needs + alloc.wants);
   assert.strictEqual(alloc.needs + alloc.wants + alloc.savings, 1_000_000);
-  const base = Math.min(...alloc.dailyAmounts.slice(0, 6));
-  assert.ok(alloc.dailyAmounts[6] >= base, 'sisa pembagian masuk ke hari terakhir (Sabtu)');
+  const base = Math.min(...alloc.dailyAmounts.slice(1));
+  assert.ok(alloc.dailyAmounts[0] >= base, 'sisa pembagian masuk ke hari terakhir (Minggu, index 0)');
 });
 
 check('totalIncome = 0 -> semua nol, tidak error', () => {

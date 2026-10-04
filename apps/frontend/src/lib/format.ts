@@ -16,6 +16,8 @@ export function formatTime(dateStr: string): string {
 }
 
 export const DAY_NAMES = ['Minggu', 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'];
+/** Urutan tampil Senin→Minggu; nilainya = indeks `DAY_NAMES` / `DailyBudget.dayOfWeek` (0=Minggu). */
+export const WEEK_ORDER = [1, 2, 3, 4, 5, 6, 0];
 
 export const MONTH_NAMES = [
   'Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni',

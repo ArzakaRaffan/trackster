@@ -34,6 +34,9 @@ export function wibDayOfWeek(d: Date): number {
   return new Date(`${wibDateKey(d)}T00:00:00Z`).getUTCDay();
 }
 
+/** Urutan tampil Senin→Minggu; nilainya = `wibDayOfWeek` / `DailyBudget.dayOfWeek` (0=Minggu). */
+export const WEEK_ORDER = [1, 2, 3, 4, 5, 6, 0];
+
 /** Senin 00:00 WIB dari minggu yang memuat `d`. */
 export function startOfWibWeek(d: Date): Date {
   const daysSinceMonday = (wibDayOfWeek(d) + 6) % 7;

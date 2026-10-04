@@ -6,7 +6,7 @@ import useSWR from 'swr';
 import { motion } from 'motion/react';
 import { Bar, BarChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import { api } from '@/lib/api';
-import { formatRupiah, formatRupiahCompact, DAY_NAMES } from '@/lib/format';
+import { formatRupiah, formatRupiahCompact, DAY_NAMES, WEEK_ORDER } from '@/lib/format';
 import { CATEGORY_COLORS, CATEGORY_LABELS } from '@/components/ui/TransactionNoteRow';
 import { AnimatedTabContent } from '@/components/ui/AnimatedTabContent';
 import { TRANSITION_SLOW } from '@/lib/motion';
@@ -303,7 +303,7 @@ function TimeHeatmapCard({ heatmap }: { heatmap: PeriodStats['timeHeatmap'] }) {
       <h2 className="text-heading font-semibold text-ink">Pola waktu</h2>
       <div className="mt-3 grid grid-cols-[36px_repeat(7,1fr)] items-center gap-1">
         <div />
-        {SHORT_DAY.map((d) => (
+        {WEEK_ORDER.map((dow) => SHORT_DAY[dow]).map((d) => (
           <div key={d} className="text-center text-micro text-ink-muted">
             {d}
           </div>
@@ -312,7 +312,7 @@ function TimeHeatmapCard({ heatmap }: { heatmap: PeriodStats['timeHeatmap'] }) {
           <div key={`label-${b.key}`} className="text-micro text-ink-muted">
             {b.label}
           </div>,
-          ...SHORT_DAY.map((_, dow) => {
+          ...WEEK_ORDER.map((dow) => {
             const total = map.get(`${dow}-${b.key}`)?.total ?? 0;
             return (
               <div

@@ -50,7 +50,8 @@ export default function WeeklyPage() {
   const totalBudget = data.days.reduce((s, d) => s + d.budget, 0);
   const totalSpent = data.days.reduce((s, d) => s + d.totalSpent, 0);
   const remaining = totalBudget - totalSpent;
-  const isToday = (date: string) => date === new Date().toISOString().slice(0, 10);
+  const todayWib = new Date(Date.now() + 7 * 3600_000).toISOString().slice(0, 10);
+  const isToday = (date: string) => date === todayWib;
 
   const chartDays = data.days.map((d) => ({
     label: SHORT_DAY[d.dayOfWeek],
@@ -64,7 +65,7 @@ export default function WeeklyPage() {
     <div className="flex flex-col gap-5 px-4 pt-2 lg:px-0">
       <header>
         <h1 className="font-title text-[32px] font-bold tracking-[-0.02em] text-text">Mingguan</h1>
-        <p className="text-[15px] text-text-subtle">7 hari terakhir</p>
+        <p className="text-[15px] text-text-subtle">Senin–Minggu minggu ini</p>
       </header>
 
       <section className="rounded-card-lg bg-card p-6 shadow-card">

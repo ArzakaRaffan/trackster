@@ -83,15 +83,15 @@ export class TransactionService {
 
   async getWeekly() {
     const now = new Date();
-    const currentDay = wibDayOfWeek(now); // 0=Minggu
-    const startOfWeek = addWibDays(startOfWibDay(now), -currentDay);
+    const startOfWeek = startOfWibWeek(now); // Senin 00:00 WIB
 
     const days: any[] = [];
     for (let i = 0; i < 7; i++) {
       const date = addWibDays(startOfWeek, i);
       const nextDate = addWibDays(date, 1);
 
-      const budgetRow = await this.prisma.dailyBudget.findUnique({ where: { dayOfWeek: i } });
+      const dayOfWeek = wibDayOfWeek(date); // Senin..Minggu = 1..6,0
+      const budgetRow = await this.prisma.dailyBudget.findUnique({ where: { dayOfWeek } });
       const transactions = await this.prisma.transaction.findMany({
         where: { occurredAt: { gte: date, lt: nextDate } },
         orderBy: { occurredAt: 'asc' },
@@ -100,7 +100,7 @@ export class TransactionService {
 
       days.push({
         date: wibDateKey(date),
-        dayOfWeek: i,
+        dayOfWeek,
         budget: budgetRow ? Number(budgetRow.amount) : 0,
         totalSpent,
         transactions,

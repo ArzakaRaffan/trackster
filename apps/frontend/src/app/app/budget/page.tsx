@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import useSWR from 'swr';
 import { api } from '@/lib/api';
-import { DAY_NAMES, formatRupiah } from '@/lib/format';
+import { DAY_NAMES, WEEK_ORDER, formatRupiah } from '@/lib/format';
 import { Input } from '@/components/ui/Input';
 import { Button } from '@/components/ui/Button';
 import { AnimatedAmount } from '@/components/ui/AnimatedAmount';
@@ -79,7 +79,7 @@ function MiniBarChart({ amounts }: { amounts: number[] }) {
   const max = Math.max(...amounts, 1);
   return (
     <div className="mt-2 flex items-end gap-0.5" style={{ height: 32 }}>
-      {amounts.map((v, i) => (
+      {WEEK_ORDER.map((i) => [i, amounts[i]] as const).map(([i, v]) => (
         <div key={i} className="flex flex-1 flex-col items-center gap-0.5">
           <div
             className="w-full rounded-subtle bg-current opacity-60 transition-all duration-slow"
@@ -373,7 +373,7 @@ export default function BudgetPage() {
         >
           <div className="overflow-hidden">
             <div className="flex flex-col gap-3 px-6 pb-6">
-              {[0, 1, 2, 3, 4, 5, 6].map((day) => (
+              {WEEK_ORDER.map((day) => (
                 <Input
                   key={day}
                   label={DAY_NAMES[day]}
