@@ -11,6 +11,7 @@ import { AmountDisplay } from '@/components/ui/AmountDisplay';
 import { BudgetProgress } from '@/components/ui/BudgetProgress';
 import { Input } from '@/components/ui/Input';
 import { Button } from '@/components/ui/Button';
+import { PendingReimbursements } from '@/components/ui/PendingReimbursements';
 import { EmptyState } from '@/components/EmptyState';
 import { EASE_ENTER, TRANSITION_BASE } from '@/lib/motion';
 import { formatRupiah } from '@/lib/format';
@@ -47,6 +48,7 @@ interface Transaction {
   category?: string;
   displayDescription?: string;
   aiCaption?: string | null;
+  reimbursedAmount?: number | string;
 }
 
 
@@ -250,6 +252,8 @@ export default function TodayPage() {
           </div>
         </div>
       )}
+
+      <PendingReimbursements />
 
       {/* Transactions */}
       <div className="flex items-baseline gap-3">

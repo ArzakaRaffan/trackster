@@ -35,7 +35,7 @@ function TransactionsList() {
 
   const title = search ?? (category ? CATEGORY_LABELS[category] ?? category : 'Semua transaksi');
   const subtitle = startDate && endDate ? `${startDate} → ${endDate}` : 'Semua waktu';
-  const total = data?.data.reduce((s, t) => s + Number(t.amount), 0) ?? 0;
+  const total = data?.data.reduce((s, t) => s + Number(t.amount) - Number(t.reimbursedAmount ?? 0), 0) ?? 0;
 
   return (
     <div className="pb-navbar animate-fade-in-up">

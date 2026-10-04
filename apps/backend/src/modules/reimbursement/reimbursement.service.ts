@@ -12,10 +12,10 @@ export class ReimbursementService {
     private balanceService: BalanceService,
   ) {}
 
-  /** Piutang: default cuma PENDING, lengkap dengan transaksi asalnya. */
-  list(status: ReimbursementStatus = 'PENDING') {
+  /** Piutang: default cuma PENDING, lengkap dengan transaksi asalnya. Dengan `transactionId`: semua status transaksi itu. */
+  list(status: ReimbursementStatus = 'PENDING', transactionId?: number) {
     return this.prisma.reimbursement.findMany({
-      where: { status },
+      where: transactionId ? { transactionId } : { status },
       include: { transaction: { select: { id: true, description: true, amount: true, occurredAt: true, source: true } } },
       orderBy: { createdAt: 'asc' },
     });

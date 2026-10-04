@@ -20,6 +20,7 @@ interface DayTransaction {
   note?: string | null;
   category?: string;
   displayDescription?: string;
+  reimbursedAmount?: number | string;
 }
 
 interface DaySummary {

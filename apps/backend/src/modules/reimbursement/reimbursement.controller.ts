@@ -11,8 +11,8 @@ export class ReimbursementController {
   constructor(private reimbursementService: ReimbursementService) {}
 
   @Get()
-  list(@Query('status') status?: ReimbursementStatus) {
-    return this.reimbursementService.list(status === 'RECEIVED' ? 'RECEIVED' : 'PENDING');
+  list(@Query('status') status?: ReimbursementStatus, @Query('transactionId') transactionId?: string) {
+    return this.reimbursementService.list(status === 'RECEIVED' ? 'RECEIVED' : 'PENDING', transactionId ? parseInt(transactionId, 10) : undefined);
   }
 
   @Post()

@@ -5,6 +5,7 @@ import { AnimatePresence, motion } from 'motion/react';
 import { api } from '@/lib/api';
 import { Button } from './Button';
 import { Input } from './Input';
+import { ReimbursementSection } from './ReimbursementSection';
 import { SourceTag } from './SourceTag';
 import { EASE_ENTER, TRANSITION_BASE } from '@/lib/motion';
 import { Pencil, StickyNote, Trash2, X } from 'lucide-react';
@@ -19,9 +20,13 @@ export interface NoteableTransaction {
   category?: string;
   displayDescription?: string;
   aiCaption?: string | null;
+  // Patungan yang sudah diterima (amount tetap bruto); pengeluaran efektif = amount - reimbursedAmount.
+  reimbursedAmount?: number | string;
 }
 
 const rp = (n: number) => 'Rp' + Math.abs(Math.round(n)).toLocaleString('id-ID');
+/** Pengeluaran efektif transaksi (bruto dikurangi patungan yang sudah diterima). */
+const netOf = (t: NoteableTransaction) => Number(t.amount) - Number(t.reimbursedAmount ?? 0);
 const clock = (iso: string) => new Date(iso).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' });
 
 export const CATEGORY_LABELS: Record<string, string> = {
@@ -74,6 +79,8 @@ export function TransactionNoteRow({
 }) {
   const hasAlias = !!transaction.displayDescription && transaction.displayDescription !== transaction.description;
   const title = transaction.displayDescription ?? transaction.description;
+  const reimbursed = Number(transaction.reimbursedAmount ?? 0);
+  const net = netOf(transaction);
 
   const [open, setOpen] = useState(false);
   const [draft, setDraft] = useState(transaction.note ?? '');
@@ -172,7 +179,12 @@ export function TransactionNoteRow({
             {hasAlias && <Pencil size={12} className="text-text-subtlest" />}
           </span>
         </span>
-        <span className="shrink-0 text-body font-bold tabular-nums text-text">−{rp(transaction.amount)}</span>
+        <span className="shrink-0 text-right">
+          <span className="block text-body font-bold tabular-nums text-text">−{rp(net)}</span>
+          {reimbursed > 0 && (
+            <span className="block text-micro tabular-nums text-text-subtlest line-through">{rp(transaction.amount)}</span>
+          )}
+        </span>
       </button>
 
       <AnimatePresence>
@@ -211,7 +223,12 @@ export function TransactionNoteRow({
                       · {clock(transaction.occurredAt)}
                     </span>
                   </p>
-                  <p className="mt-1 text-body font-bold tabular-nums text-text">−{rp(transaction.amount)}</p>
+                  <p className="mt-1 text-body font-bold tabular-nums text-text">
+                    −{rp(net)}
+                    {reimbursed > 0 && (
+                      <span className="ml-2 text-small font-normal text-text-subtlest line-through">{rp(transaction.amount)}</span>
+                    )}
+                  </p>
                 </div>
                 <button
                   onClick={() => setOpen(false)}
@@ -267,6 +284,8 @@ export function TransactionNoteRow({
                     className="min-w-0 flex-1 resize-none rounded-medium bg-neutral px-3.5 py-3 text-small text-text shadow-field outline-none transition-shadow duration-base ease-standard placeholder:text-text-subtlest focus:shadow-field-focus"
                   />
                 </label>
+
+                <ReimbursementSection transactionId={transaction.id} source={transaction.source} />
 
                 <div className="flex items-center justify-between gap-2 pt-1">
                   <Button variant="danger" size="sm" icon={<Trash2 size={14} />} onClick={handleDelete} disabled={deleting}>
