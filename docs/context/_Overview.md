@@ -18,7 +18,7 @@ cd apps/frontend && npm run dev        # http://localhost:3000
 ```
 **Cara jalan (prod):**
 ```bash
-docker compose -f docker-compose.prod.yml up -d --build   # build backend lalu frontend sequential (RAM 2GB)
+docker compose -f docker-compose.prod.yml pull && docker compose -f docker-compose.prod.yml up -d   # image dari GHCR (di-build CI), VPS tidak build. Perlu docker login ghcr.io sekali
 docker compose -f docker-compose.prod.yml exec backend npx prisma db seed   # sekali di awal, seed TIDAK otomatis
 ```
 **Entrypoint utama:** `apps/backend/src/main.ts` (NestFactory, cookie-parser, CORS credentials), `apps/frontend/src/app/layout.tsx` + `apps/frontend/src/middleware.ts` (auth redirect).
