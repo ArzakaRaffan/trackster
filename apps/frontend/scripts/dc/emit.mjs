@@ -132,6 +132,9 @@ export function createEmitter() {
             out.push('{" "}');
             continue;
           }
+          const norm = raw.replace(/\s+/g, ' ').trim();
+          const lit = literals.get(norm);
+          if (lit) { const lead = /^\s/.test(raw) ? '{" "}' : '', trail = /\s$/.test(raw) ? '{" "}' : ''; out.push(lead + '{vm.' + lit + ' ?? ' + JSON.stringify(norm) + '}' + trail); continue; }
           out.push(jsxText(raw));
           continue;
         }
@@ -190,6 +193,7 @@ export function createEmitter() {
   }
 
   let replace = new Map();
+  let literals = new Map();
   function node(n, scope, parent) {
     const rep = replace.get(n);
     if (rep) {
@@ -239,6 +243,7 @@ export function createEmitter() {
       return rules.join('\n') + '\n';
     },
     setReplace(m) { replace = m; },
+    setLiterals(m) { literals = m; },
     takeHoles() { const a = [...stats.holes].sort(); stats.holes.clear(); return a; },
   };
 }

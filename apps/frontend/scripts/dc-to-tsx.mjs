@@ -36,6 +36,16 @@ const IF_UNITS = {
 };
 
 const em = createEmitter();
+// Contoh data yang tertulis langsung di markup prototipe -> kunci view-model (default = teks aslinya, jadi /demo tetap 1:1)
+em.setLiterals(new Map(Object.entries({
+  'Rp189.000': 'subsBurnTxt', '4 aktif ·': 'dashSubCountTxt', '1 jatuh tempo dekat': 'dashSubSoonTxt',
+  'Rp181.000/hari': 'runBurnTxt', '1 hari': 'runDaysTxt', 'Rp4.230.000': 'runBalTxt',
+  'Masuk minggu ini (29 Sep)': 'incWeekTxt', 'Rp950.000': 'incReceivedTxt', 'dari perkiraan Rp2.000.000': 'incExpectedTxt',
+  'Perlu dicek (1).': 'pendTitleTxt', '+Rp750.000': 'pendAmtTxt', 'TRSF E-BANKING ANDI PRATAMA': 'pendDescTxt',
+  'Rp1.200.000/bulan': 'upsideTxt', 'dari pemasukan tak terduga (Project desain), tidak dihitung di angka di atas karena tidak bisa diandalkan.': 'upsideNoteTxt',
+  'Minggu 22 Sep – 28 Sep': 'ciWeekTxt', 'Rp2.300.000': 'ciExpTxt', 'Rp500.000': 'ciRecTxt',
+  'Minggu lalu kamu lewat budget 2 kali, dua-duanya pas weekend. Seimbang kasih ruang lebih di Sabtu–Minggu tanpa ganggu tabungan.': 'budgetReasonTxt',
+})));
 const holes = {};
 fs.mkdirSync(path.join(OUT, 'views'), { recursive: true });
 
