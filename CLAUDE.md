@@ -87,12 +87,13 @@ Konteks tambahan (`Product.md`, `Decisions.md`, `Gotchas.md` hanya ada lokal —
 
 ## Design System
 
-- Ada di folder `design-system/` (dari Claude Design), dengan `handoff/README.md` sebagai instruksi urutan kerja resmi buat apply ke codebase.
-- Token: spacing scale 8px base, mobile gutter 16px, card gap 12px, radius/warna/tipografi custom — semua harus ditrace ke `design-system/tokens/`, jangan pakai magic number Tailwind sembarangan.
-- Motion: pakai library `motion` (Framer Motion baru) + `@formkit/auto-animate`, token durasi 320ms dengan easing "ease-expressive" — konsisten dipakai di semua halaman, jangan re-invent angka baru per halaman.
+- UI saat ini = **Trackster v3**, sumber kebenaran: `docs/Rework Design Trackster/` (`Trackster v3 App.dc.html` + README). Markup layar digenerate
+  (`apps/frontend/scripts/dc-to-tsx.mjs` → `src/components/v3/views`), logika prototipe ada di `src/components/v3/logic.tsx`, data nyata di
+  `src/components/v3/live/`. Detail: `docs/context/Codemap.md` (bagian Frontend) dan `docs/Rework Design Trackster/PLAN.md`.
+- Token (warna/jarak/tipografi) hidup di `logic.tsx` (`DARK`, `LIGHT`, `DENSITY`) dan CSS variable di wrapper root — jangan pakai magic number Tailwind di layar v3.
+- Layar v3 tidak memakai Tailwind preflight (`app/(v3)/layout.tsx` tidak mengimpor `globals.css`). Tools publik lama ada di `app/(legacy)`.
+- Layar pra-app (Daftar, Masuk Google, Lupa password, Wizard setup, Harga/Plus) = **tampilan saja** (produk tetap single-user, tanpa backend baru).
+- Mengubah layar: ubah desain → regenerate view; perubahan data/aksi → `useLive.ts` + cabang `live` di `logic.tsx`. Verifikasi dengan membandingkan ke prototipe standalone.
+- Folder lama `design_system/` (Claude Design v2) tinggal arsip.
 
-## Konteks & Catatan Keputusan
 
-Baca `docs/context/` (`_Overview.md`, `Architecture.md`, `Decisions.md`, `Gotchas.md`) sebelum mulai. Jangan scan seluruh codebase di awal sesi kecuali task eksplisit membutuhkannya.
-
-Di akhir sesi, kalau ada keputusan teknis baru atau perubahan arsitektur signifikan, update `Decisions.md` / `Gotchas.md` di sana (file lokal, tidak ikut git).

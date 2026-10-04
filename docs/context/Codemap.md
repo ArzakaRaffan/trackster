@@ -1,6 +1,6 @@
 # Trackster — Codemap (mau ubah X, buka di mana)
 
-Snapshot 2026-09-24. Kalau nambah module/route/cron, update file ini.
+Snapshot 2026-10-05. Kalau nambah module/route/cron, update file ini.
 
 ## Backend — `apps/backend/src/modules/`
 
@@ -40,22 +40,32 @@ Snapshot 2026-09-24. Kalau nambah module/route/cron, update file ini.
 
 ## Frontend — `apps/frontend/src/`
 
+UI = **Trackster v3** (redesign 1:1 dari `docs/Rework Design Trackster/Trackster v3 App.dc.html`). Satu komponen host merender
+semua layar; route cuma menentukan layar mana yang aktif.
+
 | Route | Isi |
 | --- | --- |
-| `/` | Landing page publik |
-| `/login` | Login |
-| `/app` | Dashboard (net +/-, shortcut) |
-| `/app/today`, `/app/weekly` | Harian & mingguan vs budget |
-| `/app/reports`, `/app/insights` | Laporan bulanan/all-time, analisis + health score |
-| `/app/income`, `/app/budget`, `/app/goals`, `/app/subscriptions` | Pemasukan+alokasi, budget, Kantong, langganan |
-| `/app/chat` | Tanya Track |
-| `/app/more`, `/app/settings` | Menu lain; Gmail/Telegram/akun/saldo |
-| `/split-bills/*`, `/s/[slug]`, `/savings-calculator` | Tools publik |
+| `/`, `/login`, `/setup` | Landing, masuk/daftar (daftar & wizard = tampilan saja), wizard setup — layar `pre` prototipe |
+| `/app`, `/app/today`, `/app/weekly` | Beranda, Hari ini, Mingguan (7 hari terakhir) |
+| `/app/budget`, `/app/income`, `/app/income/checkin`, `/app/goals`, `/app/subscriptions` | Rencana |
+| `/app/reports`, `/app/insights`, `/app/chat`, `/app/chat/memory`, `/app/categorize` | Insight (insights = Analisis) |
+| `/app/more`, `/app/split`, `/app/calc`, `/app/sources`, `/app/privacy`, `/app/settings` | Menu |
+| `/demo/*` | Prototipe dengan data contoh (tombol "Coba pakai data contoh" di landing) |
+| `(legacy)`: `/split-bills/*`, `/s/[slug]`, `/t/[slug]`, `/trip/*`, `/tools`, `/savings-calculator`, `/installment-calculator` | Tools publik (desain lama, Tailwind) |
 
-- Data: `lib/api.ts` (fetcher, auto-redirect `/login` on 401) + SWR. Format: `lib/format.ts`. Motion: `lib/motion.ts`.
-- UI reusable: `components/ui/*` (Input, Button, AmountDisplay, StatTile, BudgetProgress,
-  TransactionNoteRow, AnimatedTabContent, SourceTag, Switch, DayBarChart). `MascotWidget` di-mount di `app/app/layout.tsx`.
-- Auth redirect: `middleware.ts`.
+Dua root layout: `app/(v3)/layout.tsx` (tanpa `globals.css`/Tailwind preflight — desain v3 bergantung pada default browser) dan
+`app/(legacy)/layout.tsx` (Tailwind + Figtree, untuk tools publik).
+
+**Cara kerja v3 (`components/v3/`)**
+- `views/*View.tsx`, `V3Tree.tsx`, `pseudo.css` — **digenerate** oleh `scripts/dc-to-tsx.mjs` dari template `.dc.html`. Jangan edit tangan;
+  ubah generator atau sumber desain lalu jalankan `node scripts/dc-to-tsx.mjs` (dari `apps/frontend`). Teks contoh yang tertulis di markup
+  prototipe diganti kunci view-model `*Txt` lewat tabel `LITERALS` di generator.
+- `logic.tsx` — logika prototipe (state, `rv_*`, kamus EN `v3tr()`) dibawa utuh dan **dirawat tangan**; di tempat yang menyentuh data ada cabang
+  `this.props.live !== undefined` (mode nyata) vs prototipe (`/demo`).
+- `live/useLive.ts` — SWR ke backend → bentuk state prototipe (`flat`, `st`, `chat`, `split`) + `actions` tulis. `live/map.ts`, `live/reports.ts`,
+  `live/dates.ts` (tanggal WIB). `V3Host.tsx` — pathname ↔ `page`/`pre` (`lib/v3-routes.ts`), tema/bahasa di localStorage.
+- Data: `lib/api.ts` (fetcher, auto-redirect `/login` on 401) + SWR. Auth redirect: `middleware.ts` (`/demo` & `/setup` publik).
+- Pemeriksaan fidelitas: bandingkan DOM/geometri dengan `Trackster v3 App (standalone).html` (lihat `docs/Rework Design Trackster/PLAN.md`).
 
 ## Dokumen lain di repo
 - `TRACKSTER_BUILD_PLAN.md` — plan MVP awal + **contoh format email asli** BCA/Jago (rujukan parser).

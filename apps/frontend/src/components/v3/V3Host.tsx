@@ -24,7 +24,7 @@ export function V3Host() {
   const [chatActive, setChatActive] = useState<number | null>(null);
   const live = useLive(!demo && path.startsWith('/app'), path, chatActive);
   // Tunggu data inti sebelum menggambar layar privat, supaya tidak ada kilatan keadaan kosong.
-  if (!demo && !live.ready) return <div style={{ position: 'fixed', inset: 0, background: pageBg() }} />;
+  if (!demo && !live.ready) return <div suppressHydrationWarning style={{ position: 'fixed', inset: 0, background: pageBg() }} />;
   return (
     <V3Logic
       path={path}
