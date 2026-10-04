@@ -226,7 +226,8 @@ export function useLive(enabled: boolean, path: string, chatActive: number | nul
     return out;
   }, [pendingList, subs, todayISO]);
 
-  const ready = !enabled || (!!budgets.data && !!today.data && !!txRes.data && !!incRes.data && !!streamsRes.data);
+  const settled = (r: { data?: unknown; error?: unknown }) => r.data !== undefined || r.error !== undefined; // error ≠ blank screen selamanya
+  const ready = !enabled || [budgets, today, txRes, incRes, streamsRes].every(settled);
   const refresh = () => mutate(() => true);
 
   const actions = useMemo(
