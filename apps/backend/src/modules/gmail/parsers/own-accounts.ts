@@ -1,17 +1,14 @@
 /**
  * Rekening milik owner — transfer ke nomor ini = internal (bukan expense).
- * Cocokkan pakai digit-only supaya format "6611-126-589" / "1234567890" sama.
+ * Cocokkan pakai digit-only supaya format "1234-567-890" / "1234567890" sama.
+ * Diisi lewat env `OWNER_ACCOUNT_NUMBERS` (comma-separated); tanpa env = tidak ada rekening yang dianggap milik sendiri.
  */
-const OWN_ACCOUNT_NUMBERS = (
-  process.env.OWNER_ACCOUNT_NUMBERS ||
-  // Default: BCA, Jago, Blu milik Arzaka (bisa dioverride via env, comma-separated)
-  '1234567890,100200300400,009988776655'
-)
+const OWN_ACCOUNT_NUMBERS = (process.env.OWNER_ACCOUNT_NUMBERS || '')
   .split(',')
   .map((s) => s.trim())
   .filter(Boolean);
 
-export const OWNER_FULL_NAME = (process.env.OWNER_FULL_NAME || 'ANDI WIJAYA PUTRA').toUpperCase();
+export const OWNER_FULL_NAME = (process.env.OWNER_FULL_NAME || '').toUpperCase();
 
 /** Normalisasi nomor rekening: buang spasi/strip, keep digits only. */
 export function normalizeAccountNumber(raw: string | null | undefined): string {
@@ -30,7 +27,7 @@ function matchesOwnAccount(digits: string, own: string): boolean {
   // Hindari false positive dari potongan pendek ("89", "577")
   if (digits.length >= 6 && (digits.endsWith(own) || own.endsWith(digits))) return true;
 
-  // Masked middle: e.g. "661189" dari "1234xxxx90" vs own "1234567890"
+  // Masked middle: e.g. "123490" dari "1234xxxx90" vs own "1234567890"
   if (digits.length >= 6 && digits.length < own.length) {
     for (let prefixLen = 4; prefixLen <= digits.length - 2; prefixLen++) {
       const suffixLen = digits.length - prefixLen;
@@ -54,7 +51,8 @@ export function isOwnAccountNumber(raw: string | null | undefined): boolean {
 }
 
 export function isOwnerName(raw: string | null | undefined): boolean {
-  if (!raw) return false;
+  // Nama kosong (env belum di-set) jangan dianggap cocok: ''.includes('') selalu true
+  if (!raw || !OWNER_FULL_NAME) return false;
   return raw.toUpperCase().includes(OWNER_FULL_NAME);
 }
 

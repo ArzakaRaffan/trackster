@@ -207,8 +207,8 @@ apps/
 nginx/              Reverse proxy vhosts and SSL helpers
 design_system/      Design tokens, guidelines, and handoff notes
 docs/
-  context/          Overview, architecture, decisions (ADR log), gotchas, codemap
-  revamp/           Revamp v2 roadmap, per-epic specs, and live status
+  context/          Overview, architecture, codemap
+  Revamp History.md Archive of the completed Revamp v2 program
 .github/workflows/  CI/CD pipeline
 docker-compose.yml        Local development (Postgres)
 docker-compose.prod.yml   Production stack
@@ -220,17 +220,14 @@ docker-compose.prod.yml   Production stack
 | --- | --- |
 | [`docs/context/_Overview.md`](docs/context/_Overview.md) | What the system is and how to run it |
 | [`docs/context/Architecture.md`](docs/context/Architecture.md) | Modules, data flow, schema, system boundaries |
-| [`docs/context/Decisions.md`](docs/context/Decisions.md) | Architecture decision log with dates and rationale |
-| [`docs/context/Gotchas.md`](docs/context/Gotchas.md) | Known pitfalls and their fixes |
 | [`docs/context/Codemap.md`](docs/context/Codemap.md) | Where to look to change a given feature |
-| [`docs/context/Product.md`](docs/context/Product.md) | Product intent and the real-world money flow |
-| [`docs/revamp/README.md`](docs/revamp/README.md) | Revamp v2 index, status table, and remaining work |
+| [`docs/Revamp History.md`](docs/Revamp%20History.md) | What the Revamp v2 program delivered, and the design decisions that came out of it |
 | [`CAUTION.md`](CAUTION.md) | Resource limits and safe-operation checklist for the shared VPS |
 | [`CLAUDE.md`](CLAUDE.md) | Project conventions and domain rules (parsers, balances) |
 
 ## Project status
 
-Revamp v2 (started 2026-09-24) covers parser correctness, the income model, the AI advisor, analytics, reports, budget advice, the mascot, and public tools. All planned sessions are implemented; the remaining work is browser and Telegram verification. Live status is tracked in [`docs/revamp/README.md`](docs/revamp/README.md).
+Revamp v2 (2026-09-24 to 2026-10-04) is complete and verified. It covered parser correctness, the income model, the AI advisor, analytics, reports, budget advice, the mascot, and public tools. See [`docs/Revamp History.md`](docs/Revamp%20History.md).
 
 ## License
 

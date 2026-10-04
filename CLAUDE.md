@@ -8,7 +8,7 @@ Personal finance expense tracker untuk Arzaka. Otomatis mencatat pengeluaran dar
 > RAM dan prod jalan di sini terus — pernah bikin prod down gara-gara build tanpa cap memory + dev
 > Postgres nyala bareng. Selalu `NODE_OPTIONS=--max-old-space-size=1536`, jangan tumpuk proses berat.
 
-Konteks tambahan: `docs/context/Product.md` (kenapa & alur uang nyata) dan `docs/context/Codemap.md` (peta module/route/cron + drift yang diketahui).
+Konteks tambahan (`Product.md`, `Decisions.md`, `Gotchas.md` hanya ada lokal — di-gitignore karena repo public, jangan di-commit): `docs/context/Product.md` (kenapa & alur uang nyata) dan `docs/context/Codemap.md` (peta module/route/cron + drift yang diketahui).
 
 ## Tech Stack
 
@@ -95,4 +95,4 @@ Konteks tambahan: `docs/context/Product.md` (kenapa & alur uang nyata) dan `docs
 
 Baca `docs/context/` (`_Overview.md`, `Architecture.md`, `Decisions.md`, `Gotchas.md`) sebelum mulai. Jangan scan seluruh codebase di awal sesi kecuali task eksplisit membutuhkannya.
 
-Di akhir sesi, kalau ada keputusan teknis baru atau perubahan arsitektur signifikan, update `Decisions.md` / `Gotchas.md` di sana.
+Di akhir sesi, kalau ada keputusan teknis baru atau perubahan arsitektur signifikan, update `Decisions.md` / `Gotchas.md` di sana (file lokal, tidak ikut git).

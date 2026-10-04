@@ -63,7 +63,7 @@ export interface StreamForecastAmounts {
 const round = (n: number) => Math.round(n);
 const average = (arr: number[]) => arr.reduce((sum, n) => sum + n, 0) / arr.length;
 
-/** Forecast per stream, deterministik — lihat tabel formula di docs/revamp/epics/E03-income-model.md.
+/** Forecast per stream, deterministik
  * Pure function: tidak menyentuh DB/waktu-sekarang, jadi bisa dites langsung dengan fixture. */
 export function calcStreamForecast(stream: StreamForecastConfig, input: StreamForecastCalcInput): StreamForecastAmounts {
   if (!input.isScheduledThisWeek) {

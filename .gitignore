@@ -8,3 +8,15 @@ dist/
 nginx/certbot/
 tsconfig.tsbuildinfo
 .aider*
+
+# Private / host-specific — never commit (repo is public)
+.redesign-bak/
+nginx/conf.d/*
+!nginx/conf.d/trackster.conf
+*.htpasswd
+docker-compose.prod.yml.bak*
+docs/context/Decisions.md
+docs/context/Gotchas.md
+docs/context/Product.md
+apps/backend/prisma/seed-income-streams.js
+.claude/settings.local.json

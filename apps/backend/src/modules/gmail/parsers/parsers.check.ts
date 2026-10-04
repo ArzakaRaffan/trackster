@@ -331,10 +331,10 @@ check('Flip receipt eksternal: amount = 64000', () => {
   assert.strictEqual(result!.amount, 64000);
 });
 
-check('Flip receipt eksternal: description = "Budi Hartono · BNI …0567"', () => {
+check('Flip receipt eksternal: description = "Budi Hartono · BNI …0100"', () => {
   const body = loadFixture('flip-receipt.txt');
   const result = flipParser.parse(fakeFlipEmail(body, 'Successful transfer to Budi Hartono. Here is the receipt.'));
-  assert.strictEqual(result!.description, 'Budi Hartono · BNI …0567');
+  assert.strictEqual(result!.description, 'Budi Hartono · BNI …0100');
 });
 
 check('Flip receipt eksternal: excluded = false', () => {

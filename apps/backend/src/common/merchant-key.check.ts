@@ -34,8 +34,8 @@ check('case-insensitive: "KOPI KENANGAN 999" → sama dengan versi title-case', 
   assert.strictEqual(merchantKey('KOPI KENANGAN 999'), merchantKey('Kopi Kenangan 1320'));
 });
 
-check('nama orang pendek tidak berubah: "Budi Hartono" → "ahmad dzulfikar as"', () => {
-  assert.strictEqual(merchantKey('Budi Hartono'), 'ahmad dzulfikar as');
+check('nama orang pendek tidak berubah: "Budi Hartono" → "budi hartono"', () => {
+  assert.strictEqual(merchantKey('Budi Hartono'), 'budi hartono');
 });
 
 check('deskripsi 1 kata: "Indomaret" → "indomaret"', () => {
