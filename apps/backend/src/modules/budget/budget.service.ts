@@ -4,6 +4,7 @@ import { UpdateBudgetDto } from './dto/update-budget.dto';
 import { MerchantAliasService } from '../merchant-alias/merchant-alias.service';
 import { addWibDays, startOfWibDay, startOfWibWeek, wibDateKey, wibDayOfWeek, wibRange } from '../../common/wib';
 import { calcRollover } from './budget-rollover';
+import { spend, sumSpend } from '../../common/spend';
 
 @Injectable()
 export class BudgetService {
@@ -59,14 +60,14 @@ export class BudgetService {
       this.prisma.dailyBudget.findMany(),
       this.prisma.transaction.findMany({
         where: { occurredAt: { gte: weekStart, lt: todayStart } },
-        select: { amount: true, occurredAt: true },
+        select: { amount: true, reimbursedAmount: true, occurredAt: true },
       }),
     ]);
     const budgetByDow = new Map(rows.map((r) => [r.dayOfWeek, Number(r.amount)]));
     const spentByDay = new Map<string, number>();
     for (const t of txs) {
       const key = wibDateKey(t.occurredAt);
-      spentByDay.set(key, (spentByDay.get(key) ?? 0) + Number(t.amount));
+      spentByDay.set(key, (spentByDay.get(key) ?? 0) + spend(t));
     }
 
     const days: { budget: number; spent: number }[] = [];
@@ -98,7 +99,7 @@ export class BudgetService {
       }),
     ]);
 
-    const totalSpent = transactions.reduce((sum, t) => sum + Number(t.amount), 0);
+    const totalSpent = transactions.reduce((sum, t) => sum + spend(t), 0);
     const totalIncome = incomes.reduce((sum, i) => sum + Number(i.amount), 0);
     const transactionsWithDisplay = await this.merchantAliasService.attachDisplayNames(transactions);
 
@@ -126,10 +127,10 @@ export class BudgetService {
 
     // Burn rate: rata-rata pengeluaran per hari dalam 7 hari terakhir
     const spentAgg = await this.prisma.transaction.aggregate({
-      _sum: { amount: true },
+      _sum: { amount: true, reimbursedAmount: true },
       where: { occurredAt: { gte: sevenDaysAgo, lte: now } },
     });
-    const totalSpent7d = Number(spentAgg._sum.amount ?? 0);
+    const totalSpent7d = sumSpend(spentAgg._sum);
     const burnRatePerDay = totalSpent7d / 7;
 
     // Sisa hari di bulan ini (kalender WIB)

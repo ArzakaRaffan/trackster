@@ -3,6 +3,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../../prisma.service';
 import { Category, Prisma, Source } from '@prisma/client';
 import { BalanceService, shouldAdjustBalance } from '../balance/balance.service';
+import { spend, sumSpend } from '../../common/spend';
 import { MerchantAliasService } from '../merchant-alias/merchant-alias.service';
 import { AnalyticsService } from '../analytics/analytics.service';
 import { CreateTransactionDto } from './dto/create-transaction.dto';
@@ -96,7 +97,7 @@ export class TransactionService {
         where: { occurredAt: { gte: date, lt: nextDate } },
         orderBy: { occurredAt: 'asc' },
       });
-      const totalSpent = transactions.reduce((sum, t) => sum + Number(t.amount), 0);
+      const totalSpent = transactions.reduce((sum, t) => sum + spend(t), 0);
 
       days.push({
         date: wibDateKey(date),
@@ -195,7 +196,7 @@ export class TransactionService {
   async getUncategorizedMerchants() {
     const transactions = await this.prisma.transaction.findMany({
       where: { category: Category.LAINNYA },
-      select: { id: true, description: true, amount: true, merchantKey: true },
+      select: { id: true, description: true, amount: true, reimbursedAmount: true, merchantKey: true },
       orderBy: { occurredAt: 'desc' },
     });
 
@@ -208,9 +209,9 @@ export class TransactionService {
       const existing = groups.get(key);
       if (existing) {
         existing.count++;
-        existing.totalAmount += Number(t.amount);
+        existing.totalAmount += spend(t);
       } else {
-        groups.set(key, { representativeId: t.id, description: t.description, count: 1, totalAmount: Number(t.amount) });
+        groups.set(key, { representativeId: t.id, description: t.description, count: 1, totalAmount: spend(t) });
       }
     }
 
@@ -241,7 +242,7 @@ export class TransactionService {
       where: { occurredAt: { gte: start, lt: end } },
       orderBy: { occurredAt: 'asc' },
     });
-    const totalSpent = transactions.reduce((sum, t) => sum + Number(t.amount), 0);
+    const totalSpent = transactions.reduce((sum, t) => sum + spend(t), 0);
     const transactionsWithDisplay = await this.attachDisplayNames(transactions);
 
     return { date, totalSpent, transactions: transactionsWithDisplay };
@@ -260,21 +261,21 @@ export class TransactionService {
       this.prisma.transaction.groupBy({
         by: ['category'],
         where: { occurredAt: { gte: start, lt: end } },
-        _sum: { amount: true },
+        _sum: { amount: true, reimbursedAmount: true },
       }),
     ]);
 
-    const totalSpent = transactions.reduce((sum, t) => sum + Number(t.amount), 0);
+    const totalSpent = transactions.reduce((sum, t) => sum + spend(t), 0);
 
     const byCategory = byCategoryRaw
-      .map((row) => ({ category: row.category, total: Number(row._sum.amount ?? 0) }))
+      .map((row) => ({ category: row.category, total: sumSpend(row._sum) }))
       .sort((a, b) => b.total - a.total);
 
     const daysInMonth = Math.round((end.getTime() - start.getTime()) / 86_400_000);
     const byDayMap = new Map<string, number>();
     for (const t of transactions) {
       const key = wibDateKey(t.occurredAt);
-      byDayMap.set(key, (byDayMap.get(key) ?? 0) + Number(t.amount));
+      byDayMap.set(key, (byDayMap.get(key) ?? 0) + spend(t));
     }
     const byDay = Array.from({ length: daysInMonth }, (_, i) => {
       const date = wibDateKey(addWibDays(start, i));
@@ -289,19 +290,19 @@ export class TransactionService {
   async getAllTimeSummary() {
     const [transactions, byCategoryRaw] = await Promise.all([
       this.prisma.transaction.findMany({ orderBy: { occurredAt: 'asc' } }),
-      this.prisma.transaction.groupBy({ by: ['category'], _sum: { amount: true } }),
+      this.prisma.transaction.groupBy({ by: ['category'], _sum: { amount: true, reimbursedAmount: true } }),
     ]);
 
-    const totalSpent = transactions.reduce((sum, t) => sum + Number(t.amount), 0);
+    const totalSpent = transactions.reduce((sum, t) => sum + spend(t), 0);
 
     const byCategory = byCategoryRaw
-      .map((row) => ({ category: row.category, total: Number(row._sum.amount ?? 0) }))
+      .map((row) => ({ category: row.category, total: sumSpend(row._sum) }))
       .sort((a, b) => b.total - a.total);
 
     const byMonthMap = new Map<string, number>();
     for (const t of transactions) {
       const key = wibDateKey(t.occurredAt).slice(0, 7); // YYYY-MM (WIB)
-      byMonthMap.set(key, (byMonthMap.get(key) ?? 0) + Number(t.amount));
+      byMonthMap.set(key, (byMonthMap.get(key) ?? 0) + spend(t));
     }
 
     let highestMonth: { month: string; total: number } | null = null;
@@ -328,15 +329,15 @@ export class TransactionService {
 
     const [stats, thisWeekTx, lastWeekTx] = await Promise.all([
       this.analyticsService.getPeriodStats(start, end, false),
-      this.prisma.transaction.findMany({ where: { occurredAt: { gte: startOfWibWeek(now), lte: now } }, select: { amount: true } }),
+      this.prisma.transaction.findMany({ where: { occurredAt: { gte: startOfWibWeek(now), lte: now } }, select: { amount: true, reimbursedAmount: true } }),
       this.prisma.transaction.findMany({
         where: { occurredAt: { gte: addWibDays(startOfWibWeek(now), -7), lt: startOfWibWeek(now) } },
-        select: { amount: true },
+        select: { amount: true, reimbursedAmount: true },
       }),
     ]);
 
-    const thisWeekTotal = thisWeekTx.reduce((sum, t) => sum + Number(t.amount), 0);
-    const lastWeekTotal = lastWeekTx.reduce((sum, t) => sum + Number(t.amount), 0);
+    const thisWeekTotal = thisWeekTx.reduce((sum, t) => sum + spend(t), 0);
+    const lastWeekTotal = lastWeekTx.reduce((sum, t) => sum + spend(t), 0);
     const trend = {
       thisWeekTotal,
       lastWeekTotal,

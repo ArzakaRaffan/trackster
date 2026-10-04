@@ -6,6 +6,7 @@ import { GoalService } from '../goal/goal.service';
 import { SubscriptionService } from '../subscription/subscription.service';
 import { IncomeForecastService } from '../income-forecast/income-forecast.service';
 import { wibDateKey, wibRange } from '../../common/wib';
+import { sumSpend } from '../../common/spend';
 
 const CACHE_MS = 5 * 60_000;
 // Sama semangatnya dengan threshold di ai-anomaly.service.ts: heuristik sederhana, bukan model
@@ -81,7 +82,7 @@ export class FinancialSnapshotService {
       this.budgetService.getTodaySummary(),
       this.prisma.dailyBudget.findMany(),
       this.prisma.transaction.aggregate({
-        _sum: { amount: true },
+        _sum: { amount: true, reimbursedAmount: true },
         where: { occurredAt: { gte: weekStart, lt: weekEnd } },
       }),
       this.prisma.transaction.findMany({
@@ -109,7 +110,7 @@ export class FinancialSnapshotService {
     lines.push(`Saldo: ${balanceParts.join(' · ')}.`);
 
     const weekBudgetTarget = dailyBudgets.reduce((sum, b) => sum + Number(b.amount), 0);
-    const weekSpent = Number(weekSpentAgg._sum.amount ?? 0);
+    const weekSpent = sumSpend(weekSpentAgg._sum);
     const weekPct = weekBudgetTarget > 0 ? Math.round((weekSpent / weekBudgetTarget) * 100) : 0;
     lines.push(
       `Minggu ini: keluar ${fmtRp(weekSpent)} dari budget ${fmtRp(weekBudgetTarget)} (${weekPct}%). ` +

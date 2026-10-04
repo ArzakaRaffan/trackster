@@ -4,6 +4,7 @@ import { PrismaService } from '../../prisma.service';
 import { AnalyticsService, PeriodStats } from '../analytics/analytics.service';
 import { AiService } from '../ai/ai.service';
 import { startOfWibDay, wibRange, wibDateKey, wibParts, startOfWibMonth } from '../../common/wib';
+import { spend, sumSpend } from '../../common/spend';
 
 const NARRATIVE_PROMPT = `Kamu adalah Trackster AI - financial buddy personal Arzaka.
 Tugas: Tulis ringkasan laporan periode (minggu atau bulan) keuangan Arzaka dalam Bahasa Indonesia santai, 3-5 kalimat.
@@ -228,17 +229,17 @@ export class ReportService {
   async getRecords(): Promise<RecordsResult> {
     const [biggestTx, totalAgg, first] = await Promise.all([
       this.prisma.transaction.findFirst({ orderBy: { amount: 'desc' }, select: { id: true, amount: true, description: true, occurredAt: true, category: true } }),
-      this.prisma.transaction.aggregate({ _count: true, _sum: { amount: true } }),
+      this.prisma.transaction.aggregate({ _count: true, _sum: { amount: true, reimbursedAmount: true } }),
       this.prisma.transaction.aggregate({ _min: { occurredAt: true } }),
     ]);
 
-    const txAll = await this.prisma.transaction.findMany({ select: { merchantKey: true, description: true, amount: true } });
+    const txAll = await this.prisma.transaction.findMany({ select: { merchantKey: true, description: true, amount: true, reimbursedAmount: true } });
     const merchantGroups = new Map<string, { count: number; total: number; description: string }>();
     for (const t of txAll) {
       const key = t.merchantKey || t.description;
       const e = merchantGroups.get(key) ?? { count: 0, total: 0, description: t.description };
       e.count++;
-      e.total += Number(t.amount);
+      e.total += spend(t);
       merchantGroups.set(key, e);
     }
     const topMerchantEntry = [...merchantGroups.entries()].sort((a, b) => b[1].count - a[1].count)[0];
@@ -270,7 +271,7 @@ export class ReportService {
       bestSavingsRateMonth: bestSavingsMonth,
       longestUnderBudgetStreak: 0, // simplified for now
       totalTransactions: totalAgg._count,
-      totalSpend: Number(totalAgg._sum.amount ?? 0),
+      totalSpend: sumSpend(totalAgg._sum),
       dataStartsAt: first._min.occurredAt ? wibDateKey(first._min.occurredAt) : null,
     };
   }

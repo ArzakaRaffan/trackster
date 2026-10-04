@@ -10,6 +10,7 @@ import {
   simulatePlan,
   whatIfPurchase,
 } from './plan-simulator';
+import { spend } from '../../common/spend';
 
 // Sama semangatnya dengan threshold di financial-snapshot.service.ts/ai-anomaly.service.ts:
 // heuristik sederhana buat "pembelian besar", bukan model statistik proper.
@@ -71,7 +72,7 @@ export class PlanSimulatorService {
 
     const rows = await this.prisma.transaction.findMany({
       where: { occurredAt: { gte: since, lt: currentWeekStart }, amount: { lt: BIG_PURCHASE_THRESHOLD } },
-      select: { amount: true, category: true, occurredAt: true },
+      select: { amount: true, reimbursedAmount: true, category: true, occurredAt: true },
     });
 
     const byCategoryWeekly = new Map<string, number[]>();
@@ -81,7 +82,7 @@ export class PlanSimulatorService {
         Math.floor((row.occurredAt.getTime() - since.getTime()) / (7 * 86_400_000)),
       );
       const arr = byCategoryWeekly.get(row.category) ?? new Array(BASELINE_WEEKS).fill(0);
-      arr[weekIdx] += Number(row.amount);
+      arr[weekIdx] += spend(row);
       byCategoryWeekly.set(row.category, arr);
     }
 

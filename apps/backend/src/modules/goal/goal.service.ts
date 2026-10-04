@@ -2,6 +2,7 @@ import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../../prisma.service';
 import { CreateGoalDto } from './dto/create-goal.dto';
 import { ContributeGoalDto } from './dto/contribute-goal.dto';
+import { sumSpend } from '../../common/spend';
 
 @Injectable()
 export class GoalService {
@@ -101,13 +102,13 @@ export class GoalService {
         where: { receivedAt: { gte: thirtyDaysAgo } },
       }),
       this.prisma.transaction.aggregate({
-        _sum: { amount: true },
+        _sum: { amount: true, reimbursedAmount: true },
         where: { occurredAt: { gte: thirtyDaysAgo } },
       }),
     ]);
 
     const totalIncome = Number(incomeAgg._sum.amount ?? 0);
-    const totalSpent = Number(spentAgg._sum.amount ?? 0);
+    const totalSpent = sumSpend(spentAgg._sum);
     const historicalMonthlySavings = Math.max(0, totalIncome - totalSpent);
 
     // adjustedMonthlySavings = savings + (totalSpent * cutPercent/100)

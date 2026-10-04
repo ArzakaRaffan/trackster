@@ -15,6 +15,7 @@ import {
   timeBucket,
   TimeBucket,
 } from './period-stats.util';
+import { toNet } from '../../common/spend';
 
 export interface PeriodTotals {
   spend: number;
@@ -83,19 +84,23 @@ export class AnalyticsService {
 
   /** `end` eksklusif. Semua kunci hari pakai `wibDateKey`, batas hari/minggu dari `wib.ts`. */
   async getPeriodStats(start: Date, end: Date, compare = true): Promise<PeriodStats> {
-    const [dataStartsAtRow, budgetRows, transactions, window90d, historyBeforeStart] = await Promise.all([
+    const [dataStartsAtRow, budgetRows, transactionsRaw, window90dRaw, historyBeforeStart] = await Promise.all([
       this.prisma.transaction.aggregate({ _min: { occurredAt: true } }),
       this.prisma.dailyBudget.findMany(),
       this.prisma.transaction.findMany({ where: { occurredAt: { gte: start, lt: end } }, orderBy: { occurredAt: 'asc' } }),
       this.prisma.transaction.findMany({
         where: { occurredAt: { gte: addWibDays(end, -90), lt: end } },
-        select: { amount: true, category: true, merchantKey: true, description: true },
+        select: { amount: true, reimbursedAmount: true, category: true, merchantKey: true, description: true },
       }),
       this.prisma.transaction.findMany({
         where: { occurredAt: { lt: start } },
         select: { merchantKey: true, description: true },
       }),
     ]);
+
+    // Pengeluaran efektif (dikurangi patungan yang sudah diterima) — semua statistik di bawah baca `amount` ini.
+    const transactions = transactionsRaw.map(toNet);
+    const window90d = window90dRaw.map(toNet);
 
     const dataStartsAt = dataStartsAtRow._min.occurredAt;
     const budgetByDow = new Map(budgetRows.map((b) => [b.dayOfWeek, Number(b.amount)]));
@@ -125,16 +130,17 @@ export class AnalyticsService {
     if (compare) {
       const prevRange = previousPeriod(start, end, dataStartsAt);
       if (prevRange) {
-        const [prevTx, prevIncome] = await Promise.all([
+        const [prevTxRaw, prevIncome] = await Promise.all([
           this.prisma.transaction.findMany({
             where: { occurredAt: { gte: prevRange.start, lt: prevRange.end } },
-            select: { amount: true, category: true, merchantKey: true, description: true, isBig: true },
+            select: { amount: true, reimbursedAmount: true, category: true, merchantKey: true, description: true, isBig: true },
           }),
           this.prisma.income.aggregate({
             _sum: { amount: true },
             where: { receivedAt: { gte: prevRange.start, lt: prevRange.end }, status: IncomeStatus.CONFIRMED },
           }),
         ]);
+        const prevTx = prevTxRaw.map(toNet);
         const prevTotals = this.computeTotals(prevTx, medianAmount90d, Number(prevIncome._sum.amount ?? 0), days);
         previous = { ...prevTotals, start: prevRange.start.toISOString(), end: prevRange.end.toISOString() };
 

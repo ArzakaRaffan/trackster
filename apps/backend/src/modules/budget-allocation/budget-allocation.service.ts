@@ -4,6 +4,7 @@ import { PrismaService } from '../../prisma.service';
 import { BudgetService } from '../budget/budget.service';
 import { TelegramService } from '../telegram/telegram.service';
 import { WEEK_ORDER, startOfWibWeek, wibDateKey, wibRange } from '../../common/wib';
+import { sumSpend } from '../../common/spend';
 
 export interface WeeklyAllocation {
   needs: number;
@@ -103,10 +104,10 @@ export class BudgetAllocationService {
 
     const { start: weekEndStart, end: weekEndEnd } = wibRange('week', now);
     const spentAgg = await this.prisma.transaction.aggregate({
-      _sum: { amount: true },
+      _sum: { amount: true, reimbursedAmount: true },
       where: { occurredAt: { gte: weekEndStart, lt: weekEndEnd } },
     });
-    const actualSpent = Number(spentAgg._sum.amount ?? 0);
+    const actualSpent = sumSpend(spentAgg._sum);
     const isOverspent = actualSpent > prevWeekPool;
     const leftover = Math.max(0, prevWeekPool - actualSpent);
 
