@@ -20,6 +20,7 @@ services:
       - '127.0.0.1:5432:5432'
 
   backend:
+    image: ghcr.io/arzakaraffan/trackster-backend:${IMAGE_TAG:-latest}
     build:
       context: ./apps/backend
     restart: unless-stopped
@@ -54,6 +55,7 @@ services:
       - '4000'
 
   frontend:
+    image: ghcr.io/arzakaraffan/trackster-frontend:${IMAGE_TAG:-latest}
     build:
       context: ./apps/frontend
       args:

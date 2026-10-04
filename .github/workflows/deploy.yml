@@ -4,8 +4,50 @@ on:
   push:
     branches: [main]
 
+env:
+  REGISTRY: ghcr.io/arzakaraffan
+
 jobs:
+  # Build di runner GitHub (7GB RAM) — VPS 2GB cuma pull image, tidak build.
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Build & push backend
+        uses: docker/build-push-action@v6
+        with:
+          context: ./apps/backend
+          push: true
+          tags: |
+            ${{ env.REGISTRY }}/trackster-backend:latest
+            ${{ env.REGISTRY }}/trackster-backend:${{ github.sha }}
+          cache-from: type=gha,scope=backend
+          cache-to: type=gha,scope=backend,mode=max
+      - name: Build & push frontend
+        uses: docker/build-push-action@v6
+        with:
+          context: ./apps/frontend
+          push: true
+          build-args: |
+            NEXT_PUBLIC_API_URL=${{ vars.NEXT_PUBLIC_API_URL || 'https://api.trackster.dev' }}
+            NEXT_PUBLIC_SITE_URL=${{ vars.NEXT_PUBLIC_SITE_URL || 'https://trackster.dev' }}
+          tags: |
+            ${{ env.REGISTRY }}/trackster-frontend:latest
+            ${{ env.REGISTRY }}/trackster-frontend:${{ github.sha }}
+          cache-from: type=gha,scope=frontend
+          cache-to: type=gha,scope=frontend,mode=max
+
   deploy:
+    needs: build
     runs-on: ubuntu-latest
     steps:
       - name: Deploy via SSH
@@ -17,12 +59,9 @@ jobs:
           script: |
             set -euo pipefail
             cd ~/trackster
+            # checkout di VPS cuma buat docker-compose.prod.yml + nginx/, bukan build
             git fetch origin
             git reset --hard origin/main
-            # Build berurutan (VPS 1.9GB RAM — paralel bikin OOM Next.js)
-            docker compose -f docker-compose.prod.yml build backend
-            docker compose -f docker-compose.prod.yml build frontend
+            docker compose -f docker-compose.prod.yml pull backend frontend
             docker compose -f docker-compose.prod.yml up -d
-            # Bebaskan memori build sebelum container baru jalan
             docker image prune -f
-            docker builder prune -f --filter until=24h
