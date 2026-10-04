@@ -22,6 +22,17 @@ export class BudgetController {
     return this.budgetService.updateAll(dto);
   }
 
+  @Get('rollover')
+  async getRollover() {
+    return { rolloverEnabled: await this.budgetService.getRolloverEnabled() };
+  }
+
+  @Put('rollover')
+  async setRollover(@Body() body: { enabled?: unknown }) {
+    if (typeof body.enabled !== 'boolean') throw new BadRequestException('enabled harus boolean');
+    return this.budgetService.setRolloverEnabled(body.enabled);
+  }
+
   @Get('today')
   async getToday() {
     return this.budgetService.getTodaySummary();

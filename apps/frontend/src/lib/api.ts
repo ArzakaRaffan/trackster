@@ -38,7 +38,45 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   return res.json();
 }
 
+/** POST yang membalas SSE (`data: {json}\n\n`) — tiap event dikirim ke `onEvent`. Resolve saat stream habis. */
+async function postStream(path: string, body: unknown, onEvent: (event: any) => void): Promise<void> {
+  const res = await fetch(`${API_URL}${path}`, {
+    method: 'POST',
+    credentials: 'include',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+  if (res.status === 401 && typeof window !== 'undefined') {
+    fetch(`${API_URL}/auth/logout`, { method: 'POST', credentials: 'include' }).finally(() => {
+      window.location.href = '/login';
+    });
+    throw new ApiError('Sesi berakhir, mengarahkan ke login...', 401);
+  }
+  if (!res.ok || !res.body) throw new ApiError(`Request gagal (${res.status})`, res.status);
+
+  const reader = res.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = '';
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    buffer += decoder.decode(value, { stream: true });
+    let sep: number;
+    while ((sep = buffer.indexOf('\n\n')) >= 0) {
+      const chunk = buffer.slice(0, sep);
+      buffer = buffer.slice(sep + 2);
+      if (!chunk.startsWith('data:')) continue; // ping komentar
+      try {
+        onEvent(JSON.parse(chunk.slice(5)));
+      } catch {
+        // event rusak — lewati
+      }
+    }
+  }
+}
+
 export const api = {
+  postStream,
   get: <T>(path: string) => request<T>(path, { method: 'GET' }),
   post: <T>(path: string, body?: unknown) =>
     request<T>(path, { method: 'POST', body: body ? JSON.stringify(body) : undefined }),

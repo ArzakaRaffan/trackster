@@ -1,4 +1,5 @@
 import { Injectable, Logger, InternalServerErrorException } from '@nestjs/common';
+import { readChatStream } from './ai-stream';
 
 export interface ChatMessage {
   role: 'system' | 'user' | 'assistant' | 'tool';
@@ -51,6 +52,9 @@ export class AiService {
     maxTokens?: number;
     /** 'fast' = AI_MODEL_FAST (kategorisasi dll), atau nama model eksplisit. Default AI_MODEL. */
     model?: 'fast' | string;
+    /** Kalau diisi, request pakai `stream:true` dan tiap potongan teks dikirim ke sini; hasil akhirnya
+     * tetap pesan utuh yang sama bentuknya dengan mode biasa. */
+    onToken?: (text: string) => void;
   }): Promise<any> {
     if (!this.apiKey) {
       throw new InternalServerErrorException('AI_API_KEY belum dikonfigurasi di environment.');
@@ -67,7 +71,7 @@ export class AiService {
       model,
       // 9router defaults ke SSE streaming kalau field ini nggak eksplisit di-set false, walau
       // request-nya bukan buat streaming — respons jadi "data: {...}\n\n" chunks, bukan JSON tunggal.
-      stream: false,
+      stream: !!params.onToken,
       max_tokens: params.maxTokens ?? 2048,
       messages: allMessages,
     };
@@ -99,8 +103,15 @@ export class AiService {
       throw new InternalServerErrorException(`AI API gagal (HTTP ${res.status})`);
     }
 
+    if (params.onToken && res.body && (res.headers.get('content-type') ?? '').includes('text/event-stream')) {
+      return readChatStream(res.body, params.onToken);
+    }
+
+    // Mode biasa — atau proxy membalas JSON walau diminta stream (tidak ada token bertahap, tapi tetap benar).
     const data = await res.json();
-    return data.choices?.[0]?.message ?? null;
+    const message = data.choices?.[0]?.message ?? null;
+    if (params.onToken && message?.content) params.onToken(message.content);
+    return message;
   }
 
   /** Tool-calling loop — loop hingga finish_reason !== 'tool_calls' atau maxIterations.
@@ -112,14 +123,17 @@ export class AiService {
     tools: AiTool[];
     maxTokens?: number;
     maxIterations?: number;
+    onToken?: (text: string) => void;
+    /** Dipanggil sebelum tool dijalankan — teks yang sudah ter-stream di putaran ini cuma pembuka, bukan jawaban final. */
+    onToolRound?: () => void;
   }): Promise<ChatMessage[]> {
-    const { system, tools, maxTokens = 2048, maxIterations = 5 } = params;
+    const { system, tools, maxTokens = 2048, maxIterations = 5, onToken, onToolRound } = params;
 
     const working: ChatMessage[] = [...params.messages];
     const newMessages: ChatMessage[] = [];
 
     for (let i = 0; i < maxIterations; i++) {
-      const assistantMessage = await this.chat({ system, messages: working, tools, maxTokens });
+      const assistantMessage = await this.chat({ system, messages: working, tools, maxTokens, onToken });
 
       if (!assistantMessage) break;
 
@@ -132,6 +146,8 @@ export class AiService {
       if (finishReason !== 'tool_calls' || !assistantMessage.tool_calls?.length) {
         return newMessages;
       }
+
+      onToolRound?.();
 
       // Jalankan tiap tool_call
       for (const toolCall of assistantMessage.tool_calls as OpenAiToolCall[]) {

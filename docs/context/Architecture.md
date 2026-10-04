@@ -22,7 +22,7 @@
 
 ## Database
 - ORM: Prisma 5 | Schema: `apps/backend/prisma/schema.prisma`
-- Tabel penting: `Transaction` (`emailId` unique dedup; manual = `manual:<uuid>`; `isBig` override manual "pembelian besar"), `Income`, `BankBalance` (live incremental per `Source` BCA/JAGO/GOPAY), `BalanceAdjustment` (koreksi manual saja), `DailyBudget`, `AlertLog` (`@@unique([date])`), `GmailToken`, `TelegramConfig`, `MerchantAlias`, `SplitBill`/`SplitBillParticipant`/`SplitBillItem`, `HealthScoreLog`, `AiInsightCard` (cache kartu AI Analisis, unique `[rangeKey, dayKey]`), `PeriodReport`
+- Tabel penting: `Transaction` (`emailId` unique dedup; manual = `manual:<uuid>`; `isBig` override manual "pembelian besar"), `Income`, `BankBalance` (live incremental per `Source` BCA/JAGO/GOPAY), `BalanceAdjustment` (koreksi manual saja), `DailyBudget`, `AlertLog` (`@@unique([date])`), `GmailToken`, `TelegramConfig`, `MerchantAlias`, `SplitBill`/`SplitBillParticipant`/`SplitBillItem`, `HealthScoreLog`, `BudgetSetting` (1 baris, `rolloverEnabled`), `AiInsightCard` (cache kartu AI Analisis, unique `[rangeKey, dayKey]`), `PeriodReport`
 (snapshot laporan WEEK/MONTH yang sudah tutup, unique `[period, periodStart]`).
 - Migrasi: dev `npx prisma migrate dev`; prod `npx prisma migrate deploy` otomatis di CMD Dockerfile tiap container start.
 

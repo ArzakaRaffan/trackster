@@ -1,4 +1,5 @@
-import { Controller, Post, Body, Get, Patch, Delete, Param, ParseIntPipe, Query, UseGuards } from '@nestjs/common';
+import { Controller, Post, Body, Get, Patch, Delete, Param, ParseIntPipe, Query, Res, UseGuards } from '@nestjs/common';
+import { Response } from 'express';
 import { IsBoolean, IsEnum, IsInt, IsNumber, IsOptional, IsString, Max, Min, MinLength } from 'class-validator';
 import { MemoryKind } from '@prisma/client';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
@@ -162,6 +163,39 @@ export class AiController {
   async sendThreadMessage(@Param('id', ParseIntPipe) id: number, @Body() body: SendThreadMessageDto) {
     const reply = await this.aiChatService.sendMessage(id, body.text);
     return { reply };
+  }
+
+  /** Sama dengan `POST threads/:id/messages`, tapi balasan dialirkan sebagai SSE:
+   *  `{type:'token',text}` · `{type:'reset'}` (tool dipanggil, buang teks pembuka) · `{type:'done',reply}` · `{type:'error'}`.
+   *  Pesan tetap disimpan lengkap oleh `sendMessage` — client yang putus di tengah tidak kehilangan balasan. */
+  @Post('threads/:id/messages/stream')
+  async streamThreadMessage(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() body: SendThreadMessageDto,
+    @Res() res: Response,
+  ) {
+    res.status(200).set({
+      'Content-Type': 'text/event-stream; charset=utf-8',
+      'Cache-Control': 'no-cache, no-transform',
+      Connection: 'keep-alive',
+      'X-Accel-Buffering': 'no', // nginx jangan di-buffer, kalau tidak token baru muncul sekaligus di akhir
+    });
+    res.flushHeaders();
+    const send = (event: object) => res.write(`data: ${JSON.stringify(event)}\n\n`);
+    // Tool call bisa diam belasan detik — ping komentar supaya proxy tidak menutup koneksi.
+    const ping = setInterval(() => res.write(': ping\n\n'), 15_000);
+    try {
+      const reply = await this.aiChatService.sendMessage(id, body.text, {
+        onToken: (text) => send({ type: 'token', text }),
+        onToolRound: () => send({ type: 'reset' }),
+      });
+      send({ type: 'done', reply });
+    } catch (err: any) {
+      send({ type: 'error', message: err?.message ?? 'Gagal memproses pesan' });
+    } finally {
+      clearInterval(ping);
+      res.end();
+    }
   }
 
   @Patch('threads/:id')

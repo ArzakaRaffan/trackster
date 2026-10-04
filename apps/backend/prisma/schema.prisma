@@ -71,6 +71,13 @@ model DailyBudget {
   updatedAt DateTime @updatedAt
 }
 
+/// Satu baris (id=1). Setting budget yang bukan angka per hari.
+model BudgetSetting {
+  id              Int     @id @default(1)
+  /// Sisa budget hari-hari sebelumnya (dalam minggu Senin–Minggu yang sama) ikut ditambahkan ke budget hari ini.
+  rolloverEnabled Boolean @default(false)
+}
+
 model EmailSyncLog {
   id         Int      @id @default(autoincrement())
   lastSyncAt DateTime

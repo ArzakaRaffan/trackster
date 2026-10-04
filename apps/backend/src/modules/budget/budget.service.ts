@@ -2,7 +2,8 @@ import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../../prisma.service';
 import { UpdateBudgetDto } from './dto/update-budget.dto';
 import { MerchantAliasService } from '../merchant-alias/merchant-alias.service';
-import { wibDateKey, wibDayOfWeek, wibRange } from '../../common/wib';
+import { addWibDays, startOfWibDay, startOfWibWeek, wibDateKey, wibDayOfWeek, wibRange } from '../../common/wib';
+import { calcRollover } from './budget-rollover';
 
 @Injectable()
 export class BudgetService {
@@ -34,10 +35,55 @@ export class BudgetService {
     return row ? Number(row.amount) : 0;
   }
 
+  async getRolloverEnabled(): Promise<boolean> {
+    const row = await this.prisma.budgetSetting.findUnique({ where: { id: 1 } });
+    return row?.rolloverEnabled ?? false;
+  }
+
+  async setRolloverEnabled(enabled: boolean) {
+    const row = await this.prisma.budgetSetting.upsert({
+      where: { id: 1 },
+      update: { rolloverEnabled: enabled },
+      create: { id: 1, rolloverEnabled: enabled },
+    });
+    return { rolloverEnabled: row.rolloverEnabled };
+  }
+
+  /** Sisa budget Senin..kemarin (minggu berjalan) yang belum terpakai — 0 di hari Senin. */
+  private async computeRollover(now: Date): Promise<number> {
+    const weekStart = startOfWibWeek(now);
+    const todayStart = startOfWibDay(now);
+    if (weekStart.getTime() === todayStart.getTime()) return 0;
+
+    const [rows, txs] = await Promise.all([
+      this.prisma.dailyBudget.findMany(),
+      this.prisma.transaction.findMany({
+        where: { occurredAt: { gte: weekStart, lt: todayStart } },
+        select: { amount: true, occurredAt: true },
+      }),
+    ]);
+    const budgetByDow = new Map(rows.map((r) => [r.dayOfWeek, Number(r.amount)]));
+    const spentByDay = new Map<string, number>();
+    for (const t of txs) {
+      const key = wibDateKey(t.occurredAt);
+      spentByDay.set(key, (spentByDay.get(key) ?? 0) + Number(t.amount));
+    }
+
+    const days: { budget: number; spent: number }[] = [];
+    for (let d = weekStart; d < todayStart; d = addWibDays(d, 1)) {
+      days.push({ budget: budgetByDow.get(wibDayOfWeek(d)) ?? 0, spent: spentByDay.get(wibDateKey(d)) ?? 0 });
+    }
+    return calcRollover(days);
+  }
+
   async getTodaySummary() {
     const now = new Date();
     const dayOfWeek = wibDayOfWeek(now);
-    const budget = await this.getBudgetForDay(dayOfWeek);
+    const baseBudget = await this.getBudgetForDay(dayOfWeek);
+    // `budget` = budget efektif hari ini (termasuk sisa kemarin kalau rollover aktif), supaya semua
+    // pemakai summary (alert over-budget, progress bar, snapshot AI) otomatis konsisten.
+    const rollover = (await this.getRolloverEnabled()) ? await this.computeRollover(now) : 0;
+    const budget = baseBudget + rollover;
 
     const { start: startOfDay, end: endOfDay } = wibRange('day', now);
 
@@ -59,6 +105,8 @@ export class BudgetService {
     return {
       date: wibDateKey(now),
       budget,
+      baseBudget,
+      rollover,
       totalSpent,
       remaining: budget - totalSpent,
       isOverBudget: totalSpent > budget,

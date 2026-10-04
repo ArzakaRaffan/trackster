@@ -61,6 +61,7 @@ interface RunwayForecast {
 interface TodaySummary {
   date: string;
   budget: number;
+  rollover?: number;
   totalSpent: number;
   remaining: number;
   isOverBudget: boolean;
@@ -177,6 +178,9 @@ export default function TodayPage() {
 
         <div className="mt-5 flex gap-8">
           <AmountDisplay label="Budget" value={data.budget} size="body" tone="muted" />
+          {!!data.rollover && (
+            <AmountDisplay label="Dari sisa kemarin" value={data.rollover} size="body" tone="muted" />
+          )}
           <AmountDisplay
             label={data.isOverBudget ? 'Lewat' : 'Sisa'}
             value={data.isOverBudget ? data.totalSpent - data.budget : data.remaining}

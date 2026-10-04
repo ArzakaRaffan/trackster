@@ -161,7 +161,11 @@ export class AiChatService {
   }
 
   /** Kirim pesan user ke thread, jalanin tool loop, simpan semua pesan baru, return balasan akhir. */
-  async sendMessage(threadId: number, text: string): Promise<string> {
+  async sendMessage(
+    threadId: number,
+    text: string,
+    stream?: { onToken: (text: string) => void; onToolRound: () => void },
+  ): Promise<string> {
     const thread = await this.assertThreadExists(threadId);
     this.logger.log(`sendMessage thread=${threadId}: ${text.slice(0, 100)}`);
 
@@ -213,6 +217,8 @@ export class AiChatService {
         messages: aiMessages,
         tools: this.aiFinanceToolsService.getTools({ threadId, excludeAfterId }),
         maxTokens: 1024,
+        onToken: stream?.onToken,
+        onToolRound: stream?.onToolRound,
       });
 
       const cards = extractCards(newMessages);

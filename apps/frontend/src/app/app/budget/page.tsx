@@ -271,6 +271,9 @@ function SuggestionsSection({
 
 export default function BudgetPage() {
   const { data, mutate } = useSWR('/budget', fetcher);
+  const { data: rollover, mutate: mutateRollover } = useSWR('/budget/rollover', (p: string) =>
+    api.get<{ rolloverEnabled: boolean }>(p),
+  );
   const { data: suggestion, isLoading: suggestionLoading } = useSWR('/ai/budget-suggestions', suggestionFetcher);
   const [values, setValues] = useState<Record<number, string>>({});
   const [saving, setSaving] = useState(false);
@@ -310,7 +313,7 @@ export default function BudgetPage() {
   const handleSuggestionApplied = () => mutate();
 
   const weeklyTotal = Object.values(values).reduce((sum, v) => sum + (parseInt(v, 10) || 0), 0);
-  const daily = [0, 1, 2, 3, 4, 5, 6].map((day) => parseInt(values[day] ?? '0', 10) || 0);
+  const daily = WEEK_ORDER.map((day) => parseInt(values[day] ?? '0', 10) || 0);
   const maxDaily = Math.max(...daily, 1);
 
   if (!data) return <BudgetSkeleton />;
@@ -338,10 +341,40 @@ export default function BudgetPage() {
                   style={{ height: `${Math.max(6, (v / maxDaily) * 100)}%` }}
                 />
               </div>
-              <span className="text-micro font-bold uppercase tracking-caps text-text-subtle">{DAY_SHORT[i]}</span>
+              <span className="text-micro font-bold uppercase tracking-caps text-text-subtle">{DAY_SHORT[WEEK_ORDER[i]]}</span>
             </div>
           ))}
         </div>
+      </section>
+
+      {/* Rollover: sisa budget hari-hari sebelumnya ikut ke hari ini (reset tiap Senin) */}
+      <section className="flex items-center gap-4 rounded-card-lg bg-card p-6 shadow-card">
+        <div className="min-w-0 flex-1">
+          <p className="text-body font-bold text-text">Bawa sisa budget ke hari berikutnya</p>
+          <p className="mt-1 text-small leading-relaxed text-text-subtle">
+            Sisa yang belum terpakai ditambahkan ke budget hari ini, sampai Minggu. Mulai Senin hitungannya dari nol lagi.
+          </p>
+        </div>
+        <button
+          type="button"
+          role="switch"
+          aria-checked={rollover?.rolloverEnabled ?? false}
+          aria-label="Bawa sisa budget ke hari berikutnya"
+          disabled={!rollover}
+          onClick={async () => {
+            await api.put('/budget/rollover', { enabled: !rollover?.rolloverEnabled });
+            mutateRollover();
+          }}
+          className={`relative h-8 w-14 shrink-0 rounded-full transition-colors duration-base ease-standard disabled:opacity-50 ${
+            rollover?.rolloverEnabled ? 'bg-brand' : 'bg-track'
+          }`}
+        >
+          <span
+            className={`absolute top-1 h-6 w-6 rounded-full bg-white shadow transition-all duration-base ease-standard ${
+              rollover?.rolloverEnabled ? 'left-7' : 'left-1'
+            }`}
+          />
+        </button>
       </section>
 
       {/* Saran AI */}

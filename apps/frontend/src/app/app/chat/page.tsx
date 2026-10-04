@@ -98,6 +98,7 @@ export default function ChatPage() {
   const [input, setInput] = useState('');
   const [sending, setSending] = useState(false);
   const [pendingUser, setPendingUser] = useState<string | null>(null);
+  const [streamText, setStreamText] = useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -150,7 +151,7 @@ export default function ChatPage() {
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [displayMessages.length, sending]);
+  }, [displayMessages.length, sending, streamText]);
 
   const handleSend = async (textToSend?: string) => {
     const text = (textToSend ?? input).trim();
@@ -169,7 +170,13 @@ export default function ChatPage() {
         setActiveThreadId(threadId);
         mutateThreads();
       }
-      await api.post<{ reply: string }>(`/ai/threads/${threadId}/messages`, { text });
+      let failed: string | null = null;
+      await api.postStream(`/ai/threads/${threadId}/messages/stream`, { text }, (e) => {
+        if (e.type === 'token') setStreamText((prev) => (prev ?? '') + e.text);
+        else if (e.type === 'reset') setStreamText(null); // tool dipanggil: teks pembuka dibuang, jawaban final menyusul
+        else if (e.type === 'error') failed = e.message;
+      });
+      if (failed) throw new Error(failed);
       await Promise.all([
         mutateMessages(undefined, { revalidate: true }),
         mutateThreads(),
@@ -177,12 +184,14 @@ export default function ChatPage() {
     } catch {
       // Biarkan history apa adanya; tampilkan pesan error sebagai bubble sementara.
       setPendingUser(null);
+      setStreamText(null);
       setSending(false);
       inputRef.current?.focus();
       return;
     }
 
     setPendingUser(null);
+    setStreamText(null);
     setSending(false);
     emitTrack('ai:reply');
     inputRef.current?.focus();
@@ -316,7 +325,18 @@ export default function ChatPage() {
             ))}
           </AnimatePresence>
 
-          {sending && (
+          {sending && streamText && (
+            <div className="flex items-end gap-2.5">
+              <span className="mb-0.5 shrink-0">
+                <Track mood="think" size={28} />
+              </span>
+              <div className="max-w-[82%] rounded-panel rounded-bl-subtle bg-card px-4 py-3 text-body leading-relaxed whitespace-pre-wrap text-text shadow-card">
+                {renderMessageBody(streamText)}
+              </div>
+            </div>
+          )}
+
+          {sending && !streamText && (
             <motion.div initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} className="flex items-end gap-2.5">
               <Track mood="think" size={28} />
               <div className="flex items-center gap-2 rounded-panel rounded-bl-subtle bg-card px-4 py-3 shadow-card">
