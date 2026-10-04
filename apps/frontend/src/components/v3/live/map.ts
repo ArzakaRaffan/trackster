@@ -52,3 +52,33 @@ export const mapGoal = (g: any) => ({
   id: g.id, name: g.name, target: Number(g.targetAmount), date: g.targetDate ? String(g.targetDate).slice(0, 10) : null,
   current: Number(g.currentAmount ?? g.saved ?? g.current ?? 0),
 });
+
+// ---- chat ---------------------------------------------------------------------------------------
+const OPTION_LABEL: Record<string, string> = { hemat: 'Hemat', seimbang: 'Seimbang', longgar: 'Longgar' };
+const MON = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des'];
+const fmtDeadline = (iso?: string | null) => {
+  if (!iso) return '—';
+  const [y, m, d] = String(iso).slice(0, 10).split('-').map(Number);
+  return `${d} ${MON[m - 1]} ${y}`;
+};
+
+/** Kartu pesan AI (bentuk backend) -> kartu prototipe v3. */
+export function mapCard(c: any): any {
+  if (c?.type === 'simulation') {
+    const ex = c.extra;
+    return {
+      type: 'simulation', title: c.title, series: (c.series ?? []).map((w: any) => w.balance), compare: (c.compareSeries ?? []).map((w: any) => w.balance),
+      weeksToGoal: c.summary?.weeksToGoal ?? null,
+      extra: ex ? `Total biaya ${RPf(ex.totalCost)}${ex.weeksDelay != null ? `, goal mundur ${ex.weeksDelay} minggu` : ''}` : '', assumptions: c.assumptions ?? [],
+    };
+  }
+  if (c?.type === 'goal-proposal') return { type: 'goal', name: c.name, target: c.target, deadline: fmtDeadline(c.deadline), rawDeadline: c.deadline ?? null, weekly: c.weeklyContribution ?? 0 };
+  return { type: 'budget', label: OPTION_LABEL[c.option] ?? c.option, total: c.totalWeekly, note: c.note ?? c.realismFlag ?? '', days: c.dailyAmounts ?? [] };
+}
+
+export const mapMsg = (m: any) => ({ role: m.role, text: m.content, cards: (m.attachments ?? []).map(mapCard) });
+
+// ---- memory -------------------------------------------------------------------------------------
+export const mapMem = (m: any) => ({
+  id: m.id, kind: m.kind, content: m.content, imp: m.importance, until: m.validUntil ? String(m.validUntil).slice(0, 10) : null, archived: !!m.archivedAt,
+});

@@ -39,3 +39,9 @@ export function buildDates(manual: number[], now: number = Date.now()): V3Dates 
   const [y, m, d] = todayISO.split('-').map(Number);
   return { todayISO, todayLabel: `${DAYN[dowOf(todayISO)]}, ${d} ${MON_LONG[m - 1]}`, days, dateIdx, todayMs: new Date(y, m - 1, d).getTime() };
 }
+
+/** '29 Sep, 21.14' (WIB) */
+export function wibLogDate(iso: string): string {
+  const d = wib(new Date(iso).getTime());
+  return `${d.getUTCDate()} ${MON_SHORT[d.getUTCMonth()]}, ${pad(d.getUTCHours())}.${pad(d.getUTCMinutes())}`;
+}

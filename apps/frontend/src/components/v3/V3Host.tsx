@@ -1,6 +1,7 @@
 'use client';
 
 import dynamic from 'next/dynamic';
+import { useState } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 import { useLive } from './live/useLive';
 
@@ -20,7 +21,8 @@ export function V3Host() {
   const path = usePathname() || '/';
   const router = useRouter();
   const demo = path === '/demo' || path.startsWith('/demo/');
-  const live = useLive(!demo && path.startsWith('/app'), path);
+  const [chatActive, setChatActive] = useState<number | null>(null);
+  const live = useLive(!demo && path.startsWith('/app'), path, chatActive);
   // Tunggu data inti sebelum menggambar layar privat, supaya tidak ada kilatan keadaan kosong.
   if (!demo && !live.ready) return <div style={{ position: 'fixed', inset: 0, background: pageBg() }} />;
   return (
@@ -29,6 +31,7 @@ export function V3Host() {
       base={demo ? '/demo' : '/app'}
       live={demo ? undefined : live}
       onNavigate={(p: string) => router.push(p)}
+      onChatActive={setChatActive}
       mulai="beranda"
       theme="dark"
       density="lega"

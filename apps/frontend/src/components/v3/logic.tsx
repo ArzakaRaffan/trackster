@@ -8,7 +8,8 @@ import { V3Tree } from './V3Tree';
 import './v3.css';
 import './pseudo.css';
 import { api } from '@/lib/api';
-import { buildDates } from './live/dates';
+import { buildDates, addDaysISO } from './live/dates';
+import { EMPTY_REPORT } from './live/reports';
 import { stateToPath, pathToState } from '@/lib/v3-routes';
 
 const I = {
@@ -117,13 +118,13 @@ export class V3Logic extends React.Component {
       this.state = { ...this.state, txs:[], manual:z, streams:[], incomes:[], subs:[], goals:[], mem:[], pending:false, synced:'',
         chat:{ ...this.state.chat, threads:[] }, split:{ ...this.state.split, bills:[] },
         st:{ ...this.state.st, gmail:false, tgConfigured:false, tgPreview:'', tgChat:'', logs:[], aliases:[], balances:{ BCA:{ ...bal }, JAGO:{ ...bal } } } };
-      v3SetupDates(z);
+      v3SetupDates(z); this.state.st = { ...this.state.st, bfAfter:addDaysISO(TODAY_ISO, -14), bfBefore:TODAY_ISO };
     }
   }
   liveCall(fn) { const L = this.props.live; if (L === undefined) return false; Promise.resolve().then(fn).then(() => L.refresh && L.refresh()).catch(e => { this.toast((e && e.message) || 'Gagal menyimpan.'); L.refresh && L.refresh(); }); return true; }
   syncLive(pl) { const L = this.props.live; if (!L) return; const cur = L.flat || {}, prev = (pl && pl.flat) || {}, patch = {}; for (const k of Object.keys(cur)) if (cur[k] !== prev[k]) patch[k] = cur[k]; for (const g of ['chat', 'st', 'split']) if (L[g] && L[g] !== (pl && pl[g])) patch[g] = { ...this.state[g], ...L[g] }; if (patch.budget && patch.budget.rec && !this._optSet) { this._optSet = 1; patch.opt = patch.budget.rec; } if (Object.keys(patch).length) this.setState(patch); }
   chatInputRef = React.createRef(); rootRef = React.createRef(); mascotRef = React.createRef(); chatScrollRef = React.createRef(); lpRef = React.createRef(); lpBoxRef = React.createRef();
-  componentDidUpdate(pp, ps) { this.syncLive(pp.live); this.syncPath(pp); this.persistPrefs(ps); if (pp && pp.mulai !== this.props.mulai) this.v3start(this.props.mulai); this.v3tr(); this.lpScan(); { const bx = this.lpBoxRef.current, k = (this.state.lpChat || []).length + (this.state.lpTyping ? .5 : 0); if (bx && this._boxN !== k) { this._boxN = k; bx.scrollTop = bx.scrollHeight; } } const el = this.chatScrollRef.current; if (el && this.state.page === 'chat') { const n = el.scrollHeight; if (n !== this._lastH) { this._lastH = n; el.scrollTop = n; } } }
+  componentDidUpdate(pp, ps) { this.loadReport(); this.searchLive(ps); if (ps && ps.chat && ps.chat.active !== this.state.chat.active && this.props.onChatActive) this.props.onChatActive(this.state.chat.active); this.syncLive(pp.live); this.syncPath(pp); this.persistPrefs(ps); if (pp && pp.mulai !== this.props.mulai) this.v3start(this.props.mulai); this.v3tr(); this.lpScan(); { const bx = this.lpBoxRef.current, k = (this.state.lpChat || []).length + (this.state.lpTyping ? .5 : 0); if (bx && this._boxN !== k) { this._boxN = k; bx.scrollTop = bx.scrollHeight; } } const el = this.chatScrollRef.current; if (el && this.state.page === 'chat') { const n = el.scrollHeight; if (n !== this._lastH) { this._lastH = n; el.scrollTop = n; } } }
   state = { pre:null, bp:'d', page:'dash', more:true, car:0, txs:TX0, runway:false, openDay:6, opt:'seimbang', basis:false, applyState:'idle', manual:[250000,180000,180000,180000,200000,200000,250000], manualOpen:false, saveState:'idle',
     streams:STREAMS0, incomes:INCOMES0, pending:true, pick:'', incTab:0, period:'month', periodOpen:false, fc:0, rowMenu:null,
     ci:{ 2:{ units:0, extra:0, amount:'' }, 3:{ units:0, extra:0, amount:'' }, 4:{ units:0, extra:0, amount:'' }, 5:{ units:0, extra:0, amount:'' } }, ciState:'open',
@@ -163,18 +164,21 @@ export class V3Logic extends React.Component {
   syncPath() { const path = this.props.path; if (path == null) return; if (this._lastPath !== path) { this.applyPath(path); return; } const want = stateToPath(this.props.base || '/app', { pre:this.state.pre ?? null, page:this.state.page }); if (want && want !== path) { this._lastPath = want; this.props.onNavigate && this.props.onNavigate(want); } }
   restorePrefs() { try { const th = localStorage.getItem('v3-theme'), lg = localStorage.getItem('v3-lang'); if (th === 'dark' || th === 'light') this.setState({ themeOv:th }); if (lg === 'id' || lg === 'en') this.setState({ lang:lg }, () => this.v3tr()); } catch (e) {} }
   persistPrefs(ps) { if (!ps) return; try { if (ps.themeOv !== this.state.themeOv && this.state.themeOv) localStorage.setItem('v3-theme', this.state.themeOv); if (ps.lang !== this.state.lang && this.state.lang) localStorage.setItem('v3-lang', this.state.lang); } catch (e) {} }
+  loadReport() { if (this.props.live !== undefined === false || this.state.page !== 'reports') return; const r = this.state.rp, key = r.tab + ':' + r.off; if (this._rpKey === key) return; this._rpKey = key; this.props.live.actions.reportData(r.tab, r.off).then(v => { if (this._rpKey === key) this.setState({ rpView:v }); }).catch(e => { this._rpKey = null; this.toast((e && e.message) || 'Gagal memuat laporan.'); }); }
+  searchLive(ps) { if (this.props.live !== undefined === false || !ps || !ps.rp) return; const a = ps.rp, b = this.state.rp; if (a.search === b.search && a.cat === b.cat && a.src === b.src) return; clearTimeout(this._sq); const on = !!b.search.trim() || b.cat !== 'ALL' || b.src !== 'ALL'; if (!on) { this.setState({ searchTxs:[] }); return; } this._sq = setTimeout(() => this.props.live.actions.searchTx(b.search.trim(), b.cat, b.src).then(l => this.setState({ searchTxs:l })).catch(() => {}), 300); }
+  openDay(b) { this.setState({ modal:'day', dayIdx:-1, dayTotal:b.total, dayLabel:b.full, dayTxs:null }); this.props.live.actions.dayTxs(b.iso).then(l => this.setState({ dayTxs:l })).catch(e => this.toast((e && e.message) || 'Gagal memuat transaksi.')); }
   later(fn, ms) { (this.tms = this.tms || []).push(setTimeout(fn, ms)); }
   spent() { return this.state.txs.filter(t => t.d === 6).reduce((a, t) => a + t.amt, 0); }
   addTx(n, time, amt, src, back) { const id = Date.now() + Math.floor(Math.random() * 1000); this.setState(st => ({ txs:[...st.txs, { id, d:6 - back, raw:n.toUpperCase(), alias:n, cap:null, src, time, cat:'MAKANAN', amt, note:'' }] })); }
   v3h(s) { const bp = s.bp, RP = n => (n < 0 ? '−' : '') + 'Rp' + Math.abs(Math.round(n)).toLocaleString('id-ID'); const seg = (id, l, cur, set) => ({ l, sel:String(cur === id), bg:cur === id ? 'var(--brand)' : 'transparent', c:cur === id ? 'var(--on-brand)' : 'var(--text)', bd:cur === id ? 'var(--brand)' : 'var(--border)', go:() => set(id) }); return { RP, NUM:n => Math.abs(Math.round(n)).toLocaleString('id-ID'), seg, isMob:bp !== 'd', isTab:false, isDesk:bp === 'd' }; }
-  componentDidMount() { this.syncLive(undefined); this.v3mount(); this.later(() => this.lpScan(), 150); this.iv = setInterval(() => { if (this.state.page === 'settings') this.setState({ nowTick:Date.now() }); }, 1000); if ((this.props.mascot ?? 'aktif') === 'aktif') { this.setState({ tipOpen:true }); this.autoHide(); } }
+  componentDidMount() { this.loadReport(); this.syncLive(undefined); this.v3mount(); this.later(() => this.lpScan(), 150); this.iv = setInterval(() => { if (this.state.page === 'settings') this.setState({ nowTick:Date.now() }); }, 1000); if ((this.props.mascot ?? 'aktif') === 'aktif') { this.setState({ tipOpen:true }); this.autoHide(); } }
   componentWillUnmount() { this.v3ro && this.v3ro.disconnect(); this.kd && window.removeEventListener('keydown', this.kd); (this.tms || []).forEach(clearTimeout); clearInterval(this.iv); ['t1','t2','t3','t4'].forEach(k => clearTimeout(this[k])); }
   autoHide() { clearTimeout(this.t3); this.t3 = setTimeout(() => this.setState({ tipOpen:false }), 6000); }
   toast(m) { clearTimeout(this.t1); this.setState({ toast:m, toastOn:true }); this.t1 = setTimeout(() => this.setState({ toastOn:false }), 3000); }
   go(p) { this.setState({ page:p, rowMenu:null, periodOpen:false, bell:false }); window.scrollTo && window.scrollTo({ top:0 }); }
   title(t) { return t.alias || t.raw; }
   updTx(id, patch) { this.setState(s => ({ txs:s.txs.map(t => t.id === id ? { ...t, ...patch } : t) })); this.liveCall(() => this.props.live.actions.updTx(id, patch)); }
-  openTx(t) { this.setState({ modal:'tx', txId:t.id, aliasDraft:t.alias || '', noteDraft:t.note || '' }); }
+  openTx(t) { this.setState({ modal:'tx', txId:t.id, txObj:t, aliasDraft:t.alias || '', noteDraft:t.note || '' }); }
   confirm(cf) { this.setState({ modal:'confirm', cf, prevModal:this.state.modal }); }
   closeModal() { this.setState({ modal:null, cf:null }); }
   mascot(px, mood) {
@@ -256,18 +260,18 @@ export class V3Logic extends React.Component {
       setTabs:tabs.map((l, i) => ({ label:l, selected:String(t.tab === i), bg: t.tab === i ? 'var(--text)' : 'var(--neutral)', fg: t.tab === i ? 'var(--page)' : 'var(--text)', hover: t.tab === i ? 'var(--text)' : 'var(--neutral-hover)', onClick:() => setT({ tab:i }) })),
       setConn:t.tab === 0, setSync:t.tab === 1, setBal:t.tab === 2, setAlias:t.tab === 3,
       askLogout:() => this.confirm({ title:'Keluar dari Trackster?', body:'Kamu perlu login lagi untuk buka dashboard.', primary:'Keluar', secondary:'Batal', danger:true, onPrimary:() => { if (this.props.live !== undefined) { api.post('/auth/logout').catch(() => {}).then(() => { window.location.href = '/login'; }); } else this.toast('Keluar… mengarahkan ke halaman login.'); } }),
-      gm: t.gmail ? { connected:true, notConnected:false, status:'Terhubung', color:'var(--success-text)', bg:'var(--success-subtle)', sub:'rizky.arzaka@gmail.com' } : { connected:false, notConnected:true, status:'Belum terhubung', color:'var(--text-subtle)', bg:'var(--neutral)', sub:'Transaksi nggak akan tercatat otomatis' },
-      askDisconnect:() => this.confirm({ title:'Putuskan Google?', body:'Trackster berhenti membaca email bank dan reminder Calendar nggak di-sync lagi.', primary:'Putuskan', secondary:'Batal', danger:true, onPrimary:() => { setT({ gmail:false }); this.toast('Google diputuskan.'); } }),
-      connectGmail:() => { setT({ gmail:true }); this.toast('Google terhubung.'); },
+      gm: t.gmail ? { connected:true, notConnected:false, status:'Terhubung', color:'var(--success-text)', bg:'var(--success-subtle)', sub:t.gmailEmail ?? 'rizky.arzaka@gmail.com' } : { connected:false, notConnected:true, status:'Belum terhubung', color:'var(--text-subtle)', bg:'var(--neutral)', sub:'Transaksi nggak akan tercatat otomatis' },
+      askDisconnect:() => this.confirm({ title:'Putuskan Google?', body:'Trackster berhenti membaca email bank dan reminder Calendar nggak di-sync lagi.', primary:'Putuskan', secondary:'Batal', danger:true, onPrimary:() => { setT({ gmail:false }); this.liveCall(() => this.props.live.actions.gmailDisconnect()); this.toast('Google diputuskan.'); } }),
+      connectGmail:() => { if (this.props.live !== undefined) { this.props.live.actions.gmailAuthUrl().then(r => { window.location.href = r.url; }).catch(e => this.toast((e && e.message) || 'Gagal membuka Google.')); return; } setT({ gmail:true }); this.toast('Google terhubung.'); },
       tg: t.tgConfigured ? { configured:true, status:'Aktif', color:'var(--success-text)', bg:'var(--success-subtle)', sub:`Token ${t.tgPreview} · Chat ID ${t.tgChat}`, editLabel:'Ubah' } : { configured:false, status:'Belum diatur', color:'var(--text-subtle)', bg:'var(--neutral)', sub:'Alert saat budget harian terlampaui', editLabel:'Atur' },
-      testTg:() => { setT({ tgResult:'Terkirim! Cek Telegram kamu.' }); }, hasTgResult:!!t.tgResult, tgResult:t.tgResult || '',
+      testTg:() => { if (this.props.live !== undefined) { setT({ tgResult:null }); this.props.live.actions.tgTest().then(r => setT({ tgResult:r && r.success ? 'Terkirim! Cek Telegram kamu.' : 'Gagal kirim. Cek konfigurasi.' })).catch(e => setT({ tgResult:(e && e.message) || 'Gagal kirim. Cek konfigurasi.' })); return; } setT({ tgResult:'Terkirim! Cek Telegram kamu.' }); }, hasTgResult:!!t.tgResult, tgResult:t.tgResult || '',
       openTg:() => this.setState({ modal:'tg', tf:{ token:'', chat:t.tgChat || '' } }),
-      tgEveryStr:String(t.tgEvery), toggleTgEvery:() => setT({ tgEvery:!t.tgEvery }), tgSwBg: t.tgEvery ? 'var(--brand)' : 'var(--border-bold)', tgSwX: t.tgEvery ? '16px' : '0px',
-      countdown:mmss(left), manualSync:() => { if (!t.gmail || t.syncing) return; setT({ syncing:true, syncResult:null }); setTimeout(() => setT({ syncing:false, syncResult:'2 transaksi baru disinkronkan.', nextRun:Date.now() + 5 * 60000 }), 1200); },
+      tgEveryStr:String(t.tgEvery), toggleTgEvery:() => { setT({ tgEvery:!t.tgEvery }); this.liveCall(() => this.props.live.actions.tgNotify(!t.tgEvery)); }, tgSwBg: t.tgEvery ? 'var(--brand)' : 'var(--border-bold)', tgSwX: t.tgEvery ? '16px' : '0px',
+      countdown:mmss(left), manualSync:() => { if (!t.gmail || t.syncing) return; setT({ syncing:true, syncResult:null }); if (this.props.live !== undefined) { this.props.live.actions.sync().then(r => this.props.live.refresh().then(() => setT({ syncing:false, syncResult:r && r.error ? 'Error: ' + r.error : (r && r.synced != null ? r.synced : 0) + ' transaksi baru disinkronkan.' }))).catch(e => setT({ syncing:false, syncResult:'Error: ' + ((e && e.message) || 'sinkron gagal') })); return; } setTimeout(() => setT({ syncing:false, syncResult:'2 transaksi baru disinkronkan.', nextRun:Date.now() + 5 * 60000 }), 1200); },
       syncOff:String(!t.gmail), syncBtnBg: t.gmail ? 'var(--brand)' : off[0], syncBtnFg: t.gmail ? 'var(--on-brand)' : off[1], mSyncing:t.syncing, syncBtn: t.syncing ? 'Sinkronisasi...' : 'Sync manual sekarang', hasSyncResult:!!t.syncResult, syncResult:t.syncResult || '',
       toggleBackfill:() => setT({ bfOpen:!t.bfOpen }), bfExpanded:String(t.bfOpen), bfRot: t.bfOpen ? '180deg' : '0deg', bfRows: t.bfOpen ? '1fr' : '0fr', bfTab: t.bfOpen ? 0 : -1,
       bfAfter:t.bfAfter, bfBefore:t.bfBefore, onBfAfter:e => setT({ bfAfter:e.target.value }), onBfBefore:e => setT({ bfBefore:e.target.value }), bfBusy:t.bfBusy, bfBtn: t.bfBusy ? 'Backfill...' : 'Backfill rentang ini',
-      runBackfill:() => { if (!t.gmail || t.bfBusy) return; setT({ bfBusy:true, bfResult:null }); setTimeout(() => setT({ bfBusy:false, bfResult:'14 transaksi baru dari 31 email (duplikat dilewati: 9).' }), 1400); }, hasBfResult:!!t.bfResult, bfResult:t.bfResult || '',
+      runBackfill:() => { if (!t.gmail || t.bfBusy) return; setT({ bfBusy:true, bfResult:null }); if (this.props.live !== undefined) { this.props.live.actions.backfill(t.bfAfter, t.bfBefore).then(r => this.props.live.refresh().then(() => setT({ bfBusy:false, bfResult:r && r.error ? 'Error: ' + r.error : (r && r.synced != null ? r.synced : 0) + ' transaksi baru dari ' + ((r && r.scanned) || 0) + ' email (duplikat dilewati: ' + ((r && r.skippedDuplicate) || 0) + ').' }))).catch(e => setT({ bfBusy:false, bfResult:'Error: ' + ((e && e.message) || 'backfill gagal') })); return; } setTimeout(() => setT({ bfBusy:false, bfResult:'14 transaksi baru dari 31 email (duplikat dilewati: 9).' }), 1400); }, hasBfResult:!!t.bfResult, bfResult:t.bfResult || '',
       plStatus:t.plStatus, onPlStatus:e => setT({ plStatus:e.target.value }), plOpts:Object.keys(PL).map(k => ({ value:k, label:PL[k] })), plLabel:PL[t.plStatus], plEmpty:logs.length === 0,
       plRows:logs.map(l => ({ subject:l.subject || '(tanpa subjek)', from:l.from, hasReason:!!l.reason, reason:l.reason || '', date:l.date, href:'https://mail.google.com/mail/u/0/#all/' + l.id })),
       balRows:['BCA','JAGO'].map(k => { const b = t.balances[k], open = t.histOpen === k; return { name: k === 'JAGO' ? 'Jago' : 'BCA', balance:RP(b.balance), updated:fmtDT(b.updated), histExpanded:String(open), histRot: open ? '180deg' : '0deg', histRows: open ? '1fr' : '0fr', histEmpty:b.adj.length === 0,
@@ -275,15 +279,15 @@ export class V3Logic extends React.Component {
         toggleHist:() => setT({ histOpen: open ? null : k }), adjust:() => this.setState({ modal:'bal', bf:{ src:k, amount:fmtIn(b.balance), note:'' } }) }; }),
       mBal:s.modal === 'bal', bf, bfSet:{ amount:e => this.setState({ bf:{ ...bf, amount:fmtIn(e.target.value) } }), note:e => this.setState({ bf:{ ...bf, note:e.target.value } }) },
       bfDelta: d === 0 ? 'Belum ada perubahan' : `Selisih ${d > 0 ? '+' : '−'}${RP(d)} dari perkiraan sekarang`,
-      submitBal:() => { const k = bf.src; this.setState(z => { const b = z.st.balances[k]; return { modal:null, st:{ ...z.st, balances:{ ...z.st.balances, [k]:{ balance:newB, updated:Date.now(), adj:[{ delta:newB - b.balance, note:bf.note.trim(), at:Date.now() }, ...b.adj] } } } }; }); this.toast('Saldo dikoreksi.'); },
+      submitBal:() => { const k = bf.src; this.setState(z => { const b = z.st.balances[k]; return { modal:null, st:{ ...z.st, balances:{ ...z.st.balances, [k]:{ balance:newB, updated:Date.now(), adj:[{ delta:newB - b.balance, note:bf.note.trim(), at:Date.now() }, ...b.adj] } } } }; }); this.liveCall(() => this.props.live.actions.correctBalance(bf.src, newB, bf.note.trim())); this.toast('Saldo dikoreksi.'); },
       mTg:s.modal === 'tg', tf, tfSet:{ token:e => this.setState({ tf:{ ...tf, token:e.target.value } }), chat:e => this.setState({ tf:{ ...tf, chat:e.target.value } }) },
       tfOff:String(!tfOk), tfBtnBg: tfOk ? 'var(--brand)' : off[0], tfBtnFg: tfOk ? 'var(--on-brand)' : off[1],
-      submitTg:() => { if (!tfOk) return; const tok = tf.token.trim(); setT({ tgConfigured:true, tgPreview:tok.slice(0, 6) + '…' + tok.slice(-4), tgChat:tf.chat.trim() }); this.setState({ modal:null }); this.toast('Telegram disimpan.'); },
+      submitTg:() => { if (!tfOk) return; const tok = tf.token.trim(); setT({ tgConfigured:true, tgPreview:tok.slice(0, 6) + '…' + tok.slice(-4), tgChat:tf.chat.trim() }); this.liveCall(() => this.props.live.actions.saveTelegram(tok, tf.chat.trim())); this.setState({ modal:null }); this.toast('Telegram disimpan.'); },
       aliasEmpty:t.aliases.length === 0,
       aliasRows:t.aliases.map(a => { const ed = t.aliasEdit === a.id; return { name:a.name, raw:a.raw, editing:ed, viewing:!ed, draft:t.aliasDraft,
         onDraft:e => setT({ aliasDraft:e.target.value }), edit:() => setT({ aliasEdit:a.id, aliasDraft:a.name }), cancel:() => setT({ aliasEdit:null }),
-        save:() => { if (!t.aliasDraft.trim()) return; setT({ aliasEdit:null, aliases:t.aliases.map(x => x.id === a.id ? { ...x, name:t.aliasDraft.trim() } : x) }); this.toast('Alias disimpan.'); },
-        del:() => { setT({ aliases:t.aliases.filter(x => x.id !== a.id) }); this.toast('Alias dihapus.'); } }; })
+        save:() => { if (!t.aliasDraft.trim()) return; setT({ aliasEdit:null, aliases:t.aliases.map(x => x.id === a.id ? { ...x, name:t.aliasDraft.trim() } : x) }); this.liveCall(() => this.props.live.actions.saveAlias(a.id, t.aliasDraft.trim())); this.toast('Alias disimpan.'); },
+        del:() => { setT({ aliases:t.aliases.filter(x => x.id !== a.id) }); this.liveCall(() => this.props.live.actions.delAlias(a.id)); this.toast('Alias dihapus.'); } }; })
     };
   }
   batch4(s, off) {
@@ -303,9 +307,9 @@ export class V3Logic extends React.Component {
           extra:cd.extra, assumptions:cd.assumptions, assumeOpen:ao, assumeExpanded:String(ao), assumeLabel: ao ? 'Sembunyikan asumsi' : `Lihat ${cd.assumptions.length} asumsi`, toggleAssume:() => setC({ assume:{ ...c.assume, [key]:!ao } }) };
       }
       if (cd.type === 'goal') return { isSim:false, isGoal:true, isBudget:false, name:cd.name, meta:`Target ${RP(cd.target)} · sebelum ${cd.deadline} · ~${RP(cd.weekly)}/minggu`, ...btn('Buat goal', 'Goal dibuat'),
-        act:run(() => this.setState(z => ({ goals:[...z.goals, { id:Date.now(), name:cd.name, target:cd.target, date:null, current:0 }] }))) };
+        act:run(() => { if (this.props.live !== undefined) this.liveCall(() => this.props.live.actions.addGoal({ name:cd.name, targetAmount:cd.target, targetDate:cd.rawDeadline ? new Date(cd.rawDeadline).toISOString() : undefined })); else this.setState(z => ({ goals:[...z.goals, { id:Date.now(), name:cd.name, target:cd.target, date:null, current:0 }] })); }) };
       return { isSim:false, isGoal:false, isBudget:true, name:`Budget ${cd.label} · ${RP(cd.total)}/minggu`, meta:cd.note, days:cd.days.map((v, i) => ({ d:['Min','Sen','Sel','Rab','Kam','Jum','Sab'][i], v:Math.round(v / 1000) + 'rb' })), ...btn('Terapkan', 'Diterapkan'),
-        act:run(() => this.setState({ manual:[...cd.days] })) };
+        act:run(() => { if (this.props.live !== undefined) this.liveCall(() => this.props.live.actions.saveBudget([...cd.days])); else this.setState({ manual:[...cd.days] }); }) };
     };
     const baseMsgs = thread ? thread.msgs : [];
     const list = c.pendingUser ? [...baseMsgs, { role:'user', text:c.pendingUser }] : baseMsgs;
@@ -317,6 +321,7 @@ export class V3Logic extends React.Component {
       if (t.includes('boros')) return { role:'assistant', text:'Minggu ini naik gara-gara dua hal: **Sushi Tei Rp152.000** hari Jumat dan **Bioskop + makan Rp196.300** hari Minggu. Di luar itu pengeluaran harianmu malah di bawah rata-rata.' };
       return { role:'assistant', text:'Oke, dicatat. Sisa budget hari ini **Rp115.500**. Ada lagi yang mau kamu tanyain?' }; };
     const send = txt => { const text = (txt ?? c.input).trim(); if (!text || c.sending) return;
+      if (this.props.live !== undefined) { this.setState(z => ({ chat:{ ...z.chat, input:'', sending:true, pendingUser:text } })); this.props.live.actions.chatSend(c.active, text).then(id => this.props.live.refresh().then(() => this.setState(z => ({ chat:{ ...z.chat, sending:false, pendingUser:null, active:id } })))).catch(e => { this.setState(z => ({ chat:{ ...z.chat, sending:false, pendingUser:null } })); this.toast((e && e.message) || 'Track belum bisa menjawab sekarang.'); }); return; }
       let id = c.active, threads = c.threads;
       if (id === null) { id = Date.now(); threads = [{ id, title:text.slice(0, 40), updated:'30 Sep', msgs:[] }, ...threads]; }
       this.setState(z => ({ chat:{ ...z.chat, threads, active:id, input:'', sending:true, pendingUser:text } }));
@@ -332,7 +337,7 @@ export class V3Logic extends React.Component {
     return {
       isChat:s.page === 'chat', isMemory:s.page === 'memory',
       threads:c.threads.map(t => ({ title:t.title || 'Percakapan baru', meta:t.updated, current: t.id === c.active ? 'true' : undefined, bg: t.id === c.active ? 'var(--neutral)' : 'transparent', open:() => setC({ active:t.id }),
-        del:() => { setC({ threads:c.threads.filter(x => x.id !== t.id), active: c.active === t.id ? null : c.active }); this.toast('Percakapan dihapus.'); } })),
+        del:() => { setC({ threads:c.threads.filter(x => x.id !== t.id), active: c.active === t.id ? null : c.active }); this.liveCall(() => this.props.live.actions.delThread(t.id)); this.toast('Percakapan dihapus.'); } })),
       threadsEmpty:c.threads.length === 0, newChat:() => setC({ active:null }), goMemory:() => this.go('memory'),
       mascotChat:this.mascot(32, c.sending ? 'idle' : 'happy'), mascotLg:this.mascot(64, 'happy'), mascotThink:this.mascot(28, 'idle'),
       chatStatus: c.sending ? 'Lagi mikir…' : 'AI financial buddy · online', chatWelcome: !thread && !c.pendingUser, chatSending:c.sending, msgs, typingDots:[0, 1, 2].map(dot),
@@ -344,14 +349,14 @@ export class V3Logic extends React.Component {
       memRows:act.map(m => { const key = 'm' + m.id, mo = s.rowMenu === key; return { kind:MK[m.kind], content:m.content, impLabel:`Kepentingan ${m.imp} dari 3`, dots:[1, 2, 3].map(n => n <= m.imp ? 'var(--brand)' : 'var(--border-bold)'), hasUntil:!!m.until, until: m.until ? fmtD(m.until) : '',
         menuOpen:String(mo), menuOpenB:mo, menu:() => this.setState({ rowMenu: mo ? null : key }),
         actions:[{ label:'Edit', color:'var(--text)', onClick:() => this.setState({ rowMenu:null, modal:'mem', memId:m.id, mf:{ content:m.content, kind:m.kind, imp:String(m.imp), until:m.until || '' } }) },
-          { label:'Arsipkan', color:'var(--text)', onClick:() => { this.setState({ rowMenu:null }); setMem(l => l.map(x => x.id === m.id ? { ...x, archived:true } : x)); this.toast('Memory diarsipkan.'); } },
-          { label:'Hapus', color:'var(--danger-text)', onClick:() => { this.setState({ rowMenu:null }); setMem(l => l.filter(x => x.id !== m.id)); this.toast('Memory dihapus.'); } }] }; }),
+          { label:'Arsipkan', color:'var(--text)', onClick:() => { this.setState({ rowMenu:null }); setMem(l => l.map(x => x.id === m.id ? { ...x, archived:true } : x)); this.liveCall(() => this.props.live.actions.memUpdate(m.id, { archived:true })); this.toast('Memory diarsipkan.'); } },
+          { label:'Hapus', color:'var(--danger-text)', onClick:() => { this.setState({ rowMenu:null }); setMem(l => l.filter(x => x.id !== m.id)); this.liveCall(() => this.props.live.actions.memDelete(m.id)); this.toast('Memory dihapus.'); } }] }; }),
       hasMemArchived:arch.length > 0, memArchCount:arch.length, toggleMemArch:() => this.setState({ memArchOpen:!s.memArchOpen }), memArchExpanded:String(!!s.memArchOpen), memArchRot: s.memArchOpen ? '180deg' : '0deg', memArchRows: s.memArchOpen ? '1fr' : '0fr', memArchTab: s.memArchOpen ? 0 : -1,
-      memArch:arch.map(m => ({ kind:MK[m.kind], content:m.content, restore:() => setMem(l => l.map(x => x.id === m.id ? { ...x, archived:false } : x)), del:() => setMem(l => l.filter(x => x.id !== m.id)) })),
+      memArch:arch.map(m => ({ kind:MK[m.kind], content:m.content, restore:() => { setMem(l => l.map(x => x.id === m.id ? { ...x, archived:false } : x)); this.liveCall(() => this.props.live.actions.memUpdate(m.id, { archived:false })); }, del:() => { setMem(l => l.filter(x => x.id !== m.id)); this.liveCall(() => this.props.live.actions.memDelete(m.id)); } })),
       mMem:s.modal === 'mem', mf, memKindOpts:Object.keys(MK).map(k => ({ value:k, label:MK[k] })),
       mfSet:{ content:e => this.setState({ mf:{ ...mf, content:e.target.value } }), kind:e => this.setState({ mf:{ ...mf, kind:e.target.value } }), imp:e => this.setState({ mf:{ ...mf, imp:e.target.value } }), until:e => this.setState({ mf:{ ...mf, until:e.target.value } }) },
       mfOff:String(!mfOk), mfBtnBg: mfOk ? 'var(--brand)' : off[0], mfBtnFg: mfOk ? 'var(--on-brand)' : off[1], mfBtn: s.memId ? 'Simpan perubahan' : 'Tambah memory',
-      submitMem:() => { if (!mfOk) return; const rec = { content:mf.content.trim(), kind:mf.kind, imp:Number(mf.imp), until:mf.until || null }; if (s.memId) setMem(l => l.map(x => x.id === s.memId ? { ...x, ...rec } : x)); else setMem(l => [{ id:Date.now(), archived:false, ...rec }, ...l]); this.setState({ modal:null }); this.toast(s.memId ? 'Memory diperbarui.' : 'Memory ditambahkan.'); }
+      submitMem:() => { if (!mfOk) return; const rec = { content:mf.content.trim(), kind:mf.kind, imp:Number(mf.imp), until:mf.until || null }; if (this.props.live !== undefined) { const body = { content:rec.content, kind:rec.kind, importance:rec.imp, validUntil:rec.until || (s.memId ? null : undefined) }; this.liveCall(() => s.memId ? this.props.live.actions.memUpdate(s.memId, body) : this.props.live.actions.memCreate(body)); this.setState({ modal:null }); this.toast(s.memId ? 'Memory diperbarui.' : 'Memory ditambahkan.'); return; } if (s.memId) setMem(l => l.map(x => x.id === s.memId ? { ...x, ...rec } : x)); else setMem(l => [{ id:Date.now(), archived:false, ...rec }, ...l]); this.setState({ modal:null }); this.toast(s.memId ? 'Memory diperbarui.' : 'Memory ditambahkan.'); }
     };
   }
   splitCalc(b) {
@@ -429,7 +434,7 @@ export class V3Logic extends React.Component {
     const r = s.rp, setR = patch => this.setState(z => ({ rp:{ ...z.rp, ...patch } }));
     const CC = { MAKANAN:'#fb7185', TRANSPORT:'#2dd4bf', BELANJA:'#c084fc', TAGIHAN:'#fbbf24', HIBURAN:'#f472b6', KESEHATAN:'#22d3ee', LAINNYA:'#94a3b8', TRANSFER:'#818cf8', TOPUP:'#38bdf8', PENDIDIKAN:'#facc15', PERAWATAN:'#f9a8d4', INVESTASI:'#4ade80', ROKOK:'#a8a29e' };
     const cmp = n => 'Rp' + (n >= 1e6 ? (n / 1e6).toFixed(1).replace('.', ',') + 'jt' : Math.round(n / 1000) + 'rb');
-    const title = t => t.alias || t.raw, meta = t => [t.src === 'JAGO' ? 'Jago' : t.src, DAYS[t.d] ? DAYS[t.d][1] : '', t.time, CAT_L[t.cat]].filter(Boolean).join(' · ');
+    const title = t => t.alias || t.raw, meta = t => [t.src === 'JAGO' ? 'Jago' : t.src, t.dl || (DAYS[t.d] ? DAYS[t.d][1] : ''), t.time, CAT_L[t.cat]].filter(Boolean).join(' · ');
     const MONTHS = [['2026-04','Apr',4820000,5600000],['2026-05','Mei',5310000,5900000],['2026-06','Jun',6120000,6000000],['2026-07','Jul',5480000,6450000],['2026-08','Agu',5020000,6800000],['2026-09','Sep',5430000,7620000]];
     const EARLY = [['2025-11','Nov 25',3900000,4200000],['2025-12','Des 25',6800000,5100000],['2026-01','Jan',4700000,5200000],['2026-02','Feb',4400000,5300000],['2026-03','Mar',5050000,5500000]];
     const tabs = ['Minggu','Bulan','6 bln','Semua'];
@@ -437,7 +442,8 @@ export class V3Logic extends React.Component {
     const catAgg = (txs, prevScale) => { const m = {}; txs.forEach(t => m[t.cat] = (m[t.cat] || 0) + t.amt); const arr = Object.entries(m).sort((a, b) => b[1] - a[1]); const mx = Math.max(1, ...arr.map(x => x[1] * Math.max(1, prevScale || 0)));
       return arr.map(([k, val], i) => { const pv = prevScale ? val * (prevScale + (i % 2 ? .25 : -.2)) : 0; return { name:CAT_L[k], value:RP(val), valColor:'var(--text)', hasSub:false, sub:'', hasBar:true, pct:(val / mx * 100) + '%', color:CC[k], hasPrev:!!prevScale, prevPct:(pv / mx * 100) + '%' }; }); };
     const merchAgg = txs => { const m = {}; txs.forEach(t => { const k = title(t); m[k] = m[k] || { n:0, v:0 }; m[k].n++; m[k].v += t.amt; }); return Object.entries(m).sort((a, b) => b[1].v - a[1].v).slice(0, 5).map(([k, x]) => ({ name:k, value:RP(x.v), valColor:'var(--text)', hasSub:true, sub:`${x.n}× transaksi`, hasBar:false })); };
-    if (r.tab === 0) {
+    if (this.props.live !== undefined) { const b = s.rpView || EMPTY_REPORT; v = { ...b, bars:b.bars.map(x => ({ ...x, onClick:x.iso ? () => this.openDay(x) : () => {} })) }; }
+    else if (r.tab === 0) {
       const sc = r.off === 0 ? 1 : 1 + r.off * -0.08, txs = s.txs, spend = txs.reduce((a, t) => a + t.amt, 0) * sc, inc = 1700000 * (r.off ? .92 : 1), net = inc - spend, prevSpend = spend * 1.12;
       const days = DAYS.map((d, i) => ({ label:d[0], full:d[1], budget:d[2], spent:txs.filter(t => t.d === i).reduce((a, t) => a + t.amt, 0) * sc }));
       const mx = Math.max(...days.map(d => Math.max(d.spent, d.budget))), over = days.filter(d => d.spent > d.budget).length;
@@ -476,10 +482,10 @@ export class V3Logic extends React.Component {
     const side = sideKey === 'subs' ? subsRows : v[sideKey] || [];
     // search
     const q = r.search.trim().toLowerCase(), active = !!q || r.cat !== 'ALL' || r.src !== 'ALL';
-    const res = active ? s.txs.filter(t => (!q || (title(t) + ' ' + t.raw + ' ' + (t.note || '')).toLowerCase().includes(q)) && (r.cat === 'ALL' || t.cat === r.cat) && (r.src === 'ALL' || t.src === r.src)) : [];
-    const dayTx = s.modal === 'day' && s.dayIdx >= 0 ? s.txs.filter(t => t.d === s.dayIdx) : [];
+    const res = active ? (this.props.live !== undefined ? (s.searchTxs || []) : s.txs.filter(t => (!q || (title(t) + ' ' + t.raw + ' ' + (t.note || '')).toLowerCase().includes(q)) && (r.cat === 'ALL' || t.cat === r.cat) && (r.src === 'ALL' || t.src === r.src))) : [];
+    const dayTx = s.modal === 'day' ? (this.props.live !== undefined ? (s.dayTxs || []) : (s.dayIdx >= 0 ? s.txs.filter(t => t.d === s.dayIdx) : [])) : [];
     const dayTot = dayTx.length ? dayTx.reduce((a, t) => a + t.amt, 0) : (s.dayTotal || 0);
-    const synth = s.modal === 'day' && s.dayIdx < 0 ? [['Kopi Kenangan','MAKANAN','BCA','08.10',.2],['Makan siang','MAKANAN','JAGO','12.20',.35],['Grab','TRANSPORT','JAGO','18.05',.25],['Indomaret','BELANJA','BCA','20.30',.2]].map(([n, c, src, tm, f]) => ({ title:n, meta:`${src === 'JAGO' ? 'Jago' : src} · ${tm} · ${CAT_L[c]}`, amount:'−' + RP(Math.round(dayTot * f / 100) * 100), open:() => {} })) : [];
+    const synth = s.modal === 'day' && s.dayIdx < 0 && this.props.live !== undefined === false ? [['Kopi Kenangan','MAKANAN','BCA','08.10',.2],['Makan siang','MAKANAN','JAGO','12.20',.35],['Grab','TRANSPORT','JAGO','18.05',.25],['Indomaret','BELANJA','BCA','20.30',.2]].map(([n, c, src, tm, f]) => ({ title:n, meta:`${src === 'JAGO' ? 'Jago' : src} · ${tm} · ${CAT_L[c]}`, amount:'−' + RP(Math.round(dayTot * f / 100) * 100), open:() => {} })) : [];
     const top3 = (v.cat || []).slice(0, 3);
     return {
       isReports:s.page === 'reports', rp:v, rpX:(r.tab * 100) + '%', rpHasNav:r.tab <= 1, rpIsAll:r.tab === 3,
@@ -491,10 +497,10 @@ export class V3Logic extends React.Component {
       rqRows:res.map(t => ({ title:title(t), meta:meta(t), amount:'−' + RP(t.amt), open:() => this.openTx(t) })),
       mDay:s.modal === 'day', dayInfo:`${dayTx.length || synth.length} transaksi · ${RP(dayTot)}`, dayEmpty: s.modal === 'day' && !dayTx.length && !synth.length,
       dayRows2: dayTx.length ? dayTx.map(t => ({ title:title(t), meta:meta(t), amount:'−' + RP(t.amt), open:() => this.openTx(t) })) : synth,
-      openShareCard:() => this.setState({ modal:'share', scBusy:false }), downloadCsv:() => this.toast('Mengunduh CSV laporan…'),
+      openShareCard:() => this.setState({ modal:'share', scBusy:false }), downloadCsv:() => { if (this.props.live !== undefined) { const b = s.rpView || {}, from = b.rangeFrom || '2000-01-01', to = b.rangeTo || TODAY_ISO; this.toast('Mengunduh CSV laporan…'); this.props.live.actions.exportCsv(from, to).then(blob => { const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'trackster-' + from + '.csv'; document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 1000); }).catch(e => this.toast((e && e.message) || 'Gagal mengunduh CSV.')); return; } this.toast('Mengunduh CSV laporan…'); },
       mShareCard:s.modal === 'share', scLabel:(r.tab <= 1 ? v.label : tabs[r.tab]).toUpperCase(), scNet:(v.net >= 0 ? '+' : '−') + RP(v.net), scNetColor: v.net >= 0 ? '#1ED760' : '#FF4D4D', scSpend:cmp(v.spend), scIncome:cmp(v.inc),
       scTop:top3.map(c => ({ name:c.name, value:c.value, pct:c.pct, color:c.color })), scBusy:!!s.scBusy, scBtn: s.scBusy ? 'Membuat gambar...' : 'Bagikan / simpan',
-      doShareCard:() => { this.setState({ scBusy:true }); setTimeout(() => { this.setState({ scBusy:false, modal:null }); this.toast('Gambar laporan disimpan.'); }, 900); }
+      doShareCard:() => { this.setState({ scBusy:true }); if (this.props.live !== undefined) { const dlg = document.querySelector('[role=dialog]'), note = dlg && [...dlg.querySelectorAll('span')].find(x => (x.textContent || '').startsWith('Preview kartu')), el = note && note.nextElementSibling; if (!el) { this.setState({ scBusy:false }); return; } import('html-to-image').then(m => m.toPng(el, { pixelRatio:2, cacheBust:true })).then(url => { const a = document.createElement('a'); a.href = url; a.download = 'trackster-laporan.png'; a.click(); this.setState({ scBusy:false, modal:null }); this.toast('Gambar laporan disimpan.'); }).catch(() => { this.setState({ scBusy:false }); this.toast('Gagal membuat gambar.'); }); return; } setTimeout(() => { this.setState({ scBusy:false, modal:null }); this.toast('Gambar laporan disimpan.'); }, 900); }
     };
   }
   b2Title3(s) { return { day: s.dayIdx >= 0 ? (DAYS[s.dayIdx] || [])[1] : (s.dayLabel || 'Detail transaksi'), share:'Bagikan laporan', mem: s.memId ? 'Edit memory' : 'Tambah memory', bal: s.bf ? `Sesuaikan saldo ${s.bf.src === 'JAGO' ? 'Jago' : 'BCA'}` : '', tg:'Konfigurasi Telegram' }[s.modal]; }
@@ -954,7 +960,7 @@ export class V3Logic extends React.Component {
     });
 
     // modals
-    const tx = s.txs.find(t => t.id === s.txId);
+    const tx = s.txs.find(t => t.id === s.txId) || (s.txObj && s.txObj.id === s.txId ? s.txObj : undefined);
     const catOpts = Object.keys(CAT_L).map(k => ({ value:k, label:CAT_L[k] }));
     const mTitles = { tx: tx ? this.title(tx) : '', expense:'Tambah pengeluaran manual', income: s.infId ? 'Edit pemasukan' : 'Tambah pemasukan manual', stream: s.sfId ? 'Edit sumber' : 'Tambah sumber', confirm: s.cf ? s.cf.title : '' };
     const ex = s.ex || {}, exOk = !!digits(ex.amount) && !!(ex.desc || '').trim();
@@ -969,7 +975,7 @@ export class V3Logic extends React.Component {
     if (sf.kind === 'SESSION') sfFields.push(numF('Rate per sesi','rate',true), numF('Ekstra sesi offline','extra',true), numF('Maks sesi/minggu','maxU'), numF('Biasanya berapa sesi','typical'));
     if (sf.kind === 'DEDUCTION') sfFields.push(numF('Potongan per hari absen','ded',true), numF('Hari kerja/minggu','maxU'));
     const cf = s.cf || {};
-    const tipMsg = TIPS[0].msg, isRem = TIPS[0].kind === 'reminder', tipOpen = !!s.tipOpen;
+    const T0 = this.props.live !== undefined ? (s.tip || { kind:'fact', msg:'Halo! Aku Track. Tanya aku kapan saja soal uangmu.' }) : TIPS[0], tipMsg = T0.msg, isRem = T0.kind === 'reminder', tipOpen = !!s.tipOpen;
     const spinner = h('svg', { width:18, height:18, viewBox:'0 0 24 24', fill:'none', stroke:'currentColor', strokeWidth:2.5, strokeLinecap:'round', 'aria-hidden':true, style:{ animation:'tsSpin .8s linear infinite' } }, h('path', { d:'M21 12a9 9 0 1 1-6.2-8.56' }));
     const off = ['var(--neutral)','var(--text-subtlest)'];
 
@@ -1011,7 +1017,7 @@ export class V3Logic extends React.Component {
       ciSave:() => { if (s.ciState !== 'open') return; this.setState({ ciState:'saving' }); if (this.props.live !== undefined) { const entries = []; for (const x of ciStreams) { const dr = s.checkin && s.checkin.byId[x.id], e = s.ci[x.id] || { units:0, extra:0, amount:'' }; if (dr && dr.alreadyFilled) continue; if (x.kind === 'IRREGULAR') { const a = Number(digits(e.amount)) || 0; if (a > 0) entries.push({ streamId:x.id, amount:a }); } else if (dr && !dr.scheduled && x.kind !== 'VARIABLE') continue; else if (x.kind === 'VARIABLE') { const a = Number(digits(e.amount)) || 0; if (a > 0) entries.push({ streamId:x.id, amount:a }); } else if (x.kind === 'SESSION') entries.push({ streamId:x.id, units:e.units, extraUnits:Math.min(e.extra, e.units) }); else if (x.kind === 'DEDUCTION') entries.push({ streamId:x.id, units:e.units }); else entries.push({ streamId:x.id }); } (entries.length ? this.props.live.actions.submitCheckin(s.checkin.weekStart, entries) : Promise.resolve()).then(() => this.props.live.refresh()).then(() => this.setState({ ciState:'done' })).catch(e => { this.setState({ ciState:'open' }); this.toast((e && e.message) || 'Gagal menyimpan check-in.'); }); return; } this.t4 = setTimeout(() => this.setState({ ciState:'done' }), 900); }, ciReset:() => this.setState({ ciState:'open' }),
       hasModal:!!s.modal, closeModal:() => this.closeModal(), mTitle:mTitles[s.modal] || this.b2Title(s) || this.b2Title3(s) || '', mHasSub: (s.modal === 'tx' && !!tx && !!tx.alias) || s.modal === 'contrib' || s.modal === 'sim', mSub: s.modal === 'contrib' ? 'Setor / tarik' : s.modal === 'sim' ? 'Simulasi target' : (tx ? tx.raw : ''),
       mTx:s.modal === 'tx' && !!tx, mExpense:s.modal === 'expense', mIncome:s.modal === 'income', mStream:s.modal === 'stream', mConfirm:s.modal === 'confirm',
-      tx: tx ? { amount:'−' + RP(tx.amt), meta:`${tx.src === 'JAGO' ? 'Jago' : tx.src} · ${DAYS[tx.d][1]} · ${tx.time}`, cat:tx.cat, raw:tx.raw, hasCap:!!tx.cap, cap:tx.cap || '', aliasDraft:s.aliasDraft, noteDraft:s.noteDraft } : {},
+      tx: tx ? { amount:'−' + RP(tx.amt), meta:`${tx.src === 'JAGO' ? 'Jago' : tx.src} · ${tx.dl || (DAYS[tx.d] || [])[1] || ''} · ${tx.time}`, cat:tx.cat, raw:tx.raw, hasCap:!!tx.cap, cap:tx.cap || '', aliasDraft:s.aliasDraft, noteDraft:s.noteDraft } : {},
       catOpts,
       onTxCat:e => { const cat = e.target.value, t = tx, ttl = this.title(t), count = s.txs.filter(x => this.title(x) === ttl).length;
         if (count > 1) this.confirm({ title:'Terapkan ke semua?', body:`Terapkan kategori ${CAT_L[cat]} ke semua transaksi "${ttl}" (${count})? Transaksi lama ikut ke-update.`, primary:`Semua (${count})`, secondary:'Ini saja', danger:false,

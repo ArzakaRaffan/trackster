@@ -2,9 +2,10 @@
 
 import { useMemo } from 'react';
 import useSWR, { useSWRConfig } from 'swr';
-import { api } from '@/lib/api';
-import { addDaysISO, buildDates, wibHHMM, wibISO } from './dates';
-import { RPf, mapGoal, mapIncome, mapStream, mapSub, streamPayload } from './map';
+import { API_URL, api } from '@/lib/api';
+import { addDaysISO, buildDates, wibHHMM, wibISO, wibLogDate } from './dates';
+import { buildAggregateReport, buildPeriodReport, dayLabelOf } from './reports';
+import { RPf, mapGoal, mapIncome, mapMem, mapMsg, mapStream, mapSub, streamPayload } from './map';
 
 const fetcher = (u: string) => api.get<any>(u);
 const useGet = (key: string | null, opts: Record<string, unknown> = {}) => useSWR<any>(key, fetcher, opts);
@@ -27,7 +28,14 @@ const STATUS_ROW: Record<string, [string, string, string]> = {
  * Data asli untuk prototipe v3. `flat` = potongan state prototipe (bentuk yang sama dengan data contohnya),
  * disalin ke state komponen tiap kali referensinya berubah. `actions` = aksi tulis ke backend.
  */
-export function useLive(enabled: boolean, path: string): Record<string, any> {
+const mapAnyTx = (t: any) => ({
+  id: t.id, d: undefined as number | undefined, dl: dayLabelOf(wibISO(new Date(t.occurredAt).getTime())), raw: t.description,
+  alias: t.displayDescription && t.displayDescription !== t.description ? t.displayDescription : null, cap: t.aiCaption || null, src: t.source,
+  time: wibHHMM(t.occurredAt), cat: t.category, amt: Number(t.amount) - Number(t.reimbursedAmount || 0), note: t.note || '',
+});
+const monthAnchor = (off: number) => { const [y, m] = wibISO().split('-').map(Number); const d = new Date(Date.UTC(y, m - 1 + off, 15)); return d.toISOString().slice(0, 10); };
+
+export function useLive(enabled: boolean, path: string, chatActive: number | null = null): Record<string, any> {
   const { mutate } = useSWRConfig();
   const todayISO = wibISO();
   const from = addDaysISO(todayISO, -6);
@@ -45,6 +53,19 @@ export function useLive(enabled: boolean, path: string): Record<string, any> {
   const draftRes = useGet(k('/income/checkin'));
   const subsRes = useGet(k('/subscriptions'));
   const goalsRes = useGet(k('/goal'));
+  const gmailRes = useGet(k('/gmail/status'));
+  const tgRes = useGet(k('/telegram/status'));
+  const nextRunRes = useGet(k('/sync/next-run'), { refreshInterval: 30_000 });
+  const balRes = useGet(k('/balance'));
+  const adjBca = useGet(k('/balance/BCA/adjustments'));
+  const adjJago = useGet(k('/balance/JAGO/adjustments'));
+  const aliasRes = useGet(k('/merchant-aliases'));
+  const parseLogRes = useGet(k('/sync/parse-log?limit=200'));
+  const syncLogRes = useGet(k('/sync/logs'));
+  const threadsRes = useGet(k('/ai/threads'));
+  const msgsRes = useGet(enabled && chatActive ? `/ai/threads/${chatActive}/messages` : null);
+  const memRes = useGet(k('/ai/memory'));
+  const tipRes = useGet(k('/ai/mascot-tip'));
   const sugRes = useGet(enabled && path.startsWith('/app/budget') ? '/ai/budget-suggestions' : null);
 
   const manual = useMemo(() => {
@@ -128,6 +149,38 @@ export function useLive(enabled: boolean, path: string): Record<string, any> {
     };
   }, [sugRes.data]);
 
+  // ---- setting ----
+  const st = useMemo(() => {
+    const bal: Record<string, any> = {};
+    const adjOf = (a: any[] | undefined) => (a ?? []).map((x) => ({ delta: Number(x.delta), note: x.note ?? '', at: new Date(x.createdAt).getTime() }));
+    for (const b of balRes.data ?? []) if (b.source === 'BCA' || b.source === 'JAGO') bal[b.source] = { balance: Number(b.balance), updated: new Date(b.lastUpdatedAt).getTime(), adj: adjOf(b.source === 'BCA' ? adjBca.data : adjJago.data) };
+    const empty = { balance: 0, updated: Date.now(), adj: [] };
+    const tg = tgRes.data;
+    return {
+      gmail: !!gmailRes.data?.connected, gmailEmail: gmailRes.data?.email ?? '',
+      tgConfigured: !!tg?.configured, tgPreview: tg?.botTokenPreview ?? '', tgChat: tg?.chatId ?? '', tgEvery: !!tg?.notifyEveryTransaction,
+      nextRun: nextRunRes.data?.nextRunAt ? new Date(nextRunRes.data.nextRunAt).getTime() : Date.now(),
+      balances: { BCA: bal.BCA ?? empty, JAGO: bal.JAGO ?? empty },
+      aliases: (aliasRes.data ?? []).map((a: any) => ({ id: a.id, name: a.displayName ?? '', raw: a.rawDescription })),
+      logs: (parseLogRes.data ?? []).map((l: any) => ({ id: l.emailId, status: l.status, subject: l.subject, from: l.from, reason: l.reason, date: wibLogDate(l.receivedAt) })),
+    };
+  }, [gmailRes.data, tgRes.data, nextRunRes.data, balRes.data, adjBca.data, adjJago.data, aliasRes.data, parseLogRes.data]);
+
+  const synced = useMemo(() => {
+    const last = (syncLogRes.data ?? []).find((x: any) => x.status === 'SUCCESS') ?? (syncLogRes.data ?? [])[0];
+    return last ? 'disinkron ' + wibHHMM(last.lastSyncAt) : '';
+  }, [syncLogRes.data]);
+
+  // ---- Tanya Track & memory ----
+  const chat = useMemo(() => ({
+    threads: (threadsRes.data ?? []).filter((t: any) => !t.archivedAt && t.channel !== 'TELEGRAM').map((t: any) => ({
+      id: t.id, title: t.title || 'Percakapan baru', updated: dm(wibISO(new Date(t.updatedAt).getTime())),
+      msgs: t.id === chatActive ? (msgsRes.data ?? []).map(mapMsg) : [],
+    })),
+  }), [threadsRes.data, msgsRes.data, chatActive]);
+  const mem = useMemo(() => (memRes.data ?? []).map(mapMem), [memRes.data]);
+  const tip = useMemo(() => (tipRes.data?.message ? { kind: tipRes.data.kind, msg: tipRes.data.message } : null), [tipRes.data]);
+
   // ---- notifikasi (bel) ----
   const notifs = useMemo(() => {
     const out: any[] = [];
@@ -157,6 +210,49 @@ export function useLive(enabled: boolean, path: string): Record<string, any> {
       saveBudget: (m: number[]) => api.put('/budget', { budgets: m.map((amount, dayOfWeek) => ({ dayOfWeek, amount })) }),
       applyBudget: (option: string, week: string) => api.post('/budget/apply', { option, week }),
       sync: () => api.post<any>('/sync/trigger'),
+      reportData: async (tab: number, off: number) => {
+        if (tab <= 1) {
+          const date = tab === 0 ? addDaysISO(wibISO(), off * 7) : monthAnchor(off);
+          return buildPeriodReport(tab as 0 | 1, await api.get<any>(`/reports?period=${tab === 0 ? 'week' : 'month'}&date=${date}`));
+        }
+        const agg = await api.get<any>(`/reports/aggregate?period=${tab === 2 ? '6m' : 'all'}`);
+        const records = tab === 3 ? await api.get<any>('/reports/records') : null;
+        return buildAggregateReport(tab as 2 | 3, agg, records, Number(wibISO().slice(0, 4)));
+      },
+      dayTxs: async (iso: string) => ((await api.get<any>(`/transactions/day/${iso}`)).transactions ?? []).map(mapAnyTx),
+      searchTx: async (q: string, cat: string, src: string) => {
+        const p = new URLSearchParams({ limit: '100' });
+        if (q) p.set('search', q);
+        if (cat !== 'ALL') p.set('category', cat);
+        if (src !== 'ALL') p.set('source', src);
+        return ((await api.get<any>(`/transactions?${p}`)).data ?? []).map(mapAnyTx);
+      },
+      exportCsv: async (from: string, to: string) => {
+        const res = await fetch(`${API_URL}/reports/export.csv?from=${from}&to=${to}`, { credentials: 'include' });
+        if (!res.ok) throw new Error('Gagal mengunduh CSV.');
+        return res.blob();
+      },
+      backfill: (after: string, before: string) => api.post<any>('/sync/backfill', { after, before }),
+      gmailAuthUrl: () => api.get<{ url: string }>('/gmail/auth-url'),
+      gmailDisconnect: () => api.post('/gmail/disconnect'),
+      saveTelegram: (botToken: string, chatId: string) => api.put('/telegram/config', { botToken, chatId }),
+      tgNotify: (v: boolean) => api.put('/telegram/config', { notifyEveryTransaction: v }),
+      tgTest: () => api.post<{ success: boolean }>('/telegram/test'),
+      correctBalance: (source: string, newBalance: number, note: string) => api.put(`/balance/${source}`, { newBalance, note: note || undefined }),
+      chatSend: async (threadId: number | null, text: string) => {
+        let id = threadId;
+        if (!id) id = (await api.post<{ id: number }>('/ai/threads')).id;
+        let failed: string | null = null;
+        await api.postStream(`/ai/threads/${id}/messages/stream`, { text }, (e) => { if (e.type === 'error') failed = e.message; });
+        if (failed) throw new Error(failed);
+        return id as number;
+      },
+      delThread: (id: number) => api.delete(`/ai/threads/${id}`),
+      memCreate: (b: any) => api.post('/ai/memory', b),
+      memUpdate: (id: number, b: any) => api.patch(`/ai/memory/${id}`, b),
+      memDelete: (id: number) => api.delete(`/ai/memory/${id}`),
+      saveAlias: (id: number, displayName: string) => api.put(`/merchant-aliases/${id}`, { displayName }),
+      delAlias: (id: number) => api.delete(`/merchant-aliases/${id}`),
       // pemasukan
       saveIncome: (id: number | null, x: { amount: number; desc: string; src: string; dateISO: string }) => {
         const body = { amount: x.amount, description: x.desc, source: x.src, receivedAt: new Date(`${x.dateISO}T12:00:00+07:00`).toISOString() };
@@ -183,7 +279,10 @@ export function useLive(enabled: boolean, path: string): Record<string, any> {
     refresh,
     actions,
     todayISO,
+    st,
+    chat,
     flat: {
+      synced, mem, tip,
       txs, manual, incomes, streams, subs, goals, notifs,
       todayBudget: today.data ? Number(today.data.budget) : undefined,
       todayIncome: today.data ? Number(today.data.totalIncome) : undefined,
