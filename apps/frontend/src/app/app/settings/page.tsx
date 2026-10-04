@@ -219,7 +219,7 @@ function SettingsContent() {
       </header>
 
       {/* Pill tab */}
-      <div className="flex gap-1 overflow-x-auto rounded-full-pill bg-card p-1 shadow-card">
+      <div className="flex gap-1 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden rounded-full-pill bg-card p-1 shadow-card">
         {SETTINGS_TABS.map((t) => (
           <button
             key={t.id}
@@ -497,7 +497,7 @@ function EmailParseLogSection() {
       >
         <div className="overflow-hidden">
           <div className="mt-4">
-            <div className="flex gap-2 overflow-x-auto pb-1">
+            <div className="flex gap-2 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden pb-1">
               {(['UNPARSED', 'ERROR', 'EXCLUDED', 'DUPLICATE', 'RECORDED'] as const).map((s) => (
                 <button
                   key={s}

@@ -5,11 +5,14 @@ import useSWR from 'swr';
 import Link from 'next/link';
 import { api } from '@/lib/api';
 import {
+  ArrowDown,
   Brain,
+  Check,
   ChevronLeft,
+  Copy,
   History,
   Plus,
-  Send,
+  ArrowUp,
   Trash2,
   Wallet,
   TrendingUp,
@@ -26,6 +29,7 @@ import { emitTrack } from '@/components/track/trackBus';
 import { SimulationCard, SimulationCardData } from '@/components/chat/SimulationCard';
 import { GoalProposalCard, GoalProposalCardData } from '@/components/chat/GoalProposalCard';
 import { BudgetProposalCard, BudgetProposalCardData } from '@/components/chat/BudgetProposalCard';
+import { MessageBody } from '@/components/chat/MessageBody';
 
 type ChatCard = SimulationCardData | GoalProposalCardData | BudgetProposalCardData;
 
@@ -63,33 +67,13 @@ const QUICK_PROMPTS = [
   { label: 'Atur ulang budget', Icon: SlidersHorizontal, text: 'Bantuin atur ulang budget harian aku dong' },
 ];
 
-const WELCOME: DisplayMessage = {
-  id: 'welcome',
-  role: 'assistant',
-  content:
-    'Halo Arzaka! Aku Track, financial buddy kamu. Mau cek kondisi keuangan, minta saran pengeluaran, atau catat transaksi bareng?',
-};
-
-function renderMessageBody(content: string) {
-  // Lightweight formatting: **bold** and plain paragraphs. No full markdown parser.
-  const parts = content.split(/(\*\*[^*]+\*\*)/g);
-  return parts.map((part, i) => {
-    if (part.startsWith('**') && part.endsWith('**')) {
-      return (
-        <strong key={i} className="font-bold text-text">
-          {part.slice(2, -2)}
-        </strong>
-      );
-    }
-    return <span key={i}>{part}</span>;
-  });
-}
-
 function fmtThreadDate(iso: string) {
   return new Date(iso).toLocaleDateString('id-ID', { day: 'numeric', month: 'short' });
 }
 
 const ACTIVE_THREAD_STORAGE_KEY = 'trackster_chat_active_thread';
+const STICK_THRESHOLD_PX = 80;
+const COMPOSER_MAX_PX = 160;
 
 export default function ChatPage() {
   const [activeThreadId, setActiveThreadIdState] = useState<number | null>(null);
@@ -99,8 +83,11 @@ export default function ChatPage() {
   const [sending, setSending] = useState(false);
   const [pendingUser, setPendingUser] = useState<string | null>(null);
   const [streamText, setStreamText] = useState<string | null>(null);
-  const messagesEndRef = useRef<HTMLDivElement>(null);
-  const inputRef = useRef<HTMLInputElement>(null);
+  const [showJump, setShowJump] = useState(false);
+  const [copiedId, setCopiedId] = useState<string | null>(null);
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const stickRef = useRef(true);
+  const inputRef = useRef<HTMLTextAreaElement>(null);
 
   const { data: threads, mutate: mutateThreads } = useSWR<Thread[]>('/ai/threads', (p: string) =>
     api.get<Thread[]>(p),
@@ -117,6 +104,7 @@ export default function ChatPage() {
    * meskipun data di DB masih ada (persis kasus yang mau dicegah E04-S1). localStorage nyimpen
    * thread id terakhir, di-restore sekali begitu daftar thread pertama kali kebaca. */
   const setActiveThreadId = (id: number | null) => {
+    stickRef.current = true;
     setActiveThreadIdState(id);
     try {
       if (id === null) localStorage.removeItem(ACTIVE_THREAD_STORAGE_KEY);
@@ -142,21 +130,48 @@ export default function ChatPage() {
 
   const messages: DisplayMessage[] =
     activeThreadId === null
-      ? [WELCOME]
+      ? []
       : (threadMessages ?? []).map((m) => ({ id: `m-${m.id}`, role: m.role, content: m.content, attachments: m.attachments }));
 
   const displayMessages = pendingUser
     ? [...messages, { id: 'pending-user', role: 'user' as const, content: pendingUser }]
     : messages;
 
+  // Auto-scroll hanya kalau user memang lagi di bawah (seperti ChatGPT/Claude): kalau dia
+  // scroll ke atas buat baca, token streaming tidak boleh menariknya turun.
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [displayMessages.length, sending, streamText]);
+    const el = scrollRef.current;
+    if (el && stickRef.current) el.scrollTo({ top: el.scrollHeight });
+  }, [displayMessages.length, sending, streamText, threadMessages]);
+
+  const handleScroll = () => {
+    const el = scrollRef.current;
+    if (!el) return;
+    const atBottom = el.scrollHeight - el.scrollTop - el.clientHeight < STICK_THRESHOLD_PX;
+    stickRef.current = atBottom;
+    setShowJump(!atBottom);
+  };
+
+  const jumpToBottom = () => {
+    const el = scrollRef.current;
+    if (!el) return;
+    stickRef.current = true;
+    el.scrollTo({ top: el.scrollHeight, behavior: 'smooth' });
+  };
+
+  // Composer auto-grow: reset ke auto dulu supaya bisa menyusut saat teks dihapus.
+  useEffect(() => {
+    const el = inputRef.current;
+    if (!el) return;
+    el.style.height = 'auto';
+    el.style.height = `${Math.min(el.scrollHeight, COMPOSER_MAX_PX)}px`;
+  }, [input]);
 
   const handleSend = async (textToSend?: string) => {
     const text = (textToSend ?? input).trim();
     if (!text || sending) return;
 
+    stickRef.current = true;
     setInput('');
     setSending(true);
     setPendingUser(text);
@@ -214,13 +229,24 @@ export default function ChatPage() {
     mutateThreads();
   };
 
-  const showQuick = activeThreadId === null && !sending;
+  const copyMessage = async (m: DisplayMessage) => {
+    try {
+      await navigator.clipboard.writeText(m.content);
+      setCopiedId(m.id);
+      setTimeout(() => setCopiedId((cur) => (cur === m.id ? null : cur)), 1500);
+    } catch {
+      // clipboard bisa ditolak (http/izin) - tidak fatal
+    }
+  };
+
+  const isEmpty = displayMessages.length === 0;
 
   return (
-    // h-dvh (bukan h-screen) + kompensasi padding `main` AppShell di desktop
-    // (py-4 = 32px). Tanpa ini total tinggi konten > viewport → body ikut scroll
-    // padahal area chat sudah punya scroll sendiri (double scrollbar).
-    <div className="relative flex h-dvh flex-col overflow-hidden pb-navbar lg:h-[calc(100dvh-2rem)] lg:pl-2">
+    // Tinggi: h-dvh di mobile (navbar bawah dikompensasi pb-navbar). Di desktop `main` AppShell
+    // punya lg:py-4 + lg:pb-28 (16 + 112px = 8rem, ruang buat mascot melayang) — tinggi panel
+    // WAJIB dikurangi sebesar itu, kalau tidak body ikut scroll (scrollbar ganda). Ubah angka
+    // padding `main` di AppShell → ubah `8rem` di sini juga.
+    <div className="relative flex h-dvh flex-col overflow-hidden pb-navbar lg:h-[calc(100dvh-8rem)] lg:pb-0 lg:pl-2">
       <header className="flex items-center gap-2.5 border-b border-border bg-page px-4 py-3 lg:rounded-t-panel lg:border lg:border-b-0 lg:bg-card">
         <Link href="/app/more" aria-label="Kembali" className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-text-subtle transition-colors hover:bg-hover hover:text-text lg:hidden">
           <ChevronLeft size={20} />
@@ -260,87 +286,107 @@ export default function ChatPage() {
         </button>
       </header>
 
-      {/* Di desktop halaman chat tampil sebagai satu "kartu" aplikasi (bordered
-          panel) alih-alih kolom mengambang, jadi posisi header/pesan/input terasa
-          satu kesatuan dan nggak acak. */}
-      <div className="mx-auto flex w-full max-w-content flex-1 flex-col overflow-hidden lg:rounded-b-panel lg:border lg:border-t-0 lg:border-border lg:bg-card">
-        <div className="flex-1 space-y-4 overflow-y-auto overscroll-contain px-4 py-4">
-          {displayMessages.length === 1 && (
-            <motion.div
-              initial={{ opacity: 0, y: 8 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={TRANSITION_SLOW}
-              className="mb-2 flex flex-col items-center gap-3 rounded-panel bg-card px-5 py-8 text-center shadow-card"
-            >
-              <Track mood="happy" size={64} />
-              <div>
-                <p className="font-title text-heading font-bold text-text">Mau bahas apa hari ini?</p>
-                <p className="mt-1 text-small leading-relaxed text-text-subtle">
-                  Tanya sisa budget, catat pengeluaran, atau minta saran sebelum belanja.
-                </p>
-              </div>
-            </motion.div>
-          )}
-
-          <AnimatePresence initial={false}>
-            {displayMessages.map((m) => (
+      {/* Satu panel: area scroll selebar panel (scrollbar menempel di tepi panel, bukan di tengah
+          kolom), isi pesan dipusatkan di kolom max-w-[720px] ala ChatGPT/Claude. */}
+      <div className="flex min-h-0 w-full flex-1 flex-col lg:rounded-b-panel lg:border lg:border-t-0 lg:border-border lg:bg-card">
+        <div ref={scrollRef} onScroll={handleScroll} className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
+          <div className="mx-auto flex min-h-full w-full max-w-[720px] flex-col gap-6 px-4 py-6">
+            {isEmpty && (
               <motion.div
-                key={m.id}
                 initial={{ opacity: 0, y: 8 }}
                 animate={{ opacity: 1, y: 0 }}
-                transition={TRANSITION_BASE}
-                className={`flex items-end gap-2.5 ${m.role === 'user' ? 'flex-row-reverse' : 'flex-row'}`}
+                transition={TRANSITION_SLOW}
+                className="my-auto flex flex-col items-center gap-6 py-6 text-center"
               >
-                {m.role === 'assistant' ? (
-                  <span className="mb-0.5 shrink-0">
-                    <Track mood="idle" size={28} />
-                  </span>
-                ) : (
-                  <span className="mb-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-brand text-micro font-bold text-on-brand">
-                    A
-                  </span>
-                )}
-                <div className="max-w-[82%]">
-                  <div
-                    className={`rounded-panel px-4 py-3 text-body leading-relaxed whitespace-pre-wrap ${
-                      m.role === 'user'
-                        ? 'rounded-br-subtle bg-brand text-on-brand font-medium'
-                        : 'rounded-bl-subtle bg-card text-text shadow-card'
-                    }`}
-                  >
-                    {m.role === 'assistant' ? renderMessageBody(m.content) : m.content}
-                  </div>
-                  {m.role === 'assistant' &&
-                    m.attachments?.map((card, i) =>
-                      card.type === 'simulation' ? (
-                        <SimulationCard key={i} card={card} />
-                      ) : card.type === 'goal-proposal' ? (
-                        <GoalProposalCard key={i} card={card} />
-                      ) : card.type === 'budget-proposal' ? (
-                        <BudgetProposalCard key={i} card={card} />
-                      ) : null,
-                    )}
+                <Track mood="happy" size={72} />
+                <div>
+                  <p className="font-title text-title font-bold text-text">Halo Arzaka, mau bahas apa?</p>
+                  <p className="mt-2 text-small leading-relaxed text-text-subtle">
+                    Tanya sisa budget, catat pengeluaran, atau minta saran sebelum belanja.
+                  </p>
+                </div>
+                <div className="grid w-full grid-cols-1 gap-2 xs:grid-cols-2">
+                  {QUICK_PROMPTS.map(({ label, Icon, text }) => (
+                    <button
+                      key={text}
+                      type="button"
+                      onClick={() => {
+                        setInput(text);
+                        inputRef.current?.focus();
+                      }}
+                      className="flex items-center gap-3 rounded-card bg-neutral px-3.5 py-3 text-left transition-colors duration-fast ease-standard hover:bg-neutral-hover"
+                    >
+                      <Icon size={16} className="shrink-0 text-brand" />
+                      <span className="text-small font-bold leading-snug text-text">{label}</span>
+                    </button>
+                  ))}
                 </div>
               </motion.div>
-            ))}
-          </AnimatePresence>
+            )}
 
-          {sending && streamText && (
-            <div className="flex items-end gap-2.5">
-              <span className="mb-0.5 shrink-0">
-                <Track mood="think" size={28} />
-              </span>
-              <div className="max-w-[82%] rounded-panel rounded-bl-subtle bg-card px-4 py-3 text-body leading-relaxed whitespace-pre-wrap text-text shadow-card">
-                {renderMessageBody(streamText)}
+            <AnimatePresence initial={false}>
+              {displayMessages.map((m) => (
+                <motion.div
+                  key={m.id}
+                  initial={{ opacity: 0, y: 8 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={TRANSITION_BASE}
+                  className={m.role === 'user' ? 'flex justify-end' : 'flex items-start gap-3'}
+                >
+                  {m.role === 'user' ? (
+                    <div className="max-w-[85%] whitespace-pre-wrap break-words rounded-panel rounded-br-subtle bg-neutral px-4 py-2.5 text-body leading-relaxed text-text">
+                      {m.content}
+                    </div>
+                  ) : (
+                    <>
+                      <span className="mt-0.5 shrink-0">
+                        <Track mood="idle" size={28} />
+                      </span>
+                      <div className="min-w-0 flex-1">
+                        <div className="text-body leading-relaxed text-text">
+                          <MessageBody content={m.content} />
+                        </div>
+                        {m.attachments?.map((card, i) =>
+                          card.type === 'simulation' ? (
+                            <SimulationCard key={i} card={card} />
+                          ) : card.type === 'goal-proposal' ? (
+                            <GoalProposalCard key={i} card={card} />
+                          ) : card.type === 'budget-proposal' ? (
+                            <BudgetProposalCard key={i} card={card} />
+                          ) : null,
+                        )}
+                        <button
+                          type="button"
+                          onClick={() => copyMessage(m)}
+                          aria-label="Salin jawaban"
+                          className="mt-1.5 -ml-1.5 flex h-7 items-center gap-1.5 rounded-full px-2 text-micro font-bold text-text-subtlest transition-colors hover:bg-hover hover:text-text"
+                        >
+                          {copiedId === m.id ? <Check size={13} className="text-brand" /> : <Copy size={13} />}
+                          {copiedId === m.id ? 'Tersalin' : 'Salin'}
+                        </button>
+                      </div>
+                    </>
+                  )}
+                </motion.div>
+              ))}
+            </AnimatePresence>
+
+            {sending && streamText && (
+              <div className="flex items-start gap-3">
+                <span className="mt-0.5 shrink-0">
+                  <Track mood="think" size={28} />
+                </span>
+                <div className="min-w-0 flex-1 text-body leading-relaxed text-text">
+                  <MessageBody content={streamText} />
+                  <span className="ml-0.5 inline-block h-4 w-1.5 translate-y-0.5 animate-pulse rounded-subtle bg-brand" aria-hidden />
+                </div>
               </div>
-            </div>
-          )}
+            )}
 
-          {sending && !streamText && (
-            <motion.div initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} className="flex items-end gap-2.5">
-              <Track mood="think" size={28} />
-              <div className="flex items-center gap-2 rounded-panel rounded-bl-subtle bg-card px-4 py-3 shadow-card">
-                <span className="flex gap-1">
+            {sending && !streamText && (
+              <motion.div initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} className="flex items-center gap-3">
+                <Track mood="think" size={28} />
+                <span className="flex gap-1" aria-label="Track lagi nulis jawaban">
                   {[0, 1, 2].map((i) => (
                     <motion.span
                       key={i}
@@ -350,59 +396,58 @@ export default function ChatPage() {
                     />
                   ))}
                 </span>
-                <span className="text-small text-text-subtle">Track lagi nulis jawaban…</span>
-              </div>
-            </motion.div>
-          )}
-
-          <div ref={messagesEndRef} />
+              </motion.div>
+            )}
+          </div>
         </div>
 
-        {showQuick && (
-          <div className="grid grid-cols-2 gap-2 px-4 pb-2 sm:grid-cols-3">
-            {QUICK_PROMPTS.map(({ label, Icon, text }) => (
-              <button
-                key={text}
+        <div className="relative px-3 pb-3 pt-1 sm:px-4 sm:pb-4">
+          <AnimatePresence>
+            {showJump && (
+              <motion.button
                 type="button"
-                onClick={() => {
-                  setInput(text);
-                  inputRef.current?.focus();
-                }}
-                className="flex items-center gap-2.5 rounded-card bg-card px-3 py-2.5 text-left shadow-card transition-colors hover:bg-card-hover"
+                initial={{ opacity: 0, y: 6 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: 6 }}
+                transition={TRANSITION_BASE}
+                onClick={jumpToBottom}
+                aria-label="Ke pesan terbaru"
+                className="absolute -top-11 left-1/2 flex h-9 w-9 -translate-x-1/2 items-center justify-center rounded-full bg-overlay text-text shadow-overlay transition-colors hover:bg-neutral-hover"
               >
-                <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-neutral text-brand">
-                  <Icon size={15} />
-                </span>
-                <span className="text-small font-bold leading-snug text-text">{label}</span>
-              </button>
-            ))}
-          </div>
-        )}
-
-        <div className="border-t border-border bg-page p-3 lg:bg-card sm:p-4">
+                <ArrowDown size={16} />
+              </motion.button>
+            )}
+          </AnimatePresence>
           <form
             onSubmit={(e) => {
               e.preventDefault();
               handleSend();
             }}
-            className="flex items-center gap-2"
+            className="mx-auto flex w-full max-w-[720px] items-end gap-2 rounded-[26px] bg-neutral py-2 pl-5 pr-2 shadow-field transition-shadow duration-base ease-standard focus-within:shadow-field-focus"
           >
-            <input
+            <textarea
               ref={inputRef}
-              type="text"
+              rows={1}
               value={input}
               onChange={(e) => setInput(e.target.value)}
+              onKeyDown={(e) => {
+                // Enter kirim, Shift+Enter baris baru. isComposing: jangan kirim saat IME aktif.
+                if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) {
+                  e.preventDefault();
+                  handleSend();
+                }
+              }}
               placeholder="Tanya atau catat pengeluaran…"
-              disabled={sending}
-              className="flex-1 rounded-medium bg-neutral px-4 py-3 text-body text-text placeholder:text-text-subtlest outline-none shadow-field transition-shadow duration-base ease-standard focus:shadow-field-focus"
+              aria-label="Pesan untuk Track"
+              className="min-h-[36px] flex-1 resize-none bg-transparent py-1.5 text-body leading-normal text-text outline-none placeholder:text-text-subtlest"
             />
             <button
               type="submit"
               disabled={!input.trim() || sending}
               aria-label="Kirim pesan"
-              className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-brand text-on-brand font-bold transition-all duration-fast ease-standard hover:bg-brand-hover active:scale-[.94] disabled:opacity-40"
+              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-brand text-on-brand transition-all duration-fast ease-standard hover:bg-brand-hover active:scale-[.94] disabled:bg-hover disabled:text-text-subtlest"
             >
-              <Send size={18} />
+              <ArrowUp size={18} strokeWidth={2.5} />
             </button>
           </form>
         </div>

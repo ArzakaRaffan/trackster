@@ -70,6 +70,34 @@ input::placeholder {
   color: var(--text-subtlest, #8c8c8c);
 }
 
+/* ============ Scrollbar (seluruh situs) ============
+   Tipis, track transparan, thumb abu-abu halus (fallback WebKit juga menyala saat di-hover).
+   Standar (Chrome 121+, Firefox, Safari 18.2+) dipakai dulu; ::-webkit-scrollbar hanya
+   fallback untuk Safari lama — Chrome mengabaikannya begitu scrollbar-color diset. */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.18) transparent;
+}
+@supports not (scrollbar-color: auto) {
+  ::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.18);
+    border-radius: 999px;
+    border: 3px solid transparent;
+    background-clip: content-box;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: rgba(255, 255, 255, 0.32);
+    background-clip: content-box;
+  }
+}
+
 @keyframes tsWord {
   from {
     opacity: 0;

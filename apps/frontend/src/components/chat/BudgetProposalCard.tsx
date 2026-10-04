@@ -43,7 +43,7 @@ export function BudgetProposalCard({ card }: { card: BudgetProposalCardData }) {
           Budget {OPTION_LABEL[card.option]} · {formatRupiah(card.totalWeekly)}/minggu
         </p>
         {card.note && <p className="text-micro text-text-subtle">{card.note}</p>}
-        <div className="mt-1.5 flex gap-2 overflow-x-auto text-micro">
+        <div className="mt-1.5 flex gap-2 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden text-micro">
           {WEEK_ORDER.map((i) => [i, card.dailyAmounts[i]] as const).map(([i, a]) => (
             <span key={i} className="whitespace-nowrap text-text-subtle">
               {DAY_SHORT[i]} <span className="font-bold text-text">{formatRupiah(a)}</span>
