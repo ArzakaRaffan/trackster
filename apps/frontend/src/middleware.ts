@@ -6,7 +6,7 @@ import type { NextRequest } from 'next/server';
 // /split-bills/new sengaja publik juga — Split Bill bisa dibuat tanpa akun (lihat
 // SplitBillService.createPublic di backend). /split-bills/manage/* itu tempat pembuat
 // anonim ngelola bill-nya lewat ownerToken, pengganti login buat mereka.
-const PUBLIC_EXACT_PATHS = ['/', '/login', '/savings-calculator', '/split-bills/new', '/tools', '/installment-calculator', '/trip/new'];
+const PUBLIC_EXACT_PATHS = ['/', '/v3-preview', '/login', '/savings-calculator', '/split-bills/new', '/tools', '/installment-calculator', '/trip/new'];
 const PUBLIC_PATH_PREFIXES = ['/s/', '/split-bills/manage/', '/t/', '/trip/manage/'];
 
 function isPublicPath(pathname: string) {

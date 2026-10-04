@@ -9,6 +9,7 @@ import { MotionProvider } from '@/components/MotionProvider';
 // dengan early-return di NavBar dan PUBLIC_* di middleware.
 const PUBLIC_EXACT = [
   '/',
+  '/v3-preview',
   '/login',
   '/savings-calculator',
   '/tools',

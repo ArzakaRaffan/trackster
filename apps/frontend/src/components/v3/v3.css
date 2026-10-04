@@ -1,0 +1,25 @@
+/* Copied verbatim from the prototype <helmet><style> */
+html,body{margin:0}
+body{-webkit-font-smoothing:antialiased;background:#121212}
+a{color:#1ED760}a:hover{color:#3BE477}
+button,input,select,textarea{font-family:inherit}
+button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible{outline:2px solid var(--focus,#fff);outline-offset:2px}
+input::-webkit-outer-spin-button,input::-webkit-inner-spin-button{-webkit-appearance:none;margin:0}
+input::placeholder,textarea::placeholder{color:var(--text-subtlest,#8C8C8C)}
+*{scrollbar-width:thin;scrollbar-color:var(--border-bold,#5A5A5A) transparent}
+::-webkit-scrollbar{width:10px;height:10px}::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:var(--border-bold,#5A5A5A);border-radius:999px;border:3px solid transparent;background-clip:content-box}
+@keyframes tsFloat{0%,100%{transform:translateY(0) rotate(0)}50%{transform:translateY(-2px) rotate(1.5deg)}}
+@keyframes tsBlink{0%,86%,94%,100%{transform:scaleY(1)}90%{transform:scaleY(.1)}}
+@keyframes tsSpin{to{transform:rotate(360deg)}}
+@keyframes tsGrow{from{transform:scaleX(0)}to{transform:none}}
+@keyframes tsDraw{from{stroke-dashoffset:420}to{stroke-dashoffset:0}}
+@keyframes tsGrowY{from{transform:scaleY(0)}to{transform:none}}
+@keyframes tsNum0{from{opacity:.4;transform:translateY(4px) scale(.98)}to{opacity:1;transform:none}}
+@keyframes tsNum1{from{opacity:.4;transform:translateY(4px) scale(.98)}to{opacity:1;transform:none}}
+@keyframes tsIn{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+@keyframes tsPop{from{opacity:0;transform:translateY(-4px) scale(.98)}to{opacity:1;transform:none}}
+@keyframes tsFade{from{opacity:0}to{opacity:1}}
+@keyframes tsModal{from{transform:translateY(12px) scale(.98);opacity:0}to{transform:none;opacity:1}}
+@media (prefers-reduced-motion: reduce){*{transition-duration:1ms!important;animation-duration:1ms!important;animation-iteration-count:1!important}}
+[data-rm="1"] *{transition-duration:1ms!important;animation-duration:1ms!important;animation-iteration-count:1!important}
