@@ -10,6 +10,9 @@ import './pseudo.css';
 import { api } from '@/lib/api';
 import { buildDates, addDaysISO } from './live/dates';
 import { EMPTY_REPORT } from './live/reports';
+import { IconPicker } from './IconPicker';
+import { iconCss, iconLabel, brandCss } from '@/lib/icons';
+import { css } from './css';
 import { stateToPath, pathToState } from '@/lib/v3-routes';
 
 const I = {
@@ -209,6 +212,10 @@ export class V3Logic extends React.Component {
   toast(m) { clearTimeout(this.t1); this.setState({ toast:m, toastOn:true }); this.t1 = setTimeout(() => this.setState({ toastOn:false }), 3000); }
   go(p) { this.setState({ page:p, rowMenu:null, periodOpen:false, bell:false }); window.scrollTo && window.scrollTo({ top:0 }); }
   title(t) { return t.alias || t.raw; }
+  iconOf(t) { return t.icon || (this.state.catIcons || {})[t.cat] || null; }
+  pickIcon(title, current, onPick) { this.setState({ iconPick:{ title, current, onPick } }); }
+  setMerchantIcon(raw, icon) { this.setState(z => ({ iconPick:null, txs:z.txs.map(x => x.raw === raw ? { ...x, icon } : x), st:{ ...z.st, aliases:z.st.aliases.map(a => a.raw === raw ? { ...a, icon } : a) } })); this.liveCall(() => this.props.live.actions.setMerchantIcon(raw, icon)); this.toast(icon ? 'Logo disimpan.' : 'Logo dihapus.'); }
+  setCatIcon(cat, icon) { this.setState(z => { const m = { ...(z.catIcons || {}) }; if (icon) m[cat] = icon; else delete m[cat]; return { iconPick:null, catIcons:m }; }); this.liveCall(() => this.props.live.actions.setCategoryIcon(cat, icon)); this.toast(icon ? 'Logo disimpan.' : 'Logo dihapus.'); }
   updTx(id, patch) { this.setState(s => ({ txs:s.txs.map(t => t.id === id ? { ...t, ...patch } : t) })); this.liveCall(() => this.props.live.actions.updTx(id, patch)); }
   openTx(t) { this.setState({ modal:'tx', txId:t.id, txObj:t, aliasDraft:t.alias || '', noteDraft:t.note || '' }); }
   confirm(cf) { this.setState({ modal:'confirm', cf, prevModal:this.state.modal }); }
@@ -306,7 +313,7 @@ export class V3Logic extends React.Component {
       runBackfill:() => { if (!t.gmail || t.bfBusy) return; setT({ bfBusy:true, bfResult:null }); if (this.props.live !== undefined) { this.props.live.actions.backfill(t.bfAfter, t.bfBefore).then(r => this.props.live.refresh().then(() => setT({ bfBusy:false, bfResult:r && r.error ? 'Error: ' + r.error : (r && r.synced != null ? r.synced : 0) + ' transaksi baru dari ' + ((r && r.scanned) || 0) + ' email (duplikat dilewati: ' + ((r && r.skippedDuplicate) || 0) + ').' }))).catch(e => setT({ bfBusy:false, bfResult:'Error: ' + ((e && e.message) || 'backfill gagal') })); return; } setTimeout(() => setT({ bfBusy:false, bfResult:'14 transaksi baru dari 31 email (duplikat dilewati: 9).' }), 1400); }, hasBfResult:!!t.bfResult, bfResult:t.bfResult || '',
       plStatus:t.plStatus, onPlStatus:e => setT({ plStatus:e.target.value }), plOpts:Object.keys(PL).map(k => ({ value:k, label:PL[k] })), plLabel:PL[t.plStatus], plEmpty:logs.length === 0,
       plRows:logs.map(l => ({ subject:l.subject || '(tanpa subjek)', from:l.from, hasReason:!!l.reason, reason:l.reason || '', date:l.date, href:'https://mail.google.com/mail/u/0/#all/' + l.id })),
-      balRows:['BCA','JAGO'].map(k => { const b = t.balances[k], open = t.histOpen === k; return { name: k === 'JAGO' ? 'Jago' : 'BCA', balance:RP(b.balance), updated:fmtDT(b.updated), histExpanded:String(open), histRot: open ? '180deg' : '0deg', histRows: open ? '1fr' : '0fr', histEmpty:b.adj.length === 0,
+      balRows:['BCA','JAGO'].map(k => { const b = t.balances[k], open = t.histOpen === k; return { logoCss:brandCss(k), name: k === 'JAGO' ? 'Jago' : 'BCA', balance:RP(b.balance), updated:fmtDT(b.updated), histExpanded:String(open), histRot: open ? '180deg' : '0deg', histRows: open ? '1fr' : '0fr', histEmpty:b.adj.length === 0,
         hist:b.adj.map(a => ({ note:a.note || 'Tanpa catatan', date:fmtDT(a.at), delta:(a.delta >= 0 ? '+' : '−') + RP(a.delta), color: a.delta >= 0 ? 'var(--success-text)' : 'var(--danger-text)' })),
         toggleHist:() => setT({ histOpen: open ? null : k }), adjust:() => this.setState({ modal:'bal', bf:{ src:k, amount:fmtIn(b.balance), note:'' } }) }; }),
       mBal:s.modal === 'bal', bf, bfSet:{ amount:e => this.setState({ bf:{ ...bf, amount:fmtIn(e.target.value) } }), note:e => this.setState({ bf:{ ...bf, note:e.target.value } }) },
@@ -316,7 +323,8 @@ export class V3Logic extends React.Component {
       tfOff:String(!tfOk), tfBtnBg: tfOk ? 'var(--brand)' : off[0], tfBtnFg: tfOk ? 'var(--on-brand)' : off[1],
       submitTg:() => { if (!tfOk) return; const tok = tf.token.trim(); setT({ tgConfigured:true, tgPreview:tok.slice(0, 6) + '…' + tok.slice(-4), tgChat:tf.chat.trim() }); this.liveCall(() => this.props.live.actions.saveTelegram(tok, tf.chat.trim())); this.setState({ modal:null }); this.toast('Telegram disimpan.'); },
       aliasEmpty:t.aliases.length === 0,
-      aliasRows:t.aliases.map(a => { const ed = t.aliasEdit === a.id; return { name:a.name, raw:a.raw, editing:ed, viewing:!ed, draft:t.aliasDraft,
+      catIconRows:Object.keys(CAT_L).map(k => { const ic = (this.state.catIcons || {})[k]; return { label:CAT_L[k], iconCss:iconCss(ic), initial:ic ? '' : CAT_L[k].charAt(0), pick:() => this.pickIcon('Logo ' + CAT_L[k], ic, v => this.setCatIcon(k, v)) }; }),
+      aliasRows:t.aliases.map(a => { const ed = t.aliasEdit === a.id; return { name:a.name, raw:a.raw, iconCss:iconCss(a.icon), iconInitial:a.icon ? '' : (a.name || '?').charAt(0).toUpperCase(), pickIcon:() => this.pickIcon('Logo ' + a.name, a.icon, k => this.setMerchantIcon(a.raw, k)), editing:ed, viewing:!ed, draft:t.aliasDraft,
         onDraft:e => setT({ aliasDraft:e.target.value }), edit:() => setT({ aliasEdit:a.id, aliasDraft:a.name }), cancel:() => setT({ aliasEdit:null }),
         save:() => { if (!t.aliasDraft.trim()) return; setT({ aliasEdit:null, aliases:t.aliases.map(x => x.id === a.id ? { ...x, name:t.aliasDraft.trim() } : x) }); this.liveCall(() => this.props.live.actions.saveAlias(a.id, t.aliasDraft.trim())); this.toast('Alias disimpan.'); },
         del:() => { setT({ aliases:t.aliases.filter(x => x.id !== a.id) }); this.liveCall(() => this.props.live.actions.delAlias(a.id)); this.toast('Alias dihapus.'); } }; })
@@ -551,7 +559,7 @@ export class V3Logic extends React.Component {
     const A = { mode:s.authMode ?? 'masuk', email:s.email ?? '', pw:s.pw ?? '', show:!!s.showPw, focus:!!s.pwFocus, err:s.authErr ?? '', forgot:!!s.forgot };
     const wiz = s.wiz ?? 0, banks = s.banks ?? { BCA:true, Jago:true, Flip:false, Lainnya:false }, codeSt = s.codeSt ?? 'wait', testSt = s.testSt ?? 'wait';
     const BANKS = [['BCA', 'Notifikasi m-BCA / KlikBCA', V3SHAPE.BCA], ['Jago', 'Bank Jago', V3SHAPE.Jago], ['Flip', 'Flip', V3SHAPE.Flip], ['Lainnya', 'Bank lain', 'border-radius:1px']];
-    const bankList = BANKS.map(([k, sub, shape]) => ({ l:k, sub, shape, on:String(!!banks[k]), bd:banks[k] ? 'var(--ink)' : 'var(--line)', bg:banks[k] ? 'var(--card)' : 'transparent', fill:banks[k] ? 'var(--ink)' : 'transparent', go:() => this.setState(st => ({ banks:{ ...(st.banks ?? banks), [k]: !(st.banks ?? banks)[k] } })) }));
+    const bankList = BANKS.map(([k, sub, shape]) => ({ l:k, sub, shape, logoCss:brandCss(k), on:String(!!banks[k]), bd:banks[k] ? 'var(--ink)' : 'var(--line)', bg:banks[k] ? 'var(--card)' : 'transparent', fill:banks[k] ? 'var(--ink)' : 'transparent', go:() => this.setState(st => ({ banks:{ ...(st.banks ?? banks), [k]: !(st.banks ?? banks)[k] } })) }));
     const em = A.email, emOk = /^\S+@\S+\.\S+$/.test(em);
     const say = [
       'Halo! Aku Track. Bilang saja banknya, aku yang urus sisanya.',
@@ -910,7 +918,7 @@ export class V3Logic extends React.Component {
   rv_dash(s, p, v) {
     const over = v.hero && v.hero.over;
     return { dashMood:over ? 'alert' : 'happy', dashInsight:over ? 'Budget hari ini sudah terlewati. Besok mulai lagi dengan angka baru.' : 'Satu pengeluaran kecil lagi masih aman. Biasanya kamu jajan lagi sekitar jam 3.', dashAsk:() => this.go('chat'), dashSrcGo:() => this.go('sources'),
-      dashSrc:(this.props.live !== undefined && s.srcInfo ? [['BCA', s.srcInfo.BCA.short, 'border-radius:2px', s.srcInfo.BCA.cond === 'menunggu' ? 'transparent' : 'var(--text)'], ['Jago', s.srcInfo.JAGO.short, 'border-radius:50%', s.srcInfo.JAGO.cond === 'menunggu' ? 'transparent' : 'var(--text)'], ['Flip', s.srcInfo.FLIP.short, 'transform:rotate(45deg)', s.srcInfo.FLIP.cond === 'menunggu' ? 'transparent' : 'var(--text)']] : [['BCA', '12 mnt lalu', 'border-radius:2px', 'var(--text)'], ['Jago', '2 jam lalu', 'border-radius:50%', 'var(--text)'], ['Flip', 'menunggu', 'transform:rotate(45deg)', 'transparent']]).map(([name, short, shape, fill]) => ({ name, short, shape, fill })),
+      dashSrc:(this.props.live !== undefined && s.srcInfo ? [['BCA', s.srcInfo.BCA.short, 'border-radius:2px', s.srcInfo.BCA.cond === 'menunggu' ? 'transparent' : 'var(--text)'], ['Jago', s.srcInfo.JAGO.short, 'border-radius:50%', s.srcInfo.JAGO.cond === 'menunggu' ? 'transparent' : 'var(--text)'], ['Flip', s.srcInfo.FLIP.short, 'transform:rotate(45deg)', s.srcInfo.FLIP.cond === 'menunggu' ? 'transparent' : 'var(--text)']] : [['BCA', '12 mnt lalu', 'border-radius:2px', 'var(--text)'], ['Jago', '2 jam lalu', 'border-radius:50%', 'var(--text)'], ['Flip', 'menunggu', 'transform:rotate(45deg)', 'transparent']]).map(([name, short, shape, fill]) => ({ name, short, shape, fill, logoCss:brandCss(name) })),
       dashRows:(v.todayRows || []).slice(0, 4),
       copyIcs2:() => this.toast('Tautan kalender disalin.'), howIcs2:() => this.toast('Google Calendar: Setelan, Tambah kalender, Dari URL. Apple: File, Langganan Kalender Baru.') };
   }
@@ -935,7 +943,7 @@ export class V3Logic extends React.Component {
       peek: sisa ? `Terpakai ${RP(spent)} dari ${RP(budget)}` : `${over ? 'Lewat' : 'Sisa'} ${RP(Math.abs(budget - spent))} dari ${RP(budget)}`,
       stats: [{ label:'Budget', value:RP(budget), color:'var(--text)' }, sisa ? { label:'Terpakai', value:RP(spent), color:'var(--text)' } : { label: over ? 'Lewat' : 'Sisa', value:RP(Math.abs(budget - spent)), color: over ? 'var(--danger-text)' : 'var(--success-text)' }] };
     const txMeta = t => [t.src === 'JAGO' ? 'Jago' : t.src, t.time, t.cat !== 'LAINNYA' ? CAT_L[t.cat] : null, t.cap].filter(Boolean).join(' · ');
-    const todayRows = tTx.map(t => ({ title:this.title(t), initial:this.title(t).trim().charAt(0).toUpperCase(), shape:(V3SHAPE[{ BCA:'BCA', JAGO:'Jago', FLIP:'Flip' }[t.src]] || 'border-radius:2px'), meta:txMeta(t), amount:'−' + RP(t.amt), hasNote:!!t.note, hasAlias:!!t.alias && t.alias !== t.raw, aria:`${this.title(t)}, ${RP(t.amt)}. Buka detail`, open:() => this.openTx(t) }));
+    const todayRows = tTx.map(t => ({ title:this.title(t), iconCss:iconCss(this.iconOf(t)), initial:this.iconOf(t) ? '' : this.title(t).trim().charAt(0).toUpperCase(), shape:(V3SHAPE[{ BCA:'BCA', JAGO:'Jago', FLIP:'Flip' }[t.src]] || 'border-radius:2px'), srcCss:brandCss(t.src), meta:txMeta(t), amount:'−' + RP(t.amt), hasNote:!!t.note, hasAlias:!!t.alias && t.alias !== t.raw, aria:`${this.title(t)}, ${RP(t.amt)}. Buka detail`, open:() => this.openTx(t) }));
     const income = s.todayIncome ?? 500000, netV = income - spent;
     const net = { value:(netV >= 0 ? '+' : '−') + RP(netV), badge: netV >= 0 ? 'Surplus' : 'Defisit', color: netV >= 0 ? 'var(--success-text)' : 'var(--danger-text)', bg: netV >= 0 ? 'var(--success-subtle)' : 'var(--danger-subtle)', inc:RP(income), exp:RP(spent) };
     const quick = [['Tanya Track','Ngobrol sama AI financial buddy',I.message,'chat'],['Langganan','Kelola manual + reminder Calendar',I.repeat,'subs'],['Pemasukan','Catat & kelola pemasukan',I.income,'income'],['Split Bill','Bagi tagihan bareng temen',I.receipt,'split'],['Laporan','Ringkasan bulanan & tren',I.chart,'reports'],['Budget','Atur budget harian',I.wallet,'budget'],['Target Tabungan','Hitung nabung per bulan',I.target,'goals']].map(([label, desc, icon, k]) => ({ label, desc, icon, onClick:() => this.go(k) }));
@@ -1054,15 +1062,15 @@ export class V3Logic extends React.Component {
       ciSave:() => { if (s.ciState !== 'open') return; this.setState({ ciState:'saving' }); if (this.props.live !== undefined) { const entries = []; for (const x of ciStreams) { const dr = s.checkin && s.checkin.byId[x.id], e = s.ci[x.id] || { units:0, extra:0, amount:'' }; if (dr && dr.alreadyFilled) continue; if (x.kind === 'IRREGULAR') { const a = Number(digits(e.amount)) || 0; if (a > 0) entries.push({ streamId:x.id, amount:a }); } else if (dr && !dr.scheduled && x.kind !== 'VARIABLE') continue; else if (x.kind === 'VARIABLE') { const a = Number(digits(e.amount)) || 0; if (a > 0) entries.push({ streamId:x.id, amount:a }); } else if (x.kind === 'SESSION') entries.push({ streamId:x.id, units:e.units, extraUnits:Math.min(e.extra, e.units) }); else if (x.kind === 'DEDUCTION') entries.push({ streamId:x.id, units:e.units }); else entries.push({ streamId:x.id }); } (entries.length ? this.props.live.actions.submitCheckin(s.checkin.weekStart, entries) : Promise.resolve()).then(() => this.props.live.refresh()).then(() => this.setState({ ciState:'done' })).catch(e => { this.setState({ ciState:'open' }); this.toast((e && e.message) || 'Gagal menyimpan check-in.'); }); return; } this.t4 = setTimeout(() => this.setState({ ciState:'done' }), 900); }, ciReset:() => this.setState({ ciState:'open' }),
       hasModal:!!s.modal, closeModal:() => this.closeModal(), mTitle:mTitles[s.modal] || this.b2Title(s) || this.b2Title3(s) || '', mHasSub: (s.modal === 'tx' && !!tx && !!tx.alias) || s.modal === 'contrib' || s.modal === 'sim', mSub: s.modal === 'contrib' ? 'Setor / tarik' : s.modal === 'sim' ? 'Simulasi target' : (tx ? tx.raw : ''),
       mTx:s.modal === 'tx' && !!tx, mExpense:s.modal === 'expense', mIncome:s.modal === 'income', mStream:s.modal === 'stream', mConfirm:s.modal === 'confirm',
-      tx: tx ? { amount:'−' + RP(tx.amt), meta:`${tx.src === 'JAGO' ? 'Jago' : tx.src} · ${tx.dl || (DAYS[tx.d] || [])[1] || ''} · ${tx.time}`, cat:tx.cat, raw:tx.raw, hasCap:!!tx.cap, cap:tx.cap || '', aliasDraft:s.aliasDraft, noteDraft:s.noteDraft } : {},
-      catOpts,
+      tx: tx ? { srcCss:brandCss(tx.src), iconCss:iconCss(tx.icon), iconInitial:tx.icon ? '' : this.title(tx).trim().charAt(0).toUpperCase(), iconLabel:tx.icon ? iconLabel(tx.icon) : 'Pilih logo untuk merchant ini', amount:'−' + RP(tx.amt), meta:`${tx.src === 'JAGO' ? 'Jago' : tx.src} · ${tx.dl || (DAYS[tx.d] || [])[1] || ''} · ${tx.time}`, cat:tx.cat, raw:tx.raw, hasCap:!!tx.cap, cap:tx.cap || '', aliasDraft:s.aliasDraft, noteDraft:s.noteDraft } : {},
+      catOpts, gmLogo:brandCss('GMAIL'), calLogo:brandCss('CALENDAR'), tgLogo:brandCss('TELEGRAM'),
       onTxCat:e => { const cat = e.target.value, t = tx, ttl = this.title(t), count = s.txs.filter(x => this.title(x) === ttl).length;
         if (count > 1) this.confirm({ title:'Terapkan ke semua?', body:`Terapkan kategori ${CAT_L[cat]} ke semua transaksi "${ttl}" (${count})? Transaksi lama ikut ke-update.`, primary:`Semua (${count})`, secondary:'Ini saja', danger:false,
           onPrimary:() => { this.setState(z => ({ txs:z.txs.map(x => this.title(x) === ttl ? { ...x, cat } : x), modal:'tx' })); this.liveCall(() => this.props.live.actions.catAll(t.id, cat)); this.toast(`${count} transaksi jadi ${CAT_L[cat]}.`); },
           onSecondary:() => { this.updTx(t.id, { cat }); this.setState({ modal:'tx' }); this.toast(`Kategori diubah ke ${CAT_L[cat]}.`); } });
         else { this.updTx(t.id, { cat }); this.toast(`Kategori diubah ke ${CAT_L[cat]}.`); } },
       onAlias:e => this.setState({ aliasDraft:e.target.value }), aliasOff:String(!s.aliasDraft.trim()), aliasBtnColor: s.aliasDraft.trim() ? 'var(--text)' : 'var(--text-subtlest)',
-      saveAlias:() => { if (!s.aliasDraft.trim()) return; this.updTx(tx.id, { alias:s.aliasDraft.trim() }); this.toast('Nama disimpan.'); },
+      pickIcon:() => this.pickIcon('Logo ' + this.title(tx), tx.icon, k => this.setMerchantIcon(tx.raw, k)), saveAlias:() => { if (!s.aliasDraft.trim()) return; this.updTx(tx.id, { alias:s.aliasDraft.trim() }); this.toast('Nama disimpan.'); },
       onNote:e => this.setState({ noteDraft:e.target.value }), saveNote:() => { this.updTx(tx.id, { note:s.noteDraft }); this.setState({ modal:null }); this.toast('Catatan disimpan.'); },
       askDeleteTx:() => this.confirm({ title:'Hapus transaksi?', body:`Hapus transaksi "${this.title(tx)}" (${RP(tx.amt)})? Saldo bank akan disesuaikan balik.`, primary:'Hapus', secondary:'Batal', danger:true, onPrimary:() => { const id = tx.id; this.setState(z => ({ txs:z.txs.filter(x => x.id !== id), modal:null })); this.liveCall(() => this.props.live.actions.delTx(id)); this.toast('Transaksi dihapus.'); }, onSecondary:() => this.setState({ modal:'tx' }) }),
       ex, exSet:{ amount:e => this.setState(z => ({ ex:{ ...z.ex, amount:fmtIn(e.target.value) } })), desc:e => this.setState(z => ({ ex:{ ...z.ex, desc:e.target.value } })), cat:e => this.setState(z => ({ ex:{ ...z.ex, cat:e.target.value } })), src:e => this.setState(z => ({ ex:{ ...z.ex, src:e.target.value } })), date:e => this.setState(z => ({ ex:{ ...z.ex, date:e.target.value } })) },
@@ -1086,5 +1094,5 @@ export class V3Logic extends React.Component {
       toastMsg:s.toast, toastOpacity: s.toastOn ? 1 : 0, toastY: s.toastOn ? '0px' : '12px'
     };
   }
-  render() { return <V3Tree vm={this.renderVals()} />; }
+  render() { const vm = this.renderVals(), p = this.state.iconPick; return <><V3Tree vm={vm} />{p && <div style={css(vm.themeStyle + ';display:contents')}><IconPicker title={p.title} current={p.current} onPick={p.onPick} onClose={() => this.setState({ iconPick:null })} /></div>}</>; }
 }

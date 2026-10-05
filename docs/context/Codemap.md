@@ -67,6 +67,12 @@ Dua root layout: `app/(v3)/layout.tsx` (tanpa `globals.css`/Tailwind preflight �
 - Data: `lib/api.ts` (fetcher, auto-redirect `/login` on 401) + SWR. Auth redirect: `middleware.ts` (`/demo` & `/setup` publik).
 - Pemeriksaan fidelitas: bandingkan DOM/geometri dengan `Trackster v3 App (standalone).html` (lihat `docs/Rework Design Trackster/PLAN.md`).
 
+**Logo (SVG)** — `MerchantAlias.icon` + tabel `CategoryIcon` (endpoint di `merchant-aliases`: `PUT /icon`, `GET|PUT /category-icons`).
+Nilai = path relatif di `apps/frontend/public/icons/` (mis. `indonesia/bca.svg`). Katalog dibuat `node scripts/build-icons.mjs`
+(sumber `<repo>/svg`, skip `undraw_*` & file >100KB) → `src/lib/icon-catalog.ts`; render `src/lib/icons.ts` (`iconCss`), picker `v3/IconPicker.tsx`.
+Logo tetap (tak bisa diubah user: BCA/Jago/Flip, Gmail, Calendar, Telegram) = `brandCss()` di `lib/icons.ts`.
+Dipakai di baris Hari ini, detail transaksi, Setting → Alias merchant (+ logo kategori). Tambah logo baru = taruh di `svg/`, jalankan skrip.
+
 ## Dokumen lain di repo
 - `TRACKSTER_BUILD_PLAN.md` — plan MVP awal + **contoh format email asli** BCA/Jago (rujukan parser).
 - `TRACKSTER_AI_FEATURES_PLAN.md` — konvensi AI (tool-calling, cron, reuse helper). Status: selesai.

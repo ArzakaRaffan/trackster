@@ -31,7 +31,7 @@ const STATUS_ROW: Record<string, [string, string, string]> = {
 const mapAnyTx = (t: any) => ({
   id: t.id, d: undefined as number | undefined, dl: dayLabelOf(wibISO(new Date(t.occurredAt).getTime())), raw: t.description,
   alias: t.displayDescription && t.displayDescription !== t.description ? t.displayDescription : null, cap: t.aiCaption || null, src: t.source,
-  time: wibHHMM(t.occurredAt), cat: t.category, amt: Number(t.amount) - Number(t.reimbursedAmount || 0), note: t.note || '',
+  time: wibHHMM(t.occurredAt), cat: t.category, amt: Number(t.amount) - Number(t.reimbursedAmount || 0), note: t.note || '', icon: t.icon || null,
 });
 const monthAnchor = (off: number) => { const [y, m] = wibISO().split('-').map(Number); const d = new Date(Date.UTC(y, m - 1 + off, 15)); return d.toISOString().slice(0, 10); };
 
@@ -60,6 +60,7 @@ export function useLive(enabled: boolean, path: string, chatActive: number | nul
   const adjBca = useGet(k('/balance/BCA/adjustments'));
   const adjJago = useGet(k('/balance/JAGO/adjustments'));
   const aliasRes = useGet(k('/merchant-aliases'));
+  const catIconRes = useGet(k('/merchant-aliases/category-icons'));
   const parseLogRes = useGet(k('/sync/parse-log?limit=200'));
   const syncLogRes = useGet(k('/sync/logs'));
   const threadsRes = useGet(k('/ai/threads'));
@@ -84,7 +85,7 @@ export function useLive(enabled: boolean, path: string, chatActive: number | nul
       const d = dates.dateIdx[wibISO(new Date(t.occurredAt).getTime())];
       if (d === undefined) continue;
       const alias = t.displayDescription && t.displayDescription !== t.description ? t.displayDescription : null;
-      out.push({ id: t.id, d, raw: t.description, alias, cap: t.aiCaption || null, src: t.source, time: wibHHMM(t.occurredAt), cat: t.category, amt: Number(t.amount) - Number(t.reimbursedAmount || 0), note: t.note || '' });
+      out.push({ id: t.id, d, raw: t.description, alias, cap: t.aiCaption || null, src: t.source, time: wibHHMM(t.occurredAt), cat: t.category, amt: Number(t.amount) - Number(t.reimbursedAmount || 0), note: t.note || '', icon: t.icon || null });
     }
     return out.sort((a, b) => a.d - b.d || a.time.localeCompare(b.time));
   }, [txRes.data, dates]);
@@ -163,10 +164,11 @@ export function useLive(enabled: boolean, path: string, chatActive: number | nul
       tgConfigured: !!tg?.configured, tgPreview: tg?.botTokenPreview ?? '', tgChat: tg?.chatId ?? '', tgEvery: !!tg?.notifyEveryTransaction,
       nextRun: nextRunRes.data?.nextRunAt ? new Date(nextRunRes.data.nextRunAt).getTime() : Date.now(),
       balances: { BCA: bal.BCA ?? empty, JAGO: bal.JAGO ?? empty },
-      aliases: (aliasRes.data ?? []).map((a: any) => ({ id: a.id, name: a.displayName ?? '', raw: a.rawDescription })),
+      aliases: (aliasRes.data ?? []).map((a: any) => ({ id: a.id, name: a.displayName ?? '', raw: a.rawDescription, icon: a.icon || null })),
       logs: (parseLogRes.data ?? []).map((l: any) => ({ id: l.emailId, status: l.status, subject: l.subject, from: l.from, reason: l.reason, date: wibLogDate(l.receivedAt) })),
     };
   }, [gmailRes.data, tgRes.data, nextRunRes.data, balRes.data, adjBca.data, adjJago.data, aliasRes.data, parseLogRes.data]);
+  const catIcons = useMemo(() => Object.fromEntries((catIconRes.data ?? []).map((c: any) => [c.category, c.icon])), [catIconRes.data]);
 
   const synced = useMemo(() => {
     const last = (syncLogRes.data ?? []).find((x: any) => x.status === 'SUCCESS') ?? (syncLogRes.data ?? [])[0];
@@ -299,6 +301,8 @@ export function useLive(enabled: boolean, path: string, chatActive: number | nul
       splitPaid: (slug: string, pid: number) => api.patch(`/split-bills/public/${slug}/participants/${pid}/mark-paid`, {}),
       splitAssign: (billId: number, itemId: number, pids: number[]) => api.patch(`/split-bills/${billId}/items/${itemId}/assign`, { shares: pids.map((participantId) => ({ participantId, weight: 1 })) }),
       scanReceipt: (imageBase64: string) => api.post<{ items: { description: string; amount: number; quantity: number }[] }>('/split-bills/scan-receipt', { imageBase64 }),
+      setMerchantIcon: (rawDescription: string, icon: string | null) => api.put('/merchant-aliases/icon', { rawDescription, icon }),
+      setCategoryIcon: (category: string, icon: string | null) => api.put('/merchant-aliases/category-icons', { category, icon }),
       saveAlias: (id: number, displayName: string) => api.put(`/merchant-aliases/${id}`, { displayName }),
       delAlias: (id: number) => api.delete(`/merchant-aliases/${id}`),
       // pemasukan
@@ -331,7 +335,7 @@ export function useLive(enabled: boolean, path: string, chatActive: number | nul
     chat,
     split,
     flat: {
-      synced, mem, tip, tidy, srcInfo, srcLog,
+      synced, mem, tip, tidy, srcInfo, srcLog, catIcons,
       txs, manual, incomes, streams, subs, goals, notifs,
       todayBudget: today.data ? Number(today.data.budget) : undefined,
       todayIncome: today.data ? Number(today.data.totalIncome) : undefined,
