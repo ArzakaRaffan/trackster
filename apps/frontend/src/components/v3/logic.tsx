@@ -100,7 +100,8 @@ const GOALS0 = [
 ];
 let TODAY_MS = new Date(2026, 8, 30).getTime(), TODAY_ISO = '2026-09-30', TODAY_LABEL = 'Rabu, 30 September';
 function v3WeekStart() { const [y, m, d] = TODAY_ISO.split('-').map(Number), dt = new Date(Date.UTC(y, m - 1, d)); dt.setUTCDate(dt.getUTCDate() - ((dt.getUTCDay() + 6) % 7)); return dt.toISOString().slice(0, 10); }
-function v3SetupDates(manual) { const d = buildDates(manual); DAYS = d.days; DATE_IDX = d.dateIdx; TODAY_MS = d.todayMs; TODAY_ISO = d.todayISO; TODAY_LABEL = d.todayLabel; }
+let WEEK = null;
+function v3SetupDates(manual) { const d = buildDates(manual); WEEK = d.week; DAYS = d.days; DATE_IDX = d.dateIdx; TODAY_MS = d.todayMs; TODAY_ISO = d.todayISO; TODAY_LABEL = d.todayLabel; }
 const daysTo = iso => { const [y, m, d] = iso.split('-').map(Number); return Math.round((new Date(y, m - 1, d).getTime() - TODAY_MS) / 86400000); };
 const TIPS = [{ kind:'reminder', msg:'Spotify Premium jatuh tempo 2 hari lagi (Rp54.990). Saldo Jago cukup, jadi aman.' }];
 const fmtDate = iso => { const [y, m, d] = iso.split('-').map(Number); return new Date(y, m - 1, d).toLocaleDateString('id-ID', { day:'numeric', month:'short' }); };
@@ -941,12 +942,13 @@ export class V3Logic extends React.Component {
     const dots = [0, 1].map(i => ({ selected:String(s.car === i), aria:`Ringkasan ${i + 1}`, w: s.car === i ? '20px' : '6px', bg: s.car === i ? 'var(--text)' : 'var(--border-bold)', onClick:() => this.setState({ car:i }) }));
 
     // weekly
-    const days = DAYS.map((d, i) => { const tx = s.txs.filter(t => t.d === i); return { label:d[0], full:d[1], budget:d[2], spent:tx.reduce((a, t) => a + t.amt, 0), tx }; });
+    const wkDays = WEEK || DAYS.map(d => [d[0], d[1], d[2], undefined, '']).map((d, i) => (d[3] = i, d)); // Senin–Minggu minggu berjalan, bukan 7 hari bergulir
+    const days = wkDays.map(d => { const tx = d[3] === undefined ? [] : s.txs.filter(t => t.d === d[3]); return { label:d[0], full:d[1], budget:d[2], iso:d[4], spent:tx.reduce((a, t) => a + t.amt, 0), tx }; });
     const wkB = days.reduce((a, d) => a + d.budget, 0), wkS = days.reduce((a, d) => a + d.spent, 0), wkR = wkB - wkS;
     const wk = { total:RP(wkS), color: wkS > wkB ? 'var(--danger-text)' : 'var(--text)', stats:[{ label:'Budget', value:RP(wkB), color:'var(--text)' }, { label: wkR < 0 ? 'Lewat' : 'Sisa', value:RP(wkR), color: wkR < 0 ? 'var(--danger-text)' : 'var(--success-text)' }, { label:'Rerata', value:RP(Math.round(wkS / 7 / 1000) * 1000), color:'var(--text-subtle)' }] };
     const mx = Math.max(...days.map(d => Math.max(d.spent, d.budget)));
-    const bars = days.map((d, i) => { const o = d.spent > d.budget, sel = s.openDay === i; return { label:d.label, amt:Math.round(d.spent / 1000) + 'rb', amtColor: o ? 'var(--danger-text)' : 'var(--text-subtle)', h:(d.spent / mx * 160) + 'px', budgetPos:(d.budget / mx * 160 - 1) + 'px', color: o ? 'var(--danger-bold)' : i === 6 ? 'var(--brand)' : 'var(--border-bold)', colBg: sel ? 'var(--neutral)' : 'transparent', pressed:String(sel), weight: sel ? 700 : 500, labelColor: sel ? 'var(--text)' : 'var(--text-subtle)', aria:`${d.full}: ${RP(d.spent)} dari ${RP(d.budget)}`, onClick:() => this.setState({ openDay:i }) }; });
-    const dayRows = days.map((d, i) => { const o = d.spent > d.budget, open = s.openDay === i; return { label:d.label, date:d.full.split(', ')[1], isToday:i === 6, pct:Math.min(100, d.spent / d.budget * 100) + '%', bar: o ? 'var(--danger-bold)' : 'var(--success-bold)', amounts:`${RP(d.spent)} / ${RP(d.budget)}`, amtColor: o ? 'var(--danger-text)' : 'var(--text-subtle)', expanded:String(open), rot: open ? '180deg' : '0deg', rows: open ? '1fr' : '0fr', openBg: open ? 'var(--hover)' : 'transparent', tab: open ? 0 : -1, toggle:() => this.setState({ openDay: open ? null : i }),
+    const bars = days.map((d, i) => { const o = d.spent > d.budget, sel = s.openDay === i; return { label:d.label, amt:Math.round(d.spent / 1000) + 'rb', amtColor: o ? 'var(--danger-text)' : 'var(--text-subtle)', h:(d.spent / mx * 160) + 'px', budgetPos:(d.budget / mx * 160 - 1) + 'px', color: o ? 'var(--danger-bold)' : d.iso === TODAY_ISO ? 'var(--brand)' : 'var(--border-bold)', colBg: sel ? 'var(--neutral)' : 'transparent', pressed:String(sel), weight: sel ? 700 : 500, labelColor: sel ? 'var(--text)' : 'var(--text-subtle)', aria:`${d.full}: ${RP(d.spent)} dari ${RP(d.budget)}`, onClick:() => this.setState({ openDay:i }) }; });
+    const dayRows = days.map((d, i) => { const o = d.spent > d.budget, open = s.openDay === i; return { label:d.label, date:d.full.split(', ')[1], isToday:d.iso === TODAY_ISO, pct:Math.min(100, d.spent / d.budget * 100) + '%', bar: o ? 'var(--danger-bold)' : 'var(--success-bold)', amounts:`${RP(d.spent)} / ${RP(d.budget)}`, amtColor: o ? 'var(--danger-text)' : 'var(--text-subtle)', expanded:String(open), rot: open ? '180deg' : '0deg', rows: open ? '1fr' : '0fr', openBg: open ? 'var(--hover)' : 'transparent', tab: open ? 0 : -1, toggle:() => this.setState({ openDay: open ? null : i }),
       tx:d.tx.map(t => ({ title:this.title(t), meta:txMeta(t), amount:'−' + RP(t.amt), open:() => this.openTx(t) })) }; });
 
     // budget

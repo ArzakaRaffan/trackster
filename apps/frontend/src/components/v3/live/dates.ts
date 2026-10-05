@@ -22,6 +22,8 @@ export interface V3Dates {
   /** 7 hari berakhir hari ini (indeks 6 = hari ini): [singkat, 'Kamis, 24 Sep', budget] */
   days: [string, string, number][];
   dateIdx: Record<string, number>;
+  /** Senin–Minggu minggu berjalan: [singkat, 'Senin, 5 Okt', budget, indeks di `days` (undefined = belum terjadi / di luar jendela), iso] */
+  week: [string, string, number, number | undefined, string][];
   todayMs: number; // tengah malam hari ini sebagai Date lokal (dipakai daysTo)
 }
 
@@ -36,8 +38,16 @@ export function buildDates(manual: number[], now: number = Date.now()): V3Dates 
     days.push([DAY_SHORT[dow], `${DAYN[dow]}, ${d} ${MON_SHORT[m - 1]}`, manual[dow] || 0]);
     dateIdx[iso] = i;
   }
+  const monISO = addDaysISO(todayISO, -((dowOf(todayISO) + 6) % 7));
+  const week: V3Dates['week'] = [];
+  for (let i = 0; i < 7; i++) {
+    const iso = addDaysISO(monISO, i);
+    const dow = dowOf(iso);
+    const [, wm, wd] = iso.split('-').map(Number);
+    week.push([DAY_SHORT[dow], `${DAYN[dow]}, ${wd} ${MON_SHORT[wm - 1]}`, manual[dow] || 0, dateIdx[iso], iso]);
+  }
   const [y, m, d] = todayISO.split('-').map(Number);
-  return { todayISO, todayLabel: `${DAYN[dowOf(todayISO)]}, ${d} ${MON_LONG[m - 1]}`, days, dateIdx, todayMs: new Date(y, m - 1, d).getTime() };
+  return { todayISO, week, todayLabel: `${DAYN[dowOf(todayISO)]}, ${d} ${MON_LONG[m - 1]}`, days, dateIdx, todayMs: new Date(y, m - 1, d).getTime() };
 }
 
 /** '29 Sep, 21.14' (WIB) */
