@@ -26,13 +26,14 @@ export const brandCss = (name?: string | null): string => {
 };
 
 /** Logo otomatis dari nama merchant (alias atau raw), dicek berurutan; logo pilihan user selalu menang.
- * Tambah merchant = satu baris [regex, kunci katalog]. Merchant tanpa SVG (Kopi Kenangan, Fore, Tuku, dst) belum ada. */
+ * Tambah merchant = satu baris [regex, kunci katalog]. Merchant tanpa file logo (Tuku, dst) belum ada. */
 const AUTO: [RegExp, string][] = [
   [/alfamidi/, 'indonesia/alfamidi.svg'], [/alfamart|alfa express/, 'indonesia/alfamart.svg'], [/indomaret|idm\b/, 'indonesia/indomaret.svg'],
   [/gopay|go-pay/, 'indonesia/go-pay.svg'], [/gojek|goride|gocar|gofood/, 'branded/Gojek.svg'], [/grab ?pay/, 'indonesia/grab-pay.svg'], [/grab/, 'branded/Grab.svg'],
   [/shopee ?pay/, 'indonesia/shopeepay.svg'], [/shopee/, 'indonesia/shopee.svg'], [/tokopedia|tokped/, 'indonesia/tokopedia.svg'], [/lazada/, 'indonesia/lazada.svg'],
   [/blibli/, 'indonesia/blibli.svg'], [/bukalapak/, 'indonesia/bukalapak.svg'], [/amazon/, 'apps/amazon.svg'],
-  [/dana\b/, 'indonesia/dana.svg'], [/ovo/, 'indonesia/ovo-new.svg'], [/link ?aja/, 'indonesia/linkaja.svg'], [/qris/, 'indonesia/qris.svg'],
+  [/dana\b/, 'indonesia/dana.svg'], [/\bovo\b/, 'indonesia/ovo-new.svg'], [/link ?aja/, 'indonesia/linkaja.svg'], [/qris/, 'indonesia/qris.svg'],
+  [/pintu/, 'branded/Pintu.jpeg'], [/kopi kenangan|kopken/, 'branded/Kopi_Kenangan.svg'], [/fore/, 'branded/Fore.webp'], [/ismaya/, 'branded/Ismaya.png'],
   [/starbucks/, 'branded/Starbucks.svg'], [/kfc/, 'branded/KFC.svg'], [/mcdonald|mcd\b/, 'branded/McDonalds.svg'], [/burger king/, 'branded/Burger_King.svg'], [/taco bell/, 'branded/Taco_Bell.svg'],
   [/netflix/, 'indonesia/netflix.svg'], [/spotify/, 'indonesia/spotify.svg'], [/youtube/, 'apps/YouTube.svg'], [/disney/, 'indonesia/disney-plus-hotstar.svg'],
   [/vidio/, 'indonesia/vidio.svg'], [/\bviu\b/, 'indonesia/viu.svg'], [/cgv/, 'indonesia/cgv.svg'], [/xxi|cinema 21/, 'indonesia/xxi-21.svg'],

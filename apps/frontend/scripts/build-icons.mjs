@@ -12,22 +12,25 @@ const MAX = 100 * 1024;
 
 // folder sumber -> [folder tujuan (= awalan kunci, harus cocok ICON_PATTERN backend), grup di picker]
 const DIRS = [['indonesia', 'indonesia', 'Bank & dompet ID'], ['branded', 'branded', 'Brand'], ['', 'apps', 'Aplikasi & layanan'], ['decor', 'decor', 'Dekor']];
-const label = (f) => f.replace(/\.svg$/i, '').replace(/^lucide_/, '').replace(/[_-]+/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
+const label = (f) => f.replace(/\.(svg|png|webp|jpe?g)$/i, '').replace(/^lucide_/, '').replace(/[_-]+/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
 
 fs.rmSync(OUT, { recursive: true, force: true });
 const items = [];
 for (const [from, to, group] of DIRS) {
   const dir = path.join(SRC, from);
   fs.mkdirSync(path.join(OUT, to), { recursive: true });
-  for (const f of fs.readdirSync(dir).filter((x) => /\.svg$/i.test(x)).sort()) {
+  for (const f of fs.readdirSync(dir).filter((x) => /\.(svg|png|webp|jpe?g)$/i.test(x)).sort()) {
     const p = path.join(dir, f);
     if (/^undraw_/.test(f) || fs.statSync(p).size > MAX) continue;
     // Sebagian SVG sumber tak punya xmlns -> browser menolak merender sebagai gambar (<img>/background).
+    if (!/\.svg$/i.test(f)) fs.copyFileSync(p, path.join(OUT, to, f)); // raster (logo tanpa SVG): salin apa adanya
+    else {
     let svg = fs.readFileSync(p, 'utf8');
     const open = svg.match(/<svg[^>]*>/i)?.[0] ?? '';
     if (!/xmlns=/.test(open)) svg = svg.replace(/<svg/i, '<svg xmlns="http://www.w3.org/2000/svg"');
     if (/xlink:href/.test(svg) && !/xmlns:xlink=/.test(svg)) svg = svg.replace(/<svg/i, '<svg xmlns:xlink="http://www.w3.org/1999/xlink"');
     fs.writeFileSync(path.join(OUT, to, f), svg);
+    }
     // lucide = ikon garis monokrom (tema design system) -> dirender pakai mask supaya ikut warna teks
     items.push({ key: `${to}/${f}`, label: label(f), group: f.startsWith('lucide_') ? 'Ikon' : group });
   }

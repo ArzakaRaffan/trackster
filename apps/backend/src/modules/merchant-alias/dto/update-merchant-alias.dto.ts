@@ -1,6 +1,6 @@
 import { IsOptional, IsString, Matches, MinLength } from 'class-validator';
 
-export const ICON_PATTERN = /^(apps|branded|indonesia|decor)\/[A-Za-z0-9_.-]+\.svg$/;
+export const ICON_PATTERN = /^(apps|branded|indonesia|decor)\/[A-Za-z0-9_.-]+\.(svg|png|webp|jpe?g)$/;
 
 export class UpdateMerchantAliasDto {
   @IsOptional()
