@@ -82,3 +82,8 @@ Dipakai di baris Hari ini, detail transaksi, Setting → Alias merchant (+ logo 
 - `CLAUDE.md` nyebut folder `design-system/`, aslinya `design_system/`.
 - ~~`.env.example` domain lama / env belum lengkap~~ — dirapikan 2026-10-06 (multi-user F0). `TELEGRAM_BOT_TOKEN` di compose prod tidak dibaca kode.
 - `Source.GOPAY` masih di enum & tipe frontend walau nggak ada sumber aktif.
+
+## Multi-user (transisi, F0–F1 selesai di branch `feat/multi-user`, belum di prod)
+- Skema: `User` + role/status/displayName/fullName/tokenVersion; semua tabel tenant punya `userId Int?` (nullable, FK Restrict) — kode runtime BELUM memakainya (F2). Tabel baru (belum dipakai): `Invite, OneTimeToken, ApiToken, InboundAddress, OwnAccount, TelegramLink(+Code), AiUsage`.
+- Alat (di `apps/backend`): `npm run check` (semua `*.check.ts`), `npm run tenancy-audit` (daftar kerja scoping), `npm run golden`/`isolation-e2e` (`scripts/`), `prisma/data-fixes/{verify-backfill,2026-10-multiuser-backfill-owner}.js`, `prisma/provision-user.js`. Detail & status: `docs/multi-user/08-Progress-Log.md`.
+

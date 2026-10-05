@@ -36,3 +36,32 @@ deviasi dari rencana (+alasan), env baru yang Arzaka harus tambahkan, langkah be
 - Env/aksi manual: belum ada.
 - Docs yang diperbarui: folder `docs/multi-user/` (baru), pointer di `CLAUDE.md`.
 - Langkah berikutnya: Arzaka membaca README + 00-Decisions, menyetujui/menolak P1, P8, P13 (gerbang F0) dan menjawab O1 (DNS/DNSSEC name.com). Lalu mulai **P0-01** (branch `feat/multi-user`).
+
+## 2026-10-06 — F0 (sebagian) + F1 P1-01..P1-04, P1-06, P1-07 — sesi malam, Arzaka tidur
+- Sesi oleh: Claude (Sonnet 5.5)   Branch: `feat/multi-user` (turunan `main`, **belum di-push, belum merge**)   Commit terakhir: lihat `git log` (3 commit: docs, F0, F1)
+- Dasar mulai: Arzaka minta "mulai dari step awal, beberapa step sekaligus". Saya menganggap itu persetujuan untuk **mulai F0/F1 di branch lokal** (P1, P8, P13 dipakai sebagai pendekatan kerja). **Status P1/P8/P13 di 00-Decisions TIDAK diubah ke LOCKED** — Arzaka masih perlu menyetujui eksplisit sebelum merge apapun.
+- **Selesai (terverifikasi):**
+  - P0-01 branch; P0-02 rapikan teks domain (`.env.example`, `CLAUDE.md`, `CAUTION.md`, Codemap → `trackster.dev`); P0-03 pointer (sudah ada).
+  - P0-08 `npm run check` (`scripts/run-checks.mjs`): baseline **18/19 tanpa DB** (`retrieval.check.ts` butuh Postgres); **20/20 dengan DB** (+`provision-user.check.ts`).
+  - P0-10 `npm run tenancy-audit`: baseline **208 temuan** di 30 file (`--summary` untuk ringkasan) = daftar kerja F2. Pengecualian sengaja: komentar `// tenancy-ok: <alasan>`.
+  - P0-07 (alat) `scripts/golden-snapshot.mjs` (`take`/`diff`; 46 endpoint GET read-only, tanpa endpoint AI) — teruji: dua snapshot berturut-turut IDENTIK. P0-11 (kerangka) `scripts/isolation-e2e.mjs`: 106 rute privat tanpa cookie → 401 semua lulus.
+  - P1-01/02 schema + migrasi `20261006100000_multiuser_expand` (SQL **murni tambah**: 0 DROP/SET NOT NULL/RENAME; dihasilkan `prisma migrate diff`, bukan `migrate dev`). P1-03 `20261006100100_multiuser_backfill` (UPDATE idempoten, no-op di DB kosong, tak pernah RAISE) + skrip data pribadi `prisma/data-fixes/2026-10-multiuser-backfill-owner.js` (dry-run default, `--apply`; membaca `OWNER_*` dari env; token bot tidak disalin). P1-04 `prisma/data-fixes/verify-backfill.js`. P1-06 `prisma/provision-user.js` + `seed.js` memakainya + `src/modules/user/provision-user.check.ts`.
+  - Diuji di **cluster Postgres scratch lokal** (bukan prod, bukan DB dev Arzaka): DB pra-multiuser dengan data sintetis di 23 tabel → apply migrasi baru → `verify-backfill` NULL=0; deploy dari DB kosong OK; `migrate diff` tidak menunjukkan drift baru (hanya 3 drift lama: indeks tsvector/trgm raw-SQL, sama seperti sebelum perubahan); skrip owner idempoten (jalan 2× → tak ada duplikat); `seed.js` 2× idempoten; backend baru jalan di skema baru, 46 endpoint 200.
+  - P1-07: build backend **bersih** (hapus `dist` + `tsconfig.tsbuildinfo` dulu) lolos; check 20/20.
+- **Belum / tertunda (butuh Arzaka):**
+  - P0-04 backup prod, P0-05 restore-drill data nyata, P0-06 cek id user Arzaka & token Telegram — butuh akses VPS.
+  - P0-07 snapshot "sebelum" dengan data Arzaka; P1-05 uji pada restore data nyata.
+  - P0-09 (job `check` di CD) ⛔ menunggu persetujuan; P1-08 merge/deploy F1 ⛔.
+  - Frontend `tsc --noEmit` tidak dijalankan (tidak ada perubahan frontend).
+- **Deviasi / temuan:**
+  1. **Docker Desktop tidak mau start** (engine WSL berhenti; tak bisa diklik dari sesi ini). Pakai Postgres 17 native: cluster scratch `C:\tmp\pg-trackster-dev\data`, port **5434**, user/pw `trackster`, DB `trackster` (data sintetis, `owner_test`) & `trackster_empty`. Service Postgres milik Arzaka di 5432 tidak disentuh. Hidupkan: `"C:\Program Files\PostgreSQL\17\bin\pg_ctl" -D C:/tmp/pg-trackster-dev/data -o "-p 5434" start`; matikan: `... stop`. **Dimatikan di akhir sesi.**
+  2. **`dist/` + `tsconfig.tsbuildinfo` basi membuat `npm run build` "lolos" tapi tidak mengeluarkan `dist/main.js`** (hanya `dist/modules`). Sebelum menganggap build valid: `rm -rf dist tsconfig.tsbuildinfo` lalu build. (Gotcha lama di CLAUDE.md, ternyata masih menggigit.)
+  3. FK `SplitBill.createdByUserId`/`Trip.createdByUserId` → `User` **ditunda** (data lama bisa menyimpan id yatim → FK akan menggagalkan migrasi di prod). Tambahkan di C1 setelah dicek.
+  4. `BudgetSetting` (PK singleton id=1) **tidak** dibuat oleh `provisionUser` — ditangani saat PK diubah (F2/F4). Sampai **C1** (unik global `DailyBudget.dayOfWeek`, `BankBalance.source`) user kedua **belum bisa di-provision**; urutan roadmap (C1 di akhir F4, register di F5) tetap benar.
+  5. Migrasi backfill SQL **otomatis jalan saat deploy** (isi `userId` + `User.role='ADMIN'` untuk user dengan id terkecil). Baris yang dibuat kode lama sesudahnya (userId NULL) harus diisi ulang lewat skrip owner (`--apply`) sebelum F2 dan sebelum C1.
+  6. `prisma format` ikut merapikan perataan model lama (diff schema lebih besar dari perubahan substansi).
+  7. Skrip verifikasi ditulis `.mjs` (bukan `.ts`) agar tanpa ts-node/build; skrip yang harus jalan di container prod (`verify-backfill`, `backfill-owner`) ada di `prisma/` (satu-satunya folder selain `dist` yang disalin Dockerfile) dan plain JS.
+- Keputusan baru / perubahan status: tidak ada (lihat catatan di atas soal P1/P8/P13).
+- Env/aksi manual untuk Arzaka: tidak ada env baru. `.env` lokal tidak diubah.
+- Docs yang diperbarui: `03-Roadmap.md` (centang + catatan), `Codemap.md`, `.env.example`, `CLAUDE.md`, `CAUTION.md`.
+- **Langkah berikutnya (urut):** (1) Arzaka: setujui/tolak P1, P8, P13 di chat. (2) Arzaka/sesi dengan akses VPS: P0-04 → P0-05 → P0-06 (backup, restore ke DB dev, cek id user + token Telegram). (3) Sesi berikutnya: snapshot golden "sebelum" dari restore, ulangi P1-05 dengan data nyata, lalu minta persetujuan P1-08. (4) Setelah F1 live: mulai F2 dari `balance` (daun) — `npm run tenancy-audit -- --summary` adalah daftar kerjanya.
