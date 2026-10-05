@@ -5,6 +5,7 @@ import { BudgetService } from '../budget/budget.service';
 import { TelegramService } from '../telegram/telegram.service';
 import { WEEK_ORDER, startOfWibWeek, wibDateKey, wibRange } from '../../common/wib';
 import { sumSpend } from '../../common/spend';
+import { forEachActiveUser } from '../../common/per-user';
 
 export interface WeeklyAllocation {
   needs: number;
@@ -45,11 +46,15 @@ export class BudgetAllocationService {
    * ulang budget harian minggu depan dari pemasukan yang baru saja di-checkin minggu ini, dan
    * rekomendasikan sisa + 20% tabungan dipindah ke Jago. */
   @Cron('0 21 * * 0', { name: 'weekly-budget-allocation', timeZone: 'Asia/Jakarta' })
-  async runWeeklyAllocation() {
-    try {
-      const preview = await this.computePreview();
+  async weeklyAllocationCron() {
+    await forEachActiveUser(this.prisma, this.logger, 'weekly-budget-allocation', (userId) => this.runWeeklyAllocation(userId));
+  }
 
-      await this.budgetService.updateAll({
+  async runWeeklyAllocation(userId: number) {
+    try {
+      const preview = await this.computePreview(userId);
+
+      await this.budgetService.updateAll(userId, {
         budgets: preview.alloc.dailyAmounts.map((amount, dayOfWeek) => ({ dayOfWeek, amount })),
       });
 
@@ -61,10 +66,10 @@ export class BudgetAllocationService {
         preview.savingsRecommendation,
         preview.isOverspent,
       );
-      await this.telegramService.sendMessage(text);
+      await this.telegramService.sendMessage(userId, text);
 
       this.logger.log(
-        `Alokasi minggu ${wibDateKey(preview.weekStart)} selesai: income=${preview.totalIncome}, savings rec=${preview.savingsRecommendation}`,
+        `Alokasi (user ${userId}) minggu ${wibDateKey(preview.weekStart)} selesai: income=${preview.totalIncome}, savings rec=${preview.savingsRecommendation}`,
       );
     } catch (err: any) {
       this.logger.error(`runWeeklyAllocation error: ${err?.message}`);
@@ -73,8 +78,8 @@ export class BudgetAllocationService {
 
   /** Sama persis kalkulasinya dengan `runWeeklyAllocation`, tapi read-only — dipakai buat kartu
    * "Alokasi 50/30/20" di halaman Budget, biar rekomendasi nabung nggak cuma lewat Telegram. */
-  async getWeeklyAllocationPreview() {
-    const preview = await this.computePreview();
+  async getWeeklyAllocationPreview(userId: number) {
+    const preview = await this.computePreview(userId);
     return {
       weekStart: wibDateKey(preview.weekStart),
       totalIncome: Math.round(preview.totalIncome),
@@ -89,23 +94,23 @@ export class BudgetAllocationService {
     };
   }
 
-  private async computePreview() {
+  private async computePreview(userId: number) {
     const now = new Date();
     const weekStart = startOfWibWeek(now);
 
     const incomes = await this.prisma.income.findMany({
-      where: { periodStart: weekStart, stream: { kind: { not: 'IRREGULAR' } } },
+      where: { userId, periodStart: weekStart, stream: { kind: { not: 'IRREGULAR' } } },
       select: { amount: true },
     });
     const totalIncome = incomes.reduce((sum, i) => sum + Number(i.amount), 0);
 
-    const prevBudgets = await this.prisma.dailyBudget.findMany();
+    const prevBudgets = await this.prisma.dailyBudget.findMany({ where: { userId } });
     const prevWeekPool = prevBudgets.reduce((sum, b) => sum + Number(b.amount), 0);
 
     const { start: weekEndStart, end: weekEndEnd } = wibRange('week', now);
     const spentAgg = await this.prisma.transaction.aggregate({
       _sum: { amount: true, reimbursedAmount: true },
-      where: { occurredAt: { gte: weekEndStart, lt: weekEndEnd } },
+      where: { userId, occurredAt: { gte: weekEndStart, lt: weekEndEnd } },
     });
     const actualSpent = sumSpend(spentAgg._sum);
     const isOverspent = actualSpent > prevWeekPool;

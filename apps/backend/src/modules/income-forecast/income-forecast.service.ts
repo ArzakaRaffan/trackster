@@ -148,35 +148,35 @@ export function isScheduledInWeek(
 export class IncomeForecastService {
   constructor(private prisma: PrismaService) {}
 
-  async getWeekForecast(dateStr?: string): Promise<WeekForecast> {
+  async getWeekForecast(userId: number, dateStr?: string): Promise<WeekForecast> {
     const anchor = dateStr ? new Date(`${dateStr}T00:00:00+07:00`) : new Date();
-    return this.computeWeek(anchor);
+    return this.computeWeek(userId, anchor);
   }
 
-  async getHorizon(weeks: number): Promise<WeekForecast[]> {
+  async getHorizon(userId: number, weeks: number): Promise<WeekForecast[]> {
     const startWeek = startOfWibWeek(new Date());
     const results: WeekForecast[] = [];
     for (let i = 0; i < weeks; i++) {
-      results.push(await this.computeWeek(addWibDays(startWeek, i * 7)));
+      results.push(await this.computeWeek(userId, addWibDays(startWeek, i * 7)));
     }
     return results;
   }
 
-  private async computeWeek(anchor: Date): Promise<WeekForecast> {
+  private async computeWeek(userId: number, anchor: Date): Promise<WeekForecast> {
     const { start: weekStart, end: weekEnd } = wibRange('week', anchor);
     const { year, month } = wibParts(weekStart);
     const monthStart = startOfWibMonth(year, month);
     const now = new Date();
     const weekEnded = now.getTime() >= weekEnd.getTime();
 
-    const streams = await this.prisma.incomeStream.findMany({ where: { isActive: true }, orderBy: { id: 'asc' } });
+    const streams = await this.prisma.incomeStream.findMany({ where: { userId, isActive: true }, orderBy: { id: 'asc' } });
 
     const results: StreamForecast[] = [];
     for (const stream of streams) {
       const scheduled = isScheduledInWeek(stream, weekStart, weekEnd);
       const [historicalAmounts, historicalAbsences] = await Promise.all([
-        this.needsAmountHistory(stream.kind) ? this.fetchHistoricalAmounts(stream, weekStart, monthStart) : [],
-        stream.kind === 'DEDUCTION' ? this.fetchHistoricalAbsences(stream.id, weekStart) : [],
+        this.needsAmountHistory(stream.kind) ? this.fetchHistoricalAmounts(userId, stream, weekStart, monthStart) : [],
+        stream.kind === 'DEDUCTION' ? this.fetchHistoricalAbsences(userId, stream.id, weekStart) : [],
       ]);
       const amounts = calcStreamForecast(
         {
@@ -191,7 +191,7 @@ export class IncomeForecastService {
         },
         { historicalAmounts, historicalAbsences, isScheduledThisWeek: scheduled },
       );
-      const received = await this.fetchReceived(stream, weekStart, weekEnd);
+      const received = await this.fetchReceived(userId, stream, weekStart, weekEnd);
       const status = deriveStreamStatus(received, amounts.expected, weekEnded);
       results.push({ id: stream.id, name: stream.name, kind: stream.kind, ...amounts, received: round(received), status });
     }
@@ -206,7 +206,7 @@ export class IncomeForecastService {
       { conservative: 0, expected: 0, max: 0, received: 0 },
     );
 
-    const upsideMonthly = await this.getUpsideMonthly();
+    const upsideMonthly = await this.getUpsideMonthly(userId);
 
     return { weekStart: wibDateKey(weekStart), streams: results, totals, upsideMonthly };
   }
@@ -218,6 +218,7 @@ export class IncomeForecastService {
   /** SESSION: 8 minggu terakhir (sebelum minggu yang sedang di-forecast). VARIABLE: 3 bulan terakhir
    * (sebelum bulan yang sedang di-forecast) — granularitas beda karena cadence-nya beda. */
   private async fetchHistoricalAmounts(
+    userId: number,
     stream: { id: number; kind: IncomeKind; cadence: IncomeCadence },
     weekStart: Date,
     monthStart: Date,
@@ -225,7 +226,7 @@ export class IncomeForecastService {
     const before = stream.cadence === 'MONTHLY' ? monthStart : weekStart;
     const take = stream.cadence === 'MONTHLY' ? 3 : 8;
     const rows = await this.prisma.income.findMany({
-      where: { streamId: stream.id, status: 'CONFIRMED', periodStart: { not: null, lt: before } },
+      where: { userId, streamId: stream.id, status: 'CONFIRMED', periodStart: { not: null, lt: before } },
       orderBy: { periodStart: 'desc' },
       take,
       select: { amount: true },
@@ -233,9 +234,9 @@ export class IncomeForecastService {
     return rows.map((r) => Number(r.amount));
   }
 
-  private async fetchHistoricalAbsences(streamId: number, weekStart: Date): Promise<number[]> {
+  private async fetchHistoricalAbsences(userId: number, streamId: number, weekStart: Date): Promise<number[]> {
     const rows = await this.prisma.income.findMany({
-      where: { streamId, status: 'CONFIRMED', periodStart: { not: null, lt: weekStart }, units: { not: null } },
+      where: { userId, streamId, status: 'CONFIRMED', periodStart: { not: null, lt: weekStart }, units: { not: null } },
       orderBy: { periodStart: 'desc' },
       take: 8,
       select: { units: true },
@@ -250,10 +251,11 @@ export class IncomeForecastService {
    * Semua cadence dicocokkan per MINGGU — check-in menulis `periodStart` = awal minggu. Untuk stream
    * MONTHLY, minggu non-payday memang harus 0. Dulu dicocokkan sebulan penuh sehingga Ruangguru
    * (cair tgl 25) tampil "Diterima" di setiap minggu bulan itu (bug 2026-10-04). */
-  private async fetchReceived(stream: { id: number }, weekStart: Date, weekEnd: Date): Promise<number> {
+  private async fetchReceived(userId: number, stream: { id: number }, weekStart: Date, weekEnd: Date): Promise<number> {
     const agg = await this.prisma.income.aggregate({
       _sum: { amount: true },
       where: {
+        userId,
         streamId: stream.id,
         status: 'CONFIRMED',
         OR: [{ periodStart: { gte: weekStart, lt: weekEnd } }, { periodStart: null, receivedAt: { gte: weekStart, lt: weekEnd } }],
@@ -264,11 +266,11 @@ export class IncomeForecastService {
 
   /** Rata-rata pemasukan IRREGULAR (mis. project) 3 bulan terakhir — ditampilkan terpisah sebagai
    * "upside", tidak masuk total forecast utama (tidak bisa diandalkan buat perencanaan). */
-  private async getUpsideMonthly(): Promise<number> {
+  private async getUpsideMonthly(userId: number): Promise<number> {
     const since = addWibDays(startOfWibWeek(new Date()), -90);
     const agg = await this.prisma.income.aggregate({
       _sum: { amount: true },
-      where: { status: 'CONFIRMED', receivedAt: { gte: since }, stream: { kind: 'IRREGULAR' } },
+      where: { userId, status: 'CONFIRMED', receivedAt: { gte: since }, stream: { kind: 'IRREGULAR' } },
     });
     return round(Number(agg._sum.amount ?? 0) / 3);
   }

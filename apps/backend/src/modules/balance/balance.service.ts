@@ -23,40 +23,43 @@ export class BalanceService {
    * doang yang tersimpan. Saldo TIDAK PERNAH dihitung ulang dari agregat; murni akumulasi delta
    * dari baseline manual, dikoreksi manual via correctBalance() kalau meleset.
    */
-  async adjustBalance(tx: Prisma.TransactionClient, source: Source, delta: number) {
-    await tx.bankBalance.upsert({
-      where: { source },
-      update: { balance: { increment: delta } },
-      create: { source, balance: delta },
-    });
+  async adjustBalance(tx: Prisma.TransactionClient, userId: number, source: Source, delta: number) {
+    // findFirst+updateMany/create (bukan upsert by `source`): unik masih global sampai C1, lalu jadi (userId, source).
+    const row = await tx.bankBalance.findFirst({ where: { userId, source }, select: { id: true } });
+    if (row) {
+      await tx.bankBalance.updateMany({ where: { id: row.id, userId }, data: { balance: { increment: delta } } });
+    } else {
+      await tx.bankBalance.create({ data: { userId, source, balance: delta } });
+    }
   }
 
-  async getAll() {
-    return this.prisma.bankBalance.findMany({ orderBy: { source: 'asc' } });
+  async getAll(userId: number) {
+    return this.prisma.bankBalance.findMany({ where: { userId }, orderBy: { source: 'asc' } });
   }
 
   /** Koreksi manual ke angka pasti (bukan delta) — dicatat sebagai BalanceAdjustment buat histori. */
-  async correctBalance(source: Source, newBalance: number, note?: string) {
+  async correctBalance(userId: number, source: Source, newBalance: number, note?: string) {
     return this.prisma.$transaction(async (tx) => {
-      const existing = await tx.bankBalance.findUnique({ where: { source } });
+      const existing = await tx.bankBalance.findFirst({ where: { userId, source } });
       const oldBalance = existing ? Number(existing.balance) : 0;
       const delta = newBalance - oldBalance;
 
-      const updated = await tx.bankBalance.upsert({
-        where: { source },
-        update: { balance: newBalance },
-        create: { source, balance: newBalance },
-      });
+      if (existing) {
+        await tx.bankBalance.updateMany({ where: { id: existing.id, userId }, data: { balance: newBalance } });
+      } else {
+        await tx.bankBalance.create({ data: { userId, source, balance: newBalance } });
+      }
+      const updated = await tx.bankBalance.findFirstOrThrow({ where: { userId, source } });
 
-      await tx.balanceAdjustment.create({ data: { source, delta, note } });
+      await tx.balanceAdjustment.create({ data: { userId, source, delta, note } });
 
       return updated;
     });
   }
 
-  async getAdjustments(source: Source) {
+  async getAdjustments(userId: number, source: Source) {
     return this.prisma.balanceAdjustment.findMany({
-      where: { source },
+      where: { userId, source },
       orderBy: { createdAt: 'desc' },
     });
   }
@@ -67,9 +70,9 @@ export class BalanceService {
    * dari ini sudah tercakup di angka saldo hasil koreksi manual, jadi tidak boleh menggerakkan saldo
    * lagi (double-count).
    */
-  async getLastManualAdjustmentAt(tx: Prisma.TransactionClient, source: Source): Promise<Date | null> {
+  async getLastManualAdjustmentAt(tx: Prisma.TransactionClient, userId: number, source: Source): Promise<Date | null> {
     const last = await tx.balanceAdjustment.findFirst({
-      where: { source },
+      where: { userId, source },
       orderBy: { createdAt: 'desc' },
       select: { createdAt: true },
     });

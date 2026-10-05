@@ -1,5 +1,5 @@
 import { Injectable, Logger, NotFoundException } from '@nestjs/common';
-import { BillingCycle, Source } from '@prisma/client';
+import { BillingCycle, Prisma, Source } from '@prisma/client';
 import { PrismaService } from '../../prisma.service';
 import { GmailAuthService } from '../gmail/gmail-auth.service';
 import { CreateSubscriptionDto } from './dto/create-subscription.dto';
@@ -38,16 +38,18 @@ export class SubscriptionService {
     };
   }
 
-  async findAll() {
+  async findAll(userId: number) {
     const rows = await this.prisma.subscription.findMany({
+      where: { userId },
       orderBy: [{ isActive: 'desc' }, { nextDueDate: 'asc' }],
     });
     return rows.map((r) => this.serialize(r as SubRow));
   }
 
-  async create(dto: CreateSubscriptionDto) {
+  async create(userId: number, dto: CreateSubscriptionDto) {
     const created = await this.prisma.subscription.create({
       data: {
+        userId,
         name: dto.name.trim(),
         amount: dto.amount,
         cycle: dto.cycle,
@@ -59,17 +61,21 @@ export class SubscriptionService {
       },
     });
 
-    const calendar = await this.syncCalendar(created as SubRow);
+    const calendar = await this.syncCalendar(userId, created as SubRow);
     return { ...this.serialize((calendar.row ?? created) as SubRow), calendarSync: calendar.status };
   }
 
-  async update(id: number, dto: UpdateSubscriptionDto) {
-    const existing = await this.prisma.subscription.findUnique({ where: { id } });
+  /** updateMany ber-userId (tak ada update-by-id polos) lalu baca ulang — dipakai semua jalur tulis. */
+  private async patch(userId: number, id: number, data: Prisma.SubscriptionUpdateManyMutationInput) {
+    await this.prisma.subscription.updateMany({ where: { id, userId }, data });
+    return this.prisma.subscription.findFirstOrThrow({ where: { id, userId } });
+  }
+
+  async update(userId: number, id: number, dto: UpdateSubscriptionDto) {
+    const existing = await this.prisma.subscription.findFirst({ where: { id, userId } });
     if (!existing) throw new NotFoundException('Langganan tidak ditemukan');
 
-    const updated = await this.prisma.subscription.update({
-      where: { id },
-      data: {
+    const updated = await this.patch(userId, id, {
         ...(dto.name !== undefined && { name: dto.name.trim() }),
         ...(dto.amount !== undefined && { amount: dto.amount }),
         ...(dto.cycle !== undefined && { cycle: dto.cycle }),
@@ -78,26 +84,25 @@ export class SubscriptionService {
         ...(dto.notes !== undefined && { notes: dto.notes?.trim() || null }),
         ...(dto.reminderDaysBefore !== undefined && { reminderDaysBefore: dto.reminderDaysBefore }),
         ...(dto.isActive !== undefined && { isActive: dto.isActive }),
-      },
     });
 
-    const calendar = await this.syncCalendar(updated as SubRow);
+    const calendar = await this.syncCalendar(userId, updated as SubRow);
     return { ...this.serialize((calendar.row ?? updated) as SubRow), calendarSync: calendar.status };
   }
 
-  async remove(id: number) {
-    const existing = await this.prisma.subscription.findUnique({ where: { id } });
+  async remove(userId: number, id: number) {
+    const existing = await this.prisma.subscription.findFirst({ where: { id, userId } });
     if (!existing) throw new NotFoundException('Langganan tidak ditemukan');
 
-    await this.deleteCalendarEvent(existing.googleCalendarEventId);
-    await this.prisma.subscription.delete({ where: { id } });
+    await this.deleteCalendarEvent(userId, existing.googleCalendarEventId);
+    await this.prisma.subscription.deleteMany({ where: { id, userId } });
     return { success: true };
   }
 
   /** Dipakai mascot: langganan aktif yang jatuh tempo dalam N hari. */
-  async getUpcomingReminders(withinDays = 3) {
+  async getUpcomingReminders(userId: number, withinDays = 3) {
     const rows = await this.prisma.subscription.findMany({
-      where: { isActive: true },
+      where: { userId, isActive: true },
       orderBy: { nextDueDate: 'asc' },
     });
     const now = startOfWibDay(new Date());
@@ -158,20 +163,17 @@ export class SubscriptionService {
     };
   }
 
-  private async syncCalendar(sub: SubRow): Promise<{ status: 'synced' | 'removed' | 'skipped' | 'error'; row?: SubRow; message?: string }> {
+  private async syncCalendar(userId: number, sub: SubRow): Promise<{ status: 'synced' | 'removed' | 'skipped' | 'error'; row?: SubRow; message?: string }> {
     if (!sub.isActive) {
-      await this.deleteCalendarEvent(sub.googleCalendarEventId);
+      await this.deleteCalendarEvent(userId, sub.googleCalendarEventId);
       if (sub.googleCalendarEventId) {
-        const row = await this.prisma.subscription.update({
-          where: { id: sub.id },
-          data: { googleCalendarEventId: null },
-        });
+        const row = await this.patch(userId, sub.id, { googleCalendarEventId: null });
         return { status: 'removed', row: row as SubRow };
       }
       return { status: 'removed' };
     }
 
-    const calendar = await this.gmailAuth.getCalendarClient();
+    const calendar = await this.gmailAuth.getCalendarClient(userId);
     if (!calendar) {
       return {
         status: 'skipped',
@@ -196,10 +198,7 @@ export class SubscriptionService {
         requestBody: body,
       });
       const eventId = created.data.id || null;
-      const row = await this.prisma.subscription.update({
-        where: { id: sub.id },
-        data: { googleCalendarEventId: eventId },
-      });
+      const row = await this.patch(userId, sub.id, { googleCalendarEventId: eventId });
       return { status: 'synced', row: row as SubRow };
     } catch (err) {
       const message = (err as Error).message;
@@ -212,9 +211,9 @@ export class SubscriptionService {
     }
   }
 
-  private async deleteCalendarEvent(eventId: string | null | undefined) {
+  private async deleteCalendarEvent(userId: number, eventId: string | null | undefined) {
     if (!eventId) return;
-    const calendar = await this.gmailAuth.getCalendarClient();
+    const calendar = await this.gmailAuth.getCalendarClient(userId);
     if (!calendar) return;
     try {
       await calendar.events.delete({ calendarId: 'primary', eventId });

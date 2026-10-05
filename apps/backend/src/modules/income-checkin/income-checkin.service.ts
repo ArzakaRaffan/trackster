@@ -96,15 +96,15 @@ export class IncomeCheckinService {
     return startOfWibWeek(anchor);
   }
 
-  async getDraft(weekParam?: string): Promise<CheckinDraft> {
+  async getDraft(userId: number, weekParam?: string): Promise<CheckinDraft> {
     const weekStart = this.normalizeWeek(weekParam);
     const { end: weekEnd } = wibRange('week', weekStart);
     const weekStartKey = wibDateKey(weekStart);
 
     const [streams, forecast, existing] = await Promise.all([
-      this.prisma.incomeStream.findMany({ where: { isActive: true }, orderBy: { id: 'asc' } }),
-      this.incomeForecastService.getWeekForecast(weekStartKey),
-      this.prisma.income.findMany({ where: { periodStart: weekStart }, select: { streamId: true, amount: true } }),
+      this.prisma.incomeStream.findMany({ where: { userId, isActive: true }, orderBy: { id: 'asc' } }),
+      this.incomeForecastService.getWeekForecast(userId, weekStartKey),
+      this.prisma.income.findMany({ where: { userId, periodStart: weekStart }, select: { streamId: true, amount: true } }),
     ]);
 
     const filledStreamIds = new Set(existing.map((e) => e.streamId).filter((id): id is number => id != null));
@@ -144,22 +144,22 @@ export class IncomeCheckinService {
 
   /** Streams yang WAJIB diisi buat dianggap "minggu ini sudah checkin" — WEEKLY selalu, MONTHLY
    * cuma di minggu payday-nya. IRREGULAR sengaja tidak masuk (opsional, "tak terduga"). */
-  async isWeekFilled(weekParam?: string): Promise<boolean> {
-    const draft = await this.getDraft(weekParam);
+  async isWeekFilled(userId: number, weekParam?: string): Promise<boolean> {
+    const draft = await this.getDraft(userId, weekParam);
     return draft.streams.filter((s) => s.kind !== 'IRREGULAR' && s.scheduled).every((s) => s.alreadyFilled);
   }
 
-  async submit(dto: SubmitCheckinDto) {
+  async submit(userId: number, dto: SubmitCheckinDto) {
     const weekStart = startOfWibWeek(new Date(`${dto.week}T00:00:00+07:00`));
     const receivedAt = addWibDays(weekStart, 6); // Minggu (akhir minggu) — kapan pemasukan itu biasanya "cair"
 
-    return this.submitEntries(weekStart, receivedAt, dto.entries);
+    return this.submitEntries(userId, weekStart, receivedAt, dto.entries);
   }
 
   /** Dipakai juga oleh handler callback_query Telegram (jawaban cepat FIXED/DEDUCTION). */
-  async submitEntries(weekStart: Date, receivedAt: Date, entries: CheckinEntryDto[]) {
+  async submitEntries(userId: number, weekStart: Date, receivedAt: Date, entries: CheckinEntryDto[]) {
     const streamIds = entries.map((e) => e.streamId);
-    const streams = await this.prisma.incomeStream.findMany({ where: { id: { in: streamIds } } });
+    const streams = await this.prisma.incomeStream.findMany({ where: { userId, id: { in: streamIds } } }); // stream milik user lain tidak ikut -> dilewati di bawah
     const streamById = new Map(streams.map((s) => [s.id, s]));
 
     const created: { streamId: number; amount: number }[] = [];
@@ -171,7 +171,7 @@ export class IncomeCheckinService {
 
         // Jangan dobel — kalau sudah ada Income buat stream+minggu ini (dari checkin lain, manual,
         // atau auto-capture), skip diam-diam (idempotent kalau tombol Telegram ke-tap dua kali).
-        const dup = await tx.income.findFirst({ where: { streamId: stream.id, periodStart: weekStart } });
+        const dup = await tx.income.findFirst({ where: { userId, streamId: stream.id, periodStart: weekStart } });
         if (dup) continue;
 
         const { amount, units, extraUnits } = calcCheckinAmount(
@@ -187,6 +187,7 @@ export class IncomeCheckinService {
 
         const income = await tx.income.create({
           data: {
+            userId,
             amount,
             description: `${stream.name} — check-in mingguan`,
             source: stream.source,
@@ -200,9 +201,9 @@ export class IncomeCheckinService {
         });
 
         if (amount > 0) {
-          const lastAdjustmentAt = await this.balanceService.getLastManualAdjustmentAt(tx, income.source);
+          const lastAdjustmentAt = await this.balanceService.getLastManualAdjustmentAt(tx, userId, income.source);
           if (shouldAdjustBalance(receivedAt, lastAdjustmentAt)) {
-            await this.balanceService.adjustBalance(tx, income.source, amount);
+            await this.balanceService.adjustBalance(tx, userId, income.source, amount);
           }
         }
 

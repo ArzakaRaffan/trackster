@@ -1,6 +1,6 @@
 # 04 — Checklist Lintas-Fase
 
-Centang `[x]` hanya setelah diverifikasi. Daftar rute diambil dari kode 2026-10-05 — **jika kode berubah, perbarui tabel** (rute baru wajib
+Centang `[x]` hanya setelah diverifikasi. `[~]` = tercakup tes isolasi HTTP (`isolation-e2e`) tapi belum ada `*.check.ts` khusus/dua-user. Daftar rute diambil dari kode 2026-10-05 — **jika kode berubah, perbarui tabel** (rute baru wajib
 ditambahkan ke matriks isolasi sebelum merge).
 
 ## A. Daftar model tenant (input skrip audit statis `tenancy-audit`)
@@ -16,30 +16,30 @@ Kolom: **Svc** = semua method service ber-`userId` & `where` memuat `userId` · 
 
 | Modul | File inti | Svc | Ctl | Job | Chk | Catatan khusus |
 | --- | --- | --- | --- | --- | --- | --- |
-| balance | `balance.service.ts` | [ ] | [ ] | [ ] | [ ] | `adjustBalance`/`getLastManualAdjustmentAt` per `(user, source)`; `balance.check.ts` +2 user |
-| budget | `budget.service.ts`, `budget-advisor`, `budget-rollover` | [ ] | [ ] | [ ] | [ ] | hapus `budgetSetting id:1`; `dailyBudget` by `(userId, dayOfWeek)`; `getTodaySummary(userId)` |
-| merchant-alias | `merchant-alias.service.ts` | [ ] | [ ] | [ ] | [ ] | `rawDescription` unik per user; `categoryIcon` per user; `findCategoryForDescription(userId, …)` dipakai sync |
-| goal | `goal.service.ts` | [ ] | [ ] | [ ] | [ ] | contribute/archive/simulate validasi pemilik; prompt "Arzaka" |
-| subscription | `subscription.service.ts` | [ ] | [ ] | [ ] | [ ] | Calendar owner-only (P11) |
-| reimbursement | `reimbursement.service.ts` | [ ] | [ ] | [ ] | [ ] | validasi `transaction.userId`; saldo `receivedSource` per user |
-| income-stream | `income-stream.service.ts` | [ ] | [ ] | [ ] | [ ] | |
-| income | `income.service.ts` | [ ] | [ ] | [ ] | [ ] | `classify(userId,…)`, korelasi `EmailParseLog` per user, `createFromParsed`, `resolve`, `remove` |
-| income-forecast | `income-forecast.service.ts` | [ ] | [ ] | [ ] | [ ] | `income-forecast.check.ts` |
-| income-checkin | `income-checkin.service.ts`, `…-reminder.service.ts` | [ ] | [ ] | [ ] | [ ] | cron per user; callback Telegram by user |
-| transaction | `transaction.service.ts` (51 panggilan Prisma) | [ ] | [ ] | [ ] | [ ] | `createFromParsed(userId,…)`, `getInsights(userId)`, `updateMany` kategori, dedup `(userId,emailId)` |
-| budget-allocation | `budget-allocation.service.ts` | [ ] | [ ] | [ ] | [ ] | menulis `DailyBudget` per user |
-| analytics | `analytics.service.ts` | [ ] | [ ] | [ ] | [ ] | `getPeriodStats(userId, …)`; `period-stats.check.ts` |
-| report | `report.service.ts` | [ ] | [ ] | [ ] | [ ] | `PeriodReport` unik `(userId, period, periodStart)`; `/reports/export.csv` hanya data user |
-| ai/finance-tools | `ai-finance-tools.service.ts` | [ ] | n/a | [ ] | [ ] | `userId` terikat server; `logExpense` menulis ke user ini |
-| ai/chat+threads | `ai-chat.service.ts`, `ai.controller.ts` | [ ] | [ ] | [ ] | [ ] | thread by-id → cek `userId`; stream SSE juga |
-| ai/memory | `ai-memory.service.ts` | [ ] | [ ] | [ ] | [ ] | `updateMany` arsip + `userId` |
-| ai/retrieval | `retrieval.service.ts` | [ ] | n/a | [ ] | [ ] | **raw SQL** + join thread |
-| ai/caption,anomaly | `ai-caption`, `ai-anomaly` | [ ] | n/a | [ ] | [ ] | notifikasi Telegram per user |
-| ai/insight-card,snapshot,budget | `ai-insight-card`, `financial-snapshot`, `ai-budget`, `ai-budget-reminder` | [ ] | [ ] | [ ] | [ ] | cache unik `(userId,…)` |
-| ai/reports (cron) | `ai-reports.service.ts` | [ ] | [ ] | [ ] | [ ] | 7 cron → runner per user (F4) |
-| telegram | `telegram.service.ts`, `telegram-webhook.controller.ts`, `telegram.controller.ts` | [ ] | [ ] | [ ] | [ ] | `chatId→userId`; `/start <kode>` |
-| sync | `sync.controller.ts` | [ ] | [ ] | [ ] | n/a | owner-only legacy; hapus di F7 |
-| gmail | `gmail-auth.service.ts`, `gmail-sync.service.ts`, `gmail.controller.ts` | [ ] | [ ] | [ ] | [ ] | `state` OAuth bertanda tangan (lihat §catatan); hapus di F7 |
+| balance | `balance.service.ts` | [x] | [x] | [x] | [~] | `adjustBalance`/`getLastManualAdjustmentAt` per `(user, source)`; `balance.check.ts` +2 user |
+| budget | `budget.service.ts`, `budget-advisor`, `budget-rollover` | [x] | [x] | [x] | [~] | hapus `budgetSetting id:1`; `dailyBudget` by `(userId, dayOfWeek)`; `getTodaySummary(userId)` |
+| merchant-alias | `merchant-alias.service.ts` | [x] | [x] | [x] | [~] | `rawDescription` unik per user; `categoryIcon` per user; `findCategoryForDescription(userId, …)` dipakai sync |
+| goal | `goal.service.ts` | [x] | [x] | [x] | [~] | contribute/archive/simulate validasi pemilik; prompt "Arzaka" |
+| subscription | `subscription.service.ts` | [x] | [x] | [x] | [~] | Calendar owner-only (P11) |
+| reimbursement | `reimbursement.service.ts` | [x] | [x] | [x] | [~] | validasi `transaction.userId`; saldo `receivedSource` per user |
+| income-stream | `income-stream.service.ts` | [x] | [x] | [x] | [~] | |
+| income | `income.service.ts` | [x] | [x] | [x] | [~] | `classify(userId,…)`, korelasi `EmailParseLog` per user, `createFromParsed`, `resolve`, `remove` |
+| income-forecast | `income-forecast.service.ts` | [x] | [x] | [x] | [~] | `income-forecast.check.ts` |
+| income-checkin | `income-checkin.service.ts`, `…-reminder.service.ts` | [x] | [x] | [x] | [~] | cron per user; callback Telegram by user |
+| transaction | `transaction.service.ts` (51 panggilan Prisma) | [x] | [x] | [x] | [~] | `createFromParsed(userId,…)`, `getInsights(userId)`, `updateMany` kategori, dedup `(userId,emailId)` |
+| budget-allocation | `budget-allocation.service.ts` | [x] | [x] | [x] | [~] | menulis `DailyBudget` per user |
+| analytics | `analytics.service.ts` | [x] | [x] | [x] | [~] | `getPeriodStats(userId, …)`; `period-stats.check.ts` |
+| report | `report.service.ts` | [x] | [x] | [x] | [~] | `PeriodReport` unik `(userId, period, periodStart)`; `/reports/export.csv` hanya data user |
+| ai/finance-tools | `ai-finance-tools.service.ts` | [x] | n/a | [x] | [~] | `userId` terikat server; `logExpense` menulis ke user ini |
+| ai/chat+threads | `ai-chat.service.ts`, `ai.controller.ts` | [x] | [x] | [x] | [~] | thread by-id → cek `userId`; stream SSE juga |
+| ai/memory | `ai-memory.service.ts` | [x] | [x] | [x] | [~] | `updateMany` arsip + `userId` |
+| ai/retrieval | `retrieval.service.ts` | [x] | n/a | [x] | [~] | **raw SQL** + join thread |
+| ai/caption,anomaly | `ai-caption`, `ai-anomaly` | [x] | n/a | [x] | [~] | notifikasi Telegram per user |
+| ai/insight-card,snapshot,budget | `ai-insight-card`, `financial-snapshot`, `ai-budget`, `ai-budget-reminder` | [x] | [x] | [x] | [~] | cache unik `(userId,…)` |
+| ai/reports (cron) | `ai-reports.service.ts` | [x] | [x] | [x] | [~] | 7 cron → runner per user (F4) |
+| telegram | `telegram.service.ts`, `telegram-webhook.controller.ts`, `telegram.controller.ts` | [x] | [x] | [x] | [~] | `chatId→userId`; `/start <kode>` |
+| sync | `sync.controller.ts` | [x] | [x] | [x] | n/a | owner-only legacy; hapus di F7 |
+| gmail | `gmail-auth.service.ts`, `gmail-sync.service.ts`, `gmail.controller.ts` | [x] | [x] | [x] | [~] | `state` OAuth bertanda tangan (lihat §catatan); hapus di F7 |
 | split-bill | `split-bill.service.ts` | [ ] | [ ] | n/a | [ ] | verifikasi `createdByUserId`; publik tak berubah |
 | trip | `trip.service.ts` | [ ] | [ ] | n/a | [ ] | idem; (tidak ada endpoint list privat saat ini) |
 | auth | `auth.*` | [ ] | [ ] | n/a | [ ] | F5 |

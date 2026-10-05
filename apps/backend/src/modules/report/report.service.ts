@@ -78,12 +78,12 @@ export class ReportService {
   /** `period`: 'week'|'month', `anchorDate` jatuh di dalam periode yang diminta.
    * Periode yang sudah tutup (end <= sekarang) dibaca/dibuat dari snapshot `PeriodReport`
    * (konsisten walau data berubah kemudian); periode berjalan selalu live dari PeriodStats. */
-  async getReport(period: 'week' | 'month', anchorDate: Date): Promise<ReportResult> {
+  async getReport(userId: number, period: 'week' | 'month', anchorDate: Date): Promise<ReportResult> {
     const { start, end } = wibRange(period, anchorDate);
     const dbPeriod = period === 'week' ? ReportPeriod.WEEK : ReportPeriod.MONTH;
 
     if (end.getTime() <= Date.now()) {
-      const saved = await this.getOrGenerate(dbPeriod, start, end);
+      const saved = await this.getOrGenerate(userId, dbPeriod, start, end);
       return {
         period,
         start: start.toISOString(),
@@ -95,22 +95,20 @@ export class ReportService {
       };
     }
 
-    const stats = await this.analyticsService.getPeriodStats(start, end);
+    const stats = await this.analyticsService.getPeriodStats(userId, start, end);
     return { period, start: start.toISOString(), end: end.toISOString(), closed: false, stats, narrative: null, generatedAt: null };
   }
 
-  private async getOrGenerate(period: ReportPeriod, start: Date, end: Date) {
-    const existing = await this.prisma.periodReport.findUnique({
-      where: { period_periodStart: { period, periodStart: start } },
-    });
+  private async getOrGenerate(userId: number, period: ReportPeriod, start: Date, end: Date) {
+    const existing = await this.prisma.periodReport.findFirst({ where: { userId, period, periodStart: start } });
     if (existing) return existing;
-    return this.closePeriod(period, start, end);
+    return this.closePeriod(userId, period, start, end);
   }
 
   /** Hitung PeriodStats + narasi AI, simpan snapshot. Dipanggil cron tutup periode ATAU
    * lazy on-demand kalau ada yang buka laporan lama yang belum pernah di-tutup (backfill implisit). */
-  async closePeriod(period: ReportPeriod, start: Date, end: Date) {
-    const stats = await this.analyticsService.getPeriodStats(start, end);
+  async closePeriod(userId: number, period: ReportPeriod, start: Date, end: Date) {
+    const stats = await this.analyticsService.getPeriodStats(userId, start, end);
 
     let narrative: string | null = null;
     try {
@@ -124,11 +122,13 @@ export class ReportService {
       this.logger.error(`closePeriod narrative gagal (${period} ${start.toISOString()}): ${err?.message}`);
     }
 
-    return this.prisma.periodReport.upsert({
-      where: { period_periodStart: { period, periodStart: start } },
-      update: { stats: stats as any, narrative },
-      create: { period, periodStart: start, stats: stats as any, narrative },
-    });
+    // findFirst + update/create (bukan upsert): unik masih global (period, periodStart) sampai C1 -> (userId, period, periodStart).
+    const existing = await this.prisma.periodReport.findFirst({ where: { userId, period, periodStart: start }, select: { id: true } });
+    if (existing) {
+      await this.prisma.periodReport.updateMany({ where: { id: existing.id, userId }, data: { stats: stats as any, narrative } });
+      return this.prisma.periodReport.findFirstOrThrow({ where: { id: existing.id, userId } });
+    }
+    return this.prisma.periodReport.create({ data: { userId, period, periodStart: start, stats: stats as any, narrative } });
   }
 
   /** anchor = hari apapun di minggu/bulan LALU (relatif ke `now`), dipakai cron tutup periode. */
@@ -143,7 +143,7 @@ export class ReportService {
   /** 6 Bulan: agregat dari 6 PeriodReport bulanan terakhir + bulan berjalan (live).
    * `anchorDate` = tanggal apapun di bulan terakhir yang mau ditampilkan (biasanya sekarang).
    * Return: byMonth[], totals (aggregate), dataStartsAt. */
-  async getAggregate(period: '6m' | 'all', anchorDate: Date): Promise<AggregateReport> {
+  async getAggregate(userId: number, period: '6m' | 'all', anchorDate: Date): Promise<AggregateReport> {
     const { year: anchorYear, month: anchorMonth } = wibParts(anchorDate);
     let months: { year: number; month: number }[] = [];
 
@@ -155,7 +155,7 @@ export class ReportService {
         months.push({ year: y, month: m });
       }
     } else {
-      const first = await this.prisma.transaction.aggregate({ _min: { occurredAt: true } });
+      const first = await this.prisma.transaction.aggregate({ where: { userId }, _min: { occurredAt: true } });
       if (!first._min.occurredAt) return emptyAggregate(period);
       const { year: fy, month: fm } = wibParts(first._min.occurredAt);
       let y = fy, m = fm;
@@ -177,7 +177,7 @@ export class ReportService {
       const monthKey = `${year}-${String(month).padStart(2, '0')}`;
 
       if (!isCurrentMonth) {
-        const report = await this.getOrGenerate(ReportPeriod.MONTH, start, end);
+        const report = await this.getOrGenerate(userId, ReportPeriod.MONTH, start, end);
         const stats = report.stats as unknown as PeriodStats;
         monthAggregates.push({
           month: monthKey,
@@ -191,7 +191,7 @@ export class ReportService {
           narrative: report.narrative,
         });
       } else {
-        const stats = await this.analyticsService.getPeriodStats(start, end);
+        const stats = await this.analyticsService.getPeriodStats(userId, start, end);
         monthAggregates.push({
           month: monthKey,
           spend: stats.totals.spend,
@@ -216,7 +216,7 @@ export class ReportService {
       avgMonthlyIncome: withData.length ? withData.reduce((s, m) => s + m.income, 0) / withData.length : 0,
     };
 
-    const first = await this.prisma.transaction.aggregate({ _min: { occurredAt: true } });
+    const first = await this.prisma.transaction.aggregate({ where: { userId }, _min: { occurredAt: true } });
     const dataStartsAt = first._min.occurredAt ? wibDateKey(first._min.occurredAt) : null;
 
     const best = withData.length ? withData.reduce((a, b) => a.spend <= b.spend ? a : b) : null;
@@ -226,14 +226,14 @@ export class ReportService {
   }
 
   /** Rekor & milestone sepanjang waktu dari data PeriodReport + transaksi. */
-  async getRecords(): Promise<RecordsResult> {
+  async getRecords(userId: number): Promise<RecordsResult> {
     const [biggestTx, totalAgg, first] = await Promise.all([
-      this.prisma.transaction.findFirst({ orderBy: { amount: 'desc' }, select: { id: true, amount: true, description: true, occurredAt: true, category: true } }),
-      this.prisma.transaction.aggregate({ _count: true, _sum: { amount: true, reimbursedAmount: true } }),
-      this.prisma.transaction.aggregate({ _min: { occurredAt: true } }),
+      this.prisma.transaction.findFirst({ where: { userId }, orderBy: { amount: 'desc' }, select: { id: true, amount: true, description: true, occurredAt: true, category: true } }),
+      this.prisma.transaction.aggregate({ where: { userId }, _count: true, _sum: { amount: true, reimbursedAmount: true } }),
+      this.prisma.transaction.aggregate({ where: { userId }, _min: { occurredAt: true } }),
     ]);
 
-    const txAll = await this.prisma.transaction.findMany({ select: { merchantKey: true, description: true, amount: true, reimbursedAmount: true } });
+    const txAll = await this.prisma.transaction.findMany({ where: { userId }, select: { merchantKey: true, description: true, amount: true, reimbursedAmount: true } });
     const merchantGroups = new Map<string, { count: number; total: number; description: string }>();
     for (const t of txAll) {
       const key = t.merchantKey || t.description;
@@ -244,7 +244,7 @@ export class ReportService {
     }
     const topMerchantEntry = [...merchantGroups.entries()].sort((a, b) => b[1].count - a[1].count)[0];
 
-    const closedMonths = await this.prisma.periodReport.findMany({ where: { period: ReportPeriod.MONTH }, orderBy: { periodStart: 'asc' } });
+    const closedMonths = await this.prisma.periodReport.findMany({ where: { userId, period: ReportPeriod.MONTH }, orderBy: { periodStart: 'asc' } });
     let bestSavingsMonth: { month: string; savingsRate: number } | null = null;
     for (const r of closedMonths) {
       const stats = r.stats as any;
@@ -276,9 +276,9 @@ export class ReportService {
     };
   }
 
-  async getDataExportRows(from: Date, to: Date) {
+  async getDataExportRows(userId: number, from: Date, to: Date) {
     return this.prisma.transaction.findMany({
-      where: { occurredAt: { gte: from, lt: to } },
+      where: { userId, occurredAt: { gte: from, lt: to } },
       orderBy: { occurredAt: 'desc' },
       select: { id: true, occurredAt: true, description: true, amount: true, category: true, source: true, note: true },
     });

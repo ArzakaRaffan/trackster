@@ -101,81 +101,84 @@ export class AiChatService {
     private retrievalService: RetrievalService,
   ) {}
 
-  listThreads(channel?: ChatChannel) {
+  listThreads(userId: number, channel?: ChatChannel) {
     return this.prisma.chatThread.findMany({
-      where: channel ? { channel } : undefined,
+      where: channel ? { userId, channel } : { userId },
       orderBy: { updatedAt: 'desc' },
     });
   }
 
-  createThread(channel: ChatChannel = ChatChannel.WEB) {
-    return this.prisma.chatThread.create({ data: { channel } });
+  createThread(userId: number, channel: ChatChannel = ChatChannel.WEB) {
+    return this.prisma.chatThread.create({ data: { userId, channel } });
   }
 
-  async updateThread(id: number, data: { title?: string; archived?: boolean }) {
-    await this.assertThreadExists(id);
-    return this.prisma.chatThread.update({
-      where: { id },
+  async updateThread(userId: number, id: number, data: { title?: string; archived?: boolean }) {
+    await this.assertThreadExists(userId, id);
+    await this.prisma.chatThread.updateMany({
+      where: { id, userId },
       data: {
         ...(data.title !== undefined ? { title: data.title } : {}),
         ...(data.archived !== undefined ? { archivedAt: data.archived ? new Date() : null } : {}),
       },
     });
+    return this.prisma.chatThread.findFirstOrThrow({ where: { id, userId } });
   }
 
-  async deleteThread(id: number) {
-    await this.assertThreadExists(id);
-    await this.prisma.chatThread.delete({ where: { id } });
+  async deleteThread(userId: number, id: number) {
+    await this.assertThreadExists(userId, id);
+    await this.prisma.chatThread.deleteMany({ where: { id, userId } });
   }
 
-  async getMessages(threadId: number) {
-    await this.assertThreadExists(threadId);
+  async getMessages(userId: number, threadId: number) {
+    await this.assertThreadExists(userId, threadId);
     return this.prisma.chatMessage.findMany({
-      where: { threadId, ...HISTORY_FILTER },
+      where: { threadId, thread: { userId }, ...HISTORY_FILTER },
       orderBy: { id: 'asc' },
     });
   }
 
   /** Thread "Quick chat" tunggal dipakai POST /ai/chat lama, sampai frontend pindah ke thread UI. */
-  async getOrCreateQuickChatThread() {
+  async getOrCreateQuickChatThread(userId: number) {
     const existing = await this.prisma.chatThread.findFirst({
-      where: { channel: ChatChannel.WEB, title: 'Quick chat', archivedAt: null },
+      where: { userId, channel: ChatChannel.WEB, title: 'Quick chat', archivedAt: null },
       orderBy: { updatedAt: 'desc' },
     });
     if (existing) return existing;
     return this.prisma.chatThread.create({
-      data: { channel: ChatChannel.WEB, title: 'Quick chat' },
+      data: { userId, channel: ChatChannel.WEB, title: 'Quick chat' },
     });
   }
 
   /** Satu thread persisten per channel Telegram — semua pesan bot masuk ke sini. */
-  async getOrCreateTelegramThread() {
+  async getOrCreateTelegramThread(userId: number) {
     const existing = await this.prisma.chatThread.findFirst({
-      where: { channel: ChatChannel.TELEGRAM, archivedAt: null },
+      where: { userId, channel: ChatChannel.TELEGRAM, archivedAt: null },
       orderBy: { createdAt: 'asc' },
     });
     if (existing) return existing;
     return this.prisma.chatThread.create({
-      data: { channel: ChatChannel.TELEGRAM, title: 'Telegram' },
+      data: { userId, channel: ChatChannel.TELEGRAM, title: 'Telegram' },
     });
   }
 
   /** Kirim pesan user ke thread, jalanin tool loop, simpan semua pesan baru, return balasan akhir. */
   async sendMessage(
+    userId: number,
     threadId: number,
     text: string,
     stream?: { onToken: (text: string) => void; onToolRound: () => void },
   ): Promise<string> {
-    const thread = await this.assertThreadExists(threadId);
-    this.logger.log(`sendMessage thread=${threadId}: ${text.slice(0, 100)}`);
+    const thread = await this.assertThreadExists(userId, threadId);
+    this.logger.log(`sendMessage user=${userId} thread=${threadId}: ${text.slice(0, 100)}`);
 
+    // tenancy-ok: thread sudah diverifikasi milik userId di assertThreadExists
     await this.prisma.chatMessage.create({
       data: { threadId, role: 'user', content: text },
     });
 
     try {
       const history = await this.prisma.chatMessage.findMany({
-        where: { threadId, ...HISTORY_FILTER },
+        where: { threadId, thread: { userId }, ...HISTORY_FILTER },
         orderBy: { id: 'desc' },
         take: WINDOW_SIZE,
       });
@@ -186,9 +189,9 @@ export class AiChatService {
       const excludeAfterId = history.length > 0 ? history[0].id - 1 : 0;
 
       const [snapshot, activeMemories, retrieved] = await Promise.all([
-        this.financialSnapshotService.getSnapshot(),
-        this.aiMemoryService.listActive(),
-        this.retrievalService.search(text, { excludeThreadId: threadId, excludeAfterId }),
+        this.financialSnapshotService.getSnapshot(userId),
+        this.aiMemoryService.listActive(userId),
+        this.retrievalService.search(userId, text, { excludeThreadId: threadId, excludeAfterId }),
       ]);
       const memoryBlock = this.aiMemoryService.formatForPrompt(activeMemories);
       const retrievalBlock = this.retrievalService.formatForPrompt(retrieved);
@@ -215,7 +218,7 @@ export class AiChatService {
       const newMessages = await this.aiService.runToolLoop({
         system,
         messages: aiMessages,
-        tools: this.aiFinanceToolsService.getTools({ threadId, excludeAfterId }),
+        tools: this.aiFinanceToolsService.getTools({ userId, threadId, excludeAfterId }),
         maxTokens: 1024,
         onToken: stream?.onToken,
         onToolRound: stream?.onToolRound,
@@ -226,6 +229,7 @@ export class AiChatService {
 
       for (let i = 0; i < newMessages.length; i++) {
         const m = newMessages[i];
+        // tenancy-ok: thread sudah diverifikasi milik userId di assertThreadExists
         await this.prisma.chatMessage.create({
           data: {
             threadId,
@@ -244,26 +248,27 @@ export class AiChatService {
 
       const reply = extractFinalReply(newMessages);
 
-      await this.prisma.chatThread.update({
-        where: { id: threadId },
+      await this.prisma.chatThread.updateMany({
+        where: { id: threadId, userId },
         data: {
           updatedAt: new Date(),
           ...(thread.title ? {} : { title: await this.generateTitle(text) }),
         },
       });
 
-      this.maybeSummarize(threadId).catch((err) =>
+      this.maybeSummarize(userId, threadId).catch((err) =>
         this.logger.warn(`Summarize thread ${threadId} gagal: ${err?.message}`),
       );
 
       if (reply) {
-        this.extractMemory(text, reply).catch((err) => this.logger.warn(`Ekstraksi memory gagal: ${err?.message}`));
+        this.extractMemory(userId, text, reply).catch((err) => this.logger.warn(`Ekstraksi memory gagal: ${err?.message}`));
       }
 
       return reply || 'Maaf, ada gangguan teknis. Coba lagi ya!';
     } catch (err: any) {
       this.logger.error(`sendMessage error: ${err?.message}`, err?.stack);
       const fallback = 'Waduh, ada error nih. Coba beberapa saat lagi ya!';
+      // tenancy-ok: thread sudah diverifikasi milik userId di assertThreadExists
       await this.prisma.chatMessage.create({
         data: { threadId, role: 'assistant', content: fallback },
       });
@@ -286,18 +291,18 @@ export class AiChatService {
     }
   }
 
-  private async maybeSummarize(threadId: number) {
-    const total = await this.prisma.chatMessage.count({ where: { threadId, ...HISTORY_FILTER } });
+  private async maybeSummarize(userId: number, threadId: number) {
+    const total = await this.prisma.chatMessage.count({ where: { threadId, thread: { userId }, ...HISTORY_FILTER } });
     if (total <= SUMMARIZE_THRESHOLD) return;
 
     const toSummarize = await this.prisma.chatMessage.findMany({
-      where: { threadId, ...HISTORY_FILTER },
+      where: { threadId, thread: { userId }, ...HISTORY_FILTER },
       orderBy: { id: 'asc' },
       take: total - WINDOW_SIZE,
     });
     if (toSummarize.length === 0) return;
 
-    const thread = await this.prisma.chatThread.findUnique({ where: { id: threadId } });
+    const thread = await this.prisma.chatThread.findFirst({ where: { id: threadId, userId } });
     const transcript = toSummarize.map((m) => `${m.role}: ${m.content}`).join('\n');
     const prompt = `${thread?.summary ? `Ringkasan sebelumnya:\n${thread.summary}\n\n` : ''}Percakapan tambahan:\n${transcript}`;
 
@@ -310,8 +315,8 @@ export class AiChatService {
     const summary = (res?.content ?? '').trim();
     if (!summary) return;
 
-    await this.prisma.chatThread.update({
-      where: { id: threadId },
+    await this.prisma.chatThread.updateMany({
+      where: { id: threadId, userId },
       data: { summary, summaryUpToId: toSummarize[toSummarize.length - 1].id },
     });
   }
@@ -319,8 +324,8 @@ export class AiChatService {
   /** Async, fire-and-forget (dipanggil tanpa await dari sendMessage) — TIDAK boleh throw ke atas.
    *  Model AI_MODEL_FAST diminta ekstrak fakta tahan lama dari satu giliran, hasil JSON divalidasi
    *  ketat oleh parseMemoryOps sebelum diterapkan (output model = untrusted input). */
-  private async extractMemory(userText: string, assistantReply: string): Promise<void> {
-    const activeMemories = await this.aiMemoryService.listActive();
+  private async extractMemory(userId: number, userText: string, assistantReply: string): Promise<void> {
+    const activeMemories = await this.aiMemoryService.listActive(userId);
     const memoryList =
       activeMemories.length > 0
         ? activeMemories.map((m) => `id=${m.id} [${m.kind}] ${m.content}`).join('\n')
@@ -339,23 +344,23 @@ export class AiChatService {
       maxTokens: 400,
     });
     const ops = parseMemoryOps(res?.content ?? '[]');
-    if (ops.length > 0) await this.aiMemoryService.applyOps(ops);
+    if (ops.length > 0) await this.aiMemoryService.applyOps(userId, ops);
   }
 
-  private async assertThreadExists(id: number) {
-    const thread = await this.prisma.chatThread.findUnique({ where: { id } });
+  private async assertThreadExists(userId: number, id: number) {
+    const thread = await this.prisma.chatThread.findFirst({ where: { id, userId } });
     if (!thread) throw new NotFoundException(`Thread ${id} tidak ditemukan`);
     return thread;
   }
 
   /** Legacy: satu pesan tanpa thread eksplisit (dipakai sebelum E04-S1). Dipertahankan untuk
    *  compatibility internal — pemanggil baru sebaiknya pakai sendMessage(threadId, text). */
-  async handleMessage(text: string, ctx: { channel: 'web' | 'telegram' }): Promise<string> {
+  async handleMessage(userId: number, text: string, ctx: { channel: 'web' | 'telegram' }): Promise<string> {
     const thread =
       ctx.channel === 'telegram'
-        ? await this.getOrCreateTelegramThread()
-        : await this.getOrCreateQuickChatThread();
-    return this.sendMessage(thread.id, text);
+        ? await this.getOrCreateTelegramThread(userId)
+        : await this.getOrCreateQuickChatThread(userId);
+    return this.sendMessage(userId, thread.id, text);
   }
 
   /** Kategorisasi otomatis untuk transaksi dari email sync.

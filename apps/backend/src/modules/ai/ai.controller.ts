@@ -3,6 +3,7 @@ import { Response } from 'express';
 import { IsBoolean, IsEnum, IsInt, IsNumber, IsOptional, IsString, Max, Min, MinLength } from 'class-validator';
 import { MemoryKind } from '@prisma/client';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
+import { AuthUser, CurrentUser } from '../../common/decorators/current-user.decorator';
 import { AiChatService } from './ai-chat.service';
 import { AiReportsService } from './ai-reports.service';
 import { AiMascotService } from './ai-mascot.service';
@@ -104,64 +105,64 @@ export class AiController {
   ) {}
 
   @Get('mascot-tip')
-  async mascotTip() {
-    return this.aiMascotService.getTip();
+  async mascotTip(@CurrentUser() user: AuthUser) {
+    return this.aiMascotService.getTip(user.id);
   }
 
   /** Debug — lihat persis teks yang disuntik ke system prompt sebagai kondisi keuangan saat ini. */
   @Get('snapshot')
-  async snapshot() {
-    const text = await this.financialSnapshotService.getSnapshot(true);
+  async snapshot(@CurrentUser() user: AuthUser) {
+    const text = await this.financialSnapshotService.getSnapshot(user.id, true);
     return { text };
   }
 
   @Get('memory')
-  async listMemory() {
-    return this.aiMemoryService.listAll();
+  async listMemory(@CurrentUser() user: AuthUser) {
+    return this.aiMemoryService.listAll(user.id);
   }
 
   @Post('memory')
-  async createMemory(@Body() body: CreateMemoryDto) {
-    return this.aiMemoryService.create(body);
+  async createMemory(@CurrentUser() user: AuthUser, @Body() body: CreateMemoryDto) {
+    return this.aiMemoryService.create(user.id, body);
   }
 
   @Patch('memory/:id')
-  async updateMemory(@Param('id', ParseIntPipe) id: number, @Body() body: UpdateMemoryDto) {
-    return this.aiMemoryService.update(id, body);
+  async updateMemory(@CurrentUser() user: AuthUser, @Param('id', ParseIntPipe) id: number, @Body() body: UpdateMemoryDto) {
+    return this.aiMemoryService.update(user.id, id, body);
   }
 
   @Delete('memory/:id')
-  async deleteMemory(@Param('id', ParseIntPipe) id: number) {
-    await this.aiMemoryService.remove(id);
+  async deleteMemory(@CurrentUser() user: AuthUser, @Param('id', ParseIntPipe) id: number) {
+    await this.aiMemoryService.remove(user.id, id);
     return { ok: true };
   }
 
   /** Legacy — bikin/lanjutkan thread "Quick chat" tunggal. Dipertahankan sampai frontend
    *  sepenuhnya pindah ke /ai/threads. */
   @Post('chat')
-  async chat(@Body() body: ChatDto) {
-    const reply = await this.aiChatService.handleMessage(body.message, { channel: 'web' });
+  async chat(@CurrentUser() user: AuthUser, @Body() body: ChatDto) {
+    const reply = await this.aiChatService.handleMessage(user.id, body.message, { channel: 'web' });
     return { reply };
   }
 
   @Get('threads')
-  async listThreads() {
-    return this.aiChatService.listThreads();
+  async listThreads(@CurrentUser() user: AuthUser) {
+    return this.aiChatService.listThreads(user.id);
   }
 
   @Post('threads')
-  async createThread() {
-    return this.aiChatService.createThread();
+  async createThread(@CurrentUser() user: AuthUser) {
+    return this.aiChatService.createThread(user.id);
   }
 
   @Get('threads/:id/messages')
-  async getThreadMessages(@Param('id', ParseIntPipe) id: number) {
-    return this.aiChatService.getMessages(id);
+  async getThreadMessages(@CurrentUser() user: AuthUser, @Param('id', ParseIntPipe) id: number) {
+    return this.aiChatService.getMessages(user.id, id);
   }
 
   @Post('threads/:id/messages')
-  async sendThreadMessage(@Param('id', ParseIntPipe) id: number, @Body() body: SendThreadMessageDto) {
-    const reply = await this.aiChatService.sendMessage(id, body.text);
+  async sendThreadMessage(@CurrentUser() user: AuthUser, @Param('id', ParseIntPipe) id: number, @Body() body: SendThreadMessageDto) {
+    const reply = await this.aiChatService.sendMessage(user.id, id, body.text);
     return { reply };
   }
 
@@ -170,6 +171,7 @@ export class AiController {
    *  Pesan tetap disimpan lengkap oleh `sendMessage` — client yang putus di tengah tidak kehilangan balasan. */
   @Post('threads/:id/messages/stream')
   async streamThreadMessage(
+    @CurrentUser() user: AuthUser,
     @Param('id', ParseIntPipe) id: number,
     @Body() body: SendThreadMessageDto,
     @Res() res: Response,
@@ -185,7 +187,7 @@ export class AiController {
     // Tool call bisa diam belasan detik — ping komentar supaya proxy tidak menutup koneksi.
     const ping = setInterval(() => res.write(': ping\n\n'), 15_000);
     try {
-      const reply = await this.aiChatService.sendMessage(id, body.text, {
+      const reply = await this.aiChatService.sendMessage(user.id, id, body.text, {
         onToken: (text) => send({ type: 'token', text }),
         onToolRound: () => send({ type: 'reset' }),
       });
@@ -199,13 +201,13 @@ export class AiController {
   }
 
   @Patch('threads/:id')
-  async updateThread(@Param('id', ParseIntPipe) id: number, @Body() body: UpdateThreadDto) {
-    return this.aiChatService.updateThread(id, body);
+  async updateThread(@CurrentUser() user: AuthUser, @Param('id', ParseIntPipe) id: number, @Body() body: UpdateThreadDto) {
+    return this.aiChatService.updateThread(user.id, id, body);
   }
 
   @Delete('threads/:id')
-  async deleteThread(@Param('id', ParseIntPipe) id: number) {
-    await this.aiChatService.deleteThread(id);
+  async deleteThread(@CurrentUser() user: AuthUser, @Param('id', ParseIntPipe) id: number) {
+    await this.aiChatService.deleteThread(user.id, id);
     return { ok: true };
   }
 
@@ -220,14 +222,15 @@ export class AiController {
 
   /** "3 hal yang perlu kamu tahu" — kartu AI ringkas dari PeriodStats, di-cache per range per hari WIB. */
   @Get('insight-card')
-  async insightCard(@Query('range') range?: string) {
-    return this.aiInsightCardService.getInsightCard(range ?? '30d');
+  async insightCard(@CurrentUser() user: AuthUser, @Query('range') range?: string) {
+    return this.aiInsightCardService.getInsightCard(user.id, range ?? '30d');
   }
 
   /** Return 12 data HealthScoreLog terakhir untuk chart trend di frontend */
   @Get('health-score/history')
-  async healthScoreHistory() {
+  async healthScoreHistory(@CurrentUser() user: AuthUser) {
     return this.prisma.healthScoreLog.findMany({
+      where: { userId: user.id },
       orderBy: { weekStart: 'desc' },
       take: 12,
     });
@@ -237,25 +240,25 @@ export class AiController {
    *  halaman /app/budget & kartu chat, digabung di sini (bukan di /budget) supaya BudgetModule
    *  tidak perlu bergantung ke AiModule (hindari circular module dependency). */
   @Get('budget-suggestions')
-  async budgetSuggestions(@Query('week') week?: string) {
+  async budgetSuggestions(@CurrentUser() user: AuthUser, @Query('week') week?: string) {
     const [suggestion, advice] = await Promise.all([
-      this.budgetAdvisorService.getSuggestions(week),
-      this.aiBudgetService.explain(week),
+      this.budgetAdvisorService.getSuggestions(user.id, week),
+      this.aiBudgetService.explain(user.id, week),
     ]);
     return { ...suggestion, advice };
   }
 
   /** Manual trigger weekly insight (untuk testing) */
   @Post('reports/trigger-weekly')
-  async triggerWeekly() {
-    await this.aiReportsService.sendWeeklyInsight();
+  async triggerWeekly(@CurrentUser() user: AuthUser) {
+    await this.aiReportsService.sendWeeklyInsight(user.id);
     return { ok: true };
   }
 
   /** Manual trigger health score compute */
   @Post('reports/trigger-health-score')
-  async triggerHealthScore() {
-    const result = await this.aiReportsService.computeAndSaveHealthScore();
+  async triggerHealthScore(@CurrentUser() user: AuthUser) {
+    const result = await this.aiReportsService.computeAndSaveHealthScore(user.id);
     return { ok: true, result };
   }
 }

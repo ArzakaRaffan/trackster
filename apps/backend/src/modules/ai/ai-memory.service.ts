@@ -66,29 +66,31 @@ export class AiMemoryService {
 
   /** Memory aktif buat disuntik ke system prompt — importance tinggi & terbaru dulu, maks `limit`.
    * `validUntil` yang lewat diarsip otomatis di sini (bukan cron terpisah — cukup murah dicek tiap panggil). */
-  async listActive(limit = 40) {
+  async listActive(userId: number, limit = 40) {
     const now = new Date();
     await this.prisma.aiMemory.updateMany({
-      where: { archivedAt: null, validUntil: { lt: now } },
+      where: { userId, archivedAt: null, validUntil: { lt: now } },
       data: { archivedAt: now },
     });
     return this.prisma.aiMemory.findMany({
-      where: { archivedAt: null },
+      where: { userId, archivedAt: null },
       orderBy: [{ importance: 'desc' }, { createdAt: 'desc' }],
       take: limit,
     });
   }
 
   /** Semua memory (termasuk yang di-archive) buat halaman "Yang Track ingat". */
-  async listAll() {
+  async listAll(userId: number) {
     return this.prisma.aiMemory.findMany({
+      where: { userId },
       orderBy: [{ archivedAt: 'asc' }, { importance: 'desc' }, { createdAt: 'desc' }],
     });
   }
 
-  async create(data: { kind: MemoryKind; content: string; importance?: number; validUntil?: string; sourceMessageId?: number }) {
+  async create(userId: number, data: { kind: MemoryKind; content: string; importance?: number; validUntil?: string; sourceMessageId?: number }) {
     return this.prisma.aiMemory.create({
       data: {
+        userId,
         kind: data.kind,
         content: data.content,
         importance: data.importance ?? 2,
@@ -99,12 +101,13 @@ export class AiMemoryService {
   }
 
   async update(
+    userId: number,
     id: number,
     data: Partial<{ kind: MemoryKind; content: string; importance: number; validUntil: string | null; archived: boolean }>,
   ) {
-    await this.assertExists(id);
-    return this.prisma.aiMemory.update({
-      where: { id },
+    await this.assertExists(userId, id);
+    await this.prisma.aiMemory.updateMany({
+      where: { id, userId },
       data: {
         ...(data.kind !== undefined ? { kind: data.kind } : {}),
         ...(data.content !== undefined ? { content: data.content } : {}),
@@ -113,26 +116,27 @@ export class AiMemoryService {
         ...(data.archived !== undefined ? { archivedAt: data.archived ? new Date() : null } : {}),
       },
     });
+    return this.prisma.aiMemory.findFirstOrThrow({ where: { id, userId } });
   }
 
-  async remove(id: number) {
-    await this.assertExists(id);
-    await this.prisma.aiMemory.delete({ where: { id } });
+  async remove(userId: number, id: number) {
+    await this.assertExists(userId, id);
+    await this.prisma.aiMemory.deleteMany({ where: { id, userId } });
   }
 
   /** Terapkan hasil ekstraksi AI — dipanggil fire-and-forget dari AiChatService, atau tool remember/forget. */
-  async applyOps(ops: MemoryOp[], sourceMessageId?: number) {
+  async applyOps(userId: number, ops: MemoryOp[], sourceMessageId?: number) {
     for (const op of ops) {
       if (op.op === 'add') {
-        await this.create({ ...op, sourceMessageId });
+        await this.create(userId, { ...op, sourceMessageId });
       } else if (op.op === 'update') {
-        const exists = await this.prisma.aiMemory.findUnique({ where: { id: op.id } });
+        const exists = await this.prisma.aiMemory.findFirst({ where: { id: op.id, userId } });
         if (!exists) continue;
-        await this.update(op.id, { kind: op.kind, content: op.content, importance: op.importance, validUntil: op.validUntil });
+        await this.update(userId, op.id, { kind: op.kind, content: op.content, importance: op.importance, validUntil: op.validUntil });
       } else if (op.op === 'archive') {
-        const exists = await this.prisma.aiMemory.findUnique({ where: { id: op.id } });
+        const exists = await this.prisma.aiMemory.findFirst({ where: { id: op.id, userId } });
         if (!exists) continue;
-        await this.update(op.id, { archived: true });
+        await this.update(userId, op.id, { archived: true });
       }
     }
   }
@@ -143,8 +147,8 @@ export class AiMemoryService {
     return memories.map((m) => `- [${m.kind}] ${m.content}`).join('\n');
   }
 
-  private async assertExists(id: number) {
-    const row = await this.prisma.aiMemory.findUnique({ where: { id } });
+  private async assertExists(userId: number, id: number) {
+    const row = await this.prisma.aiMemory.findFirst({ where: { id, userId } });
     if (!row) throw new NotFoundException(`Memory ${id} tidak ditemukan`);
     return row;
   }

@@ -42,16 +42,18 @@ export class TelegramWebhookController {
     const callbackQuery = body?.callback_query;
     if (callbackQuery) {
       const incomingChatId = callbackQuery.message?.chat?.id?.toString();
-      const config = await this.telegramService.getConfigRaw();
-      if (!config || incomingChatId !== config.chatId) {
+      const config = incomingChatId ? await this.telegramService.getConfigByChatId(incomingChatId) : null;
+      if (!config || !config.userId) {
         this.logger.warn(`Callback query dari chat ID tidak dikenal: ${incomingChatId} — diabaikan.`);
         return { ok: true };
       }
+      // userId ditentukan SERVER dari chatId yang terdaftar — tidak pernah dari isi pesan.
+      const userId = config.userId;
       try {
         if (typeof callbackQuery.data === 'string' && callbackQuery.data.startsWith('ba:')) {
-          await this.aiBudgetReminderService.handleCallback(callbackQuery);
+          await this.aiBudgetReminderService.handleCallback(userId, callbackQuery);
         } else {
-          await this.incomeCheckinReminderService.handleCallback(callbackQuery);
+          await this.incomeCheckinReminderService.handleCallback(userId, callbackQuery);
         }
       } catch (err: any) {
         this.logger.error(`Error handle callback_query check-in: ${err?.message}`);
@@ -68,9 +70,9 @@ export class TelegramWebhookController {
 
     // 4. Validasi chat ID — cegah orang lain ngobrol ke bot dan baca data finansial
     const incomingChatId = message.chat?.id?.toString();
-    const config = await this.telegramService.getConfigRaw();
+    const config = incomingChatId ? await this.telegramService.getConfigByChatId(incomingChatId) : null;
 
-    if (!config || incomingChatId !== config.chatId) {
+    if (!config || !config.userId) {
       this.logger.warn(
         `Webhook dari chat ID tidak dikenal: ${incomingChatId} — diabaikan.`,
       );
@@ -84,13 +86,14 @@ export class TelegramWebhookController {
 
     // Proses async — langsung return 200 ke Telegram, jawaban dikirim terpisah
     // (Telegram timeout 5 detik kalau webhook tidak segera respond)
+    const userId = config.userId;
     setImmediate(async () => {
       try {
-        const reply = await this.aiChatService.handleMessage(text, { channel: 'telegram' });
-        await this.telegramService.sendMessage(reply);
+        const reply = await this.aiChatService.handleMessage(userId, text, { channel: 'telegram' });
+        await this.telegramService.sendMessage(userId, reply);
       } catch (err: any) {
         this.logger.error(`Error handle telegram message: ${err?.message}`);
-        await this.telegramService.sendMessage('Maaf, ada gangguan teknis. Coba lagi ya!');
+        await this.telegramService.sendMessage(userId, 'Maaf, ada gangguan teknis. Coba lagi ya!');
       }
     });
 

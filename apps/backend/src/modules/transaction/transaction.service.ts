@@ -1,5 +1,5 @@
 import { randomUUID } from 'crypto';
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../../prisma.service';
 import { Category, Prisma, Source } from '@prisma/client';
 import { BalanceService, shouldAdjustBalance } from '../balance/balance.service';
@@ -32,11 +32,25 @@ export class TransactionService {
 
   /** Tempel displayDescription (alias merchant kalau ada) ke tiap transaksi — satu query per
    * request, tidak per-transaksi. Lihat MerchantAliasService.attachDisplayNames untuk detail. */
-  async attachDisplayNames<T extends { description: string }>(transactions: T[]) {
-    return this.merchantAliasService.attachDisplayNames(transactions);
+  async attachDisplayNames<T extends { description: string }>(userId: number, transactions: T[]) {
+    return this.merchantAliasService.attachDisplayNames(userId, transactions);
   }
 
-  async findAll(params: {
+  /** Transaksi milik user, atau 404 (tidak membedakan "tidak ada" vs "milik orang lain" — tak ada IDOR). */
+  private async own(userId: number, id: number) {
+    const t = await this.prisma.transaction.findFirst({ where: { id, userId } });
+    if (!t) throw new NotFoundException('Transaksi tidak ditemukan');
+    return t;
+  }
+
+  /** updateMany ber-userId lalu baca ulang (tak ada update-by-id polos). */
+  private async patch(userId: number, id: number, data: Prisma.TransactionUpdateManyMutationInput) {
+    const { count } = await this.prisma.transaction.updateMany({ where: { id, userId }, data });
+    if (count === 0) throw new NotFoundException('Transaksi tidak ditemukan');
+    return this.prisma.transaction.findFirstOrThrow({ where: { id, userId } });
+  }
+
+  async findAll(userId: number, params: {
     startDate?: string;
     endDate?: string;
     source?: Source;
@@ -47,7 +61,7 @@ export class TransactionService {
     limit?: number;
   }) {
     const { startDate, endDate, source, category, search, minAmount, page = 1, limit = 50 } = params;
-    const where: any = {};
+    const where: any = { userId };
     if (startDate || endDate) {
       where.occurredAt = {};
       if (startDate) where.occurredAt.gte = startOfWibDay(startDate);
@@ -60,7 +74,7 @@ export class TransactionService {
     if (search) {
       // Alias juga ikut dicari: transaksi dengan description mentah yang alias-nya cocok search
       // term ikut match, meskipun search term-nya tidak ada di description asli.
-      const aliasedDescriptions = await this.merchantAliasService.findRawDescriptionsMatchingSearch(search);
+      const aliasedDescriptions = await this.merchantAliasService.findRawDescriptionsMatchingSearch(userId, search);
       where.OR = [
         { description: { contains: search, mode: 'insensitive' } },
         { note: { contains: search, mode: 'insensitive' } },
@@ -69,20 +83,22 @@ export class TransactionService {
     }
 
     const [data, total] = await Promise.all([
+      // tenancy-ok: `where` diawali { userId } di atas
       this.prisma.transaction.findMany({
         where,
         orderBy: { occurredAt: 'desc' },
         skip: (page - 1) * limit,
         take: limit,
       }),
+      // tenancy-ok: `where` diawali { userId } di atas
       this.prisma.transaction.count({ where }),
     ]);
 
-    const dataWithDisplay = await this.attachDisplayNames(data);
+    const dataWithDisplay = await this.attachDisplayNames(userId, data);
     return { data: dataWithDisplay, total, page, limit };
   }
 
-  async getWeekly() {
+  async getWeekly(userId: number) {
     const now = new Date();
     const startOfWeek = startOfWibWeek(now); // Senin 00:00 WIB
 
@@ -92,9 +108,9 @@ export class TransactionService {
       const nextDate = addWibDays(date, 1);
 
       const dayOfWeek = wibDayOfWeek(date); // Senin..Minggu = 1..6,0
-      const budgetRow = await this.prisma.dailyBudget.findUnique({ where: { dayOfWeek } });
+      const budgetRow = await this.prisma.dailyBudget.findFirst({ where: { userId, dayOfWeek } });
       const transactions = await this.prisma.transaction.findMany({
-        where: { occurredAt: { gte: date, lt: nextDate } },
+        where: { userId, occurredAt: { gte: date, lt: nextDate } },
         orderBy: { occurredAt: 'asc' },
       });
       const totalSpent = transactions.reduce((sum, t) => sum + spend(t), 0);
@@ -110,7 +126,7 @@ export class TransactionService {
 
     // Satu query alias buat seluruh minggu (bukan per hari) — flatten lalu redistribusi balik
     // per hari sambil tetap menjaga urutan aslinya.
-    const flatWithDisplay = await this.attachDisplayNames(days.flatMap((d) => d.transactions));
+    const flatWithDisplay = await this.attachDisplayNames(userId, days.flatMap((d) => d.transactions));
     let idx = 0;
     for (const day of days) {
       const count = day.transactions.length;
@@ -125,19 +141,21 @@ export class TransactionService {
    * kecuali transaksi ini lebih lama dari koreksi manual terakhir untuk source yang sama, karena
    * saldo koreksi manual itu sudah "menyerap" pengeluaran ini (sama aturannya dengan
    * createFromParsed). */
-  async remove(id: number) {
+  async remove(userId: number, id: number) {
     return this.prisma.$transaction(async (tx) => {
+      const deleted = await tx.transaction.findFirst({ where: { id, userId } });
+      if (!deleted) throw new NotFoundException('Transaksi tidak ditemukan');
       // Reimbursement ikut terhapus (cascade) — balikkan dulu saldo dari patungan yang sudah diterima.
       const received = await tx.reimbursement.findMany({
-        where: { transactionId: id, status: 'RECEIVED', balanceApplied: true },
+        where: { userId, transactionId: id, status: 'RECEIVED', balanceApplied: true },
       });
       for (const r of received) {
-        if (r.receivedSource) await this.balanceService.adjustBalance(tx, r.receivedSource, -Number(r.amount));
+        if (r.receivedSource) await this.balanceService.adjustBalance(tx, userId, r.receivedSource, -Number(r.amount));
       }
-      const deleted = await tx.transaction.delete({ where: { id } });
-      const lastAdjustmentAt = await this.balanceService.getLastManualAdjustmentAt(tx, deleted.source);
+      await tx.transaction.deleteMany({ where: { id, userId } });
+      const lastAdjustmentAt = await this.balanceService.getLastManualAdjustmentAt(tx, userId, deleted.source);
       if (shouldAdjustBalance(deleted.occurredAt, lastAdjustmentAt)) {
-        await this.balanceService.adjustBalance(tx, deleted.source, Number(deleted.amount));
+        await this.balanceService.adjustBalance(tx, userId, deleted.source, Number(deleted.amount));
       } else {
         this.logger.debug(
           `Skip adjustBalance saat hapus transaksi ${deleted.id} (occurredAt ${deleted.occurredAt.toISOString()} < koreksi manual terakhir ${lastAdjustmentAt?.toISOString()})`,
@@ -148,54 +166,56 @@ export class TransactionService {
   }
 
   /** Catatan bebas dari user, terpisah dari data hasil parse email (amount/description/source read-only). */
-  async updateNote(id: number, note: string) {
-    return this.prisma.transaction.update({ where: { id }, data: { note } });
+  async updateNote(userId: number, id: number, note: string) {
+    return this.patch(userId, id, { note });
   }
 
-  async updateCategory(id: number, category: Category) {
-    return this.prisma.transaction.update({ where: { id }, data: { category } });
+  async updateCategory(userId: number, id: number, category: Category) {
+    return this.patch(userId, id, { category });
   }
 
   /** Kolom `merchantKey` ditambah lewat migrasi tanpa backfill (lihat Gotchas.md) — transaksi lama
    * masih NULL, jadi `where: { merchantKey: key }` doang selalu 0 match buat mereka. Recompute
    * `merchantKey(description)` di JS buat baris yang NULL supaya tetap ke-match, lalu WHERE gabung
    * keduanya. Dipakai `updateCategoryForAll` & `countSameMerchant` biar dua-duanya konsisten. */
-  private async merchantMatchWhere(key: string): Promise<Prisma.TransactionWhereInput> {
+  private async merchantMatchWhere(userId: number, key: string): Promise<Prisma.TransactionWhereInput> {
     const nullKeyRows = await this.prisma.transaction.findMany({
-      where: { merchantKey: null },
+      where: { userId, merchantKey: null },
       select: { id: true, description: true },
     });
     const matchedNullIds = nullKeyRows.filter((t) => merchantKey(t.description) === key).map((t) => t.id);
-    return { OR: [{ merchantKey: key }, { id: { in: matchedNullIds } }] };
+    return { userId, OR: [{ merchantKey: key }, { id: { in: matchedNullIds } }] };
   }
 
   /** "Terapkan ke semua transaksi <merchant>?" — simpan rule kategori (MerchantAlias, dipakai
    * sync berikutnya) DAN update semua transaksi lama dengan merchantKey yang sama sekarang juga.
    * Sekalian backfill kolom `merchantKey` transaksi lama yang match, biar match langsung lain kali. */
-  async updateCategoryForAll(id: number, category: Category) {
-    const transaction = await this.prisma.transaction.findUniqueOrThrow({ where: { id } });
+  async updateCategoryForAll(userId: number, id: number, category: Category) {
+    const transaction = await this.own(userId, id);
     const key = merchantKey(transaction.description);
 
-    await this.merchantAliasService.upsertCategory(transaction.description, category);
-    const where = await this.merchantMatchWhere(key);
+    await this.merchantAliasService.upsertCategory(userId, transaction.description, category);
+    const where = await this.merchantMatchWhere(userId, key);
+    // tenancy-ok: `where` dari merchantMatchWhere(userId, ...) memuat userId
     const result = await this.prisma.transaction.updateMany({ where, data: { category, merchantKey: key } });
     return { updated: result.count };
   }
 
   /** Berapa transaksi lain yang bakal ikut ke-update kalau user pilih "terapkan ke semua". */
-  async countSameMerchant(id: number): Promise<number> {
-    const transaction = await this.prisma.transaction.findUniqueOrThrow({ where: { id } });
+  async countSameMerchant(userId: number, id: number): Promise<number> {
+    const transaction = await this.own(userId, id);
     const key = merchantKey(transaction.description);
-    const where = await this.merchantMatchWhere(key);
+    const where = await this.merchantMatchWhere(userId, key);
+    // tenancy-ok: `where` dari merchantMatchWhere(userId, ...) memuat userId
     return this.prisma.transaction.count({ where });
   }
 
   /** Halaman "Rapikan kategori": semua transaksi LAINNYA dikelompokkan per merchantKey, diurut
    * dari nominal terbesar. `representativeId` dipakai frontend buat manggil
    * PATCH /transactions/:id/category?applyToAll kalau user terima saran. */
-  async getUncategorizedMerchants() {
+  async getUncategorizedMerchants(userId: number) {
     const transactions = await this.prisma.transaction.findMany({
-      where: { category: Category.LAINNYA },
+      where: { userId, category: Category.LAINNYA },
       select: { id: true, description: true, amount: true, reimbursedAmount: true, merchantKey: true },
       orderBy: { occurredAt: 'desc' },
     });
@@ -223,44 +243,44 @@ export class TransactionService {
   /** Shortcut buat set alias langsung dari baris transaksi: ambil description transaksi itu,
    * lalu upsert ke MerchantAlias pakai description tersebut sebagai rawDescription. Otomatis
    * berlaku ke SEMUA transaksi lama & baru yang description-nya sama, bukan cuma transaksi ini. */
-  async setAlias(id: number, displayName: string) {
-    const transaction = await this.prisma.transaction.findUniqueOrThrow({ where: { id } });
-    return this.merchantAliasService.upsert(transaction.description, displayName);
+  async setAlias(userId: number, id: number, displayName: string) {
+    const transaction = await this.own(userId, id);
+    return this.merchantAliasService.upsert(userId, transaction.description, displayName);
   }
 
   /** Override manual "pembelian besar" (`Transaction.isBig`) — `null` balik ke aturan otomatis di `AnalyticsService`. */
-  async setBig(id: number, isBig: boolean | null) {
-    return this.prisma.transaction.update({ where: { id }, data: { isBig } });
+  async setBig(userId: number, id: number, isBig: boolean | null) {
+    return this.patch(userId, id, { isBig });
   }
 
   /** Semua transaksi di satu tanggal (YYYY-MM-DD) — buat drill-down dari chart bulanan/mingguan. */
-  async getByDay(date: string) {
+  async getByDay(userId: number, date: string) {
     const start = startOfWibDay(date);
     const end = addWibDays(start, 1);
 
     const transactions = await this.prisma.transaction.findMany({
-      where: { occurredAt: { gte: start, lt: end } },
+      where: { userId, occurredAt: { gte: start, lt: end } },
       orderBy: { occurredAt: 'asc' },
     });
     const totalSpent = transactions.reduce((sum, t) => sum + spend(t), 0);
-    const transactionsWithDisplay = await this.attachDisplayNames(transactions);
+    const transactionsWithDisplay = await this.attachDisplayNames(userId, transactions);
 
     return { date, totalSpent, transactions: transactionsWithDisplay };
   }
 
   /** Total, breakdown per kategori, dan breakdown per hari (buat chart) dalam satu bulan. */
-  async getMonthly(year: number, month: number) {
+  async getMonthly(userId: number, year: number, month: number) {
     const start = startOfWibMonth(year, month);
     const end = month === 12 ? startOfWibMonth(year + 1, 1) : startOfWibMonth(year, month + 1);
 
     const [transactions, byCategoryRaw] = await Promise.all([
       this.prisma.transaction.findMany({
-        where: { occurredAt: { gte: start, lt: end } },
+        where: { userId, occurredAt: { gte: start, lt: end } },
         orderBy: { occurredAt: 'asc' },
       }),
       this.prisma.transaction.groupBy({
         by: ['category'],
-        where: { occurredAt: { gte: start, lt: end } },
+        where: { userId, occurredAt: { gte: start, lt: end } },
         _sum: { amount: true, reimbursedAmount: true },
       }),
     ]);
@@ -282,15 +302,15 @@ export class TransactionService {
       return { date, totalSpent: byDayMap.get(date) ?? 0 };
     });
 
-    const transactionsWithDisplay = await this.attachDisplayNames(transactions);
+    const transactionsWithDisplay = await this.attachDisplayNames(userId, transactions);
     return { year, month, totalSpent, byCategory, byDay, transactions: transactionsWithDisplay };
   }
 
   /** Total sepanjang waktu, breakdown per kategori, dan bulan tertinggi/terendah. */
-  async getAllTimeSummary() {
+  async getAllTimeSummary(userId: number) {
     const [transactions, byCategoryRaw] = await Promise.all([
-      this.prisma.transaction.findMany({ orderBy: { occurredAt: 'asc' } }),
-      this.prisma.transaction.groupBy({ by: ['category'], _sum: { amount: true, reimbursedAmount: true } }),
+      this.prisma.transaction.findMany({ where: { userId }, orderBy: { occurredAt: 'asc' } }),
+      this.prisma.transaction.groupBy({ by: ['category'], where: { userId }, _sum: { amount: true, reimbursedAmount: true } }),
     ]);
 
     const totalSpent = transactions.reduce((sum, t) => sum + spend(t), 0);
@@ -319,19 +339,19 @@ export class TransactionService {
    * caller lama (mascot, weekly report, health score) yang belum pindah ke `/analytics/stats`
    * langsung. Bentuk field ('trend', 'topMerchants', dst) sengaja dipertahankan sama supaya
    * caller itu tidak perlu diubah. Jangan tambah logika baru di sini — tambahkan di PeriodStats. */
-  async getInsights(range: 'all' | '30d' = '30d') {
+  async getInsights(userId: number, range: 'all' | '30d' = '30d') {
     const now = new Date();
     const end = addWibDays(startOfWibDay(now), 1);
     const start =
       range === 'all'
-        ? startOfWibDay((await this.prisma.transaction.aggregate({ _min: { occurredAt: true } }))._min.occurredAt ?? now)
+        ? startOfWibDay((await this.prisma.transaction.aggregate({ where: { userId }, _min: { occurredAt: true } }))._min.occurredAt ?? now)
         : addWibDays(end, -30);
 
     const [stats, thisWeekTx, lastWeekTx] = await Promise.all([
-      this.analyticsService.getPeriodStats(start, end, false),
-      this.prisma.transaction.findMany({ where: { occurredAt: { gte: startOfWibWeek(now), lte: now } }, select: { amount: true, reimbursedAmount: true } }),
+      this.analyticsService.getPeriodStats(userId, start, end, false),
+      this.prisma.transaction.findMany({ where: { userId, occurredAt: { gte: startOfWibWeek(now), lte: now } }, select: { amount: true, reimbursedAmount: true } }),
       this.prisma.transaction.findMany({
-        where: { occurredAt: { gte: addWibDays(startOfWibWeek(now), -7), lt: startOfWibWeek(now) } },
+        where: { userId, occurredAt: { gte: addWibDays(startOfWibWeek(now), -7), lt: startOfWibWeek(now) } },
         select: { amount: true, reimbursedAmount: true },
       }),
     ]);
@@ -367,10 +387,11 @@ export class TransactionService {
 
   /** Input manual dari user (bukan hasil parse email) — dipakai buat pengeluaran yang nggak
    * kena notifikasi bank (tunai, dll). emailId disintesis karena kolomnya unique non-null. */
-  async create(dto: CreateTransactionDto) {
+  async create(userId: number, dto: CreateTransactionDto) {
     return this.prisma.$transaction(async (tx) => {
       const created = await tx.transaction.create({
         data: {
+          userId,
           amount: dto.amount,
           description: dto.description,
           source: dto.source,
@@ -381,7 +402,7 @@ export class TransactionService {
           merchantKey: merchantKey(dto.description),
         },
       });
-      await this.balanceService.adjustBalance(tx, created.source, -Number(created.amount));
+      await this.balanceService.adjustBalance(tx, userId, created.source, -Number(created.amount));
       return created;
     });
   }
@@ -391,13 +412,15 @@ export class TransactionService {
    * transaksi ini lebih lama dari koreksi manual terakhir untuk source yang sama, karena koreksi
    * manual = snapshot saldo asli bank yang sudah mencakup transaksi itu (backfill tidak boleh
    * double-count). */
-  async createFromParsed(parsed: ParsedTransaction) {
-    const existing = await this.prisma.transaction.findUnique({ where: { emailId: parsed.emailId } });
+  async createFromParsed(userId: number, parsed: ParsedTransaction) {
+    // Dedup per user; unik DB masih global (emailId) sampai C1 -> (userId, emailId).
+    const existing = await this.prisma.transaction.findFirst({ where: { userId, emailId: parsed.emailId } });
     if (existing) return null;
 
     return this.prisma.$transaction(async (tx) => {
       const created = await tx.transaction.create({
         data: {
+          userId,
           amount: parsed.amount,
           description: parsed.description,
           source: parsed.source,
@@ -407,9 +430,9 @@ export class TransactionService {
           ...(parsed.category ? { category: parsed.category } : {}),
         },
       });
-      const lastAdjustmentAt = await this.balanceService.getLastManualAdjustmentAt(tx, created.source);
+      const lastAdjustmentAt = await this.balanceService.getLastManualAdjustmentAt(tx, userId, created.source);
       if (shouldAdjustBalance(created.occurredAt, lastAdjustmentAt)) {
-        await this.balanceService.adjustBalance(tx, created.source, -Number(created.amount));
+        await this.balanceService.adjustBalance(tx, userId, created.source, -Number(created.amount));
       } else {
         this.logger.debug(
           `Skip adjustBalance utk transaksi ${created.id} (occurredAt ${created.occurredAt.toISOString()} < koreksi manual terakhir ${lastAdjustmentAt?.toISOString()})`,
@@ -422,12 +445,12 @@ export class TransactionService {
   /** Deteksi langganan berulang (Subscription Detector).
    *  Heuristic: group transaksi 90 hari terakhir by description, variance amount <= 10%,
    *  gap antar occurredAt berurutan 27-33 hari. */
-  async getSubscriptions() {
+  async getSubscriptions(userId: number) {
     const now = new Date();
     const ninetyDaysAgo = new Date(now.getTime() - 90 * 24 * 60 * 60 * 1000);
 
     const transactions = await this.prisma.transaction.findMany({
-      where: { occurredAt: { gte: ninetyDaysAgo, lte: now } },
+      where: { userId, occurredAt: { gte: ninetyDaysAgo, lte: now } },
       orderBy: { occurredAt: 'asc' },
       select: { description: true, amount: true, occurredAt: true },
     });
@@ -484,7 +507,7 @@ export class TransactionService {
       }
     }
 
-    return this.attachDisplayNames(subscriptions);
+    return this.attachDisplayNames(userId, subscriptions);
   }
 
 }

@@ -23,7 +23,7 @@ export class AiCaptionService {
 
   /** Fire-and-forget dari caller setelah transaksi tersimpan — kosmetik, gagal diam-diam
    *  (jangan pernah gagalkan pencatatan transaksi karena caption gagal generate). */
-  async generate(transaction: CaptionableTransaction): Promise<void> {
+  async generate(userId: number, transaction: CaptionableTransaction): Promise<void> {
     try {
       const jam = transaction.occurredAt.toLocaleTimeString('id-ID', {
         hour: '2-digit',
@@ -47,8 +47,8 @@ export class AiCaptionService {
       const caption = message?.content?.trim();
       if (!caption) return;
 
-      await this.prisma.transaction.update({
-        where: { id: transaction.id },
+      await this.prisma.transaction.updateMany({
+        where: { id: transaction.id, userId },
         data: { aiCaption: caption },
       });
     } catch (err: any) {

@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { IncomeOrigin, IncomeStatus, ParseStatus, Source } from '@prisma/client';
 import { PrismaService } from '../../prisma.service';
 import { BalanceService, shouldAdjustBalance } from '../balance/balance.service';
@@ -34,36 +34,38 @@ export class IncomeService {
     private telegramService: TelegramService,
   ) {}
 
-  async findAll(params: { startDate?: string; endDate?: string; status?: IncomeStatus }) {
+  async findAll(userId: number, params: { startDate?: string; endDate?: string; status?: IncomeStatus }) {
     const { startDate, endDate, status } = params;
-    const where: any = {};
+    const where: any = { userId };
     if (startDate || endDate) {
       where.receivedAt = {};
       if (startDate) where.receivedAt.gte = startOfWibDay(startDate);
       if (endDate) where.receivedAt.lt = addWibDays(startOfWibDay(endDate), 1);
     }
     if (status) where.status = status;
+    // tenancy-ok: `where` diawali { userId } di atas
     return this.prisma.income.findMany({ where, orderBy: { receivedAt: 'desc' }, include: { stream: true } });
   }
 
-  async create(dto: CreateIncomeDto) {
+  async create(userId: number, dto: CreateIncomeDto) {
     return this.prisma.$transaction(async (tx) => {
       const income = await tx.income.create({
         data: {
+          userId,
           amount: dto.amount,
           description: dto.description,
           source: dto.source,
           receivedAt: new Date(dto.receivedAt),
         },
       });
-      await this.balanceService.adjustBalance(tx, income.source, Number(income.amount));
+      await this.balanceService.adjustBalance(tx, userId, income.source, Number(income.amount));
       return income;
     });
   }
 
   /** Quick logging endpoint untuk iOS Shortcut / integrasi webhook tanpa JWT.
    * Mencocokkan nama kategori ke IncomeStream yang sudah ada secara otomatis. */
-  async createQuick(dto: QuickIncomeDto) {
+  async createQuick(userId: number, dto: QuickIncomeDto) {
     const source = dto.source ?? Source.BCA;
     const receivedAt = new Date();
     const amount = Number(dto.amount);
@@ -72,7 +74,7 @@ export class IncomeService {
     const noteHint = (dto.note || dto.description || '').trim();
     const lookupText = `${streamHint} ${noteHint}`.toUpperCase();
 
-    const streams = await this.prisma.incomeStream.findMany({ where: { isActive: true } });
+    const streams = await this.prisma.incomeStream.findMany({ where: { userId, isActive: true } });
 
     // Prioritas 1: streamHint cocok dengan nama stream
     let matchedStream = streams.find(
@@ -105,6 +107,7 @@ export class IncomeService {
     const income = await this.prisma.$transaction(async (tx) => {
       const created = await tx.income.create({
         data: {
+          userId,
           amount,
           description,
           source,
@@ -116,9 +119,9 @@ export class IncomeService {
         include: { stream: true },
       });
 
-      const lastAdjustmentAt = await this.balanceService.getLastManualAdjustmentAt(tx, created.source);
+      const lastAdjustmentAt = await this.balanceService.getLastManualAdjustmentAt(tx, userId, created.source);
       if (shouldAdjustBalance(created.receivedAt, lastAdjustmentAt)) {
-        await this.balanceService.adjustBalance(tx, created.source, Number(created.amount));
+        await this.balanceService.adjustBalance(tx, userId, created.source, Number(created.amount));
       }
 
       return created;
@@ -129,6 +132,7 @@ export class IncomeService {
       const streamName = income.stream?.name ?? 'Tanpa Kategori';
       const formattedAmount = `Rp ${Math.round(amount).toLocaleString('id-ID')}`;
       await this.telegramService.sendMessage(
+        userId,
         `💰 <b>Pemasukan Dicatat via Shortcut</b>\n` +
         `• <b>Jumlah:</b> ${formattedAmount}\n` +
         `• <b>Kategori:</b> ${streamName}\n` +
@@ -149,13 +153,14 @@ export class IncomeService {
 
   /** Reverse efek balance dari data lama dulu, baru apply data baru — lebih simpel & aman
    * daripada ngitung selisih per-field, dan tetap benar walau amount dan source dua-duanya berubah. */
-  async update(id: number, dto: UpdateIncomeDto) {
+  async update(userId: number, id: number, dto: UpdateIncomeDto) {
     return this.prisma.$transaction(async (tx) => {
-      const existing = await tx.income.findUniqueOrThrow({ where: { id } });
-      await this.balanceService.adjustBalance(tx, existing.source, -Number(existing.amount));
+      const existing = await tx.income.findFirst({ where: { id, userId } });
+      if (!existing) throw new NotFoundException('Pemasukan tidak ditemukan');
+      await this.balanceService.adjustBalance(tx, userId, existing.source, -Number(existing.amount));
 
-      const updated = await tx.income.update({
-        where: { id },
+      await tx.income.updateMany({
+        where: { id, userId },
         data: {
           ...(dto.amount !== undefined && { amount: dto.amount }),
           ...(dto.description !== undefined && { description: dto.description }),
@@ -163,7 +168,8 @@ export class IncomeService {
           ...(dto.receivedAt !== undefined && { receivedAt: new Date(dto.receivedAt) }),
         },
       });
-      await this.balanceService.adjustBalance(tx, updated.source, Number(updated.amount));
+      const updated = await tx.income.findFirstOrThrow({ where: { id, userId } });
+      await this.balanceService.adjustBalance(tx, userId, updated.source, Number(updated.amount));
       return updated;
     });
   }
@@ -171,16 +177,17 @@ export class IncomeService {
   /** Auto-capture dari email (E02-S1) — dedup via externalId (emailId Gmail), lalu klasifikasi
    * CONFIRMED/INTERNAL/PENDING. Saldo JAGO **selalu** gerak (uang beneran masuk), terlepas dari
    * status — klasifikasi cuma soal "ini pemasukan siapa/apa", bukan soal saldo. */
-  async createFromParsed(parsed: ParsedIncome) {
-    const existing = await this.prisma.income.findUnique({ where: { externalId: parsed.emailId } });
+  async createFromParsed(userId: number, parsed: ParsedIncome) {
+    const existing = await this.prisma.income.findFirst({ where: { userId, externalId: parsed.emailId } });
     if (existing) return null;
 
-    const { status, streamId } = await this.classify(parsed);
+    const { status, streamId } = await this.classify(userId, parsed);
     const periodStart = streamId ? startOfWibWeek(parsed.occurredAt) : undefined;
 
     return this.prisma.$transaction(async (tx) => {
       const income = await tx.income.create({
         data: {
+          userId,
           amount: parsed.amount,
           description: parsed.description,
           source: parsed.source,
@@ -192,9 +199,9 @@ export class IncomeService {
         },
       });
 
-      const lastAdjustmentAt = await this.balanceService.getLastManualAdjustmentAt(tx, income.source);
+      const lastAdjustmentAt = await this.balanceService.getLastManualAdjustmentAt(tx, userId, income.source);
       if (shouldAdjustBalance(income.receivedAt, lastAdjustmentAt)) {
-        await this.balanceService.adjustBalance(tx, income.source, Number(income.amount));
+        await this.balanceService.adjustBalance(tx, userId, income.source, Number(income.amount));
       }
 
       return income;
@@ -205,14 +212,14 @@ export class IncomeService {
    * FLIPTECH (Flip) yang berkorelasi dengan EmailParseLog EXCLUDED nominal sama ±3 jam (top-up via
    * Flip ke rekening sendiri) → INTERNAL. Selain itu (termasuk FLIPTECH tanpa korelasi — bisa orang
    * lain kirim via Flip) → PENDING, muncul di "Perlu dicek". */
-  private async classify(parsed: ParsedIncome): Promise<{ status: IncomeStatus; streamId: number | null }> {
+  private async classify(userId: number, parsed: ParsedIncome): Promise<{ status: IncomeStatus; streamId: number | null }> {
     const sender = parsed.description.toUpperCase();
 
     if (isOwnerName(sender)) {
       return { status: IncomeStatus.INTERNAL, streamId: null };
     }
 
-    const streams = await this.prisma.incomeStream.findMany({ where: { isActive: true } });
+    const streams = await this.prisma.incomeStream.findMany({ where: { userId, isActive: true } });
     const matched = streams.find((s) => s.matchKeywords.some((kw) => sender.includes(kw.toUpperCase())));
     if (matched) {
       return { status: IncomeStatus.CONFIRMED, streamId: matched.id };
@@ -221,6 +228,7 @@ export class IncomeService {
     if (sender.includes('FLIPTECH')) {
       const correlated = await this.prisma.emailParseLog.findFirst({
         where: {
+          userId,
           status: ParseStatus.EXCLUDED,
           amount: parsed.amount,
           receivedAt: {
@@ -237,27 +245,35 @@ export class IncomeService {
 
   /** User menyelesaikan income PENDING dari halaman "Perlu dicek": pilih stream (→ CONFIRMED) atau
    * tandai bukan pemasukan/internal (→ INTERNAL). Saldo tidak disentuh lagi — sudah bergerak saat dibuat. */
-  async resolve(id: number, dto: ResolveIncomeDto) {
-    const income = await this.prisma.income.findUniqueOrThrow({ where: { id } });
+  async resolve(userId: number, id: number, dto: ResolveIncomeDto) {
+    const income = await this.prisma.income.findFirst({ where: { id, userId } });
+    if (!income) throw new NotFoundException('Pemasukan tidak ditemukan');
 
     if (dto.notIncome) {
-      return this.prisma.income.update({ where: { id: income.id }, data: { status: IncomeStatus.INTERNAL } });
+      await this.prisma.income.updateMany({ where: { id, userId }, data: { status: IncomeStatus.INTERNAL } });
+      return this.prisma.income.findFirstOrThrow({ where: { id, userId } });
     }
 
     if (dto.streamId) {
-      return this.prisma.income.update({
-        where: { id: income.id },
+      // streamId dari klien: wajib milik user yang sama (bukan hanya `id` income-nya).
+      const stream = await this.prisma.incomeStream.findFirst({ where: { id: dto.streamId, userId }, select: { id: true } });
+      if (!stream) throw new NotFoundException('Sumber pemasukan tidak ditemukan');
+      await this.prisma.income.updateMany({
+        where: { id, userId },
         data: { status: IncomeStatus.CONFIRMED, streamId: dto.streamId, periodStart: startOfWibWeek(income.receivedAt) },
       });
+      return this.prisma.income.findFirstOrThrow({ where: { id, userId } });
     }
 
     return income;
   }
 
-  async remove(id: number) {
+  async remove(userId: number, id: number) {
     return this.prisma.$transaction(async (tx) => {
-      const deleted = await tx.income.delete({ where: { id } });
-      await this.balanceService.adjustBalance(tx, deleted.source, -Number(deleted.amount));
+      const deleted = await tx.income.findFirst({ where: { id, userId } });
+      if (!deleted) throw new NotFoundException('Pemasukan tidak ditemukan');
+      await tx.income.deleteMany({ where: { id, userId } });
+      await this.balanceService.adjustBalance(tx, userId, deleted.source, -Number(deleted.amount));
       return deleted;
     });
   }
@@ -270,8 +286,8 @@ export class IncomeService {
    *  sekarang berarti "belum ada stream aktif sama sekali" (forecast expected = 0), bukan lagi
    *  "belum ada income tercatat X hari terakhir". Rasio 50/30/20 keputusan produk sederhana (sama
    *  semangatnya dengan SAVINGS_FACTOR di atas) — tuning kalau prioritas finansial berubah. */
-  async getAllocationRecommendation() {
-    const [week, budgets] = await Promise.all([this.incomeForecastService.getWeekForecast(), this.prisma.dailyBudget.findMany()]);
+  async getAllocationRecommendation(userId: number) {
+    const [week, budgets] = await Promise.all([this.incomeForecastService.getWeekForecast(userId), this.prisma.dailyBudget.findMany({ where: { userId } })]);
 
     const weeklyIncome = week.totals.expected;
     const weeklyBudgetTarget = budgets.reduce((sum, b) => sum + Number(b.amount), 0);

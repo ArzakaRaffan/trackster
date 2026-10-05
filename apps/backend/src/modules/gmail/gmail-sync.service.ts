@@ -52,7 +52,15 @@ export class GmailSyncService {
 
   @Cron(CronExpression.EVERY_5_MINUTES, { name: SYNC_CRON_JOB_NAME })
   async handleCron() {
-    await this.syncEmails();
+    // Satu mailbox per user yang punya token (saat ini hanya pemilik). Gagal di satu user tak menghentikan yang lain.
+    const tokens = await this.prisma.gmailToken.findMany({ where: { userId: { not: null } }, select: { userId: true } });
+    for (const { userId } of tokens) {
+      try {
+        await this.syncEmails(userId as number);
+      } catch (err: any) {
+        this.logger.error(`gmail-sync user ${userId} gagal: ${err?.message}`);
+      }
+    }
   }
 
   getNextRun(): string {
@@ -71,8 +79,8 @@ export class GmailSyncService {
     return GMAIL_QUERY_RECENT;
   }
 
-  async syncEmails(options?: SyncOptions) {
-    const gmail = await this.gmailAuthService.getGmailClient();
+  async syncEmails(userId: number, options?: SyncOptions) {
+    const gmail = await this.gmailAuthService.getGmailClient(userId);
     if (!gmail) {
       this.logger.debug('Gmail belum terhubung, skip sync.');
       return { synced: 0, scanned: 0, query: 'Gmail belum terhubung' };
@@ -106,14 +114,14 @@ export class GmailSyncService {
       let skippedDuplicate = 0;
       let newestTransaction: { source: string; description: string; amount: number } | null = null;
       const notifyEveryTransaction =
-        !quiet && (await this.telegramService.isNotifyEveryTransactionEnabled());
+        !quiet && (await this.telegramService.isNotifyEveryTransactionEnabled(userId));
 
       for (const id of messageIds) {
         const full = await gmail.users.messages.get({ userId: 'me', id, format: 'full' });
         const { from, subject, receivedAt } = this.extractHeaders(full.data);
 
         try {
-          await this.processMessage(id, full.data, from, subject, receivedAt, notifyEveryTransaction, {
+          await this.processMessage(userId, id, full.data, from, subject, receivedAt, notifyEveryTransaction, {
             onRecorded: (t) => {
               syncedCount++;
               newestTransaction = t;
@@ -125,7 +133,7 @@ export class GmailSyncService {
           });
         } catch (err: any) {
           this.logger.error(`Gagal proses email ${id}: ${err.message}`);
-          await this.logParseResult(id, from, subject, receivedAt, {
+          await this.logParseResult(userId, id, from, subject, receivedAt, {
             status: ParseStatus.ERROR,
             reason: err.message,
           });
@@ -134,11 +142,11 @@ export class GmailSyncService {
 
       const summary = `${syncedCount} baru (+${syncedIncomeCount} income) · ${messageIds.length} discan · dup=${skippedDuplicate} skip=${skippedUnparsed} excl=${skippedExcluded}`;
       await this.prisma.emailSyncLog.create({
-        data: { lastSyncAt: new Date(), status: 'SUCCESS', message: summary },
+        data: { userId, lastSyncAt: new Date(), status: 'SUCCESS', message: summary },
       });
 
       if (!quiet && syncedCount > 0 && newestTransaction) {
-        await this.checkAndAlertIfOverBudget(newestTransaction);
+        await this.checkAndAlertIfOverBudget(userId, newestTransaction);
       }
 
       return {
@@ -153,13 +161,14 @@ export class GmailSyncService {
     } catch (err) {
       this.logger.error(`Gmail sync gagal: ${err.message}`);
       await this.prisma.emailSyncLog.create({
-        data: { lastSyncAt: new Date(), status: 'ERROR', message: err.message },
+        data: { userId, lastSyncAt: new Date(), status: 'ERROR', message: err.message },
       });
       return { synced: 0, scanned: 0, error: err.message, query };
     }
   }
 
   private async processMessage(
+    userId: number,
     id: string,
     message: any,
     from: string,
@@ -178,7 +187,7 @@ export class GmailSyncService {
     // hilang kalau user hapus transaksinya. EmailParseLog.status RECORDED tetap ada setelah dihapus,
     // jadi ini satu-satunya penanda "email ini sudah pernah diproses" yang bertahan lewat delete.
     // Tanpa ini, cron 5 menit (window 7 hari) bakal bikin ulang transaksi/income yang baru dihapus.
-    const existingLog = await this.prisma.emailParseLog.findUnique({ where: { emailId: id } });
+    const existingLog = await this.prisma.emailParseLog.findFirst({ where: { userId, emailId: id } });
     if (existingLog?.status === ParseStatus.RECORDED) {
       callbacks.onDuplicate();
       return;
@@ -187,7 +196,7 @@ export class GmailSyncService {
     const rawEmail = this.extractRawEmail(message);
     if (!rawEmail) {
       callbacks.onUnparsed();
-      await this.logParseResult(id, from, subject, receivedAt, {
+      await this.logParseResult(userId, id, from, subject, receivedAt, {
         status: ParseStatus.UNPARSED,
         reason: 'body kosong / tidak bisa didekode',
       });
@@ -197,7 +206,7 @@ export class GmailSyncService {
     const { parser, result: parsed } = this.parserRegistry.parseEmailWithSource(rawEmail);
     if (!parsed) {
       callbacks.onUnparsed();
-      await this.logParseResult(id, from, subject, receivedAt, {
+      await this.logParseResult(userId, id, from, subject, receivedAt, {
         status: ParseStatus.UNPARSED,
         reason: 'no parser matched / parser return null',
         parser,
@@ -206,7 +215,7 @@ export class GmailSyncService {
     }
 
     if (parsed.kind === 'INCOME') {
-      await this.processIncome(id, rawEmail.id, from, subject, receivedAt, parsed, notifyEveryTransaction, parser, callbacks);
+      await this.processIncome(userId, id, rawEmail.id, from, subject, receivedAt, parsed, notifyEveryTransaction, parser, callbacks);
       return;
     }
 
@@ -214,9 +223,9 @@ export class GmailSyncService {
       this.logger.debug(`Skip (excluded): ${parsed.excludeReason}`);
       callbacks.onExcluded();
       if (parsed.balanceOnly) {
-        await this.applyBalanceOnlyDebit(id, parsed);
+        await this.applyBalanceOnlyDebit(userId, id, parsed);
       }
-      await this.logParseResult(id, from, subject, receivedAt, {
+      await this.logParseResult(userId, id, from, subject, receivedAt, {
         status: ParseStatus.EXCLUDED,
         reason: parsed.excludeReason,
         amount: parsed.amount,
@@ -225,9 +234,9 @@ export class GmailSyncService {
       return;
     }
 
-    const category = await this.resolveCategory(parsed.description, parsed.amount, parsed.categoryHint);
+    const category = await this.resolveCategory(userId, parsed.description, parsed.amount, parsed.categoryHint);
 
-    const created = await this.transactionService.createFromParsed({
+    const created = await this.transactionService.createFromParsed(userId, {
       amount: parsed.amount,
       description: parsed.description,
       source: parsed.source,
@@ -248,10 +257,10 @@ export class GmailSyncService {
         occurredAt: created.occurredAt,
         merchantKey: created.merchantKey,
       };
-      this.aiCaptionService.generate(captionable).catch(() => {});
-      this.aiAnomalyService.checkAndNotify(captionable).catch(() => {});
+      this.aiCaptionService.generate(userId, captionable).catch(() => {});
+      this.aiAnomalyService.checkAndNotify(userId, captionable).catch(() => {});
 
-      await this.logParseResult(id, from, subject, receivedAt, {
+      await this.logParseResult(userId, id, from, subject, receivedAt, {
         status: ParseStatus.RECORDED,
         amount: parsed.amount,
         counterparty: parsed.description,
@@ -260,7 +269,7 @@ export class GmailSyncService {
       });
 
       if (notifyEveryTransaction) {
-        await this.telegramService.sendTransactionNotif({
+        await this.telegramService.sendTransactionNotif(userId, {
           source: parsed.source,
           description: parsed.description,
           amount: parsed.amount,
@@ -269,7 +278,7 @@ export class GmailSyncService {
       }
     } else {
       callbacks.onDuplicate();
-      await this.logParseResult(id, from, subject, receivedAt, {
+      await this.logParseResult(userId, id, from, subject, receivedAt, {
         status: ParseStatus.DUPLICATE,
         amount: parsed.amount,
         parser,
@@ -281,6 +290,7 @@ export class GmailSyncService {
    * Selalu masuk sebagai Income (CONFIRMED/INTERNAL/PENDING, lihat IncomeService.classify), saldo
    * source SELALU gerak terlepas status-nya. */
   private async processIncome(
+    userId: number,
     id: string,
     emailId: string,
     from: string,
@@ -291,7 +301,7 @@ export class GmailSyncService {
     parser: string | null,
     callbacks: { onIncomeRecorded: () => void; onDuplicate: () => void },
   ) {
-    const created = await this.incomeService.createFromParsed({
+    const created = await this.incomeService.createFromParsed(userId, {
       amount: parsed.amount,
       description: parsed.description,
       source: parsed.source,
@@ -301,7 +311,7 @@ export class GmailSyncService {
 
     if (!created) {
       callbacks.onDuplicate();
-      await this.logParseResult(id, from, subject, receivedAt, {
+      await this.logParseResult(userId, id, from, subject, receivedAt, {
         status: ParseStatus.DUPLICATE,
         amount: parsed.amount,
         kind: 'INCOME',
@@ -311,7 +321,7 @@ export class GmailSyncService {
     }
 
     callbacks.onIncomeRecorded();
-    await this.logParseResult(id, from, subject, receivedAt, {
+    await this.logParseResult(userId, id, from, subject, receivedAt, {
       status: ParseStatus.RECORDED,
       amount: parsed.amount,
       counterparty: parsed.description,
@@ -320,7 +330,7 @@ export class GmailSyncService {
     });
 
     if (notifyEveryTransaction) {
-      await this.telegramService.sendIncomeNotif({
+      await this.telegramService.sendIncomeNotif(userId, {
         source: parsed.source,
         sender: parsed.description,
         amount: parsed.amount,
@@ -333,14 +343,14 @@ export class GmailSyncService {
    * beneran keluar dari `source` sekarang. Debit saldo sekali per email (dedup: kalau EmailParseLog
    * emailId ini sudah berstatus EXCLUDED dari sync sebelumnya, jangan diterapkan lagi — repeated
    * cron scan tidak boleh dobel-debit). Aturan baseline (koreksi manual) tetap berlaku. */
-  private async applyBalanceOnlyDebit(emailId: string, parsed: ParseResult) {
-    const existing = await this.prisma.emailParseLog.findUnique({ where: { emailId } });
+  private async applyBalanceOnlyDebit(userId: number, emailId: string, parsed: ParseResult) {
+    const existing = await this.prisma.emailParseLog.findFirst({ where: { userId, emailId } });
     if (existing?.status === ParseStatus.EXCLUDED) return;
 
     await this.prisma.$transaction(async (tx) => {
-      const lastAdjustmentAt = await this.balanceService.getLastManualAdjustmentAt(tx, parsed.source);
+      const lastAdjustmentAt = await this.balanceService.getLastManualAdjustmentAt(tx, userId, parsed.source);
       if (shouldAdjustBalance(parsed.occurredAt, lastAdjustmentAt)) {
-        await this.balanceService.adjustBalance(tx, parsed.source, -parsed.amount);
+        await this.balanceService.adjustBalance(tx, userId, parsed.source, -parsed.amount);
       }
     });
   }
@@ -349,42 +359,43 @@ export class GmailSyncService {
    * (`categoryHint`) → AI fast, lalu hasil AI disimpan sebagai rule baru biar merchant yang sama
    * ke depannya konsisten tanpa panggil AI lagi. */
   private async resolveCategory(
+    userId: number,
     description: string,
     amount: number,
     categoryHint?: Category,
   ): Promise<Category> {
-    const rule = await this.merchantAliasService.findCategoryForDescription(description);
+    const rule = await this.merchantAliasService.findCategoryForDescription(userId, description);
     if (rule) return rule;
 
     if (categoryHint) return categoryHint;
 
     const aiResult = (await this.aiChatService.categorize(description, amount)) as Category;
     if (aiResult !== Category.LAINNYA) {
-      await this.merchantAliasService.upsertCategory(description, aiResult);
+      await this.merchantAliasService.upsertCategory(userId, description, aiResult);
     }
     return aiResult;
   }
 
-  private async checkAndAlertIfOverBudget(lastTransaction: {
+  private async checkAndAlertIfOverBudget(userId: number, lastTransaction: {
     source: string;
     description: string;
     amount: number;
   }) {
-    const summary = await this.budgetService.getTodaySummary();
+    const summary = await this.budgetService.getTodaySummary(userId);
     if (!summary.isOverBudget) return;
 
     const todayDateOnly = new Date(summary.date);
-    const alreadyAlerted = await this.prisma.alertLog.findUnique({ where: { date: todayDateOnly } });
+    const alreadyAlerted = await this.prisma.alertLog.findFirst({ where: { userId, date: todayDateOnly } });
     if (alreadyAlerted) return;
 
-    const sent = await this.telegramService.sendBudgetAlert({
+    const sent = await this.telegramService.sendBudgetAlert(userId, {
       totalSpent: summary.totalSpent,
       budget: summary.budget,
       lastTransaction,
     });
 
     if (sent) {
-      await this.prisma.alertLog.create({ data: { date: todayDateOnly } });
+      await this.prisma.alertLog.create({ data: { userId, date: todayDateOnly } });
     }
   }
 
@@ -398,6 +409,7 @@ export class GmailSyncService {
 
   /** Upsert EmailParseLog per message — lihat shouldSkipLogUpsert utk kenapa RECORDED nggak boleh ketimpa. */
   private async logParseResult(
+    userId: number,
     emailId: string,
     from: string,
     subject: string,
@@ -411,7 +423,7 @@ export class GmailSyncService {
       parser?: string | null;
     },
   ) {
-    const existing = await this.prisma.emailParseLog.findUnique({ where: { emailId } });
+    const existing = await this.prisma.emailParseLog.findFirst({ where: { userId, emailId } });
     if (shouldSkipLogUpsert(existing?.status ?? null)) return;
 
     const data = {
@@ -425,11 +437,12 @@ export class GmailSyncService {
       kind: entry.kind,
       parser: entry.parser ?? undefined,
     };
-    await this.prisma.emailParseLog.upsert({
-      where: { emailId },
-      create: { emailId, ...data },
-      update: data,
-    });
+    // findFirst + update/create (bukan upsert): unik masih global (emailId) sampai C1 -> (userId, emailId).
+    if (existing) {
+      await this.prisma.emailParseLog.updateMany({ where: { id: existing.id, userId }, data });
+    } else {
+      await this.prisma.emailParseLog.create({ data: { userId, emailId, ...data } });
+    }
   }
 
   private extractRawEmail(message: any): RawEmail | null {

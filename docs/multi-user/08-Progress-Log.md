@@ -65,3 +65,24 @@ deviasi dari rencana (+alasan), env baru yang Arzaka harus tambahkan, langkah be
 - Env/aksi manual untuk Arzaka: tidak ada env baru. `.env` lokal tidak diubah.
 - Docs yang diperbarui: `03-Roadmap.md` (centang + catatan), `Codemap.md`, `.env.example`, `CLAUDE.md`, `CAUTION.md`.
 - **Langkah berikutnya (urut):** (1) Arzaka: setujui/tolak P1, P8, P13 di chat. (2) Arzaka/sesi dengan akses VPS: P0-04 → P0-05 → P0-06 (backup, restore ke DB dev, cek id user + token Telegram). (3) Sesi berikutnya: snapshot golden "sebelum" dari restore, ulangi P1-05 dengan data nyata, lalu minta persetujuan P1-08. (4) Setelah F1 live: mulai F2 dari `balance` (daun) — `npm run tenancy-audit -- --summary` adalah daftar kerjanya.
+
+## 2026-10-06 (lanjutan) — F2 scoping backend (hampir semua P2-xx) — sesi malam, Arzaka tidur ("lanjutkan saja dulu")
+- Sesi oleh: Claude (Sonnet 5.5)   Branch: `feat/multi-user` (belum di-push/merge)   Commit: lihat `git log` (commit "fase 2")
+- Dasar: pesan Arzaka "lanjutkan saja dulu" → saya lanjut ke F2 **di branch lokal saja**. Prasyarat roadmap ("F1 sudah di prod") **belum terpenuhi**; tidak ada merge/push/DB prod. Saat Arzaka mau merge, urutannya tetap F1 dulu (P1-08), lalu F2.
+- **Selesai (terverifikasi di scratch DB, bukan data nyata):** P2-01, 02, 03, 05, 06, 07, 09, 10; P2-04/11/12 sebagian (lihat Roadmap).
+  - Semua service/controller tenant: `userId` parameter pertama; `@CurrentUser()` di controller; by-id memakai `findFirst/updateMany/deleteMany({id,userId})` → 404 (tidak membedakan "tak ada" vs "milik orang lain").
+  - Cron (11 job non-Gmail) memakai `forEachActiveUser` (`common/per-user.ts`, versi minimal; jitter/konkurensi = F4); trigger manual (`/…/trigger-*`) hanya memproses **pemanggil**.
+  - Cache `FinancialSnapshotService` yang tadinya satu-global → per user (akan bocor lintas user).
+  - `/income/quick` (tanpa JWT) → user ADMIN pertama (`common/owner.ts`), dihapus F6. Gmail OAuth/`/sync/*` → **owner-only** (403 user lain) + `state` OAuth bertanda tangan.
+  - Migrasi baru `20261006110000_budget_setting_id_sequence` (BudgetSetting id auto-increment, sequence disetel > MAX(id); aman untuk kode lama). `schema.prisma` ikut berubah.
+  - Verifikasi: `tsc` bersih; build bersih (`dist`+`tsbuildinfo` dihapus dulu); `npm run check` 20/20 (retrieval.check kini dua user); `tenancy-audit` 208 → **0**; `isolation-e2e` **167 lulus** (dua user, A berdata/B kosong); backend boot (DI utuh); golden vs kode F1: 43/46 endpoint identik, 3 beda hanya karena data uji (dijelaskan: saldo/runway/thread dari sisa uji + baseline koreksi sintetis).
+- **Temuan penting (baca!):**
+  1. **Hazard pra-C1:** selama unik global masih ada (`BankBalance.source`, `DailyBudget.dayOfWeek`, `PeriodReport(period,periodStart)`, `AlertLog.date`, `HealthScoreLog/BudgetAdvice.weekStart`, `AiInsightCard`, `MerchantAlias.rawDescription`, `CategoryIcon.category`, `Transaction/Income/EmailParseLog` id email, `TelegramConfig`…), **user kedua yang menulis baris itu bisa 500 — dan bisa memblokir tulisan user pertama** (terbukti di uji: `/reports/aggregate` milik A 500 karena B lebih dulu membuat PeriodReport bulan yang sama). **Jangan membuat user kedua sebelum C1 (Fase 4).** Endpoint register belum ada (F5), jadi aman by-construction.
+  2. Baris yang dibuat kode lama/F1 setelah migrasi punya `userId` NULL (terbukti: PeriodReport dibuat oleh build F1). Wajib `node prisma/data-fixes/2026-10-multiuser-backfill-owner.js --apply` (lalu `verify-backfill.js`) tepat sebelum merge F2 dan sebelum C1.
+  3. Skrip owner-backfill membaca `OWNER_FULL_NAME` dari `apps/backend/.env` lewat Prisma (dotenv) — hati-hati: di mesin dev ia menulis nama pemilik asli ke DB yang sedang dipakai.
+  4. Prompt AI masih menyebut "Arzaka" dan parser masih memakai `OWNER_*` env (= F3). Karena itu fitur Gmail dikunci owner-only.
+  5. `alertLog` create bisa bentrok (unik global date) jika user kedua over-budget di hari yang sama — pra-C1 juga.
+- **Belum / tertunda:** P2-04 (cek saldo dua-user di DB → C1), P2-08 (`IngestPipelineService` → ditunda ke F6, YAGNI), P2-12 (golden dengan data nyata Arzaka + **verifikasi hidup di browser** belum — frontend tak berubah tapi `/gmail/auth-url` kini memberi `state`, dan Telegram/cron belum diuji langsung tanpa bot), P2-13 ⛔ merge.
+- **Aksi untuk Arzaka:** tidak ada env baru. Saat siap merge: backup → P1-08 → backfill-owner `--apply` → F2.
+- Docs: Roadmap (centang+catatan), 04-Checklist §B (matriks), Codemap.
+- **Langkah berikutnya:** (1) Arzaka setujui P1/P8/P13 + lakukan P0-04..06 (VPS). (2) Verifikasi hidup F2 di browser dengan DB hasil restore. (3) F3 (konteks pemilik parser, Telegram bersama, nama di prompt) — butuh keputusan P2 (bot bersama).

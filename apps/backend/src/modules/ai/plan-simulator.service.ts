@@ -37,21 +37,21 @@ export class PlanSimulatorService {
     private incomeForecastService: IncomeForecastService,
   ) {}
 
-  async simulatePlan(input: SimulatePlanInput) {
-    const baseline = await this.buildBaseline();
+  async simulatePlan(userId: number, input: SimulatePlanInput) {
+    const baseline = await this.buildBaseline(userId);
     return simulatePlan(input, baseline);
   }
 
-  async whatIfPurchase(input: WhatIfPurchaseInput) {
-    const baseline = await this.buildBaseline();
+  async whatIfPurchase(userId: number, input: WhatIfPurchaseInput) {
+    const baseline = await this.buildBaseline(userId);
     return whatIfPurchase(input, baseline);
   }
 
-  private async buildBaseline(): Promise<PlanBaseline> {
+  private async buildBaseline(userId: number): Promise<PlanBaseline> {
     const [horizon, balances, weeklySpendByCategory] = await Promise.all([
-      this.incomeForecastService.getHorizon(1),
-      this.balanceService.getAll(),
-      this.getRoutineWeeklyBaseline(),
+      this.incomeForecastService.getHorizon(userId, 1),
+      this.balanceService.getAll(userId),
+      this.getRoutineWeeklyBaseline(userId),
     ]);
     const totals = horizon[0]?.totals ?? { conservative: 0, expected: 0, max: 0, received: 0 };
     const startingBalance = balances.reduce((sum, b) => sum + Number(b.balance), 0);
@@ -66,12 +66,12 @@ export class PlanSimulatorService {
   /** Median pengeluaran rutin per kategori selama BASELINE_WEEKS minggu penuh terakhir (sebelum
    * minggu berjalan), buang pembelian besar (>= BIG_PURCHASE_THRESHOLD) supaya tidak mencemari
    * baseline "rutin" — definisi sama dengan yang dipakai financial-snapshot untuk "pembelian besar". */
-  private async getRoutineWeeklyBaseline(): Promise<Record<string, number>> {
+  private async getRoutineWeeklyBaseline(userId: number): Promise<Record<string, number>> {
     const currentWeekStart = startOfWibWeek(new Date());
     const since = addWibDays(currentWeekStart, -7 * BASELINE_WEEKS);
 
     const rows = await this.prisma.transaction.findMany({
-      where: { occurredAt: { gte: since, lt: currentWeekStart }, amount: { lt: BIG_PURCHASE_THRESHOLD } },
+      where: { userId, occurredAt: { gte: since, lt: currentWeekStart }, amount: { lt: BIG_PURCHASE_THRESHOLD } },
       select: { amount: true, reimbursedAmount: true, category: true, occurredAt: true },
     });
 
