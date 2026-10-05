@@ -2,7 +2,11 @@
 
 Personal finance expense tracker untuk Arzaka. Otomatis mencatat pengeluaran dari notifikasi email bank (BCA, Jago), tracking budget harian, alert Telegram, laporan & insight.
 
-**Single-user app.** Nggak ada multi-tenant, nggak ada signup flow. Semua fitur didesain buat satu orang (Arzaka), bukan produk publik.
+**Single-user app (saat ini) — sedang direncanakan migrasi ke multi-user invite-only.** Kode hari ini masih single-user: nggak ada multi-tenant, nggak ada signup flow.
+
+> 🚧 **MIGRASI MULTI-USER (rencana, belum diimplementasi):** sebelum menyentuh auth, schema Prisma, parser email, Telegram, cron, ingest, DNS, atau wizard,
+> **baca [`docs/multi-user/README.md`](docs/multi-user/README.md)** (protokol sesi wajib: baca CAUTION → docs → Progress Log → fase aktif; update docs & log di akhir sesi).
+> Jangan merge/push ke `main` untuk pekerjaan ini tanpa persetujuan eksplisit Arzaka (push `main` = auto-deploy + auto-migrate prod).
 
 > ⚠️ **Baca [`CAUTION.md`](CAUTION.md) sebelum `npm run build`/`start:dev` apapun.** VPS ini cuma 2GB
 > RAM dan prod jalan di sini terus — pernah bikin prod down gara-gara build tanpa cap memory + dev
