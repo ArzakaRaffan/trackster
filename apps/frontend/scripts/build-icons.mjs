@@ -29,6 +29,8 @@ for (const [from, to, group] of DIRS) {
     const open = svg.match(/<svg[^>]*>/i)?.[0] ?? '';
     if (!/xmlns=/.test(open)) svg = svg.replace(/<svg/i, '<svg xmlns="http://www.w3.org/2000/svg"');
     if (/xlink:href/.test(svg) && !/xmlns:xlink=/.test(svg)) svg = svg.replace(/<svg/i, '<svg xmlns:xlink="http://www.w3.org/1999/xlink"');
+    // ikon garis lucide: warnai hijau brand supaya konsisten berwarna dengan logo lain (tile putih)
+    if (f.startsWith('lucide_')) svg = svg.replace(/currentColor/g, '#1B7A3E');
     fs.writeFileSync(path.join(OUT, to, f), svg);
     }
     // lucide = ikon garis monokrom (tema design system) -> dirender pakai mask supaya ikut warna teks

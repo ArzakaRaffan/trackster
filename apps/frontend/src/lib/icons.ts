@@ -3,15 +3,12 @@ import { ICON_CATALOG } from './icon-catalog';
 const LABEL = new Map(ICON_CATALOG.map((i) => [i.key, i.label]));
 export const iconLabel = (key?: string | null) => (key ? LABEL.get(key) ?? key : '');
 
-/** Inline-CSS buat tile logo (tambahkan di akhir style tile). Lucide = ikon garis, dirender lewat mask supaya
- * ikut warna teks tema; logo brand ditaruh di tile putih supaya logo gelap tetap kebaca di tema gelap. */
+/** Inline-CSS buat tile logo (tambahkan di akhir style tile): selalu tile putih supaya logo gelap tetap kebaca di tema gelap. */
 export function iconCss(key?: string | null): string {
   if (!key) return '';
   const u = `url(/icons/${key})`;
-  // SVG tanpa width/height bawaan: ukuran harus 2 nilai eksplisit/contain, "68% auto" tidak dirender.
-  return key.startsWith('decor/lucide_')
-    ? `background:currentColor;color:var(--text);-webkit-mask:${u} center/58% 58% no-repeat;mask:${u} center/58% 58% no-repeat`
-    : `background:#fff ${u} center/contain no-repeat;box-sizing:border-box;border:3px solid #fff`;
+  // Semua logo berwarna di tile putih (ikon lucide diwarnai saat build). SVG tanpa width/height: pakai contain, bukan "68% auto".
+  return `background:#fff ${u} center/contain no-repeat;box-sizing:border-box;border:3px solid #fff`;
 }
 
 /** Logo tetap (tidak bisa diubah user): sumber transaksi & integrasi. Kunci = nama/kode sumber, case-insensitive. */
