@@ -51,8 +51,26 @@ export class MerchantAliasService {
     });
   }
 
-  async update(id: number, displayName: string) {
-    return this.prisma.merchantAlias.update({ where: { id }, data: { displayName } });
+  async update(id: number, data: { displayName?: string; icon?: string | null }) {
+    return this.prisma.merchantAlias.update({ where: { id }, data });
+  }
+
+  /** Set/hapus logo merchant tanpa menyentuh displayName/kategori (baris dibuat kalau belum ada). */
+  async setIcon(rawDescription: string, icon: string | null) {
+    return this.prisma.merchantAlias.upsert({
+      where: { rawDescription },
+      update: { icon },
+      create: { rawDescription, icon },
+    });
+  }
+
+  async findCategoryIcons() {
+    return this.prisma.categoryIcon.findMany();
+  }
+
+  async setCategoryIcon(category: Category, icon: string | null) {
+    if (!icon) return this.prisma.categoryIcon.deleteMany({ where: { category } });
+    return this.prisma.categoryIcon.upsert({ where: { category }, update: { icon }, create: { category, icon } });
   }
 
   /** Hapus alias — transaksi terkait otomatis balik nampilin raw description asli lewat
@@ -66,16 +84,19 @@ export class MerchantAliasService {
    * tidak pernah diubah/ditimpa, tetap dipakai buat search matching & referensi internal parser. */
   async attachDisplayNames<T extends { description: string }>(
     transactions: T[],
-  ): Promise<(T & { displayDescription: string })[]> {
+  ): Promise<(T & { displayDescription: string; icon: string | null })[]> {
     if (transactions.length === 0) return [];
 
     const uniqueDescriptions = [...new Set(transactions.map((t) => t.description))];
     const aliases = await this.prisma.merchantAlias.findMany({
       where: { rawDescription: { in: uniqueDescriptions } },
     });
-    const aliasMap = new Map(aliases.map((a) => [a.rawDescription, a.displayName]));
+    const aliasMap = new Map(aliases.map((a) => [a.rawDescription, a]));
 
-    return transactions.map((t) => ({ ...t, displayDescription: aliasMap.get(t.description) ?? t.description }));
+    return transactions.map((t) => {
+      const a = aliasMap.get(t.description);
+      return { ...t, displayDescription: a?.displayName ?? t.description, icon: a?.icon ?? null };
+    });
   }
 
   /** Cari rawDescription dari semua alias yang displayName-nya cocok search term — dipakai supaya

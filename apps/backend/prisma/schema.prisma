@@ -267,8 +267,16 @@ model MerchantAlias {
   // Kategori tetap untuk merchant ini — dipakai pipeline kategorisasi sync (rule dulu,
   // sebelum heuristik/AI) dan "terapkan ke semua" saat user koreksi kategori.
   category       Category?
+  // Logo pilihan user: path relatif di frontend/public/icons (mis. "indonesia/bca.svg"). Null = inisial huruf.
+  icon           String?
   createdAt      DateTime  @default(now())
   updatedAt      DateTime  @updatedAt
+}
+
+// Logo per kategori (kategori itu enum tetap, jadi cukup 1 baris per kategori yang dihias).
+model CategoryIcon {
+  category Category @id
+  icon     String
 }
 
 // Split Bill: fitur berdiri sendiri buat bagi tagihan makan bareng teman, SENGAJA tidak
