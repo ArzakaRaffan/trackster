@@ -1,0 +1,19 @@
+Top-up Berhasil
+Halo ANDI WIJAYA PUTRA,
+Berikut adalah detail transaksi Anda:
+Penyedia Jasa
+GoPay
+Customer
+****6471
+Tanggal
+1 Okt 2026
+Jam
+05:57:09 WIB
+Nominal Top-up
+Rp 200.000,00
+Biaya Transaksi
+Rp 1.200,00
+Total Transaksi
+Rp 201.200,00
+No. Referensi
+702610010557041264

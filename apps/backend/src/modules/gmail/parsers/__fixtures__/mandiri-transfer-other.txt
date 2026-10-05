@@ -1,0 +1,18 @@
+Transfer Online Berhasil
+Halo ANDI WIJAYA PUTRA,
+Berikut adalah detail transaksi Anda:
+Penerima
+BUDI SANTOSO
+Bank BCA - 555666777888
+Tanggal
+2 Okt 2026
+Jam
+16:09:18 WIB
+Nominal Transfer
+Rp 40.000,00
+Biaya Transfer
+Rp 6.500,00
+Total Transaksi
+Rp 46.500,00
+No. Referensi
+2610021121001977937

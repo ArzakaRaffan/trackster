@@ -21,6 +21,8 @@ import { extractField, parseRupiah, parseEmailDate, htmlToText } from './parser.
 import { BcaParser } from './bca.parser';
 import { FlipParser } from './flip.parser';
 import { JagoParser } from './jago.parser';
+import { BniParser } from './bni.parser';
+import { MandiriParser } from './mandiri.parser';
 import { Source, Category } from '@prisma/client';
 
 // ─── Helper ──────────────────────────────────────────────────────────────────
@@ -452,6 +454,62 @@ check('Jago transfer keluar ke rekening sendiri: balanceOnly = true', () => {
   assert.ok(result !== null);
   assert.strictEqual(result!.excluded, true);
   assert.strictEqual(result!.balanceOnly, true);
+});
+
+// ─── 6b. BNI (wondr) QRIS ────────────────────────────────────────────────────
+
+check('BNI QRIS: expense BNI, nominal & waktu WIB benar', () => {
+  const bni = new BniParser();
+  const email = {
+    id: 'bni-1',
+    from: 'wondr@bni.co.id',
+    subject: 'Transaksi Berhasil!',
+    body: loadFixture('bni-qris.txt'),
+    internalDate: '0',
+  };
+  assert.strictEqual(bni.canHandle(email), true);
+  const r = bni.parse(email);
+  assert.ok(r !== null);
+  assert.strictEqual(r!.amount, 76800);
+  assert.strictEqual(r!.description, 'ALGO X661 AFM RE');
+  assert.strictEqual(r!.source, Source.BNI);
+  assert.strictEqual(r!.excluded, false);
+  assert.strictEqual(r!.occurredAt.toISOString(), '2026-09-26T14:35:40.000Z');
+});
+
+check('Mandiri Livin QRIS: Rp 7.900,00 = 7900, tanggal Indonesia "Okt"', () => {
+  const m = new MandiriParser();
+  const email = {
+    id: 'm-1',
+    from: "Livin' <noreply.livin@bankmandiri.co.id>",
+    subject: 'Pembayaran Berhasil!',
+    body: loadFixture('mandiri-qris.txt'),
+    internalDate: '0',
+  };
+  assert.strictEqual(m.canHandle(email), true);
+  const r = m.parse(email);
+  assert.ok(r !== null);
+  assert.strictEqual(r!.amount, 7900);
+  assert.strictEqual(r!.description, 'JUMPSTART JAKARTA PUSAT');
+  assert.strictEqual(r!.source, Source.MANDIRI);
+  assert.strictEqual(r!.occurredAt.toISOString(), '2026-10-05T01:42:04.000Z');
+});
+
+check('Mandiri: top-up GoPay = total 201200; transfer ke rekening sendiri balanceOnly; ke orang lain expense', () => {
+  const m = new MandiriParser();
+  const mk = (subject: string, f: string) => m.parse({ id: 'm', from: 'noreply.livin@bankmandiri.co.id', subject, body: loadFixture(f), internalDate: '0' })!;
+  const t = mk('Top-up Berhasil!', 'mandiri-topup.txt');
+  assert.strictEqual(t.amount, 201200);
+  assert.strictEqual(t.description, 'Top-up GoPay');
+  assert.strictEqual(t.excluded, false);
+  assert.strictEqual(t.occurredAt.toISOString(), '2026-09-30T22:57:09.000Z');
+  const self = mk('Transfer Online Berhasil!', 'mandiri-transfer-self.txt');
+  assert.strictEqual(self.amount, 46500);
+  assert.strictEqual(self.excluded, true);
+  assert.strictEqual(self.balanceOnly, true);
+  const other = mk('Transfer Online Berhasil!', 'mandiri-transfer-other.txt');
+  assert.strictEqual(other.description, 'BUDI SANTOSO');
+  assert.strictEqual(other.excluded, false);
 });
 
 // ─── 7. Ringkasan ────────────────────────────────────────────────────────────

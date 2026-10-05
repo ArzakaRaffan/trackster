@@ -1,0 +1,13 @@
+Pembayaran Berhasil
+Halo ANDI WIJAYA PUTRA,
+Berikut adalah detail transaksi Anda dengan QR:
+Penerima
+JUMPSTART JAKARTA PUSAT - ID
+Tanggal
+5 Okt 2026
+Jam
+08:42:04 WIB
+Nominal Transaksi
+Rp 7.900,00
+No. Referensi
+2610051121512296472

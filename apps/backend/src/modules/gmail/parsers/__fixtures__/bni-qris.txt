@@ -1,0 +1,19 @@
+Terima kasih udah bertransaksi dengan wondr by BNI! Kamu baru aja bayar pakai QRIS dengan detail sebagai berikut:
+Penerima
+ALGO X661 AFM RE
+MARTADINBOGOR ID
+Sumber dana
+ANDI WIJAYA PUTRA
+TAPLUS • ******387
+Tanggal & waktu transaksi
+Tanggal
+26 Sep 2026
+Waktu
+21:35:40 WIB
+Detail pembayaran
+Nominal
+Rp76.800
+Total
+Rp76.800
+Jenis transaksi
+QRIS

@@ -76,6 +76,8 @@ enum Source {
   BCA
   JAGO
   GOPAY
+  BNI
+  MANDIRI
 }
 
 enum Category {
@@ -137,7 +139,7 @@ model EmailParseLog {
   amount       Decimal?    @db.Decimal(12, 2)
   counterparty String?
   kind         String? // 'EXPENSE' | 'INCOME' (E02)
-  parser       String? // 'bca' | 'jago' | 'flip'
+  parser       String? // 'bca' | 'jago' | 'flip' | 'bni' | 'mandiri'
   createdAt    DateTime    @default(now())
 
   @@index([status])

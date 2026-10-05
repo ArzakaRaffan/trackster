@@ -129,6 +129,7 @@ export function parseEmailDate(raw: string): Date | null {
   const months: Record<string, number> = {
     jan: 0, feb: 1, mar: 2, apr: 3, may: 4, jun: 5,
     jul: 6, aug: 7, sep: 8, oct: 9, nov: 10, dec: 11,
+    mei: 4, agu: 7, okt: 9, des: 11, // Bahasa Indonesia
   };
   // buang koma, "WIB", dan rapikan spasi
   const cleaned = raw.replace(/,/g, ' ').replace(/WIB/gi, '').trim().replace(/\s+/g, ' ');

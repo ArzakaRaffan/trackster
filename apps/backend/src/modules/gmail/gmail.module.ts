@@ -6,6 +6,8 @@ import { ParserRegistryService } from './parsers/parser-registry.service';
 import { BcaParser } from './parsers/bca.parser';
 import { JagoParser } from './parsers/jago.parser';
 import { FlipParser } from './parsers/flip.parser';
+import { BniParser } from './parsers/bni.parser';
+import { MandiriParser } from './parsers/mandiri.parser';
 import { PrismaService } from '../../prisma.service';
 import { AuthModule } from '../auth/auth.module';
 import { TransactionModule } from '../transaction/transaction.module';
@@ -35,6 +37,8 @@ import { BalanceModule } from '../balance/balance.module';
     BcaParser,
     JagoParser,
     FlipParser,
+    BniParser,
+    MandiriParser,
     PrismaService,
   ],
   exports: [GmailSyncService, GmailAuthService],
