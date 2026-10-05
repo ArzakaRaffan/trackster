@@ -47,5 +47,5 @@ docker ps -a --format '{{.Names}}\t{{.Status}}'  # cek container mana yang mati/
 ```
 Container prod biasanya auto-restart (`restart: unless-stopped` di compose) begitu OOM killer
 selesai membunuh proses yang paling banyak makan RAM — tapi tetap verifikasi manual
-(`curl -I https://track.trackster.my.id`, `curl -I https://api.track.trackster.my.id/auth/me`)
+(`curl -I https://trackster.dev`, `curl -I https://api.trackster.dev/auth/me` — 401 tanpa cookie itu normal)
 sebelum lapor "sudah pulih".

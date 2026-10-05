@@ -8,7 +8,11 @@
     "start:dev": "nest start --watch",
     "start:prod": "node dist/main",
     "prisma:generate": "prisma generate",
-    "prisma:migrate": "prisma migrate deploy"
+    "prisma:migrate": "prisma migrate deploy",
+    "check": "node scripts/run-checks.mjs",
+    "tenancy-audit": "node scripts/tenancy-audit.mjs",
+    "isolation-e2e": "node scripts/isolation-e2e.mjs",
+    "golden": "node scripts/golden-snapshot.mjs"
   },
   "prisma": {
     "seed": "node prisma/seed.js"

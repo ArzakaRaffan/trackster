@@ -80,6 +80,5 @@ Dipakai di baris Hari ini, detail transaksi, Setting → Alias merchant (+ logo 
 
 ## Drift yang ketemu (belum dibenerin)
 - `CLAUDE.md` nyebut folder `design-system/`, aslinya `design_system/`.
-- `.env.example`: komentar URL prod masih domain lama (`trackster.my.id`, `api.trackster.my.id`);
-  belum ada `AI_*`, `AI_AUTH_HEADER`, `TELEGRAM_WEBHOOK_SECRET`, `COOKIE_DOMAIN`.
+- ~~`.env.example` domain lama / env belum lengkap~~ — dirapikan 2026-10-06 (multi-user F0). `TELEGRAM_BOT_TOKEN` di compose prod tidak dibaca kode.
 - `Source.GOPAY` masih di enum & tipe frontend walau nggak ada sumber aktif.
