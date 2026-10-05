@@ -23,6 +23,7 @@ import { FlipParser } from './flip.parser';
 import { JagoParser } from './jago.parser';
 import { BniParser } from './bni.parser';
 import { MandiriParser } from './mandiri.parser';
+import { RayaParser } from './raya.parser';
 import { Source, Category } from '@prisma/client';
 
 // ─── Helper ──────────────────────────────────────────────────────────────────
@@ -510,6 +511,25 @@ check('Mandiri: top-up GoPay = total 201200; transfer ke rekening sendiri balanc
   const other = mk('Transfer Online Berhasil!', 'mandiri-transfer-other.txt');
   assert.strictEqual(other.description, 'BUDI SANTOSO');
   assert.strictEqual(other.excluded, false);
+});
+
+check('Raya: QRIS expense, uang masuk & cashback income (jam "17.44" bertitik)', () => {
+  const r = new RayaParser();
+  const mk = (subject: string, f: string) => r.parse({ id: 'r', from: 'no-reply@raya.co.id', subject, body: loadFixture(f), internalDate: '0' })!;
+  const q = mk('Transaksi QRIS Berhasil', 'raya-qris.txt');
+  assert.strictEqual(q.amount, 100000);
+  assert.strictEqual(q.description, 'Tomoro BNI Tol Kukusan');
+  assert.strictEqual(q.kind, 'EXPENSE');
+  assert.strictEqual(q.source, Source.RAYA);
+  assert.strictEqual(q.occurredAt.toISOString(), '2024-11-07T10:49:00.000Z');
+  const m = mk('Notifikasi Uang Masuk', 'raya-uang-masuk.txt');
+  assert.strictEqual(m.amount, 120000);
+  assert.strictEqual(m.kind, 'INCOME');
+  assert.strictEqual(m.occurredAt.toISOString(), '2024-11-07T10:44:00.000Z');
+  const c = mk('Asyik! Cashback Kamu Masuk, Nih', 'raya-cashback.txt');
+  assert.strictEqual(c.amount, 15000);
+  assert.strictEqual(c.kind, 'INCOME');
+  assert.strictEqual(c.description, 'Cashback Raya');
 });
 
 // ─── 7. Ringkasan ────────────────────────────────────────────────────────────

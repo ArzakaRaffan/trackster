@@ -1,0 +1,10 @@
+Halo, Andi Wijaya Putra!
+Terima kasih telah melakukan transaksi QRIS melalui Raya. Berikut informasi transaksimu:
+Nominal : Rp100.000
+Nama Merchant : Tomoro BNI Tol Kukusan
+Lokasi : DEPOK
+Bank : Bank Raya Indonesia
+Tanggal : 7 November 2024
+Waktu : 17:49 WIB
+Tipe Transaksi : QRIS
+Total Pembayaran : Rp100.000
