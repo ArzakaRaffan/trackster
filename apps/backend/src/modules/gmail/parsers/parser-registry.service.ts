@@ -5,13 +5,14 @@ import { FlipParser } from './flip.parser';
 import { BniParser } from './bni.parser';
 import { MandiriParser } from './mandiri.parser';
 import { RayaParser } from './raya.parser';
+import { BriParser } from './bri.parser';
 import { EmailParser, RawEmail, ParseResult } from './parser.interface';
 
 @Injectable()
 export class ParserRegistryService {
   private parsers: Array<{ name: string; parser: EmailParser }>;
 
-  constructor(bcaParser: BcaParser, jagoParser: JagoParser, flipParser: FlipParser, bniParser: BniParser, mandiriParser: MandiriParser, rayaParser: RayaParser) {
+  constructor(bcaParser: BcaParser, jagoParser: JagoParser, flipParser: FlipParser, bniParser: BniParser, mandiriParser: MandiriParser, rayaParser: RayaParser, briParser: BriParser) {
     // Flip dulu: email Flip jangan ke-handle BCA/Jago by accident
     this.parsers = [
       { name: 'flip', parser: flipParser },
@@ -20,6 +21,7 @@ export class ParserRegistryService {
       { name: 'bni', parser: bniParser },
       { name: 'mandiri', parser: mandiriParser },
       { name: 'raya', parser: rayaParser },
+      { name: 'bri', parser: briParser },
     ];
   }
 

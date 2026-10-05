@@ -1,0 +1,12 @@
+Halo, A**** W****
+Berikut ini adalah informasi transaksi yang telah Anda lakukan di Aplikasi BRImo.
+Transaksi Berhasil
+Tanggal: 04 Oktober 2026, 15:50:33 WIB
+Nomor Referensi: 123
+Jenis Transaksi: Transfer Bank BRI
+Bank Tujuan: BANK BRI
+Nomor Tujuan: 1477 01 000 507
+Nama Tujuan: SITI MAHARANI
+Nominal: Rp300.000
+Biaya Admin: Rp0
+Total: Rp300.000

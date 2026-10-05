@@ -9,6 +9,7 @@ import { FlipParser } from './parsers/flip.parser';
 import { BniParser } from './parsers/bni.parser';
 import { MandiriParser } from './parsers/mandiri.parser';
 import { RayaParser } from './parsers/raya.parser';
+import { BriParser } from './parsers/bri.parser';
 import { PrismaService } from '../../prisma.service';
 import { AuthModule } from '../auth/auth.module';
 import { TransactionModule } from '../transaction/transaction.module';
@@ -41,6 +42,7 @@ import { BalanceModule } from '../balance/balance.module';
     BniParser,
     MandiriParser,
     RayaParser,
+    BriParser,
     PrismaService,
   ],
   exports: [GmailSyncService, GmailAuthService],

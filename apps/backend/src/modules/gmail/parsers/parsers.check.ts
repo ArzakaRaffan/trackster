@@ -24,6 +24,7 @@ import { JagoParser } from './jago.parser';
 import { BniParser } from './bni.parser';
 import { MandiriParser } from './mandiri.parser';
 import { RayaParser } from './raya.parser';
+import { BriParser } from './bri.parser';
 import { Source, Category } from '@prisma/client';
 
 // ─── Helper ──────────────────────────────────────────────────────────────────
@@ -530,6 +531,18 @@ check('Raya: QRIS expense, uang masuk & cashback income (jam "17.44" bertitik)',
   assert.strictEqual(c.amount, 15000);
   assert.strictEqual(c.kind, 'INCOME');
   assert.strictEqual(c.description, 'Cashback Raya');
+});
+
+check('BRI: transfer ke orang lain = expense BRI, total 300000, tanggal "Oktober" + koma', () => {
+  const b = new BriParser();
+  const email = { id: 'b', from: 'BRImo <bankbri@bri.co.id>', subject: 'Pemindahan Dana Sesama Rekening BRI', body: loadFixture('bri-transfer.txt'), internalDate: '0' };
+  assert.strictEqual(b.canHandle(email), true);
+  const r = b.parse(email)!;
+  assert.strictEqual(r.amount, 300000);
+  assert.strictEqual(r.description, 'SITI MAHARANI');
+  assert.strictEqual(r.source, Source.BRI);
+  assert.strictEqual(r.excluded, false);
+  assert.strictEqual(r.occurredAt.toISOString(), '2026-10-04T08:50:33.000Z');
 });
 
 // ─── 7. Ringkasan ────────────────────────────────────────────────────────────

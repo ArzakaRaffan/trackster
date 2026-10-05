@@ -17,7 +17,7 @@ import { Category, ParseStatus } from '@prisma/client';
 import { shouldSkipLogUpsert } from './parsers/email-parse-log.util';
 
 // Cron window tetap pendek biar ringan. Historical gap pakai syncEmails({ after, before }).
-const GMAIL_QUERY_RECENT = 'from:(bca OR jago OR flip OR bni OR bankmandiri OR raya) newer_than:7d';
+const GMAIL_QUERY_RECENT = 'from:(bca OR jago OR flip OR bni OR bankmandiri OR bankraya OR bankbri@bri.co.id) newer_than:7d';
 
 const SYNC_CRON_JOB_NAME = 'gmail-sync';
 
@@ -63,7 +63,7 @@ export class GmailSyncService {
 
   private buildQuery(options?: SyncOptions): string {
     if (options?.after || options?.before) {
-      const parts = ['from:(bca OR jago OR flip OR bni OR bankmandiri OR raya)'];
+      const parts = ['from:(bca OR jago OR flip OR bni OR bankmandiri OR bankraya OR bankbri@bri.co.id)'];
       if (options.after) parts.push(`after:${options.after.replace(/-/g, '/')}`);
       if (options.before) parts.push(`before:${options.before.replace(/-/g, '/')}`);
       return parts.join(' ');
