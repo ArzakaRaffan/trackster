@@ -11,7 +11,7 @@ import { api } from '@/lib/api';
 import { buildDates, addDaysISO } from './live/dates';
 import { EMPTY_REPORT } from './live/reports';
 import { IconPicker } from './IconPicker';
-import { iconCss, iconLabel, brandCss } from '@/lib/icons';
+import { iconCss, iconLabel, brandCss, autoIcon } from '@/lib/icons';
 import { css } from './css';
 import { stateToPath, pathToState } from '@/lib/v3-routes';
 
@@ -212,7 +212,8 @@ export class V3Logic extends React.Component {
   toast(m) { clearTimeout(this.t1); this.setState({ toast:m, toastOn:true }); this.t1 = setTimeout(() => this.setState({ toastOn:false }), 3000); }
   go(p) { this.setState({ page:p, rowMenu:null, periodOpen:false, bell:false }); window.scrollTo && window.scrollTo({ top:0 }); }
   title(t) { return t.alias || t.raw; }
-  iconOf(t) { return t.icon || (this.state.catIcons || {})[t.cat] || null; }
+  autoOf(t) { return t.icon ? null : autoIcon(t.alias) || autoIcon(t.raw); }
+  iconOf(t) { return t.icon || this.autoOf(t) || (this.state.catIcons || {})[t.cat] || null; }
   pickIcon(title, current, onPick) { this.setState({ iconPick:{ title, current, onPick } }); }
   setMerchantIcon(raw, icon) { this.setState(z => ({ iconPick:null, txs:z.txs.map(x => x.raw === raw ? { ...x, icon } : x), st:{ ...z.st, aliases:z.st.aliases.map(a => a.raw === raw ? { ...a, icon } : a) } })); this.liveCall(() => this.props.live.actions.setMerchantIcon(raw, icon)); this.toast(icon ? 'Logo disimpan.' : 'Logo dihapus.'); }
   setCatIcon(cat, icon) { this.setState(z => { const m = { ...(z.catIcons || {}) }; if (icon) m[cat] = icon; else delete m[cat]; return { iconPick:null, catIcons:m }; }); this.liveCall(() => this.props.live.actions.setCategoryIcon(cat, icon)); this.toast(icon ? 'Logo disimpan.' : 'Logo dihapus.'); }
@@ -324,7 +325,7 @@ export class V3Logic extends React.Component {
       submitTg:() => { if (!tfOk) return; const tok = tf.token.trim(); setT({ tgConfigured:true, tgPreview:tok.slice(0, 6) + '…' + tok.slice(-4), tgChat:tf.chat.trim() }); this.liveCall(() => this.props.live.actions.saveTelegram(tok, tf.chat.trim())); this.setState({ modal:null }); this.toast('Telegram disimpan.'); },
       aliasEmpty:t.aliases.length === 0,
       catIconRows:Object.keys(CAT_L).map(k => { const ic = (this.state.catIcons || {})[k]; return { label:CAT_L[k], iconCss:iconCss(ic), initial:ic ? '' : CAT_L[k].charAt(0), pick:() => this.pickIcon('Logo ' + CAT_L[k], ic, v => this.setCatIcon(k, v)) }; }),
-      aliasRows:t.aliases.map(a => { const ed = t.aliasEdit === a.id; return { name:a.name, raw:a.raw, iconCss:iconCss(a.icon), iconInitial:a.icon ? '' : (a.name || '?').charAt(0).toUpperCase(), pickIcon:() => this.pickIcon('Logo ' + a.name, a.icon, k => this.setMerchantIcon(a.raw, k)), editing:ed, viewing:!ed, draft:t.aliasDraft,
+      aliasRows:t.aliases.map(a => { const ed = t.aliasEdit === a.id; return { name:a.name, raw:a.raw, iconCss:iconCss(a.icon || autoIcon(a.name) || autoIcon(a.raw)), iconInitial:(a.icon || autoIcon(a.name) || autoIcon(a.raw)) ? '' : (a.name || '?').charAt(0).toUpperCase(), pickIcon:() => this.pickIcon('Logo ' + a.name, a.icon, k => this.setMerchantIcon(a.raw, k)), editing:ed, viewing:!ed, draft:t.aliasDraft,
         onDraft:e => setT({ aliasDraft:e.target.value }), edit:() => setT({ aliasEdit:a.id, aliasDraft:a.name }), cancel:() => setT({ aliasEdit:null }),
         save:() => { if (!t.aliasDraft.trim()) return; setT({ aliasEdit:null, aliases:t.aliases.map(x => x.id === a.id ? { ...x, name:t.aliasDraft.trim() } : x) }); this.liveCall(() => this.props.live.actions.saveAlias(a.id, t.aliasDraft.trim())); this.toast('Alias disimpan.'); },
         del:() => { setT({ aliases:t.aliases.filter(x => x.id !== a.id) }); this.liveCall(() => this.props.live.actions.delAlias(a.id)); this.toast('Alias dihapus.'); } }; })
@@ -834,10 +835,10 @@ export class V3Logic extends React.Component {
   rv_src(s) {
     const r = this.src0(s);
     const B = { BCA:['#0B5CAB', '#fff', 'BCA'], Jago:['#F8A21A', '#2B1A00', 'J'], Flip:['#FF7A2F', '#fff', 'F'] };
-    r.srcCards = r.srcCards.map(c => { const b = B[c.name] || ['var(--neutral)', 'var(--text)', c.ini]; return { ...c, tileBg:b[0], tileFg:b[1], ini:b[2], hasIcon:false, hasText:true, icon:'' }; });
+    r.srcCards = r.srcCards.map(c => { const b = B[c.name] || ['var(--neutral)', 'var(--text)', c.ini]; const logo = brandCss(c.name); return { ...c, tileBg:b[0], tileFg:b[1], ini:logo ? '' : b[2], hasIcon:false, hasText:!logo, icon:'', logoCss:logo }; });
     const IC = { mail:'M22 6l-10 7L2 6 M2 4h20v16H2z', send:'M22 2 11 13 M22 2l-7 20-4-9-9-4 20-7z', cal:'M8 2v4 M16 2v4 M3 10h18 M5 4h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z', phone:'M7 2h10a1 1 0 0 1 1 1v18a1 1 0 0 1-1 1H7a1 1 0 0 1-1-1V3a1 1 0 0 1 1-1z M12 18h.01', file:'M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z M14 2v6h6 M8 13h8 M8 17h8', wa:'M21 11.5a8.4 8.4 0 0 1-12.4 7.3L3 21l1.9-5.6A8.5 8.5 0 1 1 21 11.5z', android:'M6 16V10a6 6 0 0 1 12 0v6z M9 7L7.5 4.5 M15 7l1.5-2.5 M9.5 11h.01 M14.5 11h.01' };
     const G = { 'Teruskan email':['#fff', '#4285F4', 'G'], Telegram:['#229ED9', '#fff', null, IC.send], 'Kalender (.ics)':['var(--neutral)', 'var(--text)', null, IC.cal], 'Pintasan iOS / Android':['var(--neutral)', 'var(--text)', null, IC.phone], 'Ekspor Sheets / CSV':['#1D8F4E', '#fff', null, IC.file], 'Impor mutasi CSV/PDF':['var(--neutral)', 'var(--text)', null, IC.file], 'Notifikasi e-wallet':['var(--neutral)', 'var(--text)', null, IC.phone], WhatsApp:['#25D366', '#fff', null, IC.wa] };
-    r.gallery = r.gallery.map(g => { const b = G[g.n] || ['var(--neutral)', 'var(--text)', null, IC.mail]; return { ...g, tileBg:b[0], tileFg:b[1], ini:b[2] || '', hasIcon:!b[2], hasText:!!b[2], icon:b[3] || '' }; });
+    r.gallery = r.gallery.map(g => { const b = G[g.n] || ['var(--neutral)', 'var(--text)', null, IC.mail]; const logo = brandCss({ 'Teruskan email':'GMAIL', Telegram:'TELEGRAM', 'Kalender (.ics)':'CALENDAR', 'Ekspor Sheets / CSV':'SHEETS', WhatsApp:'WHATSAPP' }[g.n]); return { ...g, tileBg:b[0], tileFg:b[1], ini:logo ? '' : b[2] || '', hasIcon:!logo && !b[2], hasText:!logo && !!b[2], icon:b[3] || '', logoCss:logo }; });
     return r;
   }
   rv_ana(s) {
@@ -1062,7 +1063,7 @@ export class V3Logic extends React.Component {
       ciSave:() => { if (s.ciState !== 'open') return; this.setState({ ciState:'saving' }); if (this.props.live !== undefined) { const entries = []; for (const x of ciStreams) { const dr = s.checkin && s.checkin.byId[x.id], e = s.ci[x.id] || { units:0, extra:0, amount:'' }; if (dr && dr.alreadyFilled) continue; if (x.kind === 'IRREGULAR') { const a = Number(digits(e.amount)) || 0; if (a > 0) entries.push({ streamId:x.id, amount:a }); } else if (dr && !dr.scheduled && x.kind !== 'VARIABLE') continue; else if (x.kind === 'VARIABLE') { const a = Number(digits(e.amount)) || 0; if (a > 0) entries.push({ streamId:x.id, amount:a }); } else if (x.kind === 'SESSION') entries.push({ streamId:x.id, units:e.units, extraUnits:Math.min(e.extra, e.units) }); else if (x.kind === 'DEDUCTION') entries.push({ streamId:x.id, units:e.units }); else entries.push({ streamId:x.id }); } (entries.length ? this.props.live.actions.submitCheckin(s.checkin.weekStart, entries) : Promise.resolve()).then(() => this.props.live.refresh()).then(() => this.setState({ ciState:'done' })).catch(e => { this.setState({ ciState:'open' }); this.toast((e && e.message) || 'Gagal menyimpan check-in.'); }); return; } this.t4 = setTimeout(() => this.setState({ ciState:'done' }), 900); }, ciReset:() => this.setState({ ciState:'open' }),
       hasModal:!!s.modal, closeModal:() => this.closeModal(), mTitle:mTitles[s.modal] || this.b2Title(s) || this.b2Title3(s) || '', mHasSub: (s.modal === 'tx' && !!tx && !!tx.alias) || s.modal === 'contrib' || s.modal === 'sim', mSub: s.modal === 'contrib' ? 'Setor / tarik' : s.modal === 'sim' ? 'Simulasi target' : (tx ? tx.raw : ''),
       mTx:s.modal === 'tx' && !!tx, mExpense:s.modal === 'expense', mIncome:s.modal === 'income', mStream:s.modal === 'stream', mConfirm:s.modal === 'confirm',
-      tx: tx ? { srcCss:brandCss(tx.src), iconCss:iconCss(tx.icon), iconInitial:tx.icon ? '' : this.title(tx).trim().charAt(0).toUpperCase(), iconLabel:tx.icon ? iconLabel(tx.icon) : 'Pilih logo untuk merchant ini', amount:'−' + RP(tx.amt), meta:`${tx.src === 'JAGO' ? 'Jago' : tx.src} · ${tx.dl || (DAYS[tx.d] || [])[1] || ''} · ${tx.time}`, cat:tx.cat, raw:tx.raw, hasCap:!!tx.cap, cap:tx.cap || '', aliasDraft:s.aliasDraft, noteDraft:s.noteDraft } : {},
+      tx: tx ? { srcCss:brandCss(tx.src), iconCss:iconCss(this.iconOf(tx)), iconInitial:this.iconOf(tx) ? '' : this.title(tx).trim().charAt(0).toUpperCase(), iconLabel:tx.icon ? iconLabel(tx.icon) : this.autoOf(tx) ? iconLabel(this.autoOf(tx)) + ' (otomatis)' : 'Pilih logo untuk merchant ini', amount:'−' + RP(tx.amt), meta:`${tx.src === 'JAGO' ? 'Jago' : tx.src} · ${tx.dl || (DAYS[tx.d] || [])[1] || ''} · ${tx.time}`, cat:tx.cat, raw:tx.raw, hasCap:!!tx.cap, cap:tx.cap || '', aliasDraft:s.aliasDraft, noteDraft:s.noteDraft } : {},
       catOpts, gmLogo:brandCss('GMAIL'), calLogo:brandCss('CALENDAR'), tgLogo:brandCss('TELEGRAM'),
       onTxCat:e => { const cat = e.target.value, t = tx, ttl = this.title(t), count = s.txs.filter(x => this.title(x) === ttl).length;
         if (count > 1) this.confirm({ title:'Terapkan ke semua?', body:`Terapkan kategori ${CAT_L[cat]} ke semua transaksi "${ttl}" (${count})? Transaksi lama ikut ke-update.`, primary:`Semua (${count})`, secondary:'Ini saja', danger:false,
@@ -1094,5 +1095,5 @@ export class V3Logic extends React.Component {
       toastMsg:s.toast, toastOpacity: s.toastOn ? 1 : 0, toastY: s.toastOn ? '0px' : '12px'
     };
   }
-  render() { const vm = this.renderVals(), p = this.state.iconPick; return <><V3Tree vm={vm} />{p && <div style={css(vm.themeStyle + ';display:contents')}><IconPicker title={p.title} current={p.current} onPick={p.onPick} onClose={() => this.setState({ iconPick:null })} /></div>}</>; }
+  render() { const vm = this.renderVals(), p = this.state.iconPick; return <><V3Tree vm={vm} />{p && <div style={{ ...vm.themeStyle, display:'contents' }}><IconPicker vm={vm} title={p.title} current={p.current} onPick={p.onPick} onClose={() => this.setState({ iconPick:null })} /></div>}</>; }
 }

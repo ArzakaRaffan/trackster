@@ -22,7 +22,12 @@ for (const [from, to, group] of DIRS) {
   for (const f of fs.readdirSync(dir).filter((x) => /\.svg$/i.test(x)).sort()) {
     const p = path.join(dir, f);
     if (/^undraw_/.test(f) || fs.statSync(p).size > MAX) continue;
-    fs.copyFileSync(p, path.join(OUT, to, f));
+    // Sebagian SVG sumber tak punya xmlns -> browser menolak merender sebagai gambar (<img>/background).
+    let svg = fs.readFileSync(p, 'utf8');
+    const open = svg.match(/<svg[^>]*>/i)?.[0] ?? '';
+    if (!/xmlns=/.test(open)) svg = svg.replace(/<svg/i, '<svg xmlns="http://www.w3.org/2000/svg"');
+    if (/xlink:href/.test(svg) && !/xmlns:xlink=/.test(svg)) svg = svg.replace(/<svg/i, '<svg xmlns:xlink="http://www.w3.org/1999/xlink"');
+    fs.writeFileSync(path.join(OUT, to, f), svg);
     // lucide = ikon garis monokrom (tema design system) -> dirender pakai mask supaya ikut warna teks
     items.push({ key: `${to}/${f}`, label: label(f), group: f.startsWith('lucide_') ? 'Ikon' : group });
   }
