@@ -403,11 +403,11 @@ export class AiFinanceToolsService {
       },
       {
         name: 'remember',
-        description: 'Simpan fakta tahan lama tentang Arzaka yang dia minta diingat secara eksplisit (mis. "ingat ya, aku...") — bukan buat angka yang sudah ada di database.',
+        description: 'Simpan fakta tahan lama tentang user yang dia minta diingat secara eksplisit (mis. "ingat ya, aku...") — bukan buat angka yang sudah ada di database.',
         input_schema: {
           type: 'object',
           properties: {
-            content: { type: 'string', description: 'Fakta, ditulis orang ketiga, contoh: "Arzaka ingin beli laptop ±Rp12jt sebelum Juni 2027"' },
+            content: { type: 'string', description: 'Fakta, ditulis orang ketiga, contoh: "User ingin beli laptop ±Rp12jt sebelum Juni 2027"' },
             kind: {
               type: 'string',
               enum: ['PROFILE', 'GOAL', 'PLAN', 'PREFERENCE', 'CONCERN', 'EVENT', 'DECISION'],
@@ -421,7 +421,7 @@ export class AiFinanceToolsService {
       },
       {
         name: 'forget',
-        description: 'Hapus (arsip) satu memory yang sudah tidak relevan — dipakai kalau Arzaka bilang "lupain yang itu" atau semacamnya.',
+        description: 'Hapus (arsip) satu memory yang sudah tidak relevan — dipakai kalau user bilang "lupain yang itu" atau semacamnya.',
         input_schema: {
           type: 'object',
           properties: {
@@ -433,7 +433,7 @@ export class AiFinanceToolsService {
       },
       {
         name: 'searchPastConversations',
-        description: 'Cari percakapan atau laporan lama yang mungkin relevan dengan pertanyaan Arzaka sekarang (mis. "dulu aku pernah nanya soal apa ya?"). Bukan buat data finansial presisi — pakai tool lain untuk itu.',
+        description: 'Cari percakapan atau laporan lama yang mungkin relevan dengan pertanyaan user sekarang (mis. "dulu aku pernah nanya soal apa ya?"). Bukan buat data finansial presisi — pakai tool lain untuk itu.',
         input_schema: {
           type: 'object',
           properties: {

@@ -5,6 +5,7 @@ import { AiMemoryService } from './ai-memory.service';
 import { BudgetAdvisorService } from '../budget/budget-advisor.service';
 import { BudgetOption } from '../budget/budget-advisor';
 import { startOfWibWeek, wibDateKey, startOfWibDay } from '../../common/wib';
+import { forUser, getUserName } from '../../common/persona';
 
 const BUDGET_EXPLAIN_PROMPT = `Kamu adalah Trackster AI. Dari 3 opsi budget mingguan (Hemat/Seimbang/Longgar,
 JSON) dan memory tentang Arzaka, pilih SATU opsi paling cocok minggu ini dan jelaskan kenapa singkat.
@@ -76,7 +77,7 @@ export class AiBudgetService {
       const memories = await this.aiMemoryService.listActive(userId, 10);
 
       const res = await this.aiService.chat({
-        system: BUDGET_EXPLAIN_PROMPT,
+        system: forUser(BUDGET_EXPLAIN_PROMPT, await getUserName(this.prisma, userId)),
         messages: [
           {
             role: 'user',

@@ -7,6 +7,7 @@ import { FinancialSnapshotService } from './financial-snapshot.service';
 import { AiMemoryService, parseMemoryOps } from './ai-memory.service';
 import { RetrievalService } from './retrieval.service';
 import { wibDateKey } from '../../common/wib';
+import { forUser, getUserName } from '../../common/persona';
 
 const MEMORY_EXTRACTION_SYSTEM_PROMPT = `Kamu mengekstrak fakta tahan lama tentang Arzaka dari satu giliran percakapan finansial.
 
@@ -21,7 +22,7 @@ atau {"op":"update","id":123,"content":"..."} atau {"op":"archive","id":123}`;
 
 // E04-S5: persona konsultan, ganti dari "financial buddy" generik (E04-S1..S4) ke alur konsultasi
 // yang lebih tegas.
-const FINANCIAL_ADVISOR_SYSTEM_PROMPT = `Kamu adalah Track — konsultan keuangan pribadi Arzaka (mahasiswa, pemasukan mingguan dari beberapa sumber yang nggak selalu tetap: les privat, magang, uang mingguan keluarga, Ruangguru, project sampingan). Bukan chatbot generik yang cuma jawab data, dan bukan penceramah yang menggurui.
+const FINANCIAL_ADVISOR_SYSTEM_PROMPT = `Kamu adalah Track — konsultan keuangan pribadi Arzaka (pemasukannya bisa dari beberapa sumber dan nggak selalu tetap — lihat memory & snapshot untuk profilnya). Bukan chatbot generik yang cuma jawab data, dan bukan penceramah yang menggurui.
 
 ALUR JAWAB untuk masalah/keputusan (mau beli sesuatu, atur budget, kejar goal, lagi bokek, dst):
 1. Pahami dulu — kalau BENAR-BENAR perlu, tanya maksimal SATU hal klarifikasi paling penting (jangan berondong pertanyaan sebelum ngasih apa-apa).
@@ -196,16 +197,17 @@ export class AiChatService {
       const memoryBlock = this.aiMemoryService.formatForPrompt(activeMemories);
       const retrievalBlock = this.retrievalService.formatForPrompt(retrieved);
 
+      const name = await getUserName(this.prisma, userId);
       const system = [
-        FINANCIAL_ADVISOR_SYSTEM_PROMPT,
-        `\nKondisi keuangan Arzaka saat ini:\n${snapshot}`,
+        forUser(FINANCIAL_ADVISOR_SYSTEM_PROMPT, name),
+        `\nKondisi keuangan ${name} saat ini:\n${snapshot}`,
         memoryBlock
-          ? `\nYang kamu tau tentang Arzaka dari percakapan sebelumnya (konteks, bukan angka presisi — tetap pakai tool buat angka):\n${memoryBlock}`
+          ? `\nYang kamu tau tentang ${name} dari percakapan sebelumnya (konteks, bukan angka presisi — tetap pakai tool buat angka):\n${memoryBlock}`
           : '',
         retrievalBlock
           ? `\nPercakapan/laporan lama yang mungkin relevan (rujuk kalau memang nyambung, jangan dipaksakan):\n${retrievalBlock}`
           : '',
-        thread.summary ? `\nRingkasan percakapan lama dengan Arzaka di thread ini:\n${thread.summary}` : '',
+        thread.summary ? `\nRingkasan percakapan lama dengan ${name} di thread ini:\n${thread.summary}` : '',
       ]
         .filter(Boolean)
         .join('\n');
@@ -338,7 +340,7 @@ export class AiChatService {
     const prompt = `Hari ini: ${wibDateKey(new Date())}.\n\nMemory aktif saat ini:\n${memoryList}\n\nPesan user: ${userText}\nBalasan asisten: ${assistantReply}`;
 
     const res = await this.aiService.chat({
-      system: MEMORY_EXTRACTION_SYSTEM_PROMPT,
+      system: forUser(MEMORY_EXTRACTION_SYSTEM_PROMPT, await getUserName(this.prisma, userId)),
       model: 'fast',
       messages: [{ role: 'user', content: prompt }],
       maxTokens: 400,

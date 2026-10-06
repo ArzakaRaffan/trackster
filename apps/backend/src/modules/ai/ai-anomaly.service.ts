@@ -3,6 +3,7 @@ import { Category } from '@prisma/client';
 import { PrismaService } from '../../prisma.service';
 import { AiService } from './ai.service';
 import { TelegramService } from '../telegram/telegram.service';
+import { forUser, getUserName } from '../../common/persona';
 
 const ANOMALY_SYSTEM_PROMPT = `Kamu adalah Trackster AI. Arzaka baru dapat transaksi yang jauh di atas kebiasaannya. Tulis SATU pesan Telegram singkat (maks 3 kalimat, Bahasa Indonesia santai) yang: 1) sebut transaksinya & seberapa di atas rata-rata biasanya, 2) tanya konfirmasi santai (bukan interogasi/menghakimi) apakah ini disengaja/wajar. Jangan pakai emoji lebih dari 2.`;
 
@@ -45,7 +46,7 @@ export class AiAnomalyService {
       if (!isAnomaly) return;
 
       const message = await this.aiService.chat({
-        system: ANOMALY_SYSTEM_PROMPT,
+        system: forUser(ANOMALY_SYSTEM_PROMPT, await getUserName(this.prisma, userId)),
         messages: [
           {
             role: 'user',

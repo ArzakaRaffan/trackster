@@ -3,6 +3,7 @@ import { PrismaService } from '../../prisma.service';
 import { AiService } from './ai.service';
 import { AnalyticsService } from '../analytics/analytics.service';
 import { wibDateKey } from '../../common/wib';
+import { forUser, getUserName } from '../../common/persona';
 
 const INSIGHT_CARD_PROMPT = `Kamu adalah Trackster AI. Dari data statistik keuangan periode ini (JSON), tulis PERSIS 3 poin
 tajam soal kondisi Arzaka — tiap poin satu kalimat pendek dengan angka nyata dari data, bukan generik/nasihat umum.
@@ -59,7 +60,7 @@ export class AiInsightCardService {
       const stats = await this.analyticsService.getPeriodStats(userId, start, end);
 
       const message = await this.aiService.chat({
-        system: INSIGHT_CARD_PROMPT,
+        system: forUser(INSIGHT_CARD_PROMPT, await getUserName(this.prisma, userId)),
         messages: [{ role: 'user', content: JSON.stringify(stats) }],
         maxTokens: 300,
         model: 'fast',

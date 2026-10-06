@@ -5,6 +5,7 @@ import { AnalyticsService, PeriodStats } from '../analytics/analytics.service';
 import { AiService } from '../ai/ai.service';
 import { startOfWibDay, wibRange, wibDateKey, wibParts, startOfWibMonth } from '../../common/wib';
 import { spend, sumSpend } from '../../common/spend';
+import { forUser, getUserName } from '../../common/persona';
 
 const NARRATIVE_PROMPT = `Kamu adalah Trackster AI - financial buddy personal Arzaka.
 Tugas: Tulis ringkasan laporan periode (minggu atau bulan) keuangan Arzaka dalam Bahasa Indonesia santai, 3-5 kalimat.
@@ -113,7 +114,7 @@ export class ReportService {
     let narrative: string | null = null;
     try {
       const res = await this.aiService.chat({
-        system: NARRATIVE_PROMPT,
+        system: forUser(NARRATIVE_PROMPT, await getUserName(this.prisma, userId)),
         messages: [{ role: 'user', content: JSON.stringify(stats) }],
         maxTokens: 400,
       });

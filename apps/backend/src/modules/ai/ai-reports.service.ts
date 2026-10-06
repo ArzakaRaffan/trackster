@@ -11,6 +11,7 @@ import { AnalyticsService } from '../analytics/analytics.service';
 import { ReportService } from '../report/report.service';
 import { forEachActiveUser } from '../../common/per-user';
 import { addWibDays, isLastWibDayOfMonth, startOfWibDay, startOfWibWeek, wibDateKey, wibRange } from '../../common/wib';
+import { forUser, getUserName } from '../../common/persona';
 
 const HEALTH_SCORE_COMMENTARY_PROMPT = `Kamu adalah Trackster AI. Berikan 1 kalimat reaksi manusiawi dan jujur terhadap Financial Health Score berikut.
 Jangan terlalu positif kalau skor rendah, tapi tetap konstruktif. Maks 20 kata. Bahasa Indonesia santai.`;
@@ -61,7 +62,7 @@ export class AiReportsService {
       if (today.totalSpent === 0 && today.totalIncome === 0) return; // nggak ada aktivitas, skip
 
       const narrative = await this.aiService.chat({
-        system: DAILY_RECAP_PROMPT,
+        system: forUser(DAILY_RECAP_PROMPT, await getUserName(this.prisma, userId)),
         messages: [{ role: 'user', content: JSON.stringify(today) }],
         maxTokens: 150,
         model: 'fast',
@@ -89,7 +90,7 @@ export class AiReportsService {
       if (!goals.length) return;
 
       const narrative = await this.aiService.chat({
-        system: GOAL_NUDGE_PROMPT,
+        system: forUser(GOAL_NUDGE_PROMPT, await getUserName(this.prisma, userId)),
         messages: [{ role: 'user', content: JSON.stringify(goals) }],
         maxTokens: 250,
       });
@@ -126,7 +127,7 @@ export class AiReportsService {
       const possibleDuplicates = this.findSimilarNames(active.map((s) => s.name));
 
       const narrative = await this.aiService.chat({
-        system: SUBSCRIPTION_REVIEW_PROMPT,
+        system: forUser(SUBSCRIPTION_REVIEW_PROMPT, await getUserName(this.prisma, userId)),
         messages: [
           {
             role: 'user',

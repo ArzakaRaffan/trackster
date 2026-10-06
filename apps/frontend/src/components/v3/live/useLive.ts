@@ -69,6 +69,7 @@ export function useLive(enabled: boolean, path: string, chatActive: number | nul
   const tipRes = useGet(k('/ai/mascot-tip'));
   const tidyRes = useGet(k('/transactions/uncategorized-merchants'));
   const billsRes = useGet(k('/split-bills'));
+  const meRes = useGet(k('/auth/me'));
   const sugRes = useGet(enabled && path.startsWith('/app/budget') ? '/ai/budget-suggestions' : null);
 
   const manual = useMemo(() => {
@@ -187,7 +188,16 @@ export function useLive(enabled: boolean, path: string, chatActive: number | nul
 
   const tidy = useMemo(() => (tidyRes.data ?? []).map((g: any) => ({ name: g.description, count: g.count, total: Number(g.totalAmount), repId: g.representativeId })), [tidyRes.data]);
 
-  const split = useMemo(() => ({ bills: (billsRes.data ?? []).map(mapBill) }), [billsRes.data]);
+  const split = useMemo(() => {
+    const bills = (billsRes.data ?? []).map(mapBill);
+    const last = bills.find((b: any) => b.acc);
+    const me = meRes.data;
+    return {
+      bills,
+      meName: me?.displayName || me?.username || '',
+      lastBank: last ? { bank: last.bank, acc: last.acc, accName: last.accName } : { bank: 'BCA', acc: '', accName: '' },
+    };
+  }, [billsRes.data, meRes.data]);
 
   // ---- sumber data (status email per bank + log) ----
   const srcInfo = useMemo(() => {
