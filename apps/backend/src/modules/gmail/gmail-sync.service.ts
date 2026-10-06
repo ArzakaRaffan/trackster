@@ -54,10 +54,10 @@ export class GmailSyncService {
   @Cron(CronExpression.EVERY_5_MINUTES, { name: SYNC_CRON_JOB_NAME })
   async handleCron() {
     // Satu mailbox per user yang punya token (saat ini hanya pemilik). Gagal di satu user tak menghentikan yang lain.
-    const tokens = await this.prisma.gmailToken.findMany({ where: { userId: { not: null } }, select: { userId: true } });
+    const tokens = await this.prisma.gmailToken.findMany({ select: { userId: true } });
     for (const { userId } of tokens) {
       try {
-        await this.syncEmails(userId as number);
+        await this.syncEmails(userId);
       } catch (err: any) {
         this.logger.error(`gmail-sync user ${userId} gagal: ${err?.message}`);
       }

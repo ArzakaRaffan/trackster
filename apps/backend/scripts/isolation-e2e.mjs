@@ -158,6 +158,23 @@ else {
     await call('DELETE', `/income-streams/${bStream.id}`, cookieB);
   });
 
+  // Pasca-C1 (ISO_PRE_C1=0): B menulis baris dengan kunci unik yang SAMA dengan milik A (unik kini komposit (userId, ...)) -> sukses, A tak bergeser.
+  if (!PRE_C1) {
+    await test('C1: B menulis kunci unik yang sama (saldo/budget/alias/income/laporan) tanpa error & tanpa menggeser A', async () => {
+      for (const [m, p, b] of [
+        ['PUT', '/balance/BCA', { newBalance: 777 }], ['PUT', '/budget', { budgets: [{ dayOfWeek: 1, amount: 11111 }] }],
+        ['POST', '/merchant-aliases', { rawDescription: `${TAG} raw`, displayName: 'b alias' }],
+        ['POST', '/income', { amount: 1, description: 'b', source: 'BCA', receivedAt: new Date().toISOString() }],
+      ]) {
+        const r = await call(m, p, cookieB, b);
+        expect(r.status >= 200 && r.status < 300, `B ${m} ${p} -> ${r.status} ${(await r.text()).slice(0, 120)}`);
+      }
+      for (const c of [cookieB, cookieA]) expect((await call('GET', '/reports/aggregate', c)).status < 300, '/reports/aggregate gagal');
+      const aBudget = JSON.stringify(await body(await call('GET', '/budget', cookieA)));
+      expect(!aBudget.includes('11111'), 'budget A tergeser oleh tulisan B');
+    });
+  }
+
   // (3) data A utuh sesudah semua percobaan B
   await test('data A utuh setelah serangan B', async () => {
     const t = await body(await call('GET', '/transactions', cookieA));
