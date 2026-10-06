@@ -94,15 +94,15 @@ Prasyarat: O1 terjawab. Lakukan di jam sepi. Siapkan **catatan NS lama** (`ns1bc
 ## 7. Onboarding user baru (operasional, setelah F5)
 
 ```bash
-docker compose -f docker-compose.prod.yml exec backend node scripts/user-invite.js --for "<nama>"   # cetak URL undangan (7 hari)
+docker compose -f docker-compose.prod.yml exec backend node prisma/user-admin.js invite --for "<nama>"   # cetak URL undangan (7 hari)
 # kirim URL ke tester lewat kanal pribadi (jangan publik). Setelah mereka daftar:
-docker compose -f docker-compose.prod.yml exec backend node scripts/user-list.js
+docker compose -f docker-compose.prod.yml exec backend node prisma/user-admin.js list
 # reset password (admin-issued)
-docker compose -f docker-compose.prod.yml exec backend node scripts/user-reset.js --username <u>   # cetak URL reset sekali pakai
+docker compose -f docker-compose.prod.yml exec backend node prisma/user-admin.js reset --username <u>   # cetak URL reset sekali pakai
 # nonaktifkan
-docker compose -f docker-compose.prod.yml exec backend node scripts/user-disable.js --username <u>
+docker compose -f docker-compose.prod.yml exec backend node prisma/user-admin.js disable --username <u>
 ```
-(Nama skrip final ditentukan saat F5; perbarui runbook ini.)
+(Satu skrip: `prisma/user-admin.js` — juga `enable --username <u>`. Env VPS opsional: `MAX_USERS` (default 10), `FRONTEND_URL` dipakai untuk membentuk URL.)
 
 ## 8. Menambah env di VPS (tanpa build)
 

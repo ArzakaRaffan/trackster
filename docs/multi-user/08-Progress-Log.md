@@ -109,3 +109,13 @@ deviasi dari rencana (+alasan), env baru yang Arzaka harus tambahkan, langkah be
 - **Belum / butuh Arzaka:** C1 belum diuji pada restore data nyata & belum di prod (⛔: backup → restore-drill → uji → baru deploy). P3-09/P3-10, P4-04 (menunggu O9), P4-06, P4-08. P0-04..06 (akses VPS) masih tertunda.
 - Deviasi: `CategoryIcon`/`BudgetSetting` tidak diberi indeks komposit tambahan; composite index `[userId, occurredAt]` dst. ditunda (data kecil, YAGNI).
 - Langkah berikutnya: F5 (auth & undangan) dikerjakan di branch memakai default P4/P14/O2 (CLI undangan, reset admin-issued, `MAX_USERS=10`) — **status P4/P14/O2 belum disetujui Arzaka**; kode mudah diubah.
+
+## 2026-10-07 — F5 Auth & undangan (kode selesai, belum merge)
+- Sesi oleh: Claude (Sonnet 5.5)   Branch: `feat/multi-user` (di-push)
+- **Selesai:** P5-01..08 (lihat Roadmap). Backend: guard cek status+tokenVersion; `register`/`change-password`/`reset-password`/`logout-all`; rate limit khusus auth; CLI `prisma/user-admin.js`; `scripts/auth-e2e.mjs` 9 skenario lulus; `isolation-e2e` 169 lulus. Frontend: `/invite/[code]`, `/reset/[token]`, middleware; diverifikasi di browser (daftar → `/app` kosong; reset password).
+- **Temuan penting:** `@nestjs/throttler` TIDAK dipakai untuk auth — `ThrottlerModule.forRoot` di `SplitBillModule` (5 per 10 menit) ikut terbaca `ThrottlerGuard` di controller lain sehingga login terbatasi 5/10 mnt/IP (terbukti: Retry-After ±600 dtk). Diganti guard sendiri. (Masalah serupa mungkin berlaku antar `split-bill`/`trip` — tidak diperiksa.) Juga ditambah `trust proxy 1` agar `req.ip` = IP klien di belakang Nginx (sebelumnya semua klien berbagi IP Nginx untuk throttle split-bill).
+- **Keputusan memakai default yang BELUM disetujui Arzaka:** P4 (CLI undangan), P14 (reset admin-issued), O2 (`MAX_USERS`=10). Mudah diubah.
+- **Env VPS (opsional):** `MAX_USERS`, pastikan `FRONTEND_URL` benar (dipakai CLI untuk URL undangan; default `https://trackster.dev`). Tes-only: `AUTH_CACHE_MS`, `AUTH_THROTTLE_LIMIT` — jangan diset di prod.
+- **Efek ke Arzaka saat deploy:** cookie lama tetap valid (tv=0). `disable` via CLI efektif ≤30 dtk.
+- Belum: UI ganti-password di Settings; keluar/masuk lagi di prod; P5-09 ⛔ merge/deploy; rotasi `JWT_SECRET` (menunggu F6).
+- Langkah berikutnya: F6 (API token & ingest manual) — butuh jawaban O7 (perangkat tester) untuk bentuk akhir; kerangka `ApiToken` + `/ingest/transaction|income` dengan `Idempotency-Key` (P7) bisa dikerjakan tanpa O7.
