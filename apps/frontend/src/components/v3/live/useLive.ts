@@ -31,7 +31,7 @@ const STATUS_ROW: Record<string, [string, string, string]> = {
 const mapAnyTx = (t: any) => ({
   id: t.id, d: undefined as number | undefined, dl: dayLabelOf(wibISO(new Date(t.occurredAt).getTime())), raw: t.description,
   alias: t.displayDescription && t.displayDescription !== t.description ? t.displayDescription : null, cap: t.aiCaption || null, src: t.source,
-  time: wibHHMM(t.occurredAt), cat: t.category, amt: Number(t.amount) - Number(t.reimbursedAmount || 0), note: t.note || '', icon: t.icon || null,
+  time: wibHHMM(t.occurredAt), cat: t.category, amt: Number(t.amount) - Number(t.reimbursedAmount || 0), gross: Number(t.amount), note: t.note || '', icon: t.icon || null,
 });
 const monthAnchor = (off: number) => { const [y, m] = wibISO().split('-').map(Number); const d = new Date(Date.UTC(y, m - 1 + off, 15)); return d.toISOString().slice(0, 10); };
 
@@ -85,7 +85,7 @@ export function useLive(enabled: boolean, path: string, chatActive: number | nul
       const d = dates.dateIdx[wibISO(new Date(t.occurredAt).getTime())];
       if (d === undefined) continue;
       const alias = t.displayDescription && t.displayDescription !== t.description ? t.displayDescription : null;
-      out.push({ id: t.id, d, raw: t.description, alias, cap: t.aiCaption || null, src: t.source, time: wibHHMM(t.occurredAt), cat: t.category, amt: Number(t.amount) - Number(t.reimbursedAmount || 0), note: t.note || '', icon: t.icon || null });
+      out.push({ id: t.id, d, raw: t.description, alias, cap: t.aiCaption || null, src: t.source, time: wibHHMM(t.occurredAt), cat: t.category, amt: Number(t.amount) - Number(t.reimbursedAmount || 0), gross: Number(t.amount), note: t.note || '', icon: t.icon || null });
     }
     return out.sort((a, b) => a.d - b.d || a.time.localeCompare(b.time));
   }, [txRes.data, dates]);
@@ -241,6 +241,10 @@ export function useLive(enabled: boolean, path: string, chatActive: number | nul
       },
       catAll: (id: number, cat: string) => api.patch(`/transactions/${id}/category`, { category: cat, applyToAll: true }),
       delTx: (id: number) => api.delete(`/transactions/${id}`),
+      rbList: (txId: number) => api.get<any[]>(`/reimbursements?transactionId=${txId}`),
+      rbAdd: (txId: number, name: string, amount: number) => api.post('/reimbursements', { transactionId: txId, personName: name, amount }),
+      rbReceive: (id: number, source: string) => api.post(`/reimbursements/${id}/received`, { source }),
+      rbDel: (id: number) => api.delete(`/reimbursements/${id}`),
       addTx: (x: { amount: number; desc: string; cat: string; src: string; dateISO: string }) =>
         api.post('/transactions', {
           amount: x.amount, description: x.desc, category: x.cat, source: x.src,
