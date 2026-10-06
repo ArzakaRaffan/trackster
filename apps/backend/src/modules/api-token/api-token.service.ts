@@ -55,7 +55,7 @@ export class ApiTokenService {
     if (now - (touched.get(row.id) ?? 0) > TOUCH_MS) {
       if (touched.size > 5000) touched.clear();
       touched.set(row.id, now);
-      this.prisma.apiToken.update({ where: { id: row.id }, data: { lastUsedAt: new Date(now) } }).catch(() => {});
+      this.prisma.apiToken.updateMany({ where: { id: row.id, userId: row.userId }, data: { lastUsedAt: new Date(now) } }).catch(() => {});
     }
     return { userId: row.userId, tokenId: row.id };
   }
