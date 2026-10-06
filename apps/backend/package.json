@@ -12,7 +12,8 @@
     "check": "node scripts/run-checks.mjs",
     "tenancy-audit": "node scripts/tenancy-audit.mjs",
     "isolation-e2e": "node scripts/isolation-e2e.mjs",
-    "golden": "node scripts/golden-snapshot.mjs"
+    "golden": "node scripts/golden-snapshot.mjs",
+    "user": "node prisma/user-admin.js"
   },
   "prisma": {
     "seed": "node prisma/seed.js"

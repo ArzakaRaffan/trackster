@@ -6,6 +6,7 @@
 //   ISO_A_USER/ISO_A_PASS = user dengan data;  ISO_B_USER/ISO_B_PASS = user kosong (bagian 2 aktif hanya bila keduanya diset)
 //
 // Bagian 1 (sudah aktif di F0): setiap rute privat tanpa cookie → 401. Tak punya efek samping (guard menolak sebelum handler).
+// Catatan: tes C1 (ISO_PRE_C1=0) meninggalkan baris tulisan B (saldo/budget/alias/income) — pakai user B baru/kosong tiap run.
 // Bagian 2 (F2): user B tak melihat data A di endpoint list; by-id milik A → 404/403.
 const baseIdx = process.argv.indexOf('--base');
 const BASE = baseIdx >= 0 ? process.argv[baseIdx + 1] : 'http://localhost:4000';
@@ -37,7 +38,7 @@ const PRIVATE = [
   ['POST', '/ai/memory'], ['POST', '/ai/chat'], ['POST', '/ai/threads'], ['POST', '/ai/threads/1/messages'], ['POST', '/ai/threads/1/messages/stream'],
   ['POST', '/ai/suggest-category'], ['POST', '/ai/reports/trigger-weekly'], ['POST', '/ai/reports/trigger-health-score'],
   ['PATCH', '/ai/memory/1'], ['PATCH', '/ai/threads/1'], ['DELETE', '/ai/memory/1'], ['DELETE', '/ai/threads/1'],
-  ['GET', '/analytics/stats'], ['GET', '/auth/me'],
+  ['GET', '/analytics/stats'], ['GET', '/auth/me'], ['POST', '/auth/change-password'], ['POST', '/auth/logout-all'],
   ['GET', '/balance'], ['PUT', '/balance/BCA'], ['GET', '/balance/BCA/adjustments'],
   ['GET', '/budget-allocation/preview'], ['POST', '/budget-allocation/trigger-weekly'],
   ['GET', '/budget'], ['GET', '/budget/rollover'], ['GET', '/budget/today'], ['GET', '/budget/runway'], ['GET', '/budget/suggestions'],
