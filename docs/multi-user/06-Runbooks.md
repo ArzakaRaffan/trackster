@@ -104,6 +104,19 @@ docker compose -f docker-compose.prod.yml exec backend node prisma/user-admin.js
 ```
 (Satu skrip: `prisma/user-admin.js` — juga `enable --username <u>`. Env VPS opsional: `MAX_USERS` (default 10), `FRONTEND_URL` dipakai untuk membentuk URL.)
 
+### 7b. Shortcut iPhone / input manual (setelah F6)
+
+User membuat token di **Setting → Shortcut** (maks 5 aktif; plaintext `trk_…` hanya tampil sekali, DB menyimpan hash SHA-256). Endpoint (Bearer, bukan cookie):
+
+| Pintu | Body JSON | Header wajib |
+| --- | --- | --- |
+| `POST /ingest/transaction` | `amount` (angka/teks angka), `description` (≤200), `source` (`BCA\|JAGO\|BNI\|MANDIRI\|RAYA\|BRI`) · opsional `category`, `occurredAt` | `Authorization: Bearer trk_…`, `Idempotency-Key` (8–100 karakter `A-Za-z0-9._:-`) |
+| `POST /ingest/income` | `amount`, `description`, `source` · opsional `receivedAt`, `streamId`, `streamName` | sama |
+
+Balasan: `201 {success, duplicate:false, id, message}`; kunci yang sama → `200 {duplicate:true}` (tidak mencatat/menggerakkan saldo lagi). `400` validasi, `401` token salah/dicabut/user nonaktif, `429` >60 req/menit/token.
+Shortcut iOS: aksi **Get Contents of URL** (POST, JSON) + dua header di atas; kunci unik = *Format Date* `yyyyMMddHHmmssSSS` + *Random Number*. Android (O7 belum dijawab): HTTP Shortcuts / Tasker dengan request yang sama.
+`source` sengaja wajib (tak ada dompet default). Mencabut semua akses seorang user: `user-admin.js disable` (token ikut ditolak ≤30 dtk) atau user mencabut token sendiri.
+
 ## 8. Menambah env di VPS (tanpa build)
 
 `.env` VPS **tidak** dikelola git/CD. Edit manual via SSH, lalu `docker compose -f docker-compose.prod.yml up -d` (bukan `--build`). Setiap fase yang butuh env baru

@@ -77,8 +77,8 @@ Setup: user A (data lengkap: transaksi, income, goal, thread, memori, alias, …
 | `split-bills` (privat) | POST `/`, scan-receipt · GET `/`, `:id` · PATCH `:id/items/:itemId/assign` | [ ] |
 | `split-bills` (publik) | POST public · GET manage/:ownerToken, public/:slug · PATCH manage/…, public/…/mark-paid — **tak berubah; tes bahwa tetap bekerja tanpa login** | [ ] |
 | `trips` | POST `/` (privat) · POST public, GET manage/:ownerToken, public/:slug, PATCH manage/…/expenses (publik) | [ ] |
-| (baru) `ingest` | POST transaction, income, email | [ ] |
-| (baru) `api-tokens` | GET/POST/DELETE | [ ] |
+| (baru) `ingest` | POST transaction, income (Bearer ApiToken; `email` = F7) | [x] `ingest-e2e` (18 skenario, 2026-10-07) + 401 tanpa token di `isolation-e2e` |
+| (baru) `api-tokens` | GET/POST/DELETE | [x] `ingest-e2e` (A tak bisa cabut token B → 404) + 401 tanpa cookie di `isolation-e2e` |
 | (baru) `onboarding`/`profile`/`own-accounts` | semua | [ ] |
 
 Tambahan tes lintas-rute: (a) **dua user, dua sesi bersamaan** — tindakan A tak memengaruhi B (saldo, budget today, alert log, rollover); (b) hapus transaksi A tak menyentuh saldo B;

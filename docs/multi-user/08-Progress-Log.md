@@ -119,3 +119,16 @@ deviasi dari rencana (+alasan), env baru yang Arzaka harus tambahkan, langkah be
 - **Efek ke Arzaka saat deploy:** cookie lama tetap valid (tv=0). `disable` via CLI efektif ≤30 dtk.
 - Belum: UI ganti-password di Settings; keluar/masuk lagi di prod; P5-09 ⛔ merge/deploy; rotasi `JWT_SECRET` (menunggu F6).
 - Langkah berikutnya: F6 (API token & ingest manual) — butuh jawaban O7 (perangkat tester) untuk bentuk akhir; kerangka `ApiToken` + `/ingest/transaction|income` dengan `Idempotency-Key` (P7) bisa dikerjakan tanpa O7.
+
+## 2026-10-07 — F6 API token & ingest manual (kode selesai, belum merge) — sesi lanjutan ("lanjutin multi-user")
+- Sesi oleh: Claude (Sonnet 5.5)   Branch: `feat/multi-user` (turunan `main`, di-push)   Commit: lihat `git log` ("F6 backend", "F6 frontend")
+- Dasar: Arzaka minta lanjut di `feat/multi-user` dan membaca semua docs. Status awal: F0–F5 selesai di branch, **belum ada yang di `main`/prod**. Dikerjakan F6 memakai default P7 (`Idempotency-Key` wajib) — **P7 masih PROPOSED**, O7 (perangkat tester) belum dijawab → panduan Android = HTTP Shortcuts/Tasker generik.
+- **Selesai (terverifikasi di scratch Postgres lokal, bukan data nyata):** P6-01, 02, 03, 07; P6-04 sebagian (panduan di app + Runbook §7b; *belum* ada berkas `.shortcut`/gambar langkah).
+  - Backend: `modules/api-token` + `common/guards/api-token.guard.ts` + `modules/ingest`; `IncomeService.createQuick` menerima `{externalId, receivedAt, streamId}` (dedup + unik P2002).
+  - Frontend: tab Shortcut (jalur resmi: edit `.dc.html` → `node scripts/dc-to-tsx.mjs` → `logic.tsx` → `useLive.ts`; regenerasi sebelum edit = nol diff, jadi diff hanya perubahan ini).
+  - Verifikasi: `tsc` backend+frontend bersih; build backend bersih (`dist`+tsbuildinfo dihapus dulu) dan `next build` lolos; `npm run check` 24/24; `tenancy-audit` 0; `ingest-e2e` 18/18; `isolation-e2e` 113 lulus; browser (Chromium): alur buat→salin→pakai→cabut + mobile + /demo, console bersih kecuali 401 yang sengaja.
+- **Temuan:** (1) env sesi cloud ini menyetel `COOKIE_DOMAIN=.track.trackster.my.id` & `FRONTEND_URL` domain lama → login lewat browser di localhost "berhasil 201 tapi tetap di /login"; jalankan backend uji dengan `COOKIE_DOMAIN=` kosong. (2) `.env.example`/docs masih menyebut domain lama di beberapa tempat (sebagian sudah dirapikan di F0). (3) Alert over-budget kini ada di dua tempat (Gmail sync + ingest) sampai Gmail dihapus (F7).
+- **Belum / butuh Arzaka:** P6-04 (rancang & uji Shortcut sungguhan di iPhone), P6-05 (pindahkan Shortcut Arzaka → token baru), P6-06 (hapus `/income/quick` + rotasi `JWT_SECRET` — **urutannya setelah P6-05**), P6-08 ⛔ merge/deploy. Persetujuan P1/P4/P7/P8/P13/P14/O2 masih diminta.
+- Env VPS baru: tidak ada (`INGEST_RATE_LIMIT` hanya untuk tes — jangan diset di prod).
+- Docs diperbarui: Roadmap (F6 dicentang+catatan), 04-Checklist (baris ingest/api-tokens), 06-Runbooks §7b, Codemap, README (status).
+- **Langkah berikutnya:** (1) Arzaka: coba tab Shortcut + buat Shortcut iPhone, jawab O7, setujui P7. (2) Setelah itu P6-05/06 (butuh akses VPS/ponsel). (3) Tanpa menunggu: F7 hanya bisa disiapkan sebagian (kode `/ingest/email` + parser MIME) tetapi butuh O1/O8 dan persetujuan DNS untuk sisanya.
