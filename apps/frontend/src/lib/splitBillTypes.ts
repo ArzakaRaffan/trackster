@@ -48,6 +48,7 @@ export interface SplitBillListItem {
 export interface ParticipantTotal {
   participantId: number;
   name: string;
+  avatar?: string | null;
   isPaid: boolean;
   paidAt: string | null;
   subtotal: number;

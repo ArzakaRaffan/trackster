@@ -13,6 +13,7 @@ import { EMPTY_REPORT } from './live/reports';
 import { IconPicker } from './IconPicker';
 import { iconCss, iconLabel, brandCss, autoIcon } from '@/lib/icons';
 import { avatarCss } from '../../lib/avatars';
+import { AvatarPicker } from '../avatar/AvatarPicker';
 import { css } from './css';
 import { stateToPath, pathToState } from '@/lib/v3-routes';
 
@@ -438,10 +439,12 @@ export class V3Logic extends React.Component {
     let sd = { fees:[], totals:[], items:[] };
     if (b) { const c = this.splitCalc(b), fees = [];
       if (c.disc) fees.push({ label:'Diskon', value:'−' + RP(c.disc), color:'var(--success-text)' }); if (c.svc) fees.push({ label:'Service', value:RP(c.svc), color:'var(--text)' }); if (c.tax) fees.push({ label:'Pajak', value:RP(c.tax), color:'var(--text)' }); if (c.del) fees.push({ label:'Lainnya', value:RP(c.del), color:'var(--text)' });
+      const personAv = id => (b.people.find(x => x.id === id) || {}).avatar || null;
+      const pickAv = (id, name) => this.setState({ avPick:{ name, value:personAv(id), onSave:avatar => { this.setState(z => ({ avPick:null, split:{ ...z.split, bills:z.split.bills.map(x => x.id === b.id ? { ...x, people:x.people.map(q => q.id === id ? { ...q, avatar } : q) } : x) } })); return this.liveCall(() => this.props.live.actions.splitAvatar(b.slug, id, avatar)) || this.toast('Avatar disimpan.'); } } });
       const togglePaid = id => { this.setState(z => ({ split:{ ...z.split, bills:z.split.bills.map(x => x.id === b.id ? { ...x, paid: x.paid.includes(id) ? x.paid.filter(y => y !== id) : [...x.paid, id] } : x) } })); this.liveCall(() => this.props.live.actions.splitPaid(b.slug, id)); };
       const toggleWho = (itemId, pid) => { const cur = (b.items.find(i => i.id === itemId) || { who:[] }).who, nxt = cur.includes(pid) ? cur.filter(w => w !== pid) : [...cur, pid]; this.setState(z => ({ split:{ ...z.split, bills:z.split.bills.map(x => x.id === b.id ? { ...x, items:x.items.map(i => i.id === itemId ? { ...i, who:nxt } : i) } : x) } })); this.liveCall(() => this.props.live.actions.splitAssign(b.id, itemId, nxt)); };
       sd = { name:b.resto, date:fmtD(b.date), people:b.people.length, grand:RP(c.grand), fees, slug:b.slug, hasBank:!!b.acc, bank:b.bank, acc:b.acc, accName:b.accName, itemCount:c.items.length,
-        totals:c.totals.map(t => { const paid = b.paid.includes(t.id); return { name:t.name, initial:t.name.charAt(0).toUpperCase(), avCss:avatarCss(t.name), breakdown:`Subtotal ${RP(t.subtotal)} ${t.fee >= 0 ? '+' : '−'} fee ${RP(t.fee)}`, total:RP(t.total), paidStr:String(paid), status: paid ? 'Lunas' : 'Belum', bg: paid ? 'var(--success-subtle)' : 'var(--danger-subtle)', fg: paid ? 'var(--success-text)' : 'var(--danger-text)', togglePaid:() => togglePaid(t.id) }; }),
+        totals:c.totals.map(t => { const paid = b.paid.includes(t.id); return { name:t.name, initial:t.name.charAt(0).toUpperCase(), avCss:avatarCss(t.name, personAv(t.id)), pickAv:() => pickAv(t.id, t.name), breakdown:`Subtotal ${RP(t.subtotal)} ${t.fee >= 0 ? '+' : '−'} fee ${RP(t.fee)}`, total:RP(t.total), paidStr:String(paid), status: paid ? 'Lunas' : 'Belum', bg: paid ? 'var(--success-subtle)' : 'var(--danger-subtle)', fg: paid ? 'var(--success-text)' : 'var(--danger-text)', togglePaid:() => togglePaid(t.id) }; }),
         items:c.items.map(i => ({ desc:i.desc, qty: Number(i.qty) > 1 ? ` ×${i.qty}` : '', line:RP(lineOf(i)), who: i.who.length ? i.who.map(w => (b.people.find(p => p.id === w) || {}).name).filter(Boolean).join(', ') : 'semua', chips:chipsFor(b.people, i.who, pid => toggleWho(i.id, pid)) })) }; }
     return {
       isSplit:s.page === 'split', isSplitNew:s.page === 'splitNew', isSplitDetail:s.page === 'splitDetail',
@@ -1106,5 +1109,5 @@ export class V3Logic extends React.Component {
       toastMsg:s.toast, toastOpacity: s.toastOn ? 1 : 0, toastY: s.toastOn ? '0px' : '12px'
     };
   }
-  render() { const vm = this.renderVals(), p = this.state.iconPick; return <><V3Tree vm={vm} />{p && <div style={{ ...vm.themeStyle, display:'contents' }}><IconPicker vm={vm} title={p.title} current={p.current} onPick={p.onPick} onClose={() => this.setState({ iconPick:null })} /></div>}</>; }
+  render() { const vm = this.renderVals(), p = this.state.iconPick; return <><V3Tree vm={vm} />{p && <div style={{ ...vm.themeStyle, display:'contents' }}><IconPicker vm={vm} title={p.title} current={p.current} onPick={p.onPick} onClose={() => this.setState({ iconPick:null })} /></div>}{this.state.avPick && <div style={{ ...vm.themeStyle, display:'contents' }}><AvatarPicker name={this.state.avPick.name} value={this.state.avPick.value} onSave={this.state.avPick.onSave} onClose={() => this.setState({ avPick:null })} /></div>}</>; }
 }

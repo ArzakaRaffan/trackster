@@ -1,10 +1,15 @@
 import { Type } from 'class-transformer';
-import { ArrayMinSize, IsArray, IsInt, IsISO8601, IsNumber, IsOptional, IsString, Min, MinLength, ValidateNested } from 'class-validator';
+import { ArrayMinSize, IsArray, IsInt, IsISO8601, IsNumber, IsOptional, IsString, Matches, Min, MinLength, ValidateNested } from 'class-validator';
+import { AVATAR_SPEC_RE } from './set-avatar.dto';
 
 class ParticipantInputDto {
   @IsString()
   @MinLength(1)
   name: string;
+
+  @IsOptional()
+  @Matches(AVATAR_SPEC_RE)
+  avatar?: string;
 }
 
 class ItemInputDto {

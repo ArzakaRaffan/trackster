@@ -7,6 +7,7 @@ import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { CreateSplitBillDto } from './dto/create-split-bill.dto';
 import { AssignSharesDto } from './dto/assign-shares.dto';
 import { ScanReceiptDto } from './dto/scan-receipt.dto';
+import { SetAvatarDto } from './dto/set-avatar.dto';
 
 @Controller('split-bills')
 export class SplitBillController {
@@ -90,6 +91,11 @@ export class SplitBillController {
   }
 
   // Tanpa JwtAuthGuard secara sengaja — lihat komentar di SplitBillService.togglePaidPublic.
+  @Patch('public/:slug/participants/:participantId/avatar')
+  async setAvatarPublic(@Param('slug') slug: string, @Param('participantId', ParseIntPipe) participantId: number, @Body() dto: SetAvatarDto) {
+    return this.splitBillService.setAvatarPublic(slug, participantId, dto.avatar);
+  }
+
   @Patch('public/:slug/participants/:participantId/mark-paid')
   async markPaidPublic(@Param('slug') slug: string, @Param('participantId', ParseIntPipe) participantId: number) {
     return this.splitBillService.togglePaidPublic(slug, participantId);

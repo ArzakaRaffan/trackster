@@ -302,6 +302,7 @@ export function useLive(enabled: boolean, path: string, chatActive: number | nul
         if (payer) await api.patch(`/split-bills/public/${created.publicSlug}/participants/${payer.id}/mark-paid`, {});
         return created.id as number;
       },
+      splitAvatar: (slug: string, pid: number, avatar: string) => api.patch(`/split-bills/public/${slug}/participants/${pid}/avatar`, { avatar }),
       splitPaid: (slug: string, pid: number) => api.patch(`/split-bills/public/${slug}/participants/${pid}/mark-paid`, {}),
       splitAssign: (billId: number, itemId: number, pids: number[]) => api.patch(`/split-bills/${billId}/items/${itemId}/assign`, { shares: pids.map((participantId) => ({ participantId, weight: 1 })) }),
       scanReceipt: (imageBase64: string) => api.post<{ items: { description: string; amount: number; quantity: number }[] }>('/split-bills/scan-receipt', { imageBase64 }),
