@@ -1,6 +1,7 @@
 export interface TripMemberSummary {
   id: number;
   name: string;
+  avatar?: string | null;
 }
 
 export interface TripExpenseSummary {

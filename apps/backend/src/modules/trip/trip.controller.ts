@@ -1,10 +1,11 @@
-import { Body, Controller, Get, Param, Patch, Post, Req, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Param, ParseIntPipe, Patch, Post, Req, UseGuards } from '@nestjs/common';
 import { Request } from 'express';
 import { ThrottlerGuard } from '@nestjs/throttler';
 import { TripService } from './trip.service';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { CreateTripDto } from './dto/create-trip.dto';
 import { AddExpenseDto } from './dto/add-expense.dto';
+import { SetAvatarDto } from '../split-bill/dto/set-avatar.dto';
 
 @Controller('trips')
 export class TripController {
@@ -37,6 +38,11 @@ export class TripController {
     @Body() dto: AddExpenseDto,
   ) {
     return this.tripService.addExpenseByOwnerToken(ownerToken, dto);
+  }
+
+  @Patch('manage/:ownerToken/members/:memberId/avatar')
+  async setMemberAvatar(@Param('ownerToken') ownerToken: string, @Param('memberId', ParseIntPipe) memberId: number, @Body() dto: SetAvatarDto) {
+    return this.tripService.setMemberAvatarByOwnerToken(ownerToken, memberId, dto.avatar);
   }
 
   // Tanpa auth — temen buka link share cuma buat lihat + lihat settle-up.

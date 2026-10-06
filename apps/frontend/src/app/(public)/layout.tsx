@@ -3,7 +3,7 @@ import '../(legal)/legal.css';
 import './pub.css';
 
 export const metadata: Metadata = {
-  title: { default: 'Trackster — Split Bill', template: '%s — Trackster' },
+  title: { default: 'Trackster — Alat keuangan gratis', template: '%s — Trackster' },
   metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL || 'https://trackster.dev'),
 };
 

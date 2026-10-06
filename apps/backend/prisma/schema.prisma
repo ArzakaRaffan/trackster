@@ -384,6 +384,8 @@ model TripMember {
   tripId Int
   trip   Trip @relation(fields: [tripId], references: [id], onDelete: Cascade)
   name   String
+  // Spec avatar kartun pilihan pembuat trip (lihat SplitBillParticipant.avatar); null = diturunkan dari nama di frontend.
+  avatar String?
 
   expensesPaid TripExpense[]
   shares       TripExpenseShare[]
