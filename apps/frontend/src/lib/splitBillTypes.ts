@@ -2,6 +2,7 @@ export interface SplitBillParticipant {
   id: number;
   splitBillId: number;
   name: string;
+  avatar?: string | null;
   isPaid: boolean;
   paidAt: string | null;
 }
