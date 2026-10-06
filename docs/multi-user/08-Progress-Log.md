@@ -99,3 +99,13 @@ deviasi dari rencana (+alasan), env baru yang Arzaka harus tambahkan, langkah be
 - Arzaka menyetujui P2 (bot bersama). Diimplementasi backward-compatible: pemilik tetap jalan lewat `TelegramConfig` lama sampai ditautkan; token env `TELEGRAM_BOT_TOKEN` dipakai bila ada (**pastikan nilainya = token bot Arzaka di `.env` VPS sebelum deploy**, kalau tidak token config lama dipakai).
 - `npm run check` 21/21, tenancy-audit 0, build bersih. **Belum diuji dengan bot Telegram sungguhan** (P3-09) dan belum di-push (menunggu backup prod + izin Arzaka).
 - Sisa F3: P3-07 (prompt AI/nama hardcode frontend), P3-09, P3-10.
+
+## 2026-10-06/07 — F3 selesai (kode) + F4 + C1 siap — sesi lanjutan ("lanjut sampai usage habis, push ke feat/multi-user")
+- Sesi oleh: Claude (Sonnet 5.5)   Branch: `feat/multi-user` (di-push ke origin; **tidak** ke `main`, CD tidak jalan)
+- **Selesai (terverifikasi di scratch Postgres 5434, bukan data nyata):**
+  - P3-07: prompt AI per-user (`common/persona.ts`), wizard Split Bill pakai `/auth/me`, rekening contoh Arzaka tak lagi masuk state live. `tsc` backend & frontend bersih.
+  - P4-01..03: runner `forEachActiveUser` (durasi/status, jitter 30 dtk untuk 7 job AI/Telegram), laporan periode tidak dibuat untuk periode sebelum user ada; `per-user.check.ts`.
+  - **C1 (P4-07) siap**: migrasi `20261007100000_multiuser_contract` — backfill ulang di awal (idempoten) → `userId NOT NULL` ×23 tabel → unik global jadi komposit → PK `CategoryIcon (userId, category)` → `BudgetSetting.userId` unik. Disusun dari `prisma migrate diff` dikurangi drift raw-SQL lama. Diuji: DB berisi baris NULL (ter-backfill), DB kosong, deploy berurutan; `migrate diff` pasca-migrasi = 3 drift lama saja; `npm run check` 22/22; `tenancy-audit` 0; build bersih; `isolation-e2e` **169 lulus** dengan `ISO_PRE_C1=0` (tes baru: user B menulis kunci unik yang sama dgn A → sukses & A tak bergeser). Hazard "user kedua memblokir user pertama" (log 2026-10-06 F2) **hilang** setelah C1.
+- **Belum / butuh Arzaka:** C1 belum diuji pada restore data nyata & belum di prod (⛔: backup → restore-drill → uji → baru deploy). P3-09/P3-10, P4-04 (menunggu O9), P4-06, P4-08. P0-04..06 (akses VPS) masih tertunda.
+- Deviasi: `CategoryIcon`/`BudgetSetting` tidak diberi indeks komposit tambahan; composite index `[userId, occurredAt]` dst. ditunda (data kecil, YAGNI).
+- Langkah berikutnya: F5 (auth & undangan) dikerjakan di branch memakai default P4/P14/O2 (CLI undangan, reset admin-issued, `MAX_USERS=10`) — **status P4/P14/O2 belum disetujui Arzaka**; kode mudah diubah.
