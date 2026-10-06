@@ -70,6 +70,18 @@ export class TelegramWebhookController {
 
     // 4. Validasi chat ID — cegah orang lain ngobrol ke bot dan baca data finansial
     const incomingChatId = message.chat?.id?.toString();
+
+    // Tautan bot bersama: `/start <kode>` dari chat yang belum dikenal (kode dibuat user di Settings).
+    const start = /^\/start\s+(\S+)/.exec(message.text);
+    if (start && incomingChatId) {
+      const linked = await this.telegramService.linkChatByCode(incomingChatId, start[1]);
+      await this.telegramService.sendToChat(
+        incomingChatId,
+        linked ? '✅ Telegram terhubung ke Trackster. Notifikasi & chat AI aktif di sini.' : 'Kode tidak valid atau sudah kedaluwarsa. Buat kode baru di Trackster → Settings.',
+      );
+      return { ok: true };
+    }
+
     const config = incomingChatId ? await this.telegramService.getConfigByChatId(incomingChatId) : null;
 
     if (!config || !config.userId) {

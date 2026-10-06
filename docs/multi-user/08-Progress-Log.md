@@ -94,3 +94,8 @@ deviasi dari rencana (+alasan), env baru yang Arzaka harus tambahkan, langkah be
 - `/auth/me` memuat `displayName`/`role`/`onboardedAt`.
 - **Belum:** P3-05 (bot Telegram bersama — butuh persetujuan P2), P3-06/07 (prompt AI "Arzaka", frontend nama hardcode), P3-09 verifikasi hidup, backfill-owner prod.
 - Fallback env `OWNER_*` masih ada di satu tempat (`getOwnerContext`) agar Arzaka tidak berubah perilaku sebelum skrip backfill dijalankan.
+
+## 2026-10-06 (malam, lanjutan) — P2 disetujui → F3 P3-05/06
+- Arzaka menyetujui P2 (bot bersama). Diimplementasi backward-compatible: pemilik tetap jalan lewat `TelegramConfig` lama sampai ditautkan; token env `TELEGRAM_BOT_TOKEN` dipakai bila ada (**pastikan nilainya = token bot Arzaka di `.env` VPS sebelum deploy**, kalau tidak token config lama dipakai).
+- `npm run check` 21/21, tenancy-audit 0, build bersih. **Belum diuji dengan bot Telegram sungguhan** (P3-09) dan belum di-push (menunggu backup prod + izin Arzaka).
+- Sisa F3: P3-07 (prompt AI/nama hardcode frontend), P3-09, P3-10.

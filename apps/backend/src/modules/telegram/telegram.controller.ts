@@ -19,6 +19,11 @@ export class TelegramController {
     return this.telegramService.updateConfig(user.id, dto);
   }
 
+  @Post('link-code')
+  async linkCode(@CurrentUser() user: AuthUser) {
+    return this.telegramService.createLinkCode(user.id);
+  }
+
   @Post('test')
   async test(@CurrentUser() user: AuthUser) {
     return this.telegramService.sendTest(user.id);
