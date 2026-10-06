@@ -123,7 +123,7 @@ export class V3Logic extends React.Component {
       const z = [0, 0, 0, 0, 0, 0, 0], bal = { balance:0, updated:Date.now(), adj:[] };
       this.state = { ...this.state, txs:[], manual:z, streams:[], incomes:[], subs:[], goals:[], mem:[], pending:false, synced:'',
         chat:{ ...this.state.chat, threads:[] }, split:{ ...this.state.split, bills:[] },
-        st:{ ...this.state.st, gmail:false, tgConfigured:false, tgPreview:'', tgChat:'', logs:[], aliases:[], balances:{ BCA:{ ...bal }, JAGO:{ ...bal } } } };
+        st:{ ...this.state.st, gmail:false, tgConfigured:false, tgPreview:'', tgChat:'', logs:[], aliases:[], tokens:[], balances:{ BCA:{ ...bal }, JAGO:{ ...bal } } } };
       v3SetupDates(z); this.state.st = { ...this.state.st, bfAfter:addDaysISO(TODAY_ISO, -14), bfBefore:TODAY_ISO };
     }
   }
@@ -150,7 +150,7 @@ export class V3Logic extends React.Component {
     mem:[{ id:1, kind:'GOAL', content:'Arzaka ingin beli laptop ±Rp12jt sebelum Maret 2027.', imp:3, until:null, archived:false }, { id:2, kind:'PREFERENCE', content:'Lebih suka budget weekend lebih longgar daripada weekday.', imp:2, until:null, archived:false },
       { id:3, kind:'EVENT', content:'Nikahan sepupu di Bandung, perlu ongkos dan kado.', imp:2, until:'2026-10-18', archived:false }, { id:4, kind:'PROFILE', content:'Kerja part-time di kafe tiap Sabtu, les privat 4–5 sesi seminggu.', imp:3, until:null, archived:false },
       { id:5, kind:'CONCERN', content:'Khawatir tabungan darurat belum cukup 3 bulan.', imp:1, until:null, archived:false }, { id:6, kind:'PLAN', content:'Mau berhenti langganan Netflix mulai Oktober.', imp:1, until:null, archived:true }],
-    st:{ tab:0, gmail:true, tgConfigured:true, tgPreview:'712345…9QxZ', tgChat:'6642095960', tgEvery:false, tgResult:null, nextRun:Date.now() + 4 * 60000 + 12000, syncing:false, syncResult:null,
+    st:{ tab:0, tokens:[{ id:1, label:'iPhone', prefix:'trk_k3Fq', createdAt:Date.now() - 6 * 86400000, lastUsedAt:Date.now() - 3 * 3600000, revokedAt:null }], tokNew:null, tokLabel:'', tokBusy:false, tokHowOpen:false, gmail:true, tgConfigured:true, tgPreview:'712345…9QxZ', tgChat:'6642095960', tgEvery:false, tgResult:null, nextRun:Date.now() + 4 * 60000 + 12000, syncing:false, syncResult:null,
       bfOpen:false, bfAfter:'2026-09-05', bfBefore:'2026-09-18', bfBusy:false, bfResult:null, plStatus:'UNPARSED', histOpen:null, aliasEdit:null, aliasDraft:'',
       logs:[{ id:'18f2a91c', status:'UNPARSED', subject:'Transaksi Kartu Debit BCA', from:'bca@bca.co.id', reason:'Format nominal tidak dikenali', date:'29 Sep, 21.14' }, { id:'18f29d02', status:'UNPARSED', subject:'Kamu baru saja transfer', from:'noreply@jago.com', reason:'Tidak ada nama penerima', date:'27 Sep, 10.02' },
         { id:'18f1b7aa', status:'ERROR', subject:'Notifikasi QRIS', from:'bca@bca.co.id', reason:'Timeout saat membaca email', date:'25 Sep, 12.40' }, { id:'18f1a0f0', status:'EXCLUDED', subject:'Promo cashback 50%', from:'promo@jago.com', reason:'Email promosi', date:'24 Sep, 09.00' },
@@ -293,17 +293,30 @@ export class V3Logic extends React.Component {
   batch3(s, off) {
     const t = s.st, mmss = sec => `${Math.floor(sec / 60)}:${String(sec % 60).padStart(2, '0')}`;
     const left = Math.max(0, Math.floor((t.nextRun - (s.nowTick || Date.now())) / 1000));
-    const tabs = ['Koneksi','Sinkronisasi','Saldo bank','Alias merchant'];
+    const tabs = ['Koneksi','Sinkronisasi','Saldo bank','Alias merchant','Shortcut'];
     const PL = { UNPARSED:'Gagal dibaca', ERROR:'Error', EXCLUDED:'Dikecualikan', DUPLICATE:'Duplikat', RECORDED:'Tercatat' };
     const logs = t.logs.filter(l => l.status === t.plStatus);
     const setT = patch => this.setState(z => ({ st:{ ...z.st, ...patch } }));
     const fmtDT = ms => new Date(ms).toLocaleString('id-ID', { day:'numeric', month:'short', hour:'2-digit', minute:'2-digit' });
     const bf = s.bf || {}, curBal = s.bf ? t.balances[s.bf.src].balance : 0, newB = Number(digits(bf.amount)) || 0, d = newB - curBal;
     const tf = s.tf || {}, tfOk = !!(tf.token || '').trim() && !!(tf.chat || '').trim();
+    const tokOk = !!(t.tokLabel || '').trim() && !t.tokBusy;
     return {
       isSettings:s.page === 'settings',
       setTabs:tabs.map((l, i) => ({ label:l, selected:String(t.tab === i), bg: t.tab === i ? 'var(--text)' : 'var(--neutral)', fg: t.tab === i ? 'var(--page)' : 'var(--text)', hover: t.tab === i ? 'var(--text)' : 'var(--neutral-hover)', onClick:() => setT({ tab:i }) })),
       setConn:t.tab === 0, setSync:t.tab === 1, setBal:t.tab === 2, setAlias:t.tab === 3,
+      setTok:t.tab === 4, hasTokNew:!!t.tokNew, tokNew:t.tokNew, tokLabel:t.tokLabel, onTokLabel:e => setT({ tokLabel:e.target.value }),
+      tokOff:String(!tokOk), tokBtnBg: tokOk ? 'var(--brand)' : off[0], tokBtnFg: tokOk ? 'var(--on-brand)' : off[1], tokBtn: t.tokBusy ? 'Membuat...' : 'Buat token',
+      tokEmpty:t.tokens.length === 0, tokApi: this.props.live !== undefined ? (process.env.NEXT_PUBLIC_API_URL || 'https://api.trackster.dev') : 'https://api.trackster.dev',
+      tokHowExpanded:String(!!t.tokHowOpen), tokHowRot: t.tokHowOpen ? '180deg' : '0deg', tokHowRows: t.tokHowOpen ? '1fr' : '0fr', tokHowTab: t.tokHowOpen ? 0 : -1, toggleTokHow:() => setT({ tokHowOpen:!t.tokHowOpen }),
+      doneTok:() => setT({ tokNew:null }),
+      copyTok:() => { const v = t.tokNew; if (typeof navigator !== 'undefined' && navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(v).then(() => this.toast('Token disalin.')).catch(() => this.toast('Gagal menyalin. Salin manual dari kotak.')); else this.toast('Salin manual dari kotak.'); },
+      createTok:() => { const label = (t.tokLabel || '').trim(); if (!label || t.tokBusy) return;
+        if (this.props.live !== undefined) { setT({ tokBusy:true }); this.props.live.actions.tokCreate(label).then(r => this.props.live.refresh().then(() => setT({ tokBusy:false, tokLabel:'', tokNew:r.token }))).catch(e => { setT({ tokBusy:false }); this.toast((e && e.message) || 'Gagal membuat token.'); }); return; }
+        const tok = 'trk_' + Math.random().toString(36).slice(2).padEnd(40, 'x').slice(0, 40); setT({ tokens:[{ id:Date.now(), label, prefix:tok.slice(0, 8), createdAt:Date.now(), lastUsedAt:null, revokedAt:null }, ...t.tokens], tokLabel:'', tokNew:tok }); },
+      tokRows:t.tokens.map(x => ({ label:x.label, active:!x.revokedAt, revoked:!!x.revokedAt, color: x.revokedAt ? 'var(--text-subtlest)' : 'var(--text)',
+        meta:`${x.prefix}… · ${x.revokedAt ? 'dicabut ' + fmtDT(x.revokedAt) : x.lastUsedAt ? 'terakhir dipakai ' + fmtDT(x.lastUsedAt) : 'belum pernah dipakai'}`,
+        revoke:() => this.confirm({ title:'Cabut token?', body:`Shortcut yang memakai "${x.label}" langsung berhenti bekerja. Ini tidak bisa dibatalkan.`, primary:'Cabut', secondary:'Batal', danger:true, onPrimary:() => { setT({ tokens:t.tokens.map(y => y.id === x.id ? { ...y, revokedAt:Date.now() } : y) }); this.liveCall(() => this.props.live.actions.tokRevoke(x.id)); this.toast('Token dicabut.'); } }) })),
       askLogout:() => this.confirm({ title:'Keluar dari Trackster?', body:'Kamu perlu login lagi untuk buka dashboard.', primary:'Keluar', secondary:'Batal', danger:true, onPrimary:() => { if (this.props.live !== undefined) { api.post('/auth/logout').catch(() => {}).then(() => { window.location.href = '/login'; }); } else this.toast('Keluar… mengarahkan ke halaman login.'); } }),
       gm: t.gmail ? { connected:true, notConnected:false, status:'Terhubung', color:'var(--success-text)', bg:'var(--success-subtle)', sub:t.gmailEmail ?? 'rizky.arzaka@gmail.com' } : { connected:false, notConnected:true, status:'Belum terhubung', color:'var(--text-subtle)', bg:'var(--neutral)', sub:'Transaksi nggak akan tercatat otomatis' },
       askDisconnect:() => this.confirm({ title:'Putuskan Google?', body:'Trackster berhenti membaca email bank dan reminder Calendar nggak di-sync lagi.', primary:'Putuskan', secondary:'Batal', danger:true, onPrimary:() => { setT({ gmail:false }); this.liveCall(() => this.props.live.actions.gmailDisconnect()); this.toast('Google diputuskan.'); } }),

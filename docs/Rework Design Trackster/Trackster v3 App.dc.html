@@ -760,6 +760,45 @@ input::placeholder,textarea::placeholder{color:var(--text-subtlest,#8C8C8C)}
         </ul>
       </section>
     </sc-if>
+
+      <sc-if value="{{ setTok }}" hint-placeholder-val="{{ false }}">
+        <section style="background:var(--card);box-shadow:var(--shadow-card);border-radius:10px;padding:var(--pad);display:flex;flex-direction:column;gap:14px">
+          <p style="margin:0;font-size:14px;line-height:20px;color:var(--text-subtle);text-wrap:pretty">Token untuk Shortcut iPhone atau aplikasi HTTP: catat pengeluaran dan pemasukan tanpa membuka Trackster. Token hanya tampil sekali. Simpan di Shortcut, jangan dibagikan.</p>
+          <sc-if value="{{ hasTokNew }}" hint-placeholder-val="{{ false }}">
+            <div role="status" style="background:var(--warning-subtle);border-radius:10px;padding:14px;display:flex;flex-direction:column;gap:10px">
+              <span style="font-size:13px;font-weight:700;color:var(--warning-text)">Token baru. Salin sekarang, tidak akan ditampilkan lagi.</span>
+              <span style="font-family:'DM Mono',monospace;font-size:13px;line-height:20px;word-break:break-all;user-select:all;color:var(--text)">{{ tokNew }}</span>
+              <div style="display:flex;gap:8px;flex-wrap:wrap">
+                <button onClick="{{ copyTok }}" style="height:36px;padding:0 16px;border:0;border-radius:6px;background:var(--text);color:var(--page);font-size:14px;font-weight:700;cursor:pointer">Salin token</button>
+                <button onClick="{{ doneTok }}" style="height:36px;padding:0 14px;border:0;border-radius:8px;background:transparent;color:var(--text-subtle);font-size:14px;font-weight:600;cursor:pointer">Sudah saya simpan</button>
+              </div>
+            </div>
+          </sc-if>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end">
+            <label style="flex:1;min-width:200px;display:flex;flex-direction:column;gap:6px"><span style="font-size:13px;font-weight:600;color:var(--text-subtle)">Nama token</span><input value="{{ tokLabel }}" onChange="{{ onTokLabel }}" maxlength="60" placeholder="Contoh: iPhone" style="height:42px;border:0;border-radius:10px;background:var(--neutral);color:var(--text);padding:0 12px;font-size:14px;box-shadow:inset 0 0 0 1px var(--border)" /></label>
+            <button onClick="{{ createTok }}" aria-disabled="{{ tokOff }}" style="height:42px;padding:0 18px;border:0;border-radius:6px;background:{{ tokBtnBg }};color:{{ tokBtnFg }};font-size:14px;font-weight:700;cursor:pointer">{{ tokBtn }}</button>
+          </div>
+          <sc-if value="{{ tokEmpty }}" hint-placeholder-val="{{ false }}"><p style="margin:0;font-size:14px;color:var(--text-subtle)">Belum ada token.</p></sc-if>
+          <ul style="list-style:none;margin:0 -8px;padding:0">
+            <sc-for list="{{ tokRows }}" as="x" hint-placeholder-count="1">
+              <li style="display:flex;align-items:center;gap:12px;min-height:var(--row-h);padding:6px 6px 6px 12px;border-radius:12px;box-sizing:border-box" style-hover="background:var(--hover)">
+                <span style="flex:1;min-width:0;display:flex;flex-direction:column"><span style="font-size:15px;font-weight:600;color:{{ x.color }}">{{ x.label }}</span><span style="font-family:'DM Mono',monospace;font-size:12px;color:var(--text-subtlest)">{{ x.meta }}</span></span>
+                <sc-if value="{{ x.active }}" hint-placeholder-val="{{ true }}"><button onClick="{{ x.revoke }}" aria-label="Cabut token {{ x.label }}" style="height:34px;padding:0 12px;border:0;border-radius:8px;background:transparent;color:var(--danger-text);font-size:13px;font-weight:600;cursor:pointer" style-hover="background:var(--hover)">Cabut</button></sc-if>
+              </li>
+            </sc-for>
+          </ul>
+          <div style="border-top:1.5px dashed var(--border);margin:0 calc(var(--pad) * -1);padding:0 var(--pad)">
+            <button onClick="{{ toggleTokHow }}" aria-expanded="{{ tokHowExpanded }}" style="width:100%;height:48px;border:0;background:transparent;color:var(--text);display:flex;align-items:center;gap:8px;padding:0;font-size:15px;font-weight:600;cursor:pointer;text-align:left"><span style="flex:1">Cara pakai di Shortcut</span><span style="display:flex;color:var(--text-subtle);transform:rotate({{ tokHowRot }});transition:transform 200ms"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="{{ ic.chevD }}" /></svg></span></button>
+            <div style="display:grid;grid-template-rows:{{ tokHowRows }};transition:grid-template-rows 250ms cubic-bezier(.2,0,0,1)"><div style="overflow:hidden"><div style="padding:4px 0 8px;display:flex;flex-direction:column;gap:8px;font-size:13px;line-height:19px;color:var(--text-subtle)">
+              <span>Tambah aksi <b>Get Contents of URL</b>, metode <b>POST</b>, isi <b>JSON</b>.</span>
+              <span style="font-family:'DM Mono',monospace;font-size:12px;word-break:break-all;color:var(--text)">{{ tokApi }}/ingest/transaction</span>
+              <span>Untuk pemasukan: <span style="font-family:'DM Mono',monospace;font-size:12px;color:var(--text)">/ingest/income</span></span>
+              <span><b>Header:</b> <span style="font-family:'DM Mono',monospace;font-size:12px;color:var(--text)">Authorization: Bearer &lt;token&gt;</span> dan <span style="font-family:'DM Mono',monospace;font-size:12px;color:var(--text)">Idempotency-Key</span> berisi teks unik tiap catatan (8–100 karakter huruf/angka, mis. tanggal-jam + angka acak). Kunci yang sama dianggap kirim ulang, tidak dicatat dua kali.</span>
+              <span><b>Isi JSON:</b> <span style="font-family:'DM Mono',monospace;font-size:12px;color:var(--text)">amount</span> (angka), <span style="font-family:'DM Mono',monospace;font-size:12px;color:var(--text)">description</span>, <span style="font-family:'DM Mono',monospace;font-size:12px;color:var(--text)">source</span> (BCA, JAGO, BNI, MANDIRI, RAYA, BRI). Opsional: <span style="font-family:'DM Mono',monospace;font-size:12px;color:var(--text)">category</span>, <span style="font-family:'DM Mono',monospace;font-size:12px;color:var(--text)">occurredAt</span> / <span style="font-family:'DM Mono',monospace;font-size:12px;color:var(--text)">receivedAt</span> (ISO 8601).</span>
+            </div></div></div>
+          </div>
+        </section>
+      </sc-if>
     <p style="margin:0;text-align:center;font-size:12px;color:var(--text-subtlest)">API: https://api.trackster.app</p>
   </div>
   </sc-if>
@@ -1408,7 +1447,7 @@ class Component extends DCLogic {
     mem:[{ id:1, kind:'GOAL', content:'Arzaka ingin beli laptop ±Rp12jt sebelum Maret 2027.', imp:3, until:null, archived:false }, { id:2, kind:'PREFERENCE', content:'Lebih suka budget weekend lebih longgar daripada weekday.', imp:2, until:null, archived:false },
       { id:3, kind:'EVENT', content:'Nikahan sepupu di Bandung, perlu ongkos dan kado.', imp:2, until:'2026-10-18', archived:false }, { id:4, kind:'PROFILE', content:'Kerja part-time di kafe tiap Sabtu, les privat 4–5 sesi seminggu.', imp:3, until:null, archived:false },
       { id:5, kind:'CONCERN', content:'Khawatir tabungan darurat belum cukup 3 bulan.', imp:1, until:null, archived:false }, { id:6, kind:'PLAN', content:'Mau berhenti langganan Netflix mulai Oktober.', imp:1, until:null, archived:true }],
-    st:{ tab:0, gmail:true, tgConfigured:true, tgPreview:'712345…9QxZ', tgChat:'6642095960', tgEvery:false, tgResult:null, nextRun:Date.now() + 4 * 60000 + 12000, syncing:false, syncResult:null,
+    st:{ tab:0, tokens:[{ id:1, label:'iPhone', prefix:'trk_k3Fq', createdAt:Date.now() - 6 * 86400000, lastUsedAt:Date.now() - 3 * 3600000, revokedAt:null }], tokNew:null, tokLabel:'', tokBusy:false, tokHowOpen:false, gmail:true, tgConfigured:true, tgPreview:'712345…9QxZ', tgChat:'6642095960', tgEvery:false, tgResult:null, nextRun:Date.now() + 4 * 60000 + 12000, syncing:false, syncResult:null,
       bfOpen:false, bfAfter:'2026-09-05', bfBefore:'2026-09-18', bfBusy:false, bfResult:null, plStatus:'UNPARSED', histOpen:null, aliasEdit:null, aliasDraft:'',
       logs:[{ id:'18f2a91c', status:'UNPARSED', subject:'Transaksi Kartu Debit BCA', from:'bca@bca.co.id', reason:'Format nominal tidak dikenali', date:'29 Sep, 21.14' }, { id:'18f29d02', status:'UNPARSED', subject:'Kamu baru saja transfer', from:'noreply@jago.com', reason:'Tidak ada nama penerima', date:'27 Sep, 10.02' },
         { id:'18f1b7aa', status:'ERROR', subject:'Notifikasi QRIS', from:'bca@bca.co.id', reason:'Timeout saat membaca email', date:'25 Sep, 12.40' }, { id:'18f1a0f0', status:'EXCLUDED', subject:'Promo cashback 50%', from:'promo@jago.com', reason:'Email promosi', date:'24 Sep, 09.00' },
@@ -1504,17 +1543,29 @@ class Component extends DCLogic {
   batch3(s, off) {
     const t = s.st, mmss = sec => `${Math.floor(sec / 60)}:${String(sec % 60).padStart(2, '0')}`;
     const left = Math.max(0, Math.floor((t.nextRun - (s.nowTick || Date.now())) / 1000));
-    const tabs = ['Koneksi','Sinkronisasi','Saldo bank','Alias merchant'];
+    const tabs = ['Koneksi','Sinkronisasi','Saldo bank','Alias merchant','Shortcut'];
     const PL = { UNPARSED:'Gagal dibaca', ERROR:'Error', EXCLUDED:'Dikecualikan', DUPLICATE:'Duplikat', RECORDED:'Tercatat' };
     const logs = t.logs.filter(l => l.status === t.plStatus);
     const setT = patch => this.setState(z => ({ st:{ ...z.st, ...patch } }));
     const fmtDT = ms => new Date(ms).toLocaleString('id-ID', { day:'numeric', month:'short', hour:'2-digit', minute:'2-digit' });
     const bf = s.bf || {}, curBal = s.bf ? t.balances[s.bf.src].balance : 0, newB = Number(digits(bf.amount)) || 0, d = newB - curBal;
     const tf = s.tf || {}, tfOk = !!(tf.token || '').trim() && !!(tf.chat || '').trim();
+    const tokOk = !!(t.tokLabel || '').trim() && !t.tokBusy;
     return {
       isSettings:s.page === 'settings',
       setTabs:tabs.map((l, i) => ({ label:l, selected:String(t.tab === i), bg: t.tab === i ? 'var(--text)' : 'var(--neutral)', fg: t.tab === i ? 'var(--page)' : 'var(--text)', hover: t.tab === i ? 'var(--text)' : 'var(--neutral-hover)', onClick:() => setT({ tab:i }) })),
       setConn:t.tab === 0, setSync:t.tab === 1, setBal:t.tab === 2, setAlias:t.tab === 3,
+      setTok:t.tab === 4, hasTokNew:!!t.tokNew, tokNew:t.tokNew, tokLabel:t.tokLabel, onTokLabel:e => setT({ tokLabel:e.target.value }),
+      tokOff:String(!tokOk), tokBtnBg: tokOk ? 'var(--brand)' : off[0], tokBtnFg: tokOk ? 'var(--on-brand)' : off[1], tokBtn: t.tokBusy ? 'Membuat...' : 'Buat token',
+      tokEmpty:t.tokens.length === 0, tokApi: 'https://api.trackster.dev',
+      tokHowExpanded:String(!!t.tokHowOpen), tokHowRot: t.tokHowOpen ? '180deg' : '0deg', tokHowRows: t.tokHowOpen ? '1fr' : '0fr', tokHowTab: t.tokHowOpen ? 0 : -1, toggleTokHow:() => setT({ tokHowOpen:!t.tokHowOpen }),
+      doneTok:() => setT({ tokNew:null }),
+      copyTok:() => { const v = t.tokNew; if (typeof navigator !== 'undefined' && navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(v).then(() => this.toast('Token disalin.')).catch(() => this.toast('Gagal menyalin. Salin manual dari kotak.')); else this.toast('Salin manual dari kotak.'); },
+      createTok:() => { const label = (t.tokLabel || '').trim(); if (!label || t.tokBusy) return;
+        const tok = 'trk_' + Math.random().toString(36).slice(2).padEnd(40, 'x').slice(0, 40); setT({ tokens:[{ id:Date.now(), label, prefix:tok.slice(0, 8), createdAt:Date.now(), lastUsedAt:null, revokedAt:null }, ...t.tokens], tokLabel:'', tokNew:tok }); },
+      tokRows:t.tokens.map(x => ({ label:x.label, active:!x.revokedAt, revoked:!!x.revokedAt, color: x.revokedAt ? 'var(--text-subtlest)' : 'var(--text)',
+        meta:`${x.prefix}… · ${x.revokedAt ? 'dicabut ' + fmtDT(x.revokedAt) : x.lastUsedAt ? 'terakhir dipakai ' + fmtDT(x.lastUsedAt) : 'belum pernah dipakai'}`,
+        revoke:() => this.confirm({ title:'Cabut token?', body:`Shortcut yang memakai "${x.label}" langsung berhenti bekerja. Ini tidak bisa dibatalkan.`, primary:'Cabut', secondary:'Batal', danger:true, onPrimary:() => { setT({ tokens:t.tokens.map(y => y.id === x.id ? { ...y, revokedAt:Date.now() } : y) }); this.toast('Token dicabut.'); } }) })),
       askLogout:() => this.confirm({ title:'Keluar dari Trackster?', body:'Kamu perlu login lagi untuk buka dashboard.', primary:'Keluar', secondary:'Batal', danger:true, onPrimary:() => this.toast('Keluar… mengarahkan ke halaman login.') }),
       gm: t.gmail ? { connected:true, notConnected:false, status:'Terhubung', color:'var(--success-text)', bg:'var(--success-subtle)', sub:'rizky.arzaka@gmail.com' } : { connected:false, notConnected:true, status:'Belum terhubung', color:'var(--text-subtle)', bg:'var(--neutral)', sub:'Transaksi nggak akan tercatat otomatis' },
       askDisconnect:() => this.confirm({ title:'Putuskan Google?', body:'Trackster berhenti membaca email bank dan reminder Calendar nggak di-sync lagi.', primary:'Putuskan', secondary:'Batal', danger:true, onPrimary:() => { setT({ gmail:false }); this.toast('Google diputuskan.'); } }),

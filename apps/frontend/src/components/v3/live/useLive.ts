@@ -55,6 +55,7 @@ export function useLive(enabled: boolean, path: string, chatActive: number | nul
   const goalsRes = useGet(k('/goal'));
   const gmailRes = useGet(k('/gmail/status'));
   const tgRes = useGet(k('/telegram/status'));
+  const tokRes = useGet(k('/api-tokens'));
   const nextRunRes = useGet(k('/sync/next-run'), { refreshInterval: 30_000 });
   const balRes = useGet(k('/balance'));
   const adjBca = useGet(k('/balance/BCA/adjustments'));
@@ -165,10 +166,11 @@ export function useLive(enabled: boolean, path: string, chatActive: number | nul
       tgConfigured: !!tg?.configured, tgPreview: tg?.botTokenPreview ?? '', tgChat: tg?.chatId ?? '', tgEvery: !!tg?.notifyEveryTransaction,
       nextRun: nextRunRes.data?.nextRunAt ? new Date(nextRunRes.data.nextRunAt).getTime() : Date.now(),
       balances: { BCA: bal.BCA ?? empty, JAGO: bal.JAGO ?? empty },
+      tokens: (tokRes.data ?? []).map((x: any) => ({ id: x.id, label: x.label, prefix: x.prefix, createdAt: new Date(x.createdAt).getTime(), lastUsedAt: x.lastUsedAt ? new Date(x.lastUsedAt).getTime() : null, revokedAt: x.revokedAt ? new Date(x.revokedAt).getTime() : null })),
       aliases: (aliasRes.data ?? []).map((a: any) => ({ id: a.id, name: a.displayName ?? '', raw: a.rawDescription, icon: a.icon || null })),
       logs: (parseLogRes.data ?? []).map((l: any) => ({ id: l.emailId, status: l.status, subject: l.subject, from: l.from, reason: l.reason, date: wibLogDate(l.receivedAt) })),
     };
-  }, [gmailRes.data, tgRes.data, nextRunRes.data, balRes.data, adjBca.data, adjJago.data, aliasRes.data, parseLogRes.data]);
+  }, [gmailRes.data, tgRes.data, tokRes.data, nextRunRes.data, balRes.data, adjBca.data, adjJago.data, aliasRes.data, parseLogRes.data]);
   const catIcons = useMemo(() => Object.fromEntries((catIconRes.data ?? []).map((c: any) => [c.category, c.icon])), [catIconRes.data]);
 
   const synced = useMemo(() => {
@@ -293,6 +295,8 @@ export function useLive(enabled: boolean, path: string, chatActive: number | nul
       saveTelegram: (botToken: string, chatId: string) => api.put('/telegram/config', { botToken, chatId }),
       tgNotify: (v: boolean) => api.put('/telegram/config', { notifyEveryTransaction: v }),
       tgTest: () => api.post<{ success: boolean }>('/telegram/test'),
+      tokCreate: (label: string) => api.post<{ id: number; token: string }>('/api-tokens', { label }),
+      tokRevoke: (id: number) => api.delete(`/api-tokens/${id}`),
       correctBalance: (source: string, newBalance: number, note: string) => api.put(`/balance/${source}`, { newBalance, note: note || undefined }),
       chatSend: async (threadId: number | null, text: string) => {
         let id = threadId;
