@@ -578,6 +578,7 @@
     "closeMenus"
   ],
   "Modal": [
+    "addRb",
     "aliasBtnColor",
     "aliasOff",
     "askDeleteTx",
@@ -653,6 +654,9 @@
     "mfSet",
     "onAlias",
     "onNote",
+    "onRbAmt",
+    "onRbName",
+    "onRbSrc",
     "onSimCut",
     "onTxCat",
     "pickIcon",
