@@ -29,9 +29,9 @@ export class GmailController {
     const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
     try {
       await this.gmailAuthService.handleCallback(code, state);
-      return res.redirect(`${frontendUrl}/settings?gmail=connected`);
+      return res.redirect(`${frontendUrl}/app/settings?gmail=connected`);
     } catch (err) {
-      return res.redirect(`${frontendUrl}/settings?gmail=error&message=${encodeURIComponent(err.message)}`);
+      return res.redirect(`${frontendUrl}/app/settings?gmail=error&message=${encodeURIComponent(err.message)}`);
     }
   }
 

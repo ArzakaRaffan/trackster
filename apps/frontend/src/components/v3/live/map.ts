@@ -88,7 +88,7 @@ const fmtIn = (v: unknown) => (Number(v) ? Number(v).toLocaleString('id-ID') : '
 const pct = (v: unknown) => (Number(v) > 0 ? String(Number(v)) : '');
 export const mapBill = (b: any) => ({
   id: b.id, slug: b.publicSlug, resto: b.restaurantName, date: String(b.billDate).slice(0, 10), bank: b.payerBankName ?? '', acc: b.payerAccountNumber ?? '', accName: b.payerAccountName ?? '',
-  people: (b.participants ?? []).map((p: any) => ({ id: p.id, name: p.name })),
+  people: (b.participants ?? []).map((p: any) => ({ id: p.id, name: p.name, avatar: p.avatar ?? null })),
   paid: (b.participants ?? []).filter((p: any) => p.isPaid).map((p: any) => p.id),
   items: (b.items ?? []).map((i: any) => ({ id: i.id, desc: i.description, amount: fmtIn(i.amount), qty: String(i.quantity ?? 1), who: (i.shares ?? []).map((s: any) => s.participantId) })),
   discPct: pct(b.discountPercent), discAmt: fmtIn(b.discountAmount), svcPct: pct(b.servicePercent), svcAmt: fmtIn(b.serviceFeeAmount), taxPct: pct(b.taxPercent), taxAmt: fmtIn(b.taxAmount),

@@ -464,6 +464,8 @@ model SplitBillParticipant {
   splitBillId Int
   splitBill   SplitBill @relation(fields: [splitBillId], references: [id], onDelete: Cascade)
   name        String
+  // Spec avatar kartun pilihan user ("gaya.kulit.rambut.latar.baju.kacamata"); null = diturunkan dari nama di frontend.
+  avatar      String?
   isPaid      Boolean   @default(false)
   paidAt      DateTime?
 
@@ -520,6 +522,8 @@ model TripMember {
   tripId Int
   trip   Trip   @relation(fields: [tripId], references: [id], onDelete: Cascade)
   name   String
+  // Spec avatar kartun pilihan pembuat trip (lihat SplitBillParticipant.avatar); null = diturunkan dari nama di frontend.
+  avatar String?
 
   expensesPaid TripExpense[]
   shares       TripExpenseShare[]

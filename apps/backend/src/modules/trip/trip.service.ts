@@ -63,7 +63,7 @@ export class TripService {
       currency: trip.currency,
       createdAt: trip.createdAt,
       totalSpent: trip.expenses.reduce((s, e) => s + Number(e.amount), 0),
-      members: trip.members.map((m) => ({ id: m.id, name: m.name })),
+      members: trip.members.map((m) => ({ id: m.id, name: m.name, avatar: m.avatar })),
       expenses: trip.expenses.map((e) => ({
         id: e.id,
         description: e.description,
@@ -91,7 +91,7 @@ export class TripService {
 
       const members: TripMember[] = [];
       for (const m of dto.members) {
-        members.push(await tx.tripMember.create({ data: { tripId: trip.id, name: m.name } }));
+        members.push(await tx.tripMember.create({ data: { tripId: trip.id, name: m.name, avatar: m.avatar } }));
       }
 
       for (const e of dto.expenses) {
@@ -169,6 +169,15 @@ export class TripService {
 
   async findByOwnerToken(ownerToken: string) {
     return this.summary(await this.getTripByOwnerTokenOrThrow(ownerToken));
+  }
+
+  /** Ganti avatar anggota — cuma pembuat trip (ownerToken); link publik trip itu read-only. */
+  async setMemberAvatarByOwnerToken(ownerToken: string, memberId: number, avatar: string) {
+    const trip = await this.prisma.trip.findUnique({ where: { ownerToken } });
+    if (!trip) throw new NotFoundException('Trip tidak ditemukan');
+    const { count } = await this.prisma.tripMember.updateMany({ where: { id: memberId, tripId: trip.id }, data: { avatar } });
+    if (!count) throw new NotFoundException('Anggota tidak ditemukan');
+    return { memberId, avatar };
   }
 
   async addExpenseByOwnerToken(ownerToken: string, dto: AddExpenseDto) {

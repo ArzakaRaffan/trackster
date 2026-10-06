@@ -11,6 +11,7 @@ type BillWithDetails = SplitBill & { participants: SplitBillParticipant[], items
 
 export interface ParticipantTotal extends ParticipantResult {
   name: string;
+  avatar: string | null;
   isPaid: boolean;
   paidAt: Date | null;
 }
@@ -50,6 +51,7 @@ export class SplitBillService {
       return {
         ...r,
         name: p.name,
+        avatar: p.avatar,
         isPaid: p.isPaid,
         paidAt: p.paidAt,
       };
@@ -84,7 +86,7 @@ export class SplitBillService {
       for (const p of dto.participants) {
         participants.push(
           await tx.splitBillParticipant.create({
-            data: { splitBillId: bill.id, name: p.name },
+            data: { splitBillId: bill.id, name: p.name, avatar: p.avatar },
           })
         );
       }
@@ -242,6 +244,15 @@ export class SplitBillService {
       })),
       participants: totals,
     };
+  }
+
+  /** Ganti avatar peserta lewat link publik — sama tingkat kepercayaannya dengan togglePaidPublic (siapa pun yang punya link). */
+  async setAvatarPublic(slug: string, participantId: number, avatar: string) {
+    const bill = await this.prisma.splitBill.findUnique({ where: { publicSlug: slug } });
+    if (!bill) throw new NotFoundException('Split bill tidak ditemukan');
+    const { count } = await this.prisma.splitBillParticipant.updateMany({ where: { id: participantId, splitBillId: bill.id }, data: { avatar } });
+    if (!count) throw new NotFoundException('Participant tidak ditemukan');
+    return { participantId, avatar };
   }
 
   async togglePaidPublic(slug: string, participantId: number) {
