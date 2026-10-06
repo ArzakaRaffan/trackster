@@ -52,7 +52,7 @@ export class AiReportsService {
    *  recap kosong. */
   @Cron('0 22 * * *', { name: 'daily-recap', timeZone: 'Asia/Jakarta' })
   async dailyRecapCron() {
-    await forEachActiveUser(this.prisma, this.logger, 'daily-recap', (userId) => this.sendDailyRecap(userId));
+    await forEachActiveUser(this.prisma, this.logger, 'daily-recap', (userId) => this.sendDailyRecap(userId), { jitterMs: 30_000 });
   }
 
   async sendDailyRecap(userId: number) {
@@ -80,7 +80,7 @@ export class AiReportsService {
   /** Weekly: setiap Senin jam 07:10 WIB (setelah weekly-insight-report) — nudge progres goal. */
   @Cron('10 7 * * 1', { name: 'weekly-goal-nudge', timeZone: 'Asia/Jakarta' })
   async goalNudgeCron() {
-    await forEachActiveUser(this.prisma, this.logger, 'weekly-goal-nudge', (userId) => this.sendGoalNudge(userId));
+    await forEachActiveUser(this.prisma, this.logger, 'weekly-goal-nudge', (userId) => this.sendGoalNudge(userId), { jitterMs: 30_000 });
   }
 
   async sendGoalNudge(userId: number) {
@@ -109,7 +109,7 @@ export class AiReportsService {
   @Cron('30 20 * * *', { name: 'monthly-subscription-review', timeZone: 'Asia/Jakarta' })
   async subscriptionReviewCron() {
     if (!isLastWibDayOfMonth(new Date())) return;
-    await forEachActiveUser(this.prisma, this.logger, 'monthly-subscription-review', (userId) => this.sendSubscriptionReview(userId));
+    await forEachActiveUser(this.prisma, this.logger, 'monthly-subscription-review', (userId) => this.sendSubscriptionReview(userId), { jitterMs: 30_000 });
   }
 
   async sendSubscriptionReview(userId: number) {
@@ -162,11 +162,16 @@ export class AiReportsService {
     return [...groups.values()].filter((g) => g.length > 1);
   }
 
+  private async existedBy(userId: number, at: Date): Promise<boolean> {
+    const u = await this.prisma.user.findUnique({ where: { id: userId }, select: { createdAt: true } });
+    return !!u && u.createdAt <= at;
+  }
+
   /** Tutup minggu lalu (Senin-Minggu) → hitung PeriodStats + narasi, simpan snapshot `PeriodReport`.
    *  Jalan sebelum `weekly-insight-report` biar narasinya udah siap pas dikirim. */
   @Cron('0 6 * * 1', { name: 'close-weekly-report', timeZone: 'Asia/Jakarta' })
   async closeWeeklyReportCron() {
-    await forEachActiveUser(this.prisma, this.logger, 'close-weekly-report', (userId) => this.closeWeeklyReport(userId));
+    await forEachActiveUser(this.prisma, this.logger, 'close-weekly-report', (userId) => this.closeWeeklyReport(userId), { jitterMs: 30_000 });
   }
 
   async closeWeeklyReport(userId: number) {
@@ -174,6 +179,7 @@ export class AiReportsService {
     try {
       const anchor = this.reportService.lastClosedWeekAnchor(new Date());
       const { start, end } = wibRange('week', anchor);
+      if (!(await this.existedBy(userId, end))) return; // user baru: jangan bikin laporan kosong utk periode sebelum ia ada
       await this.reportService.closePeriod(userId, ReportPeriod.WEEK, start, end);
     } catch (err: any) {
       this.logger.error(`closeWeeklyReport error: ${err?.message}`);
@@ -183,7 +189,7 @@ export class AiReportsService {
   /** Tutup bulan lalu → sama seperti di atas, buat bulan kalender. */
   @Cron('30 6 1 * *', { name: 'close-monthly-report', timeZone: 'Asia/Jakarta' })
   async closeMonthlyReportCron() {
-    await forEachActiveUser(this.prisma, this.logger, 'close-monthly-report', (userId) => this.closeMonthlyReport(userId));
+    await forEachActiveUser(this.prisma, this.logger, 'close-monthly-report', (userId) => this.closeMonthlyReport(userId), { jitterMs: 30_000 });
   }
 
   async closeMonthlyReport(userId: number) {
@@ -191,6 +197,7 @@ export class AiReportsService {
     try {
       const anchor = this.reportService.lastClosedMonthAnchor(new Date());
       const { start, end } = wibRange('month', anchor);
+      if (!(await this.existedBy(userId, end))) return; // user baru: jangan bikin laporan kosong utk periode sebelum ia ada
       await this.reportService.closePeriod(userId, ReportPeriod.MONTH, start, end);
     } catch (err: any) {
       this.logger.error(`closeMonthlyReport error: ${err?.message}`);
@@ -200,7 +207,7 @@ export class AiReportsService {
   /** Weekly: setiap Senin jam 07:00 WIB — kirim narasi tersimpan (minggu Senin-Minggu yang baru tutup). */
   @Cron('0 7 * * 1', { name: 'weekly-insight-report', timeZone: 'Asia/Jakarta' })
   async weeklyInsightCron() {
-    await forEachActiveUser(this.prisma, this.logger, 'weekly-insight-report', (userId) => this.sendWeeklyInsight(userId));
+    await forEachActiveUser(this.prisma, this.logger, 'weekly-insight-report', (userId) => this.sendWeeklyInsight(userId), { jitterMs: 30_000 });
   }
 
   async sendWeeklyInsight(userId: number) {
@@ -226,7 +233,7 @@ export class AiReportsService {
   /** Monthly: setiap tanggal 1 jam 07:00 WIB — kirim narasi tersimpan (bulan lalu yang baru tutup). */
   @Cron('0 7 1 * *', { name: 'monthly-report-card', timeZone: 'Asia/Jakarta' })
   async monthlyReportCardCron() {
-    await forEachActiveUser(this.prisma, this.logger, 'monthly-report-card', (userId) => this.sendMonthlyReportCard(userId));
+    await forEachActiveUser(this.prisma, this.logger, 'monthly-report-card', (userId) => this.sendMonthlyReportCard(userId), { jitterMs: 30_000 });
   }
 
   async sendMonthlyReportCard(userId: number) {
