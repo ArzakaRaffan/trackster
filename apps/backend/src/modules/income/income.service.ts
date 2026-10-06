@@ -66,9 +66,18 @@ export class IncomeService {
 
   /** Quick logging endpoint untuk iOS Shortcut / integrasi webhook tanpa JWT.
    * Mencocokkan nama kategori ke IncomeStream yang sudah ada secara otomatis. */
-  async createQuick(userId: number, dto: QuickIncomeDto) {
+  async createQuick(
+    userId: number,
+    dto: QuickIncomeDto,
+    opts: { externalId?: string; receivedAt?: Date; streamId?: number } = {},
+  ) {
+    // Jalur ingest (`/ingest/income`): externalId = "ing:<Idempotency-Key>" -> retry tidak menggandakan & tidak menggerakkan saldo dua kali.
+    if (opts.externalId) {
+      const dup = await this.prisma.income.findFirst({ where: { userId, externalId: opts.externalId }, include: { stream: true } });
+      if (dup) return { success: true, duplicate: true, income: dup, message: 'Pemasukan ini sudah tercatat sebelumnya' };
+    }
     const source = dto.source ?? Source.BCA;
-    const receivedAt = new Date();
+    const receivedAt = opts.receivedAt ?? new Date();
     const amount = Number(dto.amount);
 
     const streamHint = (dto.category || dto.streamName || '').trim();
@@ -77,8 +86,11 @@ export class IncomeService {
 
     const streams = await this.prisma.incomeStream.findMany({ where: { userId, isActive: true } });
 
+    // Prioritas 0: streamId eksplisit (hanya stream milik user ini — `streams` sudah di-scope userId)
+    let matchedStream = opts.streamId ? streams.find((s) => s.id === opts.streamId) : undefined;
+
     // Prioritas 1: streamHint cocok dengan nama stream
-    let matchedStream = streams.find(
+    matchedStream ??= streams.find(
       (s) => streamHint && s.name.toUpperCase().includes(streamHint.toUpperCase()),
     );
 
@@ -105,28 +117,39 @@ export class IncomeService {
     const periodStart = streamId ? startOfWibWeek(receivedAt) : null;
     const description = noteHint || (matchedStream ? matchedStream.name : streamHint || 'Pemasukan Shortcut');
 
-    const income = await this.prisma.$transaction(async (tx) => {
-      const created = await tx.income.create({
-        data: {
-          userId,
-          amount,
-          description,
-          source,
-          receivedAt,
-          status: IncomeStatus.CONFIRMED,
-          origin: IncomeOrigin.MANUAL,
-          ...(streamId ? { streamId, periodStart } : {}),
-        },
-        include: { stream: true },
+    let income;
+    try {
+      income = await this.prisma.$transaction(async (tx) => {
+        const created = await tx.income.create({
+          data: {
+            userId,
+            amount,
+            description,
+            source,
+            receivedAt,
+            status: IncomeStatus.CONFIRMED,
+            origin: IncomeOrigin.MANUAL,
+            ...(opts.externalId ? { externalId: opts.externalId } : {}),
+            ...(streamId ? { streamId, periodStart } : {}),
+          },
+          include: { stream: true },
+        });
+
+        const lastAdjustmentAt = await this.balanceService.getLastManualAdjustmentAt(tx, userId, created.source);
+        if (shouldAdjustBalance(created.receivedAt, lastAdjustmentAt)) {
+          await this.balanceService.adjustBalance(tx, userId, created.source, Number(created.amount));
+        }
+
+        return created;
       });
-
-      const lastAdjustmentAt = await this.balanceService.getLastManualAdjustmentAt(tx, userId, created.source);
-      if (shouldAdjustBalance(created.receivedAt, lastAdjustmentAt)) {
-        await this.balanceService.adjustBalance(tx, userId, created.source, Number(created.amount));
+    } catch (err: any) {
+      // Dua request dgn kunci sama bersamaan: yang kalah kena unik (userId, externalId) -> perlakukan sbg duplikat.
+      if (err?.code === 'P2002' && opts.externalId) {
+        const dup = await this.prisma.income.findFirst({ where: { userId, externalId: opts.externalId }, include: { stream: true } });
+        if (dup) return { success: true, duplicate: true, income: dup, message: 'Pemasukan ini sudah tercatat sebelumnya' };
       }
-
-      return created;
-    });
+      throw err;
+    }
 
     // Kirim notifikasi konfirmasi ke Telegram
     try {
@@ -146,6 +169,7 @@ export class IncomeService {
 
     return {
       success: true,
+      duplicate: false,
       income,
       message: `Pemasukan Rp ${amount.toLocaleString('id-ID')} berhasil dicatat ke ${source}`,
     };

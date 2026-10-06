@@ -22,6 +22,8 @@ import { GoalModule } from './modules/goal/goal.module';
 import { SubscriptionModule } from './modules/subscription/subscription.module';
 import { AnalyticsModule } from './modules/analytics/analytics.module';
 import { ReportModule } from './modules/report/report.module';
+import { ApiTokenModule } from './modules/api-token/api-token.module';
+import { IngestModule } from './modules/ingest/ingest.module';
 
 @Module({
   imports: [
@@ -48,6 +50,8 @@ import { ReportModule } from './modules/report/report.module';
     SubscriptionModule,
     AnalyticsModule,
     ReportModule,
+    ApiTokenModule,
+    IngestModule,
   ],
 })
 export class AppModule {}

@@ -37,6 +37,7 @@ const PRIVATE = [
   ['GET', '/ai/insight-card'], ['GET', '/ai/health-score/history'], ['GET', '/ai/budget-suggestions'],
   ['POST', '/ai/memory'], ['POST', '/ai/chat'], ['POST', '/ai/threads'], ['POST', '/ai/threads/1/messages'], ['POST', '/ai/threads/1/messages/stream'],
   ['POST', '/ai/suggest-category'], ['POST', '/ai/reports/trigger-weekly'], ['POST', '/ai/reports/trigger-health-score'],
+  ['GET', '/api-tokens'], ['POST', '/api-tokens'], ['DELETE', '/api-tokens/1'], ['POST', '/ingest/transaction'], ['POST', '/ingest/income'],
   ['PATCH', '/ai/memory/1'], ['PATCH', '/ai/threads/1'], ['DELETE', '/ai/memory/1'], ['DELETE', '/ai/threads/1'],
   ['GET', '/analytics/stats'], ['GET', '/auth/me'], ['POST', '/auth/change-password'], ['POST', '/auth/logout-all'],
   ['GET', '/balance'], ['PUT', '/balance/BCA'], ['GET', '/balance/BCA/adjustments'],
