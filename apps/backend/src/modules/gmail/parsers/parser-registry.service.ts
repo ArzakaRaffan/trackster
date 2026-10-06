@@ -6,6 +6,7 @@ import { BniParser } from './bni.parser';
 import { MandiriParser } from './mandiri.parser';
 import { RayaParser } from './raya.parser';
 import { BriParser } from './bri.parser';
+import { OwnerContext } from './own-accounts';
 import { EmailParser, RawEmail, ParseResult } from './parser.interface';
 
 @Injectable()
@@ -25,15 +26,15 @@ export class ParserRegistryService {
     ];
   }
 
-  parseEmail(email: RawEmail): ParseResult | null {
-    return this.parseEmailWithSource(email).result;
+  parseEmail(email: RawEmail, ctx: OwnerContext): ParseResult | null {
+    return this.parseEmailWithSource(email, ctx).result;
   }
 
   /** Sama seperti parseEmail, tapi juga bilang parser mana yang match — dipakai EmailParseLog. */
-  parseEmailWithSource(email: RawEmail): { parser: string | null; result: ParseResult | null } {
+  parseEmailWithSource(email: RawEmail, ctx: OwnerContext): { parser: string | null; result: ParseResult | null } {
     for (const { name, parser } of this.parsers) {
       if (parser.canHandle(email)) {
-        return { parser: name, result: parser.parse(email) };
+        return { parser: name, result: parser.parse(email, ctx) };
       }
     }
     return { parser: null, result: null };

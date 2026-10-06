@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { Source } from '@prisma/client';
 import { EmailParser, RawEmail, ParseResult, extractField, parseRupiah, parseEmailDate } from './parser.interface';
-import { isInternalDestination } from './own-accounts';
+import { isInternalDestination, OwnerContext } from './own-accounts';
 
 /**
  * BRImo (bankbri@bri.co.id). Format "Label: Value". Subject:
@@ -15,7 +15,7 @@ export class BriParser implements EmailParser {
     return from.includes('bri.co.id') || from.includes('brimo');
   }
 
-  parse(email: RawEmail): ParseResult | null {
+  parse(email: RawEmail, ctx: OwnerContext): ParseResult | null {
     const subject = email.subject.toLowerCase();
     const body = email.body;
 
@@ -40,7 +40,7 @@ export class BriParser implements EmailParser {
     const dt = body.match(/(\d{1,2}\s+[A-Za-z]{3,}\s+\d{4})[\s\S]{0,10}?(\d{1,2}:\d{2}(?::\d{2})?)/);
     const occurredAt = (dt && parseEmailDate(`${dt[1]} ${dt[2]}`)) || new Date(parseInt(email.internalDate, 10));
 
-    const isSelf = isInternalDestination({ accountNumber, beneficiaryName: description });
+    const isSelf = isInternalDestination({ accountNumber, beneficiaryName: description }, ctx);
     return {
       amount,
       description,

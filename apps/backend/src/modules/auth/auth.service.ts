@@ -32,6 +32,6 @@ export class AuthService {
   async getUserById(id: number) {
     const user = await this.prisma.user.findUnique({ where: { id } });
     if (!user) return null;
-    return { id: user.id, username: user.username };
+    return { id: user.id, username: user.username, displayName: user.displayName ?? user.username, role: user.role, onboardedAt: user.onboardedAt };
   }
 }

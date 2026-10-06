@@ -86,3 +86,11 @@ deviasi dari rencana (+alasan), env baru yang Arzaka harus tambahkan, langkah be
 - **Aksi untuk Arzaka:** tidak ada env baru. Saat siap merge: backup → P1-08 → backfill-owner `--apply` → F2.
 - Docs: Roadmap (centang+catatan), 04-Checklist §B (matriks), Codemap.
 - **Langkah berikutnya:** (1) Arzaka setujui P1/P8/P13 + lakukan P0-04..06 (VPS). (2) Verifikasi hidup F2 di browser dengan DB hasil restore. (3) F3 (konteks pemilik parser, Telegram bersama, nama di prompt) — butuh keputusan P2 (bot bersama).
+
+## 2026-10-06 (malam) — merge main + F3 sebagian (P3-01..04, P3-08)
+- Sesi oleh: Claude (Sonnet 5.5)   Branch: `feat/multi-user`
+- Merge `main` ke branch (konflik frontend diselesaikan dgn versi `main`; `gmail.controller` = `state` OAuth + redirect `/app/settings`).
+- Parser/registry/`income.classify` memakai `OwnerContext` eksplisit (nama+rekening dari DB per user); `parsers.check` 61 assertion lulus (+ user B & konteks kosong). `npm run check` 20/20 (dgn scratch DB), build bersih, `tsc` bersih.
+- `/auth/me` memuat `displayName`/`role`/`onboardedAt`.
+- **Belum:** P3-05 (bot Telegram bersama — butuh persetujuan P2), P3-06/07 (prompt AI "Arzaka", frontend nama hardcode), P3-09 verifikasi hidup, backfill-owner prod.
+- Fallback env `OWNER_*` masih ada di satu tempat (`getOwnerContext`) agar Arzaka tidak berubah perilaku sebelum skrip backfill dijalankan.

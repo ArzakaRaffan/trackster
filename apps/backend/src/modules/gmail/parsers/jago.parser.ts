@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { Source } from '@prisma/client';
 import { EmailParser, RawEmail, ParseResult, extractField, parseRupiah, parseEmailDate } from './parser.interface';
-import { isInternalDestination } from './own-accounts';
+import { isInternalDestination, OwnerContext } from './own-accounts';
 
 const JAGO_SENDER_HINTS = ['jago'];
 
@@ -12,20 +12,20 @@ export class JagoParser implements EmailParser {
     return JAGO_SENDER_HINTS.some((hint) => from.includes(hint));
   }
 
-  parse(email: RawEmail): ParseResult | null {
+  parse(email: RawEmail, ctx: OwnerContext): ParseResult | null {
     const subject = email.subject.toLowerCase();
     const body = email.body;
 
     if (subject.includes('menerima sejumlah uang') || body.includes('telah menerima sejumlah uang')) {
-      return this.parseIncoming(body, email);
+      return this.parseIncoming(body, email, ctx);
     }
 
     if (subject.includes('melakukan transfer') || body.includes('melakukan transfer uang')) {
-      return this.parseTransfer(body, email);
+      return this.parseTransfer(body, email, ctx);
     }
 
     if (subject.includes('membayar ke') || body.includes('mengirimkan uang')) {
-      return this.parseQrisPayment(body, email);
+      return this.parseQrisPayment(body, email, ctx);
     }
 
     return null;
@@ -36,7 +36,7 @@ export class JagoParser implements EmailParser {
    * pengirim mentah (dipakai IncomeService buat klasifikasi CONFIRMED/INTERNAL/PENDING via
    * matchKeywords/OWNER_FULL_NAME/korelasi FLIPTECH — bukan urusan parser ini).
    */
-  private parseIncoming(body: string, email: RawEmail): ParseResult | null {
+  private parseIncoming(body: string, email: RawEmail, ctx: OwnerContext): ParseResult | null {
     const jumlahRaw = extractField(body, 'Jumlah');
     const dari = extractField(body, 'Dari');
     const tanggalRaw = extractField(body, 'Tanggal transaksi') || extractField(body, 'Tanggal Transaksi');
@@ -58,7 +58,7 @@ export class JagoParser implements EmailParser {
     };
   }
 
-  private parseTransfer(body: string, email: RawEmail): ParseResult | null {
+  private parseTransfer(body: string, email: RawEmail, ctx: OwnerContext): ParseResult | null {
     const jumlahRaw = extractField(body, 'Jumlah');
     const ke = extractField(body, 'Ke');
     const rekening =
@@ -73,7 +73,7 @@ export class JagoParser implements EmailParser {
     const amount = parseRupiah(jumlahRaw);
     const occurredAt = (tanggalRaw && parseEmailDate(tanggalRaw)) || new Date(parseInt(email.internalDate, 10));
 
-    const isSelfTransfer = isInternalDestination({ accountNumber: rekening, beneficiaryName: ke });
+    const isSelfTransfer = isInternalDestination({ accountNumber: rekening, beneficiaryName: ke }, ctx);
 
     return {
       amount,
@@ -86,7 +86,7 @@ export class JagoParser implements EmailParser {
     };
   }
 
-  private parseQrisPayment(body: string, email: RawEmail): ParseResult | null {
+  private parseQrisPayment(body: string, email: RawEmail, ctx: OwnerContext): ParseResult | null {
     const jumlahRaw = extractField(body, 'Jumlah');
     const ke = extractField(body, 'Ke');
     const tanggalRaw = extractField(body, 'Tanggal Transaksi') || extractField(body, 'Tanggal transaksi');

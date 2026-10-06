@@ -10,6 +10,7 @@ import { ResolveIncomeDto } from './dto/resolve-income.dto';
 import { QuickIncomeDto } from './dto/quick-income.dto';
 import { addWibDays, startOfWibDay, startOfWibWeek } from '../../common/wib';
 import { isOwnerName } from '../gmail/parsers/own-accounts';
+import { getOwnerContext } from '../../common/owner';
 
 export interface ParsedIncome {
   amount: number;
@@ -215,7 +216,7 @@ export class IncomeService {
   private async classify(userId: number, parsed: ParsedIncome): Promise<{ status: IncomeStatus; streamId: number | null }> {
     const sender = parsed.description.toUpperCase();
 
-    if (isOwnerName(sender)) {
+    if (isOwnerName(sender, await getOwnerContext(this.prisma, userId))) {
       return { status: IncomeStatus.INTERNAL, streamId: null };
     }
 

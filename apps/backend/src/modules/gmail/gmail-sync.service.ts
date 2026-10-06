@@ -7,6 +7,7 @@ import { TransactionService } from '../transaction/transaction.service';
 import { BudgetService } from '../budget/budget.service';
 import { TelegramService } from '../telegram/telegram.service';
 import { PrismaService } from '../../prisma.service';
+import { getOwnerContext } from '../../common/owner';
 import { AiChatService } from '../ai/ai-chat.service';
 import { AiCaptionService } from '../ai/ai-caption.service';
 import { AiAnomalyService } from '../ai/ai-anomaly.service';
@@ -203,7 +204,7 @@ export class GmailSyncService {
       return;
     }
 
-    const { parser, result: parsed } = this.parserRegistry.parseEmailWithSource(rawEmail);
+    const { parser, result: parsed } = this.parserRegistry.parseEmailWithSource(rawEmail, await getOwnerContext(this.prisma, userId));
     if (!parsed) {
       callbacks.onUnparsed();
       await this.logParseResult(userId, id, from, subject, receivedAt, {
@@ -498,4 +499,6 @@ export class GmailSyncService {
   private htmlToText(html: string): string {
     return htmlToText(html);
   }
-}
+}
+
+

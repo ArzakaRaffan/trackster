@@ -89,14 +89,14 @@ Legenda: ⛔ **GERBANG** = butuh persetujuan Arzaka sebelum lanjut · 🛟 backu
 
 **Prasyarat:** F2 live. Referensi: [02 §5, §8](02-Target-Architecture.md). **Gerbang:** ⛔ P2 (bot bersama).
 
-- [ ] P3-01 `UserProfileService`: `getOwnerContext(userId)` dari `User.fullName`/`OwnAccount`; CRUD rekening milik (validasi digit-only, ≥6, unik per user).
-- [ ] P3-02 Refaktor `gmail/parsers/own-accounts.ts` → fungsi murni dengan `OwnerContext`; `EmailParser.parse(email, ctx)`; `ParserRegistry.parseEmailWithSource(email, ctx)`; update `bca|bni|bri|flip|jago|mandiri.parser.ts` & `income.service.classify(userId,…)`. **Tidak mengubah** logika pencocokan.
-- [ ] P3-03 `parsers.check.ts`: ganti `process.env.OWNER_*` dengan konteks eksplisit; semua kasus lama tetap lulus; **tambah**: konteks user B (nama/rekening berbeda) tidak mengecualikan transaksi user A; konteks kosong tidak menghasilkan match palsu.
-- [ ] P3-04 Hapus pembacaan `OWNER_*` dari kode (tetap dipakai skrip backfill saja). Compose/`.env.example`: tandai deprecated.
+- [x] P3-01 `UserProfileService`: `getOwnerContext(userId)` dari `User.fullName`/`OwnAccount`; CRUD rekening milik (validasi digit-only, ≥6, unik per user). — *2026-10-06: `getOwnerContext(prisma,userId)` di `common/owner.ts` (User.fullName + OwnAccount). CRUD rekening milik belum ada (F8 wizard).*
+- [x] P3-02 Refaktor `gmail/parsers/own-accounts.ts` → fungsi murni dengan `OwnerContext`; `EmailParser.parse(email, ctx)`; `ParserRegistry.parseEmailWithSource(email, ctx)`; update `bca|bni|bri|flip|jago|mandiri.parser.ts` & `income.service.classify(userId,…)`. **Tidak mengubah** logika pencocokan. — *2026-10-06: sebagian: `OwnerContext` + parser/registry/income memakai konteks (logika pencocokan tidak berubah).*
+- [x] P3-03 `parsers.check.ts`: ganti `process.env.OWNER_*` dengan konteks eksplisit; semua kasus lama tetap lulus; **tambah**: konteks user B (nama/rekening berbeda) tidak mengecualikan transaksi user A; konteks kosong tidak menghasilkan match palsu. — *2026-10-06: kasus lama lulus + user B/konteks kosong (61 assertion).*
+- [x] P3-04 Hapus pembacaan `OWNER_*` dari kode (tetap dipakai skrip backfill saja). Compose/`.env.example`: tandai deprecated. — *2026-10-06: kode runtime tak lagi membaca env kecuali fallback tunggal di `common/owner.ts#getOwnerContext` (pemilik belum di-backfill) — hapus setelah `backfill-owner --apply` di prod.*
 - [ ] P3-05 Telegram bersama: tabel `TelegramLink`/`TelegramLinkCode`, endpoint buat kode, handler `/start <kode>`, `sendMessage(userId,…)`, webhook memetakan `chatId→userId`; `TelegramConfig` dipensiunkan (tetap ada sampai C1). Backfill link Arzaka (🛟).
 - [ ] P3-06 Verifikasi semua pengirim Telegram (alert budget, notif transaksi/income, recap, nudge, check-in, anomali, saran budget, laporan) memakai `userId` — grep `telegramService.send*` → tak ada pemanggilan tanpa `userId`.
 - [ ] P3-07 Prompt AI: ganti "Arzaka" dengan `displayName` (daftar file di audit §4); frontend: ganti nama hardcode di wizard Split Bill (`logic.tsx`) & `ModalView` memakai `/auth/me` (jangan menyentuh data `/demo`). Regenerate view bila sumber desain berubah; `logic.tsx` dirawat tangan.
-- [ ] P3-08 `/auth/me` diperluas (`displayName`, `role`, `onboardedAt`) — frontend memakainya.
+- [x] P3-08 `/auth/me` diperluas (`displayName`, `role`, `onboardedAt`) — frontend memakainya. — *2026-10-06: `/auth/me` kini memuat `displayName`, `role`, `onboardedAt`.*
 - [ ] P3-09 Verifikasi: golden identik untuk Arzaka (nama sama); tes dua user: user B dengan nama/rekening beda → internal-transfer logic terpisah. 🔬 Kirim Telegram uji ke Arzaka (alert + balasan chat).
 - [ ] P3-10 ⛔ Merge + deploy (🛟). **Pasca-deploy:** `.env` VPS — pastikan `TELEGRAM_BOT_TOKEN` benar (Arzaka via SSH).
 
