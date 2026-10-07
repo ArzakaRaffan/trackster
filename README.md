@@ -5,7 +5,7 @@
 <h1 align="center">Trackster</h1>
 
 <p align="center">
-  Personal finance platform that turns bank notification emails into a live budget, balances, reports, and an AI advisor.
+  Personal finance that fills itself in. Bank notification emails become a live budget, balances, reports, and an AI advisor that knows your numbers.
 </p>
 
 <p align="center">
@@ -18,216 +18,107 @@
 </p>
 
 <p align="center">
-  <a href="https://track.trackster.my.id"><strong>Live app</strong></a>
+  <a href="https://trackster.dev"><strong>Live app</strong></a>
   &nbsp;·&nbsp;
-  <a href="#architecture">Architecture</a>
+  <a href="https://trackster.dev/demo"><strong>Try the demo</strong></a>
   &nbsp;·&nbsp;
-  <a href="#getting-started">Getting started</a>
+  <a href="#what-it-does">Features</a>
   &nbsp;·&nbsp;
-  <a href="#documentation">Documentation</a>
+  <a href="#how-it-works">How it works</a>
+</p>
+
+<p align="center">
+  <img src="docs/screenshots/home.png" alt="Trackster dashboard: today's remaining budget, net for the day, and a receipt-style list of today's transactions" width="900" />
 </p>
 
 ---
 
-## Table of contents
+## The idea
 
-- [Overview](#overview)
-- [Capabilities](#capabilities)
-- [Architecture](#architecture)
-- [Tech stack](#tech-stack)
-- [Getting started](#getting-started)
-- [Configuration](#configuration)
-- [Quality checks](#quality-checks)
-- [Deployment](#deployment)
-- [Security model](#security-model)
-- [Repository layout](#repository-layout)
-- [Documentation](#documentation)
-- [Project status](#project-status)
-- [License](#license)
+Most expense trackers die the same way: you stop typing things in. Trackster removes the typing. When your bank sends a notification, Trackster reads it, files it under the right category, moves the right balance, and tells you what is still safe to spend today.
 
-## Overview
+The product has one question at its center, **"how much can I still spend today?"**, and everything else exists to answer it honestly.
 
-Trackster ingests transaction notification emails from BCA, Jago, and Flip through the Gmail API, parses them into expenses and income, and keeps balances, daily budgets, and reports in sync without manual entry. A Telegram bot delivers alerts and check-ins, and an AI advisor answers questions against the user's own financial data.
+## What it does
 
-It is a **single-tenant system by design**: one owner, no signup flow, no multi-tenancy. Every feature is scoped to that one account, which keeps the data model and the security surface small.
-
-## Capabilities
-
-| Area | What it does |
+| | |
 | --- | --- |
-| **Automatic capture** | Gmail sync every 5 minutes. HTML parsers for BCA (transfers, virtual accounts), Jago (transfers, incoming money), and Flip (receipts). Deduplicated by Gmail message ID. Every parse outcome is logged for audit. |
-| **Balances** | Live, incremental per-account balances (BCA, Jago). They move with each expense and income inside a single database transaction. Manual corrections are recorded as adjustments. |
-| **Budgeting** | Daily budget per weekday, optional carry-over of unspent budget within the week, weekly 50/30/20 allocation from confirmed income, and AI-assisted budget suggestions. |
-| **Income** | Income streams (fixed, per-session, variable, deduction-based, irregular), forecast with conservative / expected / maximum scenarios, weekly check-in via web and Telegram, and email-based capture. |
-| **Reports and analytics** | Period statistics with a comparison period, routine vs. one-off spending, anomaly detection, habits, time heatmap, frozen weekly and monthly report snapshots, 6-month and all-time views. |
-| **AI advisor ("Tanya Track")** | Streaming chat with persistent threads, long-term memory, full-text retrieval over past chats and reports, simulation tools (savings plans, what-if purchases), and the same advisor on Telegram. All figures come from deterministic code; the model only selects and explains. |
-| **Goals, subscriptions, reimbursements** | Savings pockets with contribution tracking, recurring bills with Google Calendar reminders, and shared-expense reimbursement tracking with net vs. gross views. |
-| **Public tools** | Split Bill (receipt scan, proportional tax, shareable link), Trip settle-up, savings calculator, and installment / PayLater calculator. These are isolated from private financial data. |
+| **Automatic capture** | Parses BCA, Jago, and Flip notification emails into expenses and income. No typing, no duplicates, and transfers between your own accounts are recognized and kept out of your spending. |
+| **Quick add anywhere** | Log a payment from an iPhone Shortcut in two taps, using a personal API token you can revoke at any time. Safe to retry: a repeated request never double-counts. |
+| **Live balances** | Per-account balances (BCA, Jago) that move the moment money does, and stay consistent even when something fails halfway. |
+| **Daily budget** | A budget for each weekday, optional carry-over of what you did not spend, and a weekly 50/30/20 split built from the income you have actually confirmed. |
+| **Income that is not a salary** | Fixed pay, per-session pay, irregular income. Forecasts come in conservative, expected, and maximum scenarios, with a weekly check-in on the web and in Telegram. |
+| **Analysis and reports** | Routine spending separated from one-off big purchases, a heatmap of when you spend, anomaly detection, and frozen weekly and monthly report snapshots. |
+| **Tanya Track, the AI advisor** | Chat that remembers you, searches your past conversations, and simulates decisions ("what if I buy this?", "can I afford this plan?"). It explains the numbers; it never invents them. |
+| **Goals, subscriptions, reimbursements** | Savings pockets, recurring bills with reminders, and tracking for money other people owe you. |
+| **Public tools** | Split Bill with receipt scanning and a shareable link, Trip settle-up, savings and installment calculators. No account needed. |
 
-## Architecture
+<table>
+  <tr>
+    <td width="50%"><img src="docs/screenshots/budget.png" alt="Weekly budget with a 50/30/20 allocation" /></td>
+    <td width="50%"><img src="docs/screenshots/analysis.png" alt="Spending analysis with a category breakdown and time-of-day heatmap" /></td>
+  </tr>
+  <tr>
+    <td align="center"><sub>Budget: weekly allocation, per-day limits, and what is safe to spend</sub></td>
+    <td align="center"><sub>Analysis: where the money goes, and when</sub></td>
+  </tr>
+</table>
+
+<p align="center">
+  <img src="docs/screenshots/advisor.png" alt="Tanya Track, the AI advisor chat" width="900" />
+  <br />
+  <sub>Tanya Track: an advisor that answers from your real numbers</sub>
+</p>
+
+*Screenshots are the public demo, which uses sample data.*
+
+## How it works
 
 ```mermaid
 flowchart LR
   subgraph External
-    GM[Gmail API]
-    TG[Telegram Bot API]
-    AI[AI gateway<br/>OpenAI-compatible]
+    EM[Bank emails]
+    TG[Telegram]
+    AI[AI gateway]
+    IP[iPhone Shortcut]
   end
 
-  subgraph VPS["VPS - Docker Compose"]
-    NX[Nginx + Let's Encrypt]
-    FE[Next.js 14<br/>App Router]
-    BE[NestJS 10<br/>REST + SSE + cron]
-    DB[(PostgreSQL 16)]
+  subgraph Trackster
+    FE[Next.js<br/>web app]
+    BE[NestJS API<br/>parsers, budgets, cron]
+    DB[(PostgreSQL)]
   end
 
-  U[Browser] --> NX
-  NX --> FE
-  NX --> BE
-  FE -- "SWR, httpOnly JWT cookie" --> BE
-  BE --> DB
-  BE -- "poll every 5 min" --> GM
+  U[You] --> FE
+  FE --> BE
+  EM --> BE
+  IP --> BE
   BE <--> TG
   BE --> AI
+  BE --> DB
 ```
 
-**Key design rules**
+A few rules the system is built around:
 
-- **One feature, one NestJS module** under `apps/backend/src/modules/`: module, controller, service, and DTOs where validation is needed.
-- **Balances are never recomputed from aggregates.** They move only through `BalanceService.adjustBalance()` inside the same Prisma transaction as the operation that caused the change. A baseline rule prevents backfilled history from double-counting against a manual correction.
-- **Single source of truth for statistics.** `AnalyticsService.getPeriodStats()` feeds the Analysis page, reports, budget adherence, AI cards, and the health score.
-- **Deterministic numbers, generative narrative.** The LLM never calculates displayed figures.
-- **WIB time boundaries everywhere.** Day, week (Monday to Sunday), and month boundaries use shared helpers instead of server-local time.
+- **Balances are never recomputed from totals.** They move only inside the same database transaction as the event that caused them, so a balance can never disagree with its history.
+- **Deterministic numbers, generative narrative.** Every figure on screen comes from plain code. The AI only picks what to look at and explains it.
+- **One source of truth for statistics.** The analysis page, reports, budget adherence, AI cards, and the health score all read from the same calculation.
+- **Isolation by default.** Every record belongs to exactly one user, and every query is scoped to them. Tenant isolation is covered by automated end-to-end tests.
+- **Private tools stay private.** Split Bill and the calculators never touch anyone's transactions or balances.
 
-## Tech stack
+## Built with
 
 | Layer | Technology |
 | --- | --- |
-| Frontend | Next.js 14 (App Router), React 18, Tailwind CSS, SWR, Recharts, Motion |
-| Backend | NestJS 10, Prisma 5, `@nestjs/schedule` for cron |
-| Database | PostgreSQL 16 (full-text search with the `indonesian` dictionary) |
-| Auth | Username and password (bcrypt), JWT in an httpOnly cookie |
-| Integrations | Gmail API (OAuth2), Telegram Bot API, OpenAI-compatible AI gateway |
-| Delivery | Docker Compose, Nginx, Let's Encrypt, GitHub Actions, GHCR |
+| Frontend | Next.js 14 (App Router), React 18, Tailwind CSS, SWR, Recharts |
+| Backend | NestJS 10, Prisma 5, scheduled jobs for sync, alerts, and reports |
+| Database | PostgreSQL 16, with full-text search in Indonesian |
+| Integrations | Telegram Bot API, an OpenAI-compatible AI gateway, Google Calendar |
+| Delivery | Docker, GitHub Actions, GHCR, automatic deploys on every release |
 
-## Getting started
+## Status
 
-**Prerequisites:** Node.js 20, Docker with Compose, a Google Cloud OAuth client (Gmail API and Calendar API enabled).
-
-```bash
-cp .env.example .env           # then fill in credentials, see Configuration
-
-# Database (host port 5434)
-docker compose -p trackster-dev up -d postgres
-
-# Backend
-cd apps/backend
-npm install
-npx prisma migrate dev
-npx prisma db seed
-npm run start:dev              # http://localhost:4000
-
-# Frontend, in a second terminal
-cd apps/frontend
-npm install
-npm run dev                    # http://localhost:3000
-```
-
-Sign in with `ADMIN_USERNAME` and `ADMIN_PASSWORD` from `.env`. Connect Gmail and the Telegram bot from **Settings** inside the app; those credentials are stored in the database, not in `.env`.
-
-> **Running on a shared host?** Read [`CAUTION.md`](CAUTION.md) first. Always pass `-p trackster-dev` to Compose for the dev database, and cap Node memory (`NODE_OPTIONS=--max-old-space-size=1536`) for builds. The development compose file shares a project name and volume with production.
-
-## Configuration
-
-Copy `.env.example` and fill in the values. The main groups:
-
-| Group | Variables |
-| --- | --- |
-| Database | `DATABASE_URL`, `POSTGRES_PASSWORD` |
-| Auth | `JWT_SECRET`, `ADMIN_USERNAME`, `ADMIN_PASSWORD`, `COOKIE_DOMAIN` (production) |
-| Owner identity | `OWNER_FULL_NAME`, `OWNER_ACCOUNT_NUMBERS`. Used by parsers to classify transfers to the owner's own accounts as internal. |
-| Gmail | `GMAIL_CLIENT_ID`, `GMAIL_CLIENT_SECRET`, `GMAIL_REDIRECT_URI` |
-| AI | `AI_BASE_URL`, `AI_API_KEY`, `AI_MODEL`, `AI_MODEL_FAST`, `SPLITBILL_AI_*` |
-| URLs | `FRONTEND_URL`, `NEXT_PUBLIC_API_URL`, `NEXT_PUBLIC_SITE_URL`, `BACKEND_PORT` |
-
-`NEXT_PUBLIC_*` values are baked into the frontend image at build time. In production the server `.env` is managed by hand and is intentionally not part of the repository or the CD pipeline.
-
-## Quality checks
-
-```bash
-# Backend: type check without emitting (memory-capped)
-cd apps/backend && NODE_OPTIONS=--max-old-space-size=1536 npx tsc --noEmit -p tsconfig.json
-
-# Frontend: type check
-cd apps/frontend && npx tsc --noEmit
-
-# Self-checks: pure-logic assertions, no database required
-cd apps/backend  && npx ts-node src/modules/<module>/<name>.check.ts
-cd apps/frontend && npx tsx    src/lib/<name>.check.ts
-```
-
-Parser fixtures are real bank emails stored under `apps/backend/src/modules/gmail/parsers/__fixtures__/`. Update them whenever a bank changes its email format. Before reporting a change as done, build both apps and verify the behavior in a running browser session, not only at compile time.
-
-## Deployment
-
-Delivery is fully automated on every push to `main` (`.github/workflows/deploy.yml`):
-
-1. **Build** runs on a GitHub runner and pushes `trackster-backend` and `trackster-frontend` images to GHCR, tagged `latest` and with the commit SHA.
-2. **Deploy** connects to the VPS over SSH, syncs the compose and Nginx files, runs `docker compose pull`, then `up -d`. The VPS builds nothing.
-
-Database migrations apply automatically when the backend container starts (`prisma migrate deploy`). Seeding is a one-time manual step:
-
-```bash
-docker compose -f docker-compose.prod.yml exec backend npx prisma db seed
-```
-
-**Rollback** to any previous build:
-
-```bash
-IMAGE_TAG=<commit-sha> docker compose -f docker-compose.prod.yml up -d
-```
-
-The VPS needs a one-time `docker login ghcr.io` using a classic personal access token with `read:packages`. New environment variables must be added to the server `.env` manually, followed by `docker compose up -d`. TLS certificates are issued once through `init-letsencrypt.sh`.
-
-## Security model
-
-- Single owner account; no registration endpoint exists.
-- Session is a JWT in an httpOnly cookie scoped to the parent domain, and the frontend middleware gates every private route.
-- The Telegram webhook is public but validates a secret path segment and the configured chat ID.
-- Split Bill separates a read-only `publicSlug` from a management `ownerToken` so participants cannot edit assignments. Public creation endpoints are rate limited.
-- Split Bill and the public calculators never read or write transactions or balances.
-- Secrets live in the server `.env` or in the database, never in git.
-
-## Repository layout
-
-```
-apps/
-  backend/          NestJS API, Prisma schema and migrations, Gmail parsers, cron jobs
-  frontend/         Next.js application (private /app area + public tools)
-nginx/              Reverse proxy vhosts and SSL helpers
-design_system/      Design tokens, guidelines, and handoff notes
-docs/
-  context/          Overview, architecture, codemap
-  Revamp History.md Archive of the completed Revamp v2 program
-.github/workflows/  CI/CD pipeline
-docker-compose.yml        Local development (Postgres)
-docker-compose.prod.yml   Production stack
-```
-
-## Documentation
-
-| Document | Purpose |
-| --- | --- |
-| [`docs/context/_Overview.md`](docs/context/_Overview.md) | What the system is and how to run it |
-| [`docs/context/Architecture.md`](docs/context/Architecture.md) | Modules, data flow, schema, system boundaries |
-| [`docs/context/Codemap.md`](docs/context/Codemap.md) | Where to look to change a given feature |
-| [`docs/Revamp History.md`](docs/Revamp%20History.md) | What the Revamp v2 program delivered, and the design decisions that came out of it |
-| [`CAUTION.md`](CAUTION.md) | Resource limits and safe-operation checklist for the shared VPS |
-| [`CLAUDE.md`](CLAUDE.md) | Project conventions and domain rules (parsers, balances) |
-
-## Project status
-
-Revamp v2 (2026-09-24 to 2026-10-04) is complete and verified. It covered parser correctness, the income model, the AI advisor, analytics, reports, budget advice, the mascot, and public tools. See [`docs/Revamp History.md`](docs/Revamp%20History.md).
+Live and in daily use. Access is by invitation.
 
 ## License
 
