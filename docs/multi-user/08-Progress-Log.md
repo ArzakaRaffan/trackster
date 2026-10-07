@@ -132,3 +132,11 @@ deviasi dari rencana (+alasan), env baru yang Arzaka harus tambahkan, langkah be
 - Env VPS baru: tidak ada (`INGEST_RATE_LIMIT` hanya untuk tes — jangan diset di prod).
 - Docs diperbarui: Roadmap (F6 dicentang+catatan), 04-Checklist (baris ingest/api-tokens), 06-Runbooks §7b, Codemap, README (status).
 - **Langkah berikutnya:** (1) Arzaka: coba tab Shortcut + buat Shortcut iPhone, jawab O7, setujui P7. (2) Setelah itu P6-05/06 (butuh akses VPS/ponsel). (3) Tanpa menunggu: F7 hanya bisa disiapkan sebagian (kode `/ingest/email` + parser MIME) tetapi butuh O1/O8 dan persetujuan DNS untuk sisanya.
+
+## 2026-10-07 — Restore-drill + uji C1 pada data prod nyata (P0-04, P0-05, P1-05)
+- Sesi oleh: Claude (Sonnet 5.5) + Arzaka   Branch: `feat/multi-user`
+- Selesai: backup prod `backup-2026-10-07-1033.sql` (disalin ke laptop, 251 `Transaction` = prod). Restore ke Postgres scratch lokal (port 5434, DB `trackster_restore`).
+- `prisma migrate deploy` (expand → backfill → budget_setting_id_sequence → contract) lolos di restore; `verify-backfill`: NULL = 0 di semua tabel, 1 user ADMIN memegang semua data.
+- Verifikasi hidup (backend build bersih + frontend lokal ke restore): Arzaka login dan membandingkan dengan prod — saldo BCA/Jago, budget hari ini sama persis.
+- Catatan: token Gmail/Telegram dihapus dari SALINAN restore sebelum backend dijalankan (cegah cron memakai kredensial asli). `BudgetSetting` kosong di data prod (bukan akibat migrasi). `pg_dump` baru menyisipkan `\unrestrict` yang tak dikenali psql — error tak berbahaya di akhir restore.
+- Belum: P0-06 (cek `TELEGRAM_BOT_TOKEN` env VPS = token bot), merge/deploy ⛔, P6-05/06, rotasi `JWT_SECRET`.
