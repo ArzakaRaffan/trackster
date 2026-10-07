@@ -312,7 +312,7 @@ export class V3Logic extends React.Component {
       doneTok:() => setT({ tokNew:null }),
       copyTok:() => { const v = t.tokNew; if (typeof navigator !== 'undefined' && navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(v).then(() => this.toast('Token disalin.')).catch(() => this.toast('Gagal menyalin. Salin manual dari kotak.')); else this.toast('Salin manual dari kotak.'); },
       createTok:() => { const label = (t.tokLabel || '').trim(); if (!label || t.tokBusy) return;
-        if (this.props.live !== undefined) { setT({ tokBusy:true }); this.props.live.actions.tokCreate(label).then(r => this.props.live.refresh().then(() => setT({ tokBusy:false, tokLabel:'', tokNew:r.token }))).catch(e => { setT({ tokBusy:false }); this.toast((e && e.message) || 'Gagal membuat token.'); }); return; }
+        if (this.props.live !== undefined) { setT({ tokBusy:true }); this.props.live.actions.tokCreate(label).then(r => { setT({ tokBusy:false, tokLabel:'', tokNew:r.token }); this.props.live.refresh(); }).catch(e => { setT({ tokBusy:false }); this.toast((e && e.message) || 'Gagal membuat token.'); }); return; }
         const tok = 'trk_' + Math.random().toString(36).slice(2).padEnd(40, 'x').slice(0, 40); setT({ tokens:[{ id:Date.now(), label, prefix:tok.slice(0, 8), createdAt:Date.now(), lastUsedAt:null, revokedAt:null }, ...t.tokens], tokLabel:'', tokNew:tok }); },
       tokRows:t.tokens.map(x => ({ label:x.label, active:!x.revokedAt, revoked:!!x.revokedAt, color: x.revokedAt ? 'var(--text-subtlest)' : 'var(--text)',
         meta:`${x.prefix}… · ${x.revokedAt ? 'dicabut ' + fmtDT(x.revokedAt) : x.lastUsedAt ? 'terakhir dipakai ' + fmtDT(x.lastUsedAt) : 'belum pernah dipakai'}`,
