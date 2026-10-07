@@ -13,53 +13,57 @@ export class BudgetService {
     private merchantAliasService: MerchantAliasService,
   ) {}
 
-  async getAll() {
-    return this.prisma.dailyBudget.findMany({ orderBy: { dayOfWeek: 'asc' } });
+  async getAll(userId: number) {
+    return this.prisma.dailyBudget.findMany({ where: { userId }, orderBy: { dayOfWeek: 'asc' } });
   }
 
-  async updateAll(dto: UpdateBudgetDto) {
-    const results: Awaited<ReturnType<typeof this.prisma.dailyBudget.upsert>>[] = [];
+  async updateAll(userId: number, dto: UpdateBudgetDto) {
+    const results: Awaited<ReturnType<typeof this.prisma.dailyBudget.create>>[] = [];
     for (const item of dto.budgets) {
-      const updated = await this.prisma.dailyBudget.upsert({
-        where: { dayOfWeek: item.dayOfWeek },
-        update: { amount: item.amount },
-        create: { dayOfWeek: item.dayOfWeek, amount: item.amount },
-      });
-      results.push(updated);
+      // findFirst + updateMany/create (bukan upsert by `dayOfWeek`): unik masih global sampai C1 -> (userId, dayOfWeek).
+      const row = await this.prisma.dailyBudget.findFirst({ where: { userId, dayOfWeek: item.dayOfWeek }, select: { id: true } });
+      if (row) {
+        await this.prisma.dailyBudget.updateMany({ where: { id: row.id, userId }, data: { amount: item.amount } });
+        results.push(await this.prisma.dailyBudget.findFirstOrThrow({ where: { id: row.id, userId } }));
+      } else {
+        results.push(await this.prisma.dailyBudget.create({ data: { userId, dayOfWeek: item.dayOfWeek, amount: item.amount } }));
+      }
     }
     return results;
   }
 
   /** Ambil budget untuk hari tertentu (0=Minggu...6=Sabtu) */
-  async getBudgetForDay(dayOfWeek: number): Promise<number> {
-    const row = await this.prisma.dailyBudget.findUnique({ where: { dayOfWeek } });
+  async getBudgetForDay(userId: number, dayOfWeek: number): Promise<number> {
+    const row = await this.prisma.dailyBudget.findFirst({ where: { userId, dayOfWeek } });
     return row ? Number(row.amount) : 0;
   }
 
-  async getRolloverEnabled(): Promise<boolean> {
-    const row = await this.prisma.budgetSetting.findUnique({ where: { id: 1 } });
+  async getRolloverEnabled(userId: number): Promise<boolean> {
+    const row = await this.prisma.budgetSetting.findFirst({ where: { userId } });
     return row?.rolloverEnabled ?? false;
   }
 
-  async setRolloverEnabled(enabled: boolean) {
-    const row = await this.prisma.budgetSetting.upsert({
-      where: { id: 1 },
-      update: { rolloverEnabled: enabled },
-      create: { id: 1, rolloverEnabled: enabled },
-    });
-    return { rolloverEnabled: row.rolloverEnabled };
+  async setRolloverEnabled(userId: number, enabled: boolean) {
+    // Satu baris per user (bukan lagi singleton id=1); unik `userId` dipasang di C1.
+    const existing = await this.prisma.budgetSetting.findFirst({ where: { userId }, select: { id: true } });
+    if (existing) {
+      await this.prisma.budgetSetting.updateMany({ where: { id: existing.id, userId }, data: { rolloverEnabled: enabled } });
+    } else {
+      await this.prisma.budgetSetting.create({ data: { userId, rolloverEnabled: enabled } });
+    }
+    return { rolloverEnabled: enabled };
   }
 
   /** Sisa budget Senin..kemarin (minggu berjalan) yang belum terpakai — 0 di hari Senin. */
-  private async computeRollover(now: Date): Promise<number> {
+  private async computeRollover(userId: number, now: Date): Promise<number> {
     const weekStart = startOfWibWeek(now);
     const todayStart = startOfWibDay(now);
     if (weekStart.getTime() === todayStart.getTime()) return 0;
 
     const [rows, txs] = await Promise.all([
-      this.prisma.dailyBudget.findMany(),
+      this.prisma.dailyBudget.findMany({ where: { userId } }),
       this.prisma.transaction.findMany({
-        where: { occurredAt: { gte: weekStart, lt: todayStart } },
+        where: { userId, occurredAt: { gte: weekStart, lt: todayStart } },
         select: { amount: true, reimbursedAmount: true, occurredAt: true },
       }),
     ]);
@@ -77,31 +81,31 @@ export class BudgetService {
     return calcRollover(days);
   }
 
-  async getTodaySummary() {
+  async getTodaySummary(userId: number) {
     const now = new Date();
     const dayOfWeek = wibDayOfWeek(now);
-    const baseBudget = await this.getBudgetForDay(dayOfWeek);
+    const baseBudget = await this.getBudgetForDay(userId, dayOfWeek);
     // `budget` = budget efektif hari ini (termasuk sisa kemarin kalau rollover aktif), supaya semua
     // pemakai summary (alert over-budget, progress bar, snapshot AI) otomatis konsisten.
-    const rollover = (await this.getRolloverEnabled()) ? await this.computeRollover(now) : 0;
+    const rollover = (await this.getRolloverEnabled(userId)) ? await this.computeRollover(userId, now) : 0;
     const budget = baseBudget + rollover;
 
     const { start: startOfDay, end: endOfDay } = wibRange('day', now);
 
     const [transactions, incomes] = await Promise.all([
       this.prisma.transaction.findMany({
-        where: { occurredAt: { gte: startOfDay, lt: endOfDay } },
+        where: { userId, occurredAt: { gte: startOfDay, lt: endOfDay } },
         orderBy: { occurredAt: 'desc' },
       }),
       this.prisma.income.findMany({
-        where: { receivedAt: { gte: startOfDay, lt: endOfDay } },
+        where: { userId, receivedAt: { gte: startOfDay, lt: endOfDay } },
         orderBy: { receivedAt: 'desc' },
       }),
     ]);
 
     const totalSpent = transactions.reduce((sum, t) => sum + spend(t), 0);
     const totalIncome = incomes.reduce((sum, i) => sum + Number(i.amount), 0);
-    const transactionsWithDisplay = await this.merchantAliasService.attachDisplayNames(transactions);
+    const transactionsWithDisplay = await this.merchantAliasService.attachDisplayNames(userId, transactions);
 
     return {
       date: wibDateKey(now),
@@ -121,14 +125,14 @@ export class BudgetService {
 
   /** Runway forecast: estimasi kondisi keuangan akhir bulan berdasarkan burn rate 7 hari terakhir.
    *  Tidak butuh LLM — murni kalkulasi deterministik. */
-  async getRunwayForecast() {
+  async getRunwayForecast(userId: number) {
     const now = new Date();
     const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
 
     // Burn rate: rata-rata pengeluaran per hari dalam 7 hari terakhir
     const spentAgg = await this.prisma.transaction.aggregate({
       _sum: { amount: true, reimbursedAmount: true },
-      where: { occurredAt: { gte: sevenDaysAgo, lte: now } },
+      where: { userId, occurredAt: { gte: sevenDaysAgo, lte: now } },
     });
     const totalSpent7d = sumSpend(spentAgg._sum);
     const burnRatePerDay = totalSpent7d / 7;
@@ -140,7 +144,7 @@ export class BudgetService {
     const remainingDays = daysInMonth - dayOfMonth;
 
     // Saldo BCA + Jago saat ini
-    const balances = await this.prisma.bankBalance.findMany();
+    const balances = await this.prisma.bankBalance.findMany({ where: { userId } });
     const currentBalance = balances.reduce((sum, b) => sum + Number(b.balance), 0);
 
     const projectedEndOfMonthBalance = currentBalance - burnRatePerDay * remainingDays;

@@ -3,6 +3,7 @@ import { Category } from '@prisma/client';
 import { PrismaService } from '../../prisma.service';
 import { AiService } from './ai.service';
 import { TelegramService } from '../telegram/telegram.service';
+import { forUser, getUserName } from '../../common/persona';
 
 const ANOMALY_SYSTEM_PROMPT = `Kamu adalah Trackster AI. Arzaka baru dapat transaksi yang jauh di atas kebiasaannya. Tulis SATU pesan Telegram singkat (maks 3 kalimat, Bahasa Indonesia santai) yang: 1) sebut transaksinya & seberapa di atas rata-rata biasanya, 2) tanya konfirmasi santai (bukan interogasi/menghakimi) apakah ini disengaja/wajar. Jangan pakai emoji lebih dari 2.`;
 
@@ -34,9 +35,9 @@ export class AiAnomalyService {
   /** Fire-and-forget dari gmail-sync setelah transaksi baru tercatat. Deteksi murni statistik
    *  (rata-rata merchant/kategori 90 hari) — AI cuma dipanggil buat narasi KALAU memang anomali,
    *  supaya tidak ada "anomali" yang sebenarnya cuma halusinasi model. */
-  async checkAndNotify(transaction: CheckableTransaction): Promise<void> {
+  async checkAndNotify(userId: number, transaction: CheckableTransaction): Promise<void> {
     try {
-      const baseline = await this.getBaseline(transaction);
+      const baseline = await this.getBaseline(userId, transaction);
       if (!baseline || baseline.count < MIN_BASELINE_SAMPLES) return;
 
       const isAnomaly =
@@ -45,7 +46,7 @@ export class AiAnomalyService {
       if (!isAnomaly) return;
 
       const message = await this.aiService.chat({
-        system: ANOMALY_SYSTEM_PROMPT,
+        system: forUser(ANOMALY_SYSTEM_PROMPT, await getUserName(this.prisma, userId)),
         messages: [
           {
             role: 'user',
@@ -66,26 +67,29 @@ export class AiAnomalyService {
       const text = message?.content?.trim();
       if (!text) return;
 
-      await this.telegramService.sendMessage(`🔍 <b>Kok gede ya?</b>\n\n${text}`);
+      await this.telegramService.sendMessage(userId, `🔍 <b>Kok gede ya?</b>\n\n${text}`);
     } catch (err: any) {
       this.logger.warn(`Anomaly check gagal utk transaksi ${transaction.id}: ${err?.message}`);
     }
   }
 
-  private async getBaseline(transaction: CheckableTransaction) {
+  private async getBaseline(userId: number, transaction: CheckableTransaction) {
     const ninetyDaysAgo = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000);
     const where = transaction.merchantKey
       ? {
+          userId,
           merchantKey: transaction.merchantKey,
           occurredAt: { gte: ninetyDaysAgo },
           id: { not: transaction.id },
         }
       : {
+          userId,
           category: transaction.category,
           occurredAt: { gte: ninetyDaysAgo },
           id: { not: transaction.id },
         };
 
+    // tenancy-ok: `where` dibangun di atas dengan userId
     const agg = await this.prisma.transaction.aggregate({
       where,
       _avg: { amount: true },

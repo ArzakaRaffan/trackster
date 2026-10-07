@@ -3,6 +3,7 @@ import { PrismaService } from '../../prisma.service';
 import { AiService } from './ai.service';
 import { AnalyticsService } from '../analytics/analytics.service';
 import { wibDateKey } from '../../common/wib';
+import { forUser, getUserName } from '../../common/persona';
 
 const INSIGHT_CARD_PROMPT = `Kamu adalah Trackster AI. Dari data statistik keuangan periode ini (JSON), tulis PERSIS 3 poin
 tajam soal kondisi Arzaka — tiap poin satu kalimat pendek dengan angka nyata dari data, bukan generik/nasihat umum.
@@ -33,31 +34,33 @@ export class AiInsightCardService {
   ) {}
 
   /** Cache per (range, hari WIB) — generate ulang cuma sekali sehari per range. */
-  async getInsightCard(range: string): Promise<{ points: string[] }> {
+  async getInsightCard(userId: number, range: string): Promise<{ points: string[] }> {
     const rangeKey = VALID_RANGES.includes(range) ? range : '30d';
     const dayKey = wibDateKey(new Date());
 
-    const cached = await this.prisma.aiInsightCard.findUnique({ where: { rangeKey_dayKey: { rangeKey, dayKey } } });
+    const cached = await this.prisma.aiInsightCard.findFirst({ where: { userId, rangeKey, dayKey } });
     if (cached) return { points: cached.points as string[] };
 
-    const points = await this.generatePoints(rangeKey);
+    const points = await this.generatePoints(userId, rangeKey);
 
-    await this.prisma.aiInsightCard.upsert({
-      where: { rangeKey_dayKey: { rangeKey, dayKey } },
-      update: { points },
-      create: { rangeKey, dayKey, points },
-    });
+    // findFirst + update/create (bukan upsert): unik masih global (rangeKey, dayKey) sampai C1 -> (userId, rangeKey, dayKey).
+    const existing = await this.prisma.aiInsightCard.findFirst({ where: { userId, rangeKey, dayKey }, select: { id: true } });
+    if (existing) {
+      await this.prisma.aiInsightCard.updateMany({ where: { id: existing.id, userId }, data: { points } });
+    } else {
+      await this.prisma.aiInsightCard.create({ data: { userId, rangeKey, dayKey, points } });
+    }
 
     return { points };
   }
 
-  private async generatePoints(rangeKey: string): Promise<string[]> {
+  private async generatePoints(userId: number, rangeKey: string): Promise<string[]> {
     try {
-      const { start, end } = await this.analyticsService.resolvePeriod(rangeKey);
-      const stats = await this.analyticsService.getPeriodStats(start, end);
+      const { start, end } = await this.analyticsService.resolvePeriod(userId, rangeKey);
+      const stats = await this.analyticsService.getPeriodStats(userId, start, end);
 
       const message = await this.aiService.chat({
-        system: INSIGHT_CARD_PROMPT,
+        system: forUser(INSIGHT_CARD_PROMPT, await getUserName(this.prisma, userId)),
         messages: [{ role: 'user', content: JSON.stringify(stats) }],
         maxTokens: 300,
         model: 'fast',

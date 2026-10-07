@@ -6,6 +6,8 @@ import { BudgetService } from '../budget/budget.service';
 import { BudgetAdvisorService } from '../budget/budget-advisor.service';
 import { AiBudgetService } from './ai-budget.service';
 import { WEEK_ORDER, addWibDays, startOfWibWeek, wibDateKey } from '../../common/wib';
+import { PrismaService } from '../../prisma.service';
+import { forEachActiveUser } from '../../common/per-user';
 
 const OPTION_LABEL: Record<string, string> = { hemat: 'Hemat', seimbang: 'Seimbang', longgar: 'Longgar' };
 
@@ -24,6 +26,7 @@ export class AiBudgetReminderService {
   private readonly logger = new Logger(AiBudgetReminderService.name);
 
   constructor(
+    private prisma: PrismaService,
     private telegramService: TelegramService,
     private budgetService: BudgetService,
     private budgetAdvisorService: BudgetAdvisorService,
@@ -31,20 +34,24 @@ export class AiBudgetReminderService {
   ) {}
 
   @Cron('10 21 * * 0', { name: 'budget-suggestion-followup', timeZone: 'Asia/Jakarta' })
-  async sendFollowup() {
+  async followupCron() {
+    await forEachActiveUser(this.prisma, this.logger, 'budget-suggestion-followup', (userId) => this.sendFollowup(userId));
+  }
+
+  async sendFollowup(userId: number) {
     try {
       const nextWeekStart = wibDateKey(addWibDays(startOfWibWeek(new Date()), 7));
-      const { text, keyboard } = await this.buildMessage(nextWeekStart);
-      await this.telegramService.sendMessageWithKeyboard(text, keyboard);
-      this.logger.log(`Saran budget minggu ${nextWeekStart} terkirim.`);
+      const { text, keyboard } = await this.buildMessage(userId, nextWeekStart);
+      await this.telegramService.sendMessageWithKeyboard(userId, text, keyboard);
+      this.logger.log(`Saran budget (user ${userId}) minggu ${nextWeekStart} terkirim.`);
     } catch (err: any) {
       this.logger.error(`sendFollowup error: ${err?.message}`);
     }
   }
 
-  private async buildMessage(weekStart: string): Promise<{ text: string; keyboard: TelegramBot.InlineKeyboardButton[][] }> {
-    const suggestion = await this.budgetAdvisorService.getSuggestions(weekStart);
-    const advice = await this.aiBudgetService.explain(weekStart);
+  private async buildMessage(userId: number, weekStart: string): Promise<{ text: string; keyboard: TelegramBot.InlineKeyboardButton[][] }> {
+    const suggestion = await this.budgetAdvisorService.getSuggestions(userId, weekStart);
+    const advice = await this.aiBudgetService.explain(userId, weekStart);
     const chosen = suggestion.options.find(o => o.option === advice.recommended) ?? suggestion.options[1];
 
     const fmt = (n: number) => `Rp${Math.round(n).toLocaleString('id-ID')}`;
@@ -70,20 +77,20 @@ export class AiBudgetReminderService {
   }
 
   /** Dipanggil dari TelegramWebhookController saat tombol "Terapkan" di-tap. */
-  async handleCallback(callbackQuery: { id: string; data?: string; message?: { chat: { id: number }; message_id: number } }) {
+  async handleCallback(userId: number, callbackQuery: { id: string; data?: string; message?: { chat: { id: number }; message_id: number } }) {
     const data = callbackQuery.data;
     if (!data) return;
     const parsed = parseApplyCallback(data);
     if (!parsed) return;
 
-    const suggestion = await this.budgetAdvisorService.getSuggestions(parsed.weekStart);
+    const suggestion = await this.budgetAdvisorService.getSuggestions(userId, parsed.weekStart);
     const chosen = suggestion.options.find(o => o.option === parsed.option);
     if (!chosen) return;
 
-    await this.budgetService.updateAll({
+    await this.budgetService.updateAll(userId, {
       budgets: chosen.dailyAmounts.map((amount, dayOfWeek) => ({ dayOfWeek, amount })),
     });
-    await this.telegramService.answerCallbackQuery(callbackQuery.id, 'Diterapkan ✅');
+    await this.telegramService.answerCallbackQuery(userId, callbackQuery.id, 'Diterapkan ✅');
 
     if (callbackQuery.message) {
       const fmt = (n: number) => `Rp${Math.round(n).toLocaleString('id-ID')}`;
@@ -93,7 +100,7 @@ export class AiBudgetReminderService {
         ``,
         ...WEEK_ORDER.map((i) => `${dayNames[i]}: ${fmt(chosen.dailyAmounts[i])}`),
       ].join('\n');
-      await this.telegramService.editMessage(String(callbackQuery.message.chat.id), callbackQuery.message.message_id, text);
+      await this.telegramService.editMessage(userId, String(callbackQuery.message.chat.id), callbackQuery.message.message_id, text);
     }
   }
 }

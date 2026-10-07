@@ -9,6 +9,7 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
+import { AuthUser, CurrentUser } from '../../common/decorators/current-user.decorator';
 import { GoalService } from './goal.service';
 import { CreateGoalDto } from './dto/create-goal.dto';
 import { ContributeGoalDto } from './dto/contribute-goal.dto';
@@ -20,27 +21,27 @@ export class GoalController {
   constructor(private goalService: GoalService) {}
 
   @Get()
-  findAll() {
-    return this.goalService.findAll();
+  findAll(@CurrentUser() user: AuthUser) {
+    return this.goalService.findAll(user.id);
   }
 
   @Post()
-  create(@Body() dto: CreateGoalDto) {
-    return this.goalService.create(dto);
+  create(@CurrentUser() user: AuthUser, @Body() dto: CreateGoalDto) {
+    return this.goalService.create(user.id, dto);
   }
 
   @Post(':id/contribute')
-  contribute(@Param('id', ParseIntPipe) id: number, @Body() dto: ContributeGoalDto) {
-    return this.goalService.contribute(id, dto);
+  contribute(@CurrentUser() user: AuthUser, @Param('id', ParseIntPipe) id: number, @Body() dto: ContributeGoalDto) {
+    return this.goalService.contribute(user.id, id, dto);
   }
 
   @Patch(':id/archive')
-  archive(@Param('id', ParseIntPipe) id: number) {
-    return this.goalService.archive(id);
+  archive(@CurrentUser() user: AuthUser, @Param('id', ParseIntPipe) id: number) {
+    return this.goalService.archive(user.id, id);
   }
 
   @Post(':id/simulate')
-  simulate(@Param('id', ParseIntPipe) id: number, @Body() dto: SimulateGoalDto) {
-    return this.goalService.simulate(id, dto.cutPercent);
+  simulate(@CurrentUser() user: AuthUser, @Param('id', ParseIntPipe) id: number, @Body() dto: SimulateGoalDto) {
+    return this.goalService.simulate(user.id, id, dto.cutPercent);
   }
 }

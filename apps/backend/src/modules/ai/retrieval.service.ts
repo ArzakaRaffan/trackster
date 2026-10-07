@@ -32,6 +32,7 @@ export class RetrievalService {
    *  `excludeThreadId` + `excludeAfterId`: kecualikan pesan thread aktif yang sudah masuk window
    *  history (id > excludeAfterId) — pesan lama thread yang sama (di luar window) tetap kandidat. */
   async search(
+    userId: number,
     query: string,
     opts: { excludeThreadId?: number; excludeAfterId?: number; limit?: number } = {},
   ): Promise<RetrievedMessage[]> {
@@ -52,7 +53,8 @@ export class RetrievalService {
         ) AS "snippet"
       FROM "ChatMessage" cm
       JOIN "ChatThread" ct ON ct.id = cm."threadId"
-      WHERE cm.search @@ websearch_to_tsquery('indonesian', ${q})
+      WHERE ct."userId" = ${userId}::int
+        AND cm.search @@ websearch_to_tsquery('indonesian', ${q})
         AND cm.role IN ('user', 'assistant')
         AND cm.content <> ''
         AND NOT (

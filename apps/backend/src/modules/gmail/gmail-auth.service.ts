@@ -1,4 +1,5 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, UnauthorizedException } from '@nestjs/common';
+import { JwtService } from '@nestjs/jwt';
 import { google } from 'googleapis';
 import { PrismaService } from '../../prisma.service';
 
@@ -11,7 +12,10 @@ const SCOPES = [
 
 @Injectable()
 export class GmailAuthService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private jwtService: JwtService,
+  ) {}
 
   private getOAuth2Client() {
     return new google.auth.OAuth2(
@@ -21,16 +25,31 @@ export class GmailAuthService {
     );
   }
 
-  getAuthUrl(): string {
+  /** `state` = JWT pendek bertanda tangan server berisi userId pemulai alur — callback (tanpa cookie/JWT) hanya bisa
+   * menyimpan token untuk user itu. Tanpa ini siapa pun yang menyelesaikan OAuth bisa menimpa token user lain. */
+  getAuthUrl(userId: number): string {
     const client = this.getOAuth2Client();
+    const state = this.jwtService.sign({ sub: userId, purpose: 'gmail-oauth' }, { secret: process.env.JWT_SECRET, expiresIn: '10m' });
     return client.generateAuthUrl({
       access_type: 'offline', // wajib supaya dapat refresh_token
       prompt: 'consent', // paksa consent screen supaya refresh_token selalu diberikan
       scope: SCOPES,
+      state,
     });
   }
 
-  async handleCallback(code: string) {
+  private userIdFromState(state: string | undefined): number {
+    try {
+      const payload = this.jwtService.verify(state ?? '', { secret: process.env.JWT_SECRET });
+      if (payload?.purpose === 'gmail-oauth' && Number.isInteger(payload.sub)) return payload.sub;
+    } catch {
+      // jatuh ke throw di bawah
+    }
+    throw new UnauthorizedException('State OAuth tidak valid atau kedaluwarsa — mulai ulang dari Setting.');
+  }
+
+  async handleCallback(code: string, state: string | undefined) {
+    const userId = this.userIdFromState(state);
     const client = this.getOAuth2Client();
     const { tokens } = await client.getToken(code);
 
@@ -44,33 +63,33 @@ export class GmailAuthService {
     const oauth2 = google.oauth2({ version: 'v2', auth: client });
     const { data } = await oauth2.userinfo.get();
 
-    const existing = await this.prisma.gmailToken.findFirst();
+    const existing = await this.prisma.gmailToken.findFirst({ where: { userId } });
     if (existing) {
-      await this.prisma.gmailToken.update({
-        where: { id: existing.id },
+      await this.prisma.gmailToken.updateMany({
+        where: { id: existing.id, userId },
         data: { refreshToken: tokens.refresh_token, email: data.email || '' },
       });
     } else {
       await this.prisma.gmailToken.create({
-        data: { refreshToken: tokens.refresh_token, email: data.email || '' },
+        data: { userId, refreshToken: tokens.refresh_token, email: data.email || '' },
       });
     }
 
     return { email: data.email };
   }
 
-  async getStatus() {
-    const token = await this.prisma.gmailToken.findFirst();
+  async getStatus(userId: number) {
+    const token = await this.prisma.gmailToken.findFirst({ where: { userId } });
     return { connected: !!token, email: token?.email };
   }
 
-  async disconnect() {
-    await this.prisma.gmailToken.deleteMany();
+  async disconnect(userId: number) {
+    await this.prisma.gmailToken.deleteMany({ where: { userId } });
     return { success: true };
   }
 
-  private async getAuthedOAuth2Client() {
-    const tokenRow = await this.prisma.gmailToken.findFirst();
+  private async getAuthedOAuth2Client(userId: number) {
+    const tokenRow = await this.prisma.gmailToken.findFirst({ where: { userId } });
     if (!tokenRow) return null;
 
     const client = this.getOAuth2Client();
@@ -79,15 +98,15 @@ export class GmailAuthService {
   }
 
   /** Return authenticated Gmail API client, atau null kalau belum connect */
-  async getGmailClient() {
-    const client = await this.getAuthedOAuth2Client();
+  async getGmailClient(userId: number) {
+    const client = await this.getAuthedOAuth2Client(userId);
     if (!client) return null;
     return google.gmail({ version: 'v1', auth: client });
   }
 
   /** Return authenticated Calendar API client, atau null kalau belum connect */
-  async getCalendarClient() {
-    const client = await this.getAuthedOAuth2Client();
+  async getCalendarClient(userId: number) {
+    const client = await this.getAuthedOAuth2Client(userId);
     if (!client) return null;
     return google.calendar({ version: 'v3', auth: client });
   }

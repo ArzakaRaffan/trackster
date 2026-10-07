@@ -80,6 +80,17 @@ Dipakai di baris Hari ini, detail transaksi, Setting → Alias merchant (+ logo 
 
 ## Drift yang ketemu (belum dibenerin)
 - `CLAUDE.md` nyebut folder `design-system/`, aslinya `design_system/`.
-- `.env.example`: komentar URL prod masih domain lama (`trackster.my.id`, `api.trackster.my.id`);
-  belum ada `AI_*`, `AI_AUTH_HEADER`, `TELEGRAM_WEBHOOK_SECRET`, `COOKIE_DOMAIN`.
+- ~~`.env.example` domain lama / env belum lengkap~~ — dirapikan 2026-10-06 (multi-user F0). `TELEGRAM_BOT_TOKEN` di compose prod tidak dibaca kode.
 - `Source.GOPAY` masih di enum & tipe frontend walau nggak ada sumber aktif.
+
+## Multi-user — F6 (di branch)
+- `modules/api-token` (`/api-tokens`, JWT): buat/daftar/cabut token API per user (`trk_`+40 base62, hash SHA-256, maks 5 aktif). `common/guards/api-token.guard.ts` = Bearer → `req.apiAuth{userId,tokenId}` (user harus ACTIVE, rate limit 60/mnt/token, env tes `INGEST_RATE_LIMIT`).
+- `modules/ingest` (`POST /ingest/transaction|income`): pintu Shortcut; `Idempotency-Key` → `emailId`/`externalId = ing:<key>` (dedup per user). Income memakai `IncomeService.createQuick(userId, dto, {externalId, receivedAt, streamId})`.
+- Frontend: tab **Shortcut** di `/app/settings` (sumber di `.dc.html` + `logic.tsx` batch3 `setTok…` + `useLive` `tokens`/`tokCreate`/`tokRevoke`). `/income/quick` lama MASIH ada (dihapus di P6-06 setelah Shortcut Arzaka pindah).
+- Tes: `scripts/ingest-e2e.mjs` (backend jalan dgn `INGEST_RATE_LIMIT=30`), `api-token.util.check.ts`, `ingest.util.check.ts`.
+
+## Multi-user (transisi, F0–F1 selesai di branch `feat/multi-user`, belum di prod)
+- Skema: `User` + role/status/displayName/fullName/tokenVersion; semua tabel tenant punya `userId Int?` (nullable, FK Restrict) — kode runtime BELUM memakainya (F2). Tabel baru (belum dipakai): `Invite, OneTimeToken, ApiToken, InboundAddress, OwnAccount, TelegramLink(+Code), AiUsage`.
+- Alat (di `apps/backend`): `npm run check` (semua `*.check.ts`), `npm run tenancy-audit` (daftar kerja scoping), `npm run golden`/`isolation-e2e` (`scripts/`), `prisma/data-fixes/{verify-backfill,2026-10-multiuser-backfill-owner}.js`, `prisma/provision-user.js`. Detail & status: `docs/multi-user/08-Progress-Log.md`.
+- **F2 (scoping backend, di branch):** semua service tenant menerima `userId` sebagai parameter pertama; controller memakai `@CurrentUser()` (`common/decorators/current-user.decorator.ts`). Cron per user lewat `common/per-user.ts#forEachActiveUser`; jalur legacy tanpa konteks user (`/income/quick`, Gmail/`/sync/*`) memakai/mengunci ke pemilik (`common/owner.ts`). Upsert-by-unique-global diganti `findFirst`+`update/create` sampai C1. **Jangan buat user kedua sebelum C1** (unik global masih ada) — lihat Progress Log 2026-10-06 (lanjutan).
+

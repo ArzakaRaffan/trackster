@@ -36,9 +36,12 @@ export class AiFinanceToolsService {
     private budgetAdvisorService: BudgetAdvisorService,
   ) {}
 
-  /** `ctx` = thread & window pesan yang sedang dikirim ulang ke model, dipakai
+  /** `ctx.userId` = pemilik percakapan, DIIKAT SERVER saat tool dibuat — tidak pernah datang dari argumen
+   *  tool yang diisi model (prompt-injection tidak bisa berpindah user).
+   *  `threadId`/`excludeAfterId` = thread & window pesan yang sedang dikirim ulang ke model, dipakai
    *  `searchPastConversations` biar nggak nyaranin balik pesan yang sudah ada di history. */
-  getTools(ctx: { threadId?: number; excludeAfterId?: number } = {}): AiTool[] {
+  getTools(ctx: { userId: number; threadId?: number; excludeAfterId?: number }): AiTool[] {
+    const { userId } = ctx;
     return [
       {
         name: 'getTodaySummary',
@@ -48,7 +51,7 @@ export class AiFinanceToolsService {
           properties: {},
           required: [],
         },
-        handler: async () => this.budgetService.getTodaySummary(),
+        handler: async () => this.budgetService.getTodaySummary(userId),
       },
       {
         name: 'getWeeklySummary',
@@ -58,7 +61,7 @@ export class AiFinanceToolsService {
           properties: {},
           required: [],
         },
-        handler: async () => this.transactionService.getWeekly(),
+        handler: async () => this.transactionService.getWeekly(userId),
       },
       {
         name: 'getInsights',
@@ -75,7 +78,7 @@ export class AiFinanceToolsService {
           required: [],
         },
         handler: async (input: { range?: '30d' | 'all' }) =>
-          this.transactionService.getInsights(input?.range ?? '30d'),
+          this.transactionService.getInsights(userId, input?.range ?? '30d'),
       },
       {
         name: 'getMonthlySummary',
@@ -89,7 +92,7 @@ export class AiFinanceToolsService {
           required: ['year', 'month'],
         },
         handler: async (input: { year: number; month: number }) =>
-          this.transactionService.getMonthly(input.year, input.month),
+          this.transactionService.getMonthly(userId, input.year, input.month),
       },
       {
         name: 'getAllTimeSummary',
@@ -99,7 +102,7 @@ export class AiFinanceToolsService {
           properties: {},
           required: [],
         },
-        handler: async () => this.transactionService.getAllTimeSummary(),
+        handler: async () => this.transactionService.getAllTimeSummary(userId),
       },
       {
         name: 'getIncomeAllocation',
@@ -109,7 +112,7 @@ export class AiFinanceToolsService {
           properties: {},
           required: [],
         },
-        handler: async () => this.incomeService.getAllocationRecommendation(),
+        handler: async () => this.incomeService.getAllocationRecommendation(userId),
       },
       {
         name: 'logExpense',
@@ -144,7 +147,7 @@ export class AiFinanceToolsService {
           category: string;
           source: string;
         }) => {
-          const created = await this.transactionService.create({
+          const created = await this.transactionService.create(userId, {
             amount: input.amount,
             description: input.description,
             category: input.category as Category,
@@ -152,7 +155,7 @@ export class AiFinanceToolsService {
             occurredAt: new Date().toISOString(),
           });
           this.aiCaptionService
-            .generate({
+            .generate(userId, {
               id: created.id,
               description: created.description,
               amount: Number(created.amount),
@@ -182,7 +185,7 @@ export class AiFinanceToolsService {
           required: [],
         },
         handler: async (input: { text?: string; category?: string; from?: string; to?: string; minAmount?: number; limit?: number }) =>
-          this.transactionService.findAll({
+          this.transactionService.findAll(userId, {
             search: input.text,
             category: input.category as Category | undefined,
             startDate: input.from,
@@ -205,16 +208,16 @@ export class AiFinanceToolsService {
           required: ['period'],
         },
         handler: async (input: { period: 'week' | 'month' | 'range'; date?: string; from?: string; to?: string }) => {
-          if (input.period === 'week') return this.transactionService.getWeekly();
+          if (input.period === 'week') return this.transactionService.getWeekly(userId);
           if (input.period === 'range') {
             if (!input.from || !input.to) return { error: 'period="range" butuh from & to' };
             const start = startOfWibDay(input.from);
             const end = addWibDays(startOfWibDay(input.to), 1);
-            return this.analyticsService.getPeriodStats(start, end);
+            return this.analyticsService.getPeriodStats(userId, start, end);
           }
           const now = new Date();
           const [y, m] = (input.date ?? wibDateKey(now).slice(0, 7)).split('-').map(Number);
-          return this.transactionService.getMonthly(y, m);
+          return this.transactionService.getMonthly(userId, y, m);
         },
       },
       {
@@ -227,14 +230,14 @@ export class AiFinanceToolsService {
           },
           required: [],
         },
-        handler: async (input: { weeks?: number }) => this.incomeForecastService.getHorizon(Math.min(26, input.weeks ?? 4)),
+        handler: async (input: { weeks?: number }) => this.incomeForecastService.getHorizon(userId, Math.min(26, input.weeks ?? 4)),
       },
       {
         name: 'getGoals',
         description: 'Ambil daftar goal tabungan aktif beserta progres saat ini dan kontribusi mingguan yang dibutuhkan untuk mengejar deadline (kalau ada deadline).',
         input_schema: { type: 'object', properties: {}, required: [] },
         handler: async () => {
-          const goals = await this.goalService.findAll();
+          const goals = await this.goalService.findAll(userId);
           const today = new Date();
           return goals.map((g) => {
             const remaining = Math.max(0, Number(g.targetAmount) - g.currentAmount);
@@ -288,7 +291,7 @@ export class AiFinanceToolsService {
           required: ['weeks', 'incomeScenario'],
         },
         handler: async (input: any) => {
-          const result = await this.planSimulatorService.simulatePlan(input);
+          const result = await this.planSimulatorService.simulatePlan(userId, input);
           return {
             ...result,
             card: { type: 'simulation', title: `Simulasi ${input.weeks} minggu`, ...result },
@@ -317,7 +320,7 @@ export class AiFinanceToolsService {
           required: ['amount', 'label', 'method'],
         },
         handler: async (input: any) => {
-          const result = await this.planSimulatorService.whatIfPurchase(input);
+          const result = await this.planSimulatorService.whatIfPurchase(userId, input);
           return {
             ...result,
             card: {
@@ -374,7 +377,7 @@ export class AiFinanceToolsService {
         },
         handler: async (input: { option?: string; dayOverrides?: { dayOfWeek: number; amount: number }[]; note?: string }): Promise<ToolCard> => {
           const option = (input.option as any) ?? 'seimbang';
-          const result = await this.budgetAdvisorService.proposeAdjusted(undefined, option, input.dayOverrides ?? []);
+          const result = await this.budgetAdvisorService.proposeAdjusted(userId, undefined, option, input.dayOverrides ?? []);
           return { card: { type: 'budget-proposal', ...result, note: input.note ?? null } };
         },
       },
@@ -391,7 +394,7 @@ export class AiFinanceToolsService {
           required: ['amount', 'description', 'source'],
         },
         handler: async (input: { amount: number; description: string; source: string }) =>
-          this.incomeService.create({
+          this.incomeService.create(userId, {
             amount: input.amount,
             description: input.description,
             source: input.source as Source,
@@ -400,11 +403,11 @@ export class AiFinanceToolsService {
       },
       {
         name: 'remember',
-        description: 'Simpan fakta tahan lama tentang Arzaka yang dia minta diingat secara eksplisit (mis. "ingat ya, aku...") — bukan buat angka yang sudah ada di database.',
+        description: 'Simpan fakta tahan lama tentang user yang dia minta diingat secara eksplisit (mis. "ingat ya, aku...") — bukan buat angka yang sudah ada di database.',
         input_schema: {
           type: 'object',
           properties: {
-            content: { type: 'string', description: 'Fakta, ditulis orang ketiga, contoh: "Arzaka ingin beli laptop ±Rp12jt sebelum Juni 2027"' },
+            content: { type: 'string', description: 'Fakta, ditulis orang ketiga, contoh: "User ingin beli laptop ±Rp12jt sebelum Juni 2027"' },
             kind: {
               type: 'string',
               enum: ['PROFILE', 'GOAL', 'PLAN', 'PREFERENCE', 'CONCERN', 'EVENT', 'DECISION'],
@@ -414,11 +417,11 @@ export class AiFinanceToolsService {
           required: ['content', 'kind'],
         },
         handler: async (input: { content: string; kind: string }) =>
-          this.aiMemoryService.create({ content: input.content, kind: input.kind as MemoryKind }),
+          this.aiMemoryService.create(userId, { content: input.content, kind: input.kind as MemoryKind }),
       },
       {
         name: 'forget',
-        description: 'Hapus (arsip) satu memory yang sudah tidak relevan — dipakai kalau Arzaka bilang "lupain yang itu" atau semacamnya.',
+        description: 'Hapus (arsip) satu memory yang sudah tidak relevan — dipakai kalau user bilang "lupain yang itu" atau semacamnya.',
         input_schema: {
           type: 'object',
           properties: {
@@ -426,11 +429,11 @@ export class AiFinanceToolsService {
           },
           required: ['memoryId'],
         },
-        handler: async (input: { memoryId: number }) => this.aiMemoryService.update(input.memoryId, { archived: true }),
+        handler: async (input: { memoryId: number }) => this.aiMemoryService.update(userId, input.memoryId, { archived: true }),
       },
       {
         name: 'searchPastConversations',
-        description: 'Cari percakapan atau laporan lama yang mungkin relevan dengan pertanyaan Arzaka sekarang (mis. "dulu aku pernah nanya soal apa ya?"). Bukan buat data finansial presisi — pakai tool lain untuk itu.',
+        description: 'Cari percakapan atau laporan lama yang mungkin relevan dengan pertanyaan user sekarang (mis. "dulu aku pernah nanya soal apa ya?"). Bukan buat data finansial presisi — pakai tool lain untuk itu.',
         input_schema: {
           type: 'object',
           properties: {
@@ -439,7 +442,7 @@ export class AiFinanceToolsService {
           required: ['query'],
         },
         handler: async (input: { query: string }) =>
-          this.retrievalService.search(input.query, {
+          this.retrievalService.search(userId, input.query, {
             excludeThreadId: ctx.threadId,
             excludeAfterId: ctx.excludeAfterId,
           }),

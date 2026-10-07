@@ -9,16 +9,16 @@ export class GoalService {
   constructor(private prisma: PrismaService) {}
 
   /** List goal aktif (belum di-archive) + currentAmount teragregasi dari contributions */
-  async findAll() {
+  async findAll(userId: number) {
     const goals = await this.prisma.goal.findMany({
-      where: { archivedAt: null },
+      where: { userId, archivedAt: null },
       orderBy: { createdAt: 'asc' },
     });
 
     const goalsWithAmount = await Promise.all(
       goals.map(async (goal) => {
         const agg = await this.prisma.goalContribution.aggregate({
-          where: { goalId: goal.id },
+          where: { goalId: goal.id, goal: { userId } },
           _sum: { amount: true },
         });
         const currentAmount = Number(agg._sum.amount ?? 0);
@@ -33,9 +33,10 @@ export class GoalService {
     return goalsWithAmount;
   }
 
-  async create(dto: CreateGoalDto) {
+  async create(userId: number, dto: CreateGoalDto) {
     return this.prisma.goal.create({
       data: {
+        userId,
         name: dto.name,
         targetAmount: dto.targetAmount,
         ...(dto.targetDate ? { targetDate: new Date(dto.targetDate) } : {}),
@@ -43,12 +44,13 @@ export class GoalService {
     });
   }
 
-  async contribute(goalId: number, dto: ContributeGoalDto) {
+  async contribute(userId: number, goalId: number, dto: ContributeGoalDto) {
     const goal = await this.prisma.goal.findFirst({
-      where: { id: goalId, archivedAt: null },
+      where: { id: goalId, userId, archivedAt: null },
     });
     if (!goal) throw new NotFoundException(`Goal ${goalId} tidak ditemukan`);
 
+    // tenancy-ok: goal sudah diverifikasi milik userId (findFirst di atas); GoalContribution via induk
     return this.prisma.goalContribution.create({
       data: {
         goalId,
@@ -58,27 +60,28 @@ export class GoalService {
     });
   }
 
-  async archive(goalId: number) {
-    const goal = await this.prisma.goal.findUnique({ where: { id: goalId } });
+  async archive(userId: number, goalId: number) {
+    const goal = await this.prisma.goal.findFirst({ where: { id: goalId, userId } });
     if (!goal) throw new NotFoundException(`Goal ${goalId} tidak ditemukan`);
 
-    return this.prisma.goal.update({
-      where: { id: goalId },
+    await this.prisma.goal.updateMany({
+      where: { id: goalId, userId },
       data: { archivedAt: new Date() },
     });
+    return this.prisma.goal.findFirstOrThrow({ where: { id: goalId, userId } });
   }
 
   /** What-if simulator: murni matematik, TIDAK panggil LLM.
-   *  Hitung berapa bulan lebih cepat kalau Arzaka potong pengeluaran sebesar cutPercent. */
-  async simulate(goalId: number, cutPercent: number) {
+   *  Hitung berapa bulan lebih cepat kalau user memotong pengeluaran sebesar cutPercent. */
+  async simulate(userId: number, goalId: number, cutPercent: number) {
     const goal = await this.prisma.goal.findFirst({
-      where: { id: goalId, archivedAt: null },
+      where: { id: goalId, userId, archivedAt: null },
     });
     if (!goal) throw new NotFoundException(`Goal ${goalId} tidak ditemukan`);
 
     // currentAmount dari aggregate contributions
     const agg = await this.prisma.goalContribution.aggregate({
-      where: { goalId },
+      where: { goalId, goal: { userId } },
       _sum: { amount: true },
     });
     const currentAmount = Number(agg._sum.amount ?? 0);
@@ -99,11 +102,11 @@ export class GoalService {
     const [incomeAgg, spentAgg] = await Promise.all([
       this.prisma.income.aggregate({
         _sum: { amount: true },
-        where: { receivedAt: { gte: thirtyDaysAgo } },
+        where: { userId, receivedAt: { gte: thirtyDaysAgo } },
       }),
       this.prisma.transaction.aggregate({
         _sum: { amount: true, reimbursedAmount: true },
-        where: { occurredAt: { gte: thirtyDaysAgo } },
+        where: { userId, occurredAt: { gte: thirtyDaysAgo } },
       }),
     ]);
 

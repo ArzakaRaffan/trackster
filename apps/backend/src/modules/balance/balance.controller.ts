@@ -3,6 +3,7 @@ import { BalanceService } from './balance.service';
 import { CorrectBalanceDto } from './dto/correct-balance.dto';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { Source } from '@prisma/client';
+import { AuthUser, CurrentUser } from '../../common/decorators/current-user.decorator';
 
 function parseSource(value: string): Source {
   if (!Object.values(Source).includes(value as Source)) {
@@ -17,17 +18,17 @@ export class BalanceController {
   constructor(private balanceService: BalanceService) {}
 
   @Get()
-  async getAll() {
-    return this.balanceService.getAll();
+  async getAll(@CurrentUser() user: AuthUser) {
+    return this.balanceService.getAll(user.id);
   }
 
   @Put(':source')
-  async correctBalance(@Param('source') source: string, @Body() dto: CorrectBalanceDto) {
-    return this.balanceService.correctBalance(parseSource(source), dto.newBalance, dto.note);
+  async correctBalance(@CurrentUser() user: AuthUser, @Param('source') source: string, @Body() dto: CorrectBalanceDto) {
+    return this.balanceService.correctBalance(user.id, parseSource(source), dto.newBalance, dto.note);
   }
 
   @Get(':source/adjustments')
-  async getAdjustments(@Param('source') source: string) {
-    return this.balanceService.getAdjustments(parseSource(source));
+  async getAdjustments(@CurrentUser() user: AuthUser, @Param('source') source: string) {
+    return this.balanceService.getAdjustments(user.id, parseSource(source));
   }
 }

@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { Category, Source } from '@prisma/client';
 import { EmailParser, RawEmail, ParseResult, extractField, parseRupiah, parseEmailDate } from './parser.interface';
-import { isInternalDestination } from './own-accounts';
+import { isInternalDestination, OwnerContext } from './own-accounts';
 
 const FLIP_SENDER_HINTS = ['flip.id', 'fliptech', 'flip '];
 
@@ -26,7 +26,7 @@ export class FlipParser implements EmailParser {
     return false;
   }
 
-  parse(email: RawEmail): ParseResult | null {
+  parse(email: RawEmail, ctx: OwnerContext): ParseResult | null {
     // Email instruksi bayar ke rekening Flip — belum expense final (uang baru keluar
     // begitu SoF BCA memotong saldo; tercatat dari sisi BCA). Subject bisa Inggris
     // ("Transaction information...") atau Indonesia ("Informasi transfer ke ...").
@@ -54,7 +54,7 @@ export class FlipParser implements EmailParser {
     const excluded = isInternalDestination({
       accountNumber: destinationAccount,
       beneficiaryName: destinationName,
-    });
+    }, ctx);
 
     // Deskripsi: "<Nama> · <Bank> …<4 digit rekening>"
     const accountDigits = (destinationAccount || '').replace(/\D/g, '');

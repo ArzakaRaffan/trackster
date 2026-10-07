@@ -63,7 +63,7 @@ export class AnalyticsService {
 
   /** `?range=7d|30d|90d|all` ATAU `from`&`to` (WIB, inklusif) → `{start,end}` instant UTC, `end` eksklusif.
    * Dipakai `AnalyticsController` & `AiInsightCardService` biar parsing range cuma sekali. */
-  async resolvePeriod(range?: string, from?: string, to?: string): Promise<{ start: Date; end: Date }> {
+  async resolvePeriod(userId: number, range?: string, from?: string, to?: string): Promise<{ start: Date; end: Date }> {
     if (from && to) {
       return { start: startOfWibDay(from), end: addWibDays(startOfWibDay(to), 1) };
     }
@@ -72,7 +72,7 @@ export class AnalyticsService {
     const end = addWibDays(startOfWibDay(now), 1);
 
     if (range === 'all') {
-      const first = await this.getPeriodStats(new Date(0), end, false);
+      const first = await this.getPeriodStats(userId, new Date(0), end, false);
       const start = first.range.dataStartsAt ? startOfWibDay(new Date(first.range.dataStartsAt)) : startOfWibDay(now);
       return { start, end };
     }
@@ -83,17 +83,17 @@ export class AnalyticsService {
   }
 
   /** `end` eksklusif. Semua kunci hari pakai `wibDateKey`, batas hari/minggu dari `wib.ts`. */
-  async getPeriodStats(start: Date, end: Date, compare = true): Promise<PeriodStats> {
+  async getPeriodStats(userId: number, start: Date, end: Date, compare = true): Promise<PeriodStats> {
     const [dataStartsAtRow, budgetRows, transactionsRaw, window90dRaw, historyBeforeStart] = await Promise.all([
-      this.prisma.transaction.aggregate({ _min: { occurredAt: true } }),
-      this.prisma.dailyBudget.findMany(),
-      this.prisma.transaction.findMany({ where: { occurredAt: { gte: start, lt: end } }, orderBy: { occurredAt: 'asc' } }),
+      this.prisma.transaction.aggregate({ where: { userId }, _min: { occurredAt: true } }),
+      this.prisma.dailyBudget.findMany({ where: { userId } }),
+      this.prisma.transaction.findMany({ where: { userId, occurredAt: { gte: start, lt: end } }, orderBy: { occurredAt: 'asc' } }),
       this.prisma.transaction.findMany({
-        where: { occurredAt: { gte: addWibDays(end, -90), lt: end } },
+        where: { userId, occurredAt: { gte: addWibDays(end, -90), lt: end } },
         select: { amount: true, reimbursedAmount: true, category: true, merchantKey: true, description: true },
       }),
       this.prisma.transaction.findMany({
-        where: { occurredAt: { lt: start } },
+        where: { userId, occurredAt: { lt: start } },
         select: { merchantKey: true, description: true },
       }),
     ]);
@@ -117,7 +117,7 @@ export class AnalyticsService {
     );
 
     const incomeRows = await this.prisma.income.findMany({
-      where: { receivedAt: { gte: start, lt: end }, status: IncomeStatus.CONFIRMED },
+      where: { userId, receivedAt: { gte: start, lt: end }, status: IncomeStatus.CONFIRMED },
       select: { amount: true, receivedAt: true },
     });
     const totalIncome = incomeRows.reduce((sum, i) => sum + Number(i.amount), 0);
@@ -132,12 +132,12 @@ export class AnalyticsService {
       if (prevRange) {
         const [prevTxRaw, prevIncome] = await Promise.all([
           this.prisma.transaction.findMany({
-            where: { occurredAt: { gte: prevRange.start, lt: prevRange.end } },
+            where: { userId, occurredAt: { gte: prevRange.start, lt: prevRange.end } },
             select: { amount: true, reimbursedAmount: true, category: true, merchantKey: true, description: true, isBig: true },
           }),
           this.prisma.income.aggregate({
             _sum: { amount: true },
-            where: { receivedAt: { gte: prevRange.start, lt: prevRange.end }, status: IncomeStatus.CONFIRMED },
+            where: { userId, receivedAt: { gte: prevRange.start, lt: prevRange.end }, status: IncomeStatus.CONFIRMED },
           }),
         ]);
         const prevTx = prevTxRaw.map(toNet);
@@ -156,7 +156,7 @@ export class AnalyticsService {
     }
 
     const byCategory = this.buildByCategory(transactions, prevByCategory);
-    const byMerchant = await this.buildByMerchant(transactions, prevByMerchant, days);
+    const byMerchant = await this.buildByMerchant(userId, transactions, prevByMerchant, days);
     const byDay = this.buildByDay(transactions, incomeRows, start, end, budgetByDow, medianAmount90d);
     const byWeekday = this.buildByWeekday(byDay);
     const timeHeatmap = this.buildTimeHeatmap(transactions);
@@ -164,9 +164,9 @@ export class AnalyticsService {
       .filter((t) => isBigPurchase(Number(t.amount), medianAmount90d, t.isBig))
       .sort((a, b) => Number(b.amount) - Number(a.amount));
     const anomalies = this.buildAnomalies(transactions, medianAmount90d, categoryMedians, p90Amount90d, knownMerchantsBeforeStart);
-    const habits = await this.buildHabits(transactions, medianAmount90d, days);
+    const habits = await this.buildHabits(userId, transactions, medianAmount90d, days);
     const budget = { ...computeBudgetAdherence(byDay.map((d) => ({ spend: d.spendRoutine, budget: d.budget }))), worstWeekday: this.worstWeekday(byDay) };
-    const dataQuality = await this.buildDataQuality(transactions);
+    const dataQuality = await this.buildDataQuality(userId, transactions);
 
     return {
       range: { start: start.toISOString(), end: end.toISOString(), days, dataStartsAt: dataStartsAt?.toISOString() ?? null },
@@ -225,7 +225,7 @@ export class AnalyticsService {
       .sort((a, b) => b.total - a.total);
   }
 
-  private async buildByMerchant(transactions: Transaction[], prevByMerchant: Map<string, number> | undefined, days: number) {
+  private async buildByMerchant(userId: number, transactions: Transaction[], prevByMerchant: Map<string, number> | undefined, days: number) {
     const groups = new Map<string, { total: number; count: number; description: string }>();
     for (const t of transactions) {
       const key = t.merchantKey || computeMerchantKey(t.description);
@@ -236,7 +236,7 @@ export class AnalyticsService {
     }
 
     const representatives = Array.from(groups.values()).map((g) => ({ description: g.description }));
-    const withDisplay = await this.merchantAliasService.attachDisplayNames(representatives);
+    const withDisplay = await this.merchantAliasService.attachDisplayNames(userId, representatives);
     const displayByDescription = new Map(withDisplay.map((r) => [r.description, r.displayDescription]));
 
     return Array.from(groups.entries())
@@ -344,7 +344,7 @@ export class AnalyticsService {
     return anomalies;
   }
 
-  private async buildHabits(transactions: Transaction[], medianAmount90d: number, days: number) {
+  private async buildHabits(userId: number, transactions: Transaction[], medianAmount90d: number, days: number) {
     const groups = new Map<string, { total: number; count: number; description: string }>();
     for (const t of transactions) {
       if (isBigPurchase(Number(t.amount), medianAmount90d, t.isBig)) continue;
@@ -360,7 +360,7 @@ export class AnalyticsService {
       .map(([key, g]) => ({ merchantKey: key, ...g, perWeek: g.count / weeks }))
       .filter((g) => g.count >= 3 && g.perWeek >= 1);
 
-    const withDisplay = await this.merchantAliasService.attachDisplayNames(candidates.map((c) => ({ description: c.description })));
+    const withDisplay = await this.merchantAliasService.attachDisplayNames(userId, candidates.map((c) => ({ description: c.description })));
     const displayByDescription = new Map(withDisplay.map((r) => [r.description, r.displayDescription]));
 
     return candidates
@@ -384,12 +384,12 @@ export class AnalyticsService {
     return max > 0 ? overCountByDow.indexOf(max) : null;
   }
 
-  private async buildDataQuality(transactions: Transaction[]) {
+  private async buildDataQuality(userId: number, transactions: Transaction[]) {
     const spend = transactions.reduce((sum, t) => sum + Number(t.amount), 0);
     const lainnyaTotal = transactions.filter((t) => t.category === Category.LAINNYA).reduce((sum, t) => sum + Number(t.amount), 0);
     const [pendingIncomeCount, unparsedEmailCount] = await Promise.all([
-      this.prisma.income.count({ where: { status: IncomeStatus.PENDING } }),
-      this.prisma.emailParseLog.count({ where: { status: ParseStatus.UNPARSED } }),
+      this.prisma.income.count({ where: { userId, status: IncomeStatus.PENDING } }),
+      this.prisma.emailParseLog.count({ where: { userId, status: ParseStatus.UNPARSED } }),
     ]);
     return { lainnyaPct: spend > 0 ? (lainnyaTotal / spend) * 100 : 0, pendingIncomeCount, unparsedEmailCount };
   }

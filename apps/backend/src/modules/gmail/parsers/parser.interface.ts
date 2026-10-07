@@ -1,4 +1,5 @@
 import { Source, Category } from '@prisma/client';
+import type { OwnerContext } from './own-accounts';
 
 export interface RawEmail {
   id: string; // Gmail message ID, dipakai untuk deduplication (emailId)
@@ -36,7 +37,7 @@ export interface EmailParser {
   /** Cek apakah email ini cocok ditangani parser ini (biasanya cek sender/from) */
   canHandle(email: RawEmail): boolean;
   /** Parse body email jadi data transaksi. Return null kalau bukan notifikasi transaksi yang relevan (OTP, promo, dll) */
-  parse(email: RawEmail): ParseResult | null;
+  parse(email: RawEmail, ctx: OwnerContext): ParseResult | null;
 }
 
 /**

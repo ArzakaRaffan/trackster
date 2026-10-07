@@ -1,14 +1,11 @@
 /**
- * Rekening milik owner — transfer ke nomor ini = internal (bukan expense).
- * Cocokkan pakai digit-only supaya format "1234-567-890" / "1234567890" sama.
- * Diisi lewat env `OWNER_ACCOUNT_NUMBERS` (comma-separated); tanpa env = tidak ada rekening yang dianggap milik sendiri.
+ * Konteks pemilik (per user): nama di rekening bank + nomor rekening miliknya. Transfer ke nomor/nama ini = internal.
+ * Cocokkan pakai digit-only supaya format "1234-567-890" / "1234567890" sama. Konteks kosong = tidak ada yang dianggap milik sendiri.
  */
-const OWN_ACCOUNT_NUMBERS = (process.env.OWNER_ACCOUNT_NUMBERS || '')
-  .split(',')
-  .map((s) => s.trim())
-  .filter(Boolean);
-
-export const OWNER_FULL_NAME = (process.env.OWNER_FULL_NAME || '').toUpperCase();
+export interface OwnerContext {
+  fullName: string;
+  accounts: string[];
+}
 
 /** Normalisasi nomor rekening: buang spasi/strip, keep digits only. */
 export function normalizeAccountNumber(raw: string | null | undefined): string {
@@ -44,32 +41,29 @@ function matchesOwnAccount(digits: string, own: string): boolean {
   return false;
 }
 
-export function isOwnAccountNumber(raw: string | null | undefined): boolean {
+export function isOwnAccountNumber(raw: string | null | undefined, ctx: OwnerContext): boolean {
   const digits = normalizeAccountNumber(raw);
   if (!digits) return false;
-  return OWN_ACCOUNT_NUMBERS.some((own) => matchesOwnAccount(digits, normalizeAccountNumber(own)));
+  return ctx.accounts.some((own) => matchesOwnAccount(digits, normalizeAccountNumber(own)));
 }
 
-export function isOwnerName(raw: string | null | undefined): boolean {
+export function isOwnerName(raw: string | null | undefined, ctx: OwnerContext): boolean {
+  const ownerName = ctx.fullName.trim().toUpperCase();
   // Nama kosong (env belum di-set) jangan dianggap cocok: ''.includes('') selalu true
-  if (!raw || !OWNER_FULL_NAME) return false;
-  return raw.toUpperCase().includes(OWNER_FULL_NAME);
+  if (!raw || !ownerName) return false;
+  return raw.toUpperCase().includes(ownerName);
 }
 
 /**
  * Internal transfer kalau tujuan jelas rekening sendiri.
  * Prefer account number; fallback ke nama owner kalau nomor tidak ada di email.
  */
-export function isInternalDestination(opts: {
-  accountNumber?: string | null;
-  beneficiaryName?: string | null;
-}): boolean {
-  if (isOwnAccountNumber(opts.accountNumber)) return true;
+export function isInternalDestination(
+  opts: { accountNumber?: string | null; beneficiaryName?: string | null },
+  ctx: OwnerContext,
+): boolean {
+  if (isOwnAccountNumber(opts.accountNumber, ctx)) return true;
   // Nama saja rentan false positive — cuma dipakai kalau account number kosong
-  if (!normalizeAccountNumber(opts.accountNumber) && isOwnerName(opts.beneficiaryName)) return true;
+  if (!normalizeAccountNumber(opts.accountNumber) && isOwnerName(opts.beneficiaryName, ctx)) return true;
   return false;
-}
-
-export function ownAccountNumbersForLog(): string[] {
-  return [...OWN_ACCOUNT_NUMBERS];
 }

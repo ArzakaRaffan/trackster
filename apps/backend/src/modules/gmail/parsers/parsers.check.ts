@@ -8,13 +8,6 @@ import * as fs from 'fs';
 import * as path from 'path';
 import * as assert from 'assert';
 
-// own-accounts.ts baca OWNER_ACCOUNT_NUMBERS/OWNER_FULL_NAME dari process.env sekali di module-load
-// time. Import di bawah ini transitif me-require @prisma/client, yang auto-load .env (dotenv) buat
-// DATABASE_URL — efek sampingnya, .env dev (nilai dummy: OWNER_ACCOUNT_NUMBERS=0000000000) bisa
-// menimpa default kalau belum di-set. Set dulu ke nilai asli SEBELUM import lain jalan (dotenv
-// tidak override env yang sudah ada) — fixture di sini pakai rekening/nama produksi asli.
-process.env.OWNER_ACCOUNT_NUMBERS = '1234567890,100200300400,009988776655';
-process.env.OWNER_FULL_NAME = 'ANDI WIJAYA PUTRA';
 
 // ─── Impor fungsi & tipe yang akan diuji ────────────────────────────────────
 import { extractField, parseRupiah, parseEmailDate, htmlToText } from './parser.interface';
@@ -26,6 +19,11 @@ import { MandiriParser } from './mandiri.parser';
 import { RayaParser } from './raya.parser';
 import { BriParser } from './bri.parser';
 import { Source, Category } from '@prisma/client';
+import { OwnerContext } from './own-accounts';
+
+// Konteks pemilik eksplisit (bukan env) — fixture pakai rekening/nama sintetis.
+const CTX: OwnerContext = { fullName: 'ANDI WIJAYA PUTRA', accounts: ['1234567890', '100200300400', '009988776655'] };
+
 
 // ─── Helper ──────────────────────────────────────────────────────────────────
 
@@ -151,72 +149,72 @@ const parser = new BcaParser();
 // --- VA GoPay ---
 check('VA GoPay: amount = 11000 (Total Payment termasuk admin fee)', () => {
   const body = loadFixture('bca-va-gopay.txt');
-  const result = parser.parse(fakeEmail(body));
+  const result = parser.parse(fakeEmail(body), CTX);
   assert.ok(result !== null, 'parse harusnya return ParseResult, bukan null');
   assert.strictEqual(result!.amount, 11000);
 });
 
 check('VA GoPay: description = "GoPay Top-up (VA)"', () => {
   const body = loadFixture('bca-va-gopay.txt');
-  const result = parser.parse(fakeEmail(body));
+  const result = parser.parse(fakeEmail(body), CTX);
   assert.strictEqual(result!.description, 'GoPay Top-up (VA)');
 });
 
 check('VA GoPay: excluded = false (bukan rekening sendiri)', () => {
   const body = loadFixture('bca-va-gopay.txt');
-  const result = parser.parse(fakeEmail(body));
+  const result = parser.parse(fakeEmail(body), CTX);
   assert.strictEqual(result!.excluded, false);
 });
 
 check('VA GoPay: source = BCA', () => {
   const body = loadFixture('bca-va-gopay.txt');
-  const result = parser.parse(fakeEmail(body));
+  const result = parser.parse(fakeEmail(body), CTX);
   assert.strictEqual(result!.source, Source.BCA);
 });
 
 check('VA GoPay: occurredAt = 2026-09-23T07:01:00.000Z (WIB 14:01)', () => {
   const body = loadFixture('bca-va-gopay.txt');
-  const result = parser.parse(fakeEmail(body));
+  const result = parser.parse(fakeEmail(body), CTX);
   assert.strictEqual(result!.occurredAt.toISOString(), '2026-09-23T07:01:00.000Z');
 });
 
 // --- VA ShopeePay ---
 check('VA ShopeePay: amount = 60000', () => {
   const body = loadFixture('bca-va-shopeepay.txt');
-  const result = parser.parse(fakeEmail(body));
+  const result = parser.parse(fakeEmail(body), CTX);
   assert.ok(result !== null, 'parse harusnya return ParseResult, bukan null');
   assert.strictEqual(result!.amount, 60000);
 });
 
 check('VA ShopeePay: description = "ShopeePay Top-up (VA)"', () => {
   const body = loadFixture('bca-va-shopeepay.txt');
-  const result = parser.parse(fakeEmail(body));
+  const result = parser.parse(fakeEmail(body), CTX);
   assert.strictEqual(result!.description, 'ShopeePay Top-up (VA)');
 });
 
 check('VA ShopeePay: excluded = false (Name berisi nama owner, tapi VA number bukan rekening sendiri)', () => {
   const body = loadFixture('bca-va-shopeepay.txt');
-  const result = parser.parse(fakeEmail(body));
+  const result = parser.parse(fakeEmail(body), CTX);
   assert.strictEqual(result!.excluded, false, 'ShopeePay TIDAK boleh di-exclude meski Name berisi nama owner');
 });
 
 // --- VA OVO — KRITIS: Name = nama owner penuh, tapi bukan internal ---
 check('VA OVO: amount = 36000', () => {
   const body = loadFixture('bca-va-ovo.txt');
-  const result = parser.parse(fakeEmail(body));
+  const result = parser.parse(fakeEmail(body), CTX);
   assert.ok(result !== null, 'parse harusnya return ParseResult, bukan null');
   assert.strictEqual(result!.amount, 36000);
 });
 
 check('VA OVO: description = "OVO Top-up (VA)"', () => {
   const body = loadFixture('bca-va-ovo.txt');
-  const result = parser.parse(fakeEmail(body));
+  const result = parser.parse(fakeEmail(body), CTX);
   assert.strictEqual(result!.description, 'OVO Top-up (VA)');
 });
 
 check('VA OVO: excluded = false meski Name = "ANDI WIJAYA PUTRA" (critical false-positive guard)', () => {
   const body = loadFixture('bca-va-ovo.txt');
-  const result = parser.parse(fakeEmail(body));
+  const result = parser.parse(fakeEmail(body), CTX);
   assert.strictEqual(
     result!.excluded,
     false,
@@ -227,74 +225,74 @@ check('VA OVO: excluded = false meski Name = "ANDI WIJAYA PUTRA" (critical false
 // --- QRIS Tokopedia ---
 check('QRIS Tokopedia: amount = 117492', () => {
   const body = loadFixture('bca-qris-tokopedia.txt');
-  const result = parser.parse(fakeEmail(body));
+  const result = parser.parse(fakeEmail(body), CTX);
   assert.ok(result !== null);
   assert.strictEqual(result!.amount, 117492);
 });
 
 check('QRIS Tokopedia: description = "PT Tokopedia"', () => {
   const body = loadFixture('bca-qris-tokopedia.txt');
-  const result = parser.parse(fakeEmail(body));
+  const result = parser.parse(fakeEmail(body), CTX);
   assert.strictEqual(result!.description, 'PT Tokopedia');
 });
 
 check('QRIS Tokopedia: excluded = false', () => {
   const body = loadFixture('bca-qris-tokopedia.txt');
-  const result = parser.parse(fakeEmail(body));
+  const result = parser.parse(fakeEmail(body), CTX);
   assert.strictEqual(result!.excluded, false);
 });
 
 // --- QRIS basic ---
 check('QRIS basic: amount = 15000', () => {
   const body = loadFixture('bca-qris.txt');
-  const result = parser.parse(fakeEmail(body));
+  const result = parser.parse(fakeEmail(body), CTX);
   assert.ok(result !== null);
   assert.strictEqual(result!.amount, 15000);
 });
 
 check('QRIS basic: description = "Warung Makan Bu Sari"', () => {
   const body = loadFixture('bca-qris.txt');
-  const result = parser.parse(fakeEmail(body));
+  const result = parser.parse(fakeEmail(body), CTX);
   assert.strictEqual(result!.description, 'Warung Makan Bu Sari');
 });
 
 // --- QRIS Shopee Indonesia (merchant, bukan VA top-up) ---
 check('QRIS Shopee merchant: amount = 150150', () => {
   const body = loadFixture('bca-qris-shopee.txt');
-  const result = parser.parse(fakeEmail(body));
+  const result = parser.parse(fakeEmail(body), CTX);
   assert.ok(result !== null, 'parse harusnya return ParseResult, bukan null');
   assert.strictEqual(result!.amount, 150150);
 });
 
 check('QRIS Shopee merchant: description = "Shopee Indonesia" (bukan "ShopeePay Top-up (VA)")', () => {
   const body = loadFixture('bca-qris-shopee.txt');
-  const result = parser.parse(fakeEmail(body));
+  const result = parser.parse(fakeEmail(body), CTX);
   assert.strictEqual(result!.description, 'Shopee Indonesia');
 });
 
 check('QRIS Shopee merchant: excluded = false', () => {
   const body = loadFixture('bca-qris-shopee.txt');
-  const result = parser.parse(fakeEmail(body));
+  const result = parser.parse(fakeEmail(body), CTX);
   assert.strictEqual(result!.excluded, false);
 });
 
 // --- Transfer Fliptech: harus excluded ---
 check('Transfer Fliptech: excluded = true (SoF ke Flip, bukan expense akhir)', () => {
   const body = loadFixture('bca-transfer-fliptech.txt');
-  const result = parser.parse(fakeEmail(body));
+  const result = parser.parse(fakeEmail(body), CTX);
   assert.ok(result !== null);
   assert.strictEqual(result!.excluded, true);
 });
 
 check('Transfer Fliptech: excludeReason mengandung "FLIPTECH"', () => {
   const body = loadFixture('bca-transfer-fliptech.txt');
-  const result = parser.parse(fakeEmail(body));
+  const result = parser.parse(fakeEmail(body), CTX);
   assert.ok(result!.excludeReason?.includes('FLIPTECH') || result!.excludeReason?.includes('Flip'));
 });
 
 // --- Body yang bukan notifikasi transaksi: return null ---
 check('Email bukan transaksi BCA → null', () => {
-  const result = parser.parse(fakeEmail('Promo BCA: Dapatkan cashback 10%!'));
+  const result = parser.parse(fakeEmail('Promo BCA: Dapatkan cashback 10%!'), CTX);
   assert.strictEqual(result, null);
 });
 
@@ -317,65 +315,65 @@ function fakeFlipEmail(body: string, subject: string, id = 'test-id'): { id: str
 // --- Instruksi bayar (belum expense final) → null ---
 check('Flip instruksi "Transaction information...": return null', () => {
   const body = loadFixture('flip-instruction.txt');
-  const result = flipParser.parse(fakeFlipEmail(body, 'Transaction information to multiple destinations'));
+  const result = flipParser.parse(fakeFlipEmail(body, 'Transaction information to multiple destinations'), CTX);
   assert.strictEqual(result, null);
 });
 
 check('Flip instruksi ID "Informasi transfer ke ...": return null', () => {
   const body = loadFixture('flip-instruction-id.txt');
-  const result = flipParser.parse(fakeFlipEmail(body, 'Informasi transfer ke ANDI WIJAYA PUTRA'));
+  const result = flipParser.parse(fakeFlipEmail(body, 'Informasi transfer ke ANDI WIJAYA PUTRA'), CTX);
   assert.strictEqual(result, null);
 });
 
 // --- Receipt ke orang lain → expense final ---
 check('Flip receipt eksternal: amount = 64000', () => {
   const body = loadFixture('flip-receipt.txt');
-  const result = flipParser.parse(fakeFlipEmail(body, 'Successful transfer to Budi Hartono. Here is the receipt.'));
+  const result = flipParser.parse(fakeFlipEmail(body, 'Successful transfer to Budi Hartono. Here is the receipt.'), CTX);
   assert.ok(result !== null, 'parse harusnya return ParseResult, bukan null');
   assert.strictEqual(result!.amount, 64000);
 });
 
 check('Flip receipt eksternal: description = "Budi Hartono · BNI …0100"', () => {
   const body = loadFixture('flip-receipt.txt');
-  const result = flipParser.parse(fakeFlipEmail(body, 'Successful transfer to Budi Hartono. Here is the receipt.'));
+  const result = flipParser.parse(fakeFlipEmail(body, 'Successful transfer to Budi Hartono. Here is the receipt.'), CTX);
   assert.strictEqual(result!.description, 'Budi Hartono · BNI …0100');
 });
 
 check('Flip receipt eksternal: excluded = false', () => {
   const body = loadFixture('flip-receipt.txt');
-  const result = flipParser.parse(fakeFlipEmail(body, 'Successful transfer to Budi Hartono. Here is the receipt.'));
+  const result = flipParser.parse(fakeFlipEmail(body, 'Successful transfer to Budi Hartono. Here is the receipt.'), CTX);
   assert.strictEqual(result!.excluded, false);
 });
 
 check('Flip receipt eksternal: occurredAt = 2026-09-20T14:15:00.000Z (WIB 21:15)', () => {
   const body = loadFixture('flip-receipt.txt');
-  const result = flipParser.parse(fakeFlipEmail(body, 'Successful transfer to Budi Hartono. Here is the receipt.'));
+  const result = flipParser.parse(fakeFlipEmail(body, 'Successful transfer to Budi Hartono. Here is the receipt.'), CTX);
   assert.strictEqual(result!.occurredAt.toISOString(), '2026-09-20T14:15:00.000Z');
 });
 
 check('Flip receipt eksternal: source = BCA', () => {
   const body = loadFixture('flip-receipt.txt');
-  const result = flipParser.parse(fakeFlipEmail(body, 'Successful transfer to Budi Hartono. Here is the receipt.'));
+  const result = flipParser.parse(fakeFlipEmail(body, 'Successful transfer to Budi Hartono. Here is the receipt.'), CTX);
   assert.strictEqual(result!.source, Source.BCA);
 });
 
 // --- Receipt ke rekening sendiri → internal, excluded ---
 check('Flip receipt internal (Destination = rekening Blu sendiri): excluded = true', () => {
   const body = loadFixture('flip-receipt-internal.txt');
-  const result = flipParser.parse(fakeFlipEmail(body, 'Successful transfer to ANDI WIJAYA PUTRA. Here is the receipt.'));
+  const result = flipParser.parse(fakeFlipEmail(body, 'Successful transfer to ANDI WIJAYA PUTRA. Here is the receipt.'), CTX);
   assert.ok(result !== null);
   assert.strictEqual(result!.excluded, true);
 });
 
 check('Flip receipt internal: excludeReason mengandung "internal"', () => {
   const body = loadFixture('flip-receipt-internal.txt');
-  const result = flipParser.parse(fakeFlipEmail(body, 'Successful transfer to ANDI WIJAYA PUTRA. Here is the receipt.'));
+  const result = flipParser.parse(fakeFlipEmail(body, 'Successful transfer to ANDI WIJAYA PUTRA. Here is the receipt.'), CTX);
   assert.ok(result!.excludeReason?.includes('internal'));
 });
 
 check('Flip receipt internal: balanceOnly = true (uang beneran keluar dari SoF BCA)', () => {
   const body = loadFixture('flip-receipt-internal.txt');
-  const result = flipParser.parse(fakeFlipEmail(body, 'Successful transfer to ANDI WIJAYA PUTRA. Here is the receipt.'));
+  const result = flipParser.parse(fakeFlipEmail(body, 'Successful transfer to ANDI WIJAYA PUTRA. Here is the receipt.'), CTX);
   assert.strictEqual(result!.balanceOnly, true);
 });
 
@@ -397,40 +395,40 @@ function fakeJagoEmail(body: string, subject = 'Asik, kamu telah menerima sejuml
 
 check('Jago terima FLIPTECH: kind = INCOME', () => {
   const body = loadFixture('jago-terima-fliptech.txt');
-  const result = jagoParser.parse(fakeJagoEmail(body));
+  const result = jagoParser.parse(fakeJagoEmail(body), CTX);
   assert.ok(result !== null);
   assert.strictEqual(result!.kind, 'INCOME');
 });
 
 check('Jago terima FLIPTECH: amount = 112500, description = nama pengirim', () => {
   const body = loadFixture('jago-terima-fliptech.txt');
-  const result = jagoParser.parse(fakeJagoEmail(body));
+  const result = jagoParser.parse(fakeJagoEmail(body), CTX);
   assert.strictEqual(result!.amount, 112500);
   assert.strictEqual(result!.description, 'FLIPTECH LENTERA INSPIRASI PERTIWI');
 });
 
 check('Jago terima FLIPTECH: occurredAt = 2026-08-26T06:37:00.000Z (WIB 13:37)', () => {
   const body = loadFixture('jago-terima-fliptech.txt');
-  const result = jagoParser.parse(fakeJagoEmail(body));
+  const result = jagoParser.parse(fakeJagoEmail(body), CTX);
   assert.strictEqual(result!.occurredAt.toISOString(), '2026-08-26T06:37:00.000Z');
 });
 
 check('Jago terima FLIPTECH: excluded = false (income tetap dicatat, klasifikasi urusan IncomeService)', () => {
   const body = loadFixture('jago-terima-fliptech.txt');
-  const result = jagoParser.parse(fakeJagoEmail(body));
+  const result = jagoParser.parse(fakeJagoEmail(body), CTX);
   assert.strictEqual(result!.excluded, false);
 });
 
 check('Jago terima owner sendiri: amount = 250000, description = "ANDI WIJAYA PUTRA"', () => {
   const body = loadFixture('jago-terima-owner.txt');
-  const result = jagoParser.parse(fakeJagoEmail(body));
+  const result = jagoParser.parse(fakeJagoEmail(body), CTX);
   assert.strictEqual(result!.amount, 250000);
   assert.strictEqual(result!.description, 'ANDI WIJAYA PUTRA');
 });
 
 check('Jago terima dari orang tak dikenal: amount = 50000, description = "BUDI SANTOSO"', () => {
   const body = loadFixture('jago-terima-unknown.txt');
-  const result = jagoParser.parse(fakeJagoEmail(body));
+  const result = jagoParser.parse(fakeJagoEmail(body), CTX);
   assert.strictEqual(result!.amount, 50000);
   assert.strictEqual(result!.description, 'BUDI SANTOSO');
 });
@@ -452,7 +450,7 @@ check('Jago transfer keluar ke rekening sendiri: balanceOnly = true', () => {
     subject: 'Kamu telah melakukan transfer uang',
     body,
     internalDate: String(new Date('2026-09-10T02:00:00Z').getTime()),
-  });
+  }, CTX);
   assert.ok(result !== null);
   assert.strictEqual(result!.excluded, true);
   assert.strictEqual(result!.balanceOnly, true);
@@ -470,7 +468,7 @@ check('BNI QRIS: expense BNI, nominal & waktu WIB benar', () => {
     internalDate: '0',
   };
   assert.strictEqual(bni.canHandle(email), true);
-  const r = bni.parse(email);
+  const r = bni.parse(email, CTX);
   assert.ok(r !== null);
   assert.strictEqual(r!.amount, 76800);
   assert.strictEqual(r!.description, 'ALGO X661 AFM RE');
@@ -489,7 +487,7 @@ check('Mandiri Livin QRIS: Rp 7.900,00 = 7900, tanggal Indonesia "Okt"', () => {
     internalDate: '0',
   };
   assert.strictEqual(m.canHandle(email), true);
-  const r = m.parse(email);
+  const r = m.parse(email, CTX);
   assert.ok(r !== null);
   assert.strictEqual(r!.amount, 7900);
   assert.strictEqual(r!.description, 'JUMPSTART JAKARTA PUSAT');
@@ -499,7 +497,7 @@ check('Mandiri Livin QRIS: Rp 7.900,00 = 7900, tanggal Indonesia "Okt"', () => {
 
 check('Mandiri: top-up GoPay = total 201200; transfer ke rekening sendiri balanceOnly; ke orang lain expense', () => {
   const m = new MandiriParser();
-  const mk = (subject: string, f: string) => m.parse({ id: 'm', from: 'noreply.livin@bankmandiri.co.id', subject, body: loadFixture(f), internalDate: '0' })!;
+  const mk = (subject: string, f: string) => m.parse({ id: 'm', from: 'noreply.livin@bankmandiri.co.id', subject, body: loadFixture(f), internalDate: '0' }, CTX)!;
   const t = mk('Top-up Berhasil!', 'mandiri-topup.txt');
   assert.strictEqual(t.amount, 201200);
   assert.strictEqual(t.description, 'Top-up GoPay');
@@ -537,7 +535,7 @@ check('BRI: transfer ke orang lain = expense BRI, total 300000, tanggal "Oktober
   const b = new BriParser();
   const email = { id: 'b', from: 'BRImo <bankbri@bri.co.id>', subject: 'Pemindahan Dana Sesama Rekening BRI', body: loadFixture('bri-transfer.txt'), internalDate: '0' };
   assert.strictEqual(b.canHandle(email), true);
-  const r = b.parse(email)!;
+  const r = b.parse(email, CTX)!;
   assert.strictEqual(r.amount, 300000);
   assert.strictEqual(r.description, 'SITI MAHARANI');
   assert.strictEqual(r.source, Source.BRI);
@@ -545,7 +543,27 @@ check('BRI: transfer ke orang lain = expense BRI, total 300000, tanggal "Oktober
   assert.strictEqual(r.occurredAt.toISOString(), '2026-10-04T08:50:33.000Z');
 });
 
-// ─── 7. Ringkasan ────────────────────────────────────────────────────────────
+// ─── 7. Konteks pemilik per user (multi-user) ────────────────────────────────
+
+import { isInternalDestination } from './own-accounts';
+
+const CTX_B: OwnerContext = { fullName: 'BUDI SANTOSO', accounts: ['5550001112'] };
+const CTX_EMPTY: OwnerContext = { fullName: '', accounts: [] };
+
+check('rekening/nama user A tidak dianggap milik user B (dan sebaliknya)', () => {
+  assert.strictEqual(isInternalDestination({ accountNumber: '1234567890' }, CTX), true);
+  assert.strictEqual(isInternalDestination({ accountNumber: '1234567890' }, CTX_B), false);
+  assert.strictEqual(isInternalDestination({ beneficiaryName: 'ANDI WIJAYA PUTRA' }, CTX_B), false);
+  assert.strictEqual(isInternalDestination({ accountNumber: '5550001112' }, CTX_B), true);
+  assert.strictEqual(isInternalDestination({ accountNumber: '5550001112' }, CTX), false);
+});
+
+check('konteks kosong tidak menghasilkan match palsu', () => {
+  assert.strictEqual(isInternalDestination({ accountNumber: '1234567890', beneficiaryName: 'APA SAJA' }, CTX_EMPTY), false);
+  assert.strictEqual(isInternalDestination({ beneficiaryName: '' }, CTX_EMPTY), false);
+});
+
+// ─── 8. Ringkasan ────────────────────────────────────────────────────────────
 
 console.log(`\n${'─'.repeat(50)}`);
 if (failed === 0) {

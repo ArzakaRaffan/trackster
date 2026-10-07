@@ -2,7 +2,11 @@
 
 Personal finance expense tracker untuk Arzaka. Otomatis mencatat pengeluaran dari notifikasi email bank (BCA, Jago), tracking budget harian, alert Telegram, laporan & insight.
 
-**Single-user app.** Nggak ada multi-tenant, nggak ada signup flow. Semua fitur didesain buat satu orang (Arzaka), bukan produk publik.
+**Single-user app (saat ini) — sedang direncanakan migrasi ke multi-user invite-only.** Kode hari ini masih single-user: nggak ada multi-tenant, nggak ada signup flow.
+
+> 🚧 **MIGRASI MULTI-USER (rencana, belum diimplementasi):** sebelum menyentuh auth, schema Prisma, parser email, Telegram, cron, ingest, DNS, atau wizard,
+> **baca [`docs/multi-user/README.md`](docs/multi-user/README.md)** (protokol sesi wajib: baca CAUTION → docs → Progress Log → fase aktif; update docs & log di akhir sesi).
+> Jangan merge/push ke `main` untuk pekerjaan ini tanpa persetujuan eksplisit Arzaka (push `main` = auto-deploy + auto-migrate prod).
 
 > ⚠️ **Baca [`CAUTION.md`](CAUTION.md) sebelum `npm run build`/`start:dev` apapun.** VPS ini cuma 2GB
 > RAM dan prod jalan di sini terus — pernah bikin prod down gara-gara build tanpa cap memory + dev
@@ -16,7 +20,7 @@ Konteks tambahan (`Product.md`, `Decisions.md`, `Gotchas.md` hanya ada lokal —
 - Frontend: Next.js 14 App Router + Tailwind CSS + SWR, di `apps/frontend`
 - Auth: JWT via httpOnly cookie (bukan localStorage)
 - Deploy: Docker Compose di VPS Tencent Cloud (Jakarta), Nginx + Let's Encrypt, GitHub Actions CD auto-deploy tiap push ke `main`
-- Domain: `track.trackster.my.id` (frontend), `api.track.trackster.my.id` (backend) — dua subdomain terpisah, bukan satu domain
+- Domain: `trackster.dev` (frontend), `api.trackster.dev` (backend) — dua subdomain terpisah, bukan satu domain. (Domain lama `track.trackster.my.id` hanya redirect di Nginx.)
 
 ## Struktur & Konvensi
 
@@ -71,7 +75,7 @@ Konteks tambahan (`Product.md`, `Decisions.md`, `Gotchas.md` hanya ada lokal —
 - **VPS cuma 2GB RAM**: image **tidak lagi di-build di VPS** (sejak 2026-10-04, build di GitHub Actions → GHCR). Build manual di VPS (`docker compose build`) hanya fallback darurat: sequential, `NODE_HEAP_MB` default 1280 (build-arg di Dockerfile; CI pakai 4096 — `nest build` butuh >1280MB heap). Berlaku juga buat `npm run build`/`npm run start:dev` lokal di sesi Claude Code — **pernah bikin prod down** (2026-09-28) gara-gara build tanpa cap + dev Postgres nyala bareng container prod. Detail & checklist: [`CAUTION.md`](CAUTION.md).
 - **tsconfig rootDir**: `apps/backend/tsconfig.json` harus punya `"rootDir": "./src"` dan `"include": ["src/**/*.ts"]` — kalau nggak, TypeScript ikut compile `prisma/seed.ts` dan bikin output `dist/src/main.js` bukan `dist/main.js`, sementara CMD di Dockerfile expect `node dist/main`.
 - **Prisma seed jangan pakai ts-node di production** — pakai plain JS (`prisma/seed.js` + `"prisma": {"seed": "node prisma/seed.js"}` di package.json). ts-node sering konflik ESM/CJS di Node 20+ dan gampang exclude dari devDependencies pas `npm install --omit=dev`.
-- **Cookie cross-subdomain**: karena frontend (`track.trackster.my.id`) dan backend (`api.track.trackster.my.id`) beda subdomain, cookie JWT butuh `domain: process.env.COOKIE_DOMAIN` (`.track.trackster.my.id`) eksplisit di `res.cookie()`, kalau nggak browser nggak nge-share cookie antar subdomain (gejala: login sukses 201 tapi langsung ke-redirect balik ke /login).
+- **Cookie cross-subdomain**: karena frontend (`trackster.dev`) dan backend (`api.trackster.dev`) beda subdomain, cookie JWT butuh `domain: process.env.COOKIE_DOMAIN` (`.trackster.dev`) eksplisit di `res.cookie()`, kalau nggak browser nggak nge-share cookie antar subdomain (gejala: login sukses 201 tapi langsung ke-redirect balik ke /login).
 - **`useSearchParams()` di Next.js App Router** harus dibungkus `<Suspense>` kalau mau lolos `next build` (production), meskipun jalan normal di `next dev`.
 - **Dockerfile naming**: file HARUS persis bernama `Dockerfile`, bukan `backend.Dockerfile` dst — kalau salah nama pas manual save dari luar, `docker compose build` gagal cari file.
 - **`package-lock.json` nyimpen flag `dev` per-package terpisah dari `package.json`** — mindahin package dari devDependencies ke dependencies di `package.json` doang nggak cukup, `npm install --omit=dev` masih baca dari lockfile lama kalau nggak di-regenerate.

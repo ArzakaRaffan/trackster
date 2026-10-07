@@ -5,6 +5,7 @@ import { AiMemoryService } from './ai-memory.service';
 import { BudgetAdvisorService } from '../budget/budget-advisor.service';
 import { BudgetOption } from '../budget/budget-advisor';
 import { startOfWibWeek, wibDateKey, startOfWibDay } from '../../common/wib';
+import { forUser, getUserName } from '../../common/persona';
 
 const BUDGET_EXPLAIN_PROMPT = `Kamu adalah Trackster AI. Dari 3 opsi budget mingguan (Hemat/Seimbang/Longgar,
 JSON) dan memory tentang Arzaka, pilih SATU opsi paling cocok minggu ini dan jelaskan kenapa singkat.
@@ -48,33 +49,35 @@ export class AiBudgetService {
   ) {}
 
   /** Cache per minggu (weekStart) di `BudgetAdvice` — generate ulang cuma sekali per minggu. */
-  async explain(weekParam?: string): Promise<BudgetAdvice> {
+  async explain(userId: number, weekParam?: string): Promise<BudgetAdvice> {
     const weekStart = weekParam ? startOfWibDay(weekParam) : startOfWibWeek(new Date());
     const weekKey = wibDateKey(weekStart);
 
-    const cached = await this.prisma.budgetAdvice.findUnique({ where: { weekStart } });
+    const cached = await this.prisma.budgetAdvice.findFirst({ where: { userId, weekStart } });
     if (cached) {
       return { recommended: cached.recommended as BudgetOption, reason: cached.reason, tip: cached.tip };
     }
 
-    const advice = await this.generate(weekKey);
+    const advice = await this.generate(userId, weekKey);
 
-    await this.prisma.budgetAdvice.upsert({
-      where: { weekStart },
-      update: advice,
-      create: { weekStart, ...advice },
-    });
+    // findFirst + update/create (bukan upsert): unik masih global (weekStart) sampai C1 -> (userId, weekStart).
+    const existing = await this.prisma.budgetAdvice.findFirst({ where: { userId, weekStart }, select: { id: true } });
+    if (existing) {
+      await this.prisma.budgetAdvice.updateMany({ where: { id: existing.id, userId }, data: advice });
+    } else {
+      await this.prisma.budgetAdvice.create({ data: { userId, weekStart, ...advice } });
+    }
 
     return advice;
   }
 
-  private async generate(weekKey: string): Promise<BudgetAdvice> {
+  private async generate(userId: number, weekKey: string): Promise<BudgetAdvice> {
     try {
-      const suggestion = await this.budgetAdvisorService.getSuggestions(weekKey);
-      const memories = await this.aiMemoryService.listActive(10);
+      const suggestion = await this.budgetAdvisorService.getSuggestions(userId, weekKey);
+      const memories = await this.aiMemoryService.listActive(userId, 10);
 
       const res = await this.aiService.chat({
-        system: BUDGET_EXPLAIN_PROMPT,
+        system: forUser(BUDGET_EXPLAIN_PROMPT, await getUserName(this.prisma, userId)),
         messages: [
           {
             role: 'user',

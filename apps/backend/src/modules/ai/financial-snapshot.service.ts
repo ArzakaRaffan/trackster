@@ -44,7 +44,8 @@ function fmtDayLong(d: Date): string {
  */
 @Injectable()
 export class FinancialSnapshotService {
-  private cache: { text: string; expiresAt: number } | null = null;
+  // Cache PER USER — satu cache global akan menyajikan snapshot user A ke user B.
+  private cache = new Map<number, { text: string; expiresAt: number }>();
 
   constructor(
     private prisma: PrismaService,
@@ -55,14 +56,15 @@ export class FinancialSnapshotService {
     private incomeForecastService: IncomeForecastService,
   ) {}
 
-  async getSnapshot(force = false): Promise<string> {
-    if (!force && this.cache && this.cache.expiresAt > Date.now()) return this.cache.text;
-    const text = await this.buildSnapshot();
-    this.cache = { text, expiresAt: Date.now() + CACHE_MS };
+  async getSnapshot(userId: number, force = false): Promise<string> {
+    const hit = this.cache.get(userId);
+    if (!force && hit && hit.expiresAt > Date.now()) return hit.text;
+    const text = await this.buildSnapshot(userId);
+    this.cache.set(userId, { text, expiresAt: Date.now() + CACHE_MS });
     return text;
   }
 
-  private async buildSnapshot(): Promise<string> {
+  private async buildSnapshot(userId: number): Promise<string> {
     const now = new Date();
     const { start: weekStart, end: weekEnd } = wibRange('week', now);
     const { start: dayStart, end: dayEnd } = wibRange('day', now);
@@ -78,22 +80,22 @@ export class FinancialSnapshotService {
       weekForecast,
       pendingIncomeCount,
     ] = await Promise.all([
-      this.balanceService.getAll(),
-      this.budgetService.getTodaySummary(),
-      this.prisma.dailyBudget.findMany(),
+      this.balanceService.getAll(userId),
+      this.budgetService.getTodaySummary(userId),
+      this.prisma.dailyBudget.findMany({ where: { userId } }),
       this.prisma.transaction.aggregate({
         _sum: { amount: true, reimbursedAmount: true },
-        where: { occurredAt: { gte: weekStart, lt: weekEnd } },
+        where: { userId, occurredAt: { gte: weekStart, lt: weekEnd } },
       }),
       this.prisma.transaction.findMany({
-        where: { occurredAt: { gte: new Date(now.getTime() - 30 * 86_400_000) }, amount: { gte: BIG_PURCHASE_THRESHOLD } },
+        where: { userId, occurredAt: { gte: new Date(now.getTime() - 30 * 86_400_000) }, amount: { gte: BIG_PURCHASE_THRESHOLD } },
         orderBy: { amount: 'desc' },
         take: 3,
       }),
-      this.goalService.findAll(),
-      this.subscriptionService.getUpcomingReminders(14),
-      this.incomeForecastService.getWeekForecast(),
-      this.prisma.income.count({ where: { status: 'PENDING' } }),
+      this.goalService.findAll(userId),
+      this.subscriptionService.getUpcomingReminders(userId, 14),
+      this.incomeForecastService.getWeekForecast(userId),
+      this.prisma.income.count({ where: { userId, status: 'PENDING' } }),
     ]);
 
     const lines: string[] = [];
@@ -102,7 +104,7 @@ export class FinancialSnapshotService {
 
     const balanceParts = await Promise.all(
       balances.map(async (b) => {
-        const adjustments = await this.balanceService.getAdjustments(b.source);
+        const adjustments = await this.balanceService.getAdjustments(userId, b.source);
         const lastAdj = adjustments[0];
         return `${b.source} ${fmtRp(Number(b.balance))}${lastAdj ? ` (koreksi manual terakhir ${fmtDateShort(lastAdj.createdAt)})` : ''}`;
       }),

@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { Source, Category } from '@prisma/client';
 import { EmailParser, RawEmail, ParseResult, extractField, parseRupiah, parseEmailDate } from './parser.interface';
-import { isInternalDestination } from './own-accounts';
+import { isInternalDestination, OwnerContext } from './own-accounts';
 
 const BCA_SENDER_HINTS = ['bca', 'klikbca'];
 
@@ -16,7 +16,7 @@ export class BcaParser implements EmailParser {
     return BCA_SENDER_HINTS.some((hint) => from.includes(hint));
   }
 
-  parse(email: RawEmail): ParseResult | null {
+  parse(email: RawEmail, ctx: OwnerContext): ParseResult | null {
     const body = email.body;
 
     if (!body.includes('Here are the details of your transaction')) {
@@ -27,20 +27,20 @@ export class BcaParser implements EmailParser {
     const transferType = extractField(body, 'Transfer Type');
 
     if (transactionType) {
-      return this.parseQrisPayment(body, email);
+      return this.parseQrisPayment(body, email, ctx);
     }
     if (transferType) {
       // Cek Virtual Account lebih dulu sebelum fallback ke transfer biasa
       if (/virtual\s*account/i.test(transferType)) {
-        return this.parseVirtualAccount(body, email);
+        return this.parseVirtualAccount(body, email, ctx);
       }
-      return this.parseTransfer(body, email, transferType);
+      return this.parseTransfer(body, email, ctx, transferType);
     }
 
     // Beberapa notifikasi pakai "Type of Transaction" (QRIS Transfer) — fallback ke QRIS kalau ada Payment to
     const typeOfTransaction = extractField(body, 'Type of Transaction');
     if (typeOfTransaction) {
-      return this.parseQrisPayment(body, email);
+      return this.parseQrisPayment(body, email, ctx);
     }
 
     // Fallback: beberapa notifikasi VA / payment tidak pakai label Transfer Type persis
@@ -49,7 +49,7 @@ export class BcaParser implements EmailParser {
       extractField(body, 'Transaction Amount') ||
       extractField(body, 'Amount')
     ) {
-      return this.parseTransfer(body, email, 'fallback');
+      return this.parseTransfer(body, email, ctx, 'fallback');
     }
 
     return null;
@@ -66,7 +66,7 @@ export class BcaParser implements EmailParser {
    * amount = Total Payment (semua uang keluar dari BCA, termasuk admin fee)
    * description dibentuk dari Company/Product Name
    */
-  private parseVirtualAccount(body: string, email: RawEmail): ParseResult | null {
+  private parseVirtualAccount(body: string, email: RawEmail, ctx: OwnerContext): ParseResult | null {
     const totalPaymentRaw = extractField(body, 'Total Payment');
     const payAmountRaw = extractField(body, 'Pay Amount');
     const companyProduct = extractField(body, 'Company/Product Name');
@@ -91,7 +91,7 @@ export class BcaParser implements EmailParser {
 
     // Cek apakah VA number ini adalah rekening sendiri (mis. top-up Jago via VA BCA).
     // Hanya cek accountNumber — JANGAN cek beneficiaryName karena e-wallet isi dengan nama owner.
-    const isOwnDestination = isInternalDestination({ accountNumber: vaNumber });
+    const isOwnDestination = isInternalDestination({ accountNumber: vaNumber }, ctx);
 
     if (isOwnDestination) {
       return {
@@ -154,7 +154,7 @@ export class BcaParser implements EmailParser {
     return str.toLowerCase().replace(/\b\w/g, (c) => c.toUpperCase());
   }
 
-  private parseQrisPayment(body: string, email: RawEmail): ParseResult | null {
+  private parseQrisPayment(body: string, email: RawEmail, ctx: OwnerContext): ParseResult | null {
     const totalPaymentRaw = extractField(body, 'Total Payment');
     const paymentTo = extractField(body, 'Payment to');
     const dateRaw = extractField(body, 'Transaction Date');
@@ -173,7 +173,7 @@ export class BcaParser implements EmailParser {
     };
   }
 
-  private parseTransfer(body: string, email: RawEmail, transferType: string): ParseResult | null {
+  private parseTransfer(body: string, email: RawEmail, ctx: OwnerContext, transferType: string): ParseResult | null {
     const transferAmountRaw =
       extractField(body, 'Transfer Amount') ||
       extractField(body, 'Transaction Amount') ||
@@ -200,7 +200,7 @@ export class BcaParser implements EmailParser {
     const isOwnDestination = isInternalDestination({
       accountNumber: beneficiaryAccount,
       beneficiaryName,
-    });
+    }, ctx);
 
     // Flip intermediary (SoF) selalu exclude di sisi BCA — purpose final dibaca dari email Flip,
     // saldo TIDAK gerak di sini (receipt Flip yang pegang). Transfer langsung ke rekening sendiri

@@ -29,17 +29,17 @@ export class AiMascotService {
     private subscriptionService: SubscriptionService,
   ) {}
 
-  async getTip(): Promise<MascotTip> {
+  async getTip(userId: number): Promise<MascotTip> {
     // Reminder langganan jatuh tempo dihitung deterministik dari data manual,
     // didahulukan dari fun fact.
-    const reminder = await this.getUpcomingSubscriptionReminder();
+    const reminder = await this.getUpcomingSubscriptionReminder(userId);
     if (reminder) return { kind: 'reminder', message: reminder };
 
-    return { kind: 'fact', message: await this.generateFunFact() };
+    return { kind: 'fact', message: await this.generateFunFact(userId) };
   }
 
-  private async getUpcomingSubscriptionReminder(): Promise<string | null> {
-    const upcoming = await this.subscriptionService.getUpcomingReminders(3);
+  private async getUpcomingSubscriptionReminder(userId: number): Promise<string | null> {
+    const upcoming = await this.subscriptionService.getUpcomingReminders(userId, 3);
     if (!upcoming.length) return null;
 
     const sub = upcoming[0];
@@ -49,11 +49,11 @@ export class AiMascotService {
       : `Heads up, langganan "${sub.name}" (${amount}) jatuh tempo ${sub.daysLeft} hari lagi.`;
   }
 
-  private async generateFunFact(): Promise<string> {
+  private async generateFunFact(userId: number): Promise<string> {
     const [today, insights, allocation] = await Promise.all([
-      this.budgetService.getTodaySummary(),
-      this.transactionService.getInsights('30d'),
-      this.incomeService.getAllocationRecommendation(),
+      this.budgetService.getTodaySummary(userId),
+      this.transactionService.getInsights(userId, '30d'),
+      this.incomeService.getAllocationRecommendation(userId),
     ]);
 
     try {
