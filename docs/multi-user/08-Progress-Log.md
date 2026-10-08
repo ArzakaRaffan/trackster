@@ -140,3 +140,9 @@ deviasi dari rencana (+alasan), env baru yang Arzaka harus tambahkan, langkah be
 - Verifikasi hidup (backend build bersih + frontend lokal ke restore): Arzaka login dan membandingkan dengan prod — saldo BCA/Jago, budget hari ini sama persis.
 - Catatan: token Gmail/Telegram dihapus dari SALINAN restore sebelum backend dijalankan (cegah cron memakai kredensial asli). `BudgetSetting` kosong di data prod (bukan akibat migrasi). `pg_dump` baru menyisipkan `\unrestrict` yang tak dikenali psql — error tak berbahaya di akhir restore.
 - Belum: P0-06 (cek `TELEGRAM_BOT_TOKEN` env VPS = token bot), merge/deploy ⛔, P6-05/06, rotasi `JWT_SECRET`.
+
+## 2026-10-08 — F7 dibuka: O1 & O8 dijawab
+- Sesi oleh: Claude (Sonnet 5.5)   Branch: `feat/multi-user`
+- O1: inventaris DNS name.com = A `@`, A `api` (43.157.208.202, TTL 300), TXT google-site-verification (3600). Tidak ada MX/CAA/www. **DNSSEC belum dikonfirmasi** — wajib dicek sebelum P7-02.
+- O8: `in.trackster.dev` disetujui.
+- Gerbang tersisa: ⛔ persetujuan eksplisit **per langkah DNS** (P7-02, P7-03), P3/P6 untuk cutover. Kode P7-04 (modul `inbound`) boleh dikerjakan tanpa menyentuh DNS.
