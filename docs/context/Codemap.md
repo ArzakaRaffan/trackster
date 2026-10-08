@@ -86,7 +86,7 @@ Dipakai di baris Hari ini, detail transaksi, Setting → Alias merchant (+ logo 
 ## Multi-user — F6 (di branch)
 - `modules/api-token` (`/api-tokens`, JWT): buat/daftar/cabut token API per user (`trk_`+40 base62, hash SHA-256, maks 5 aktif). `common/guards/api-token.guard.ts` = Bearer → `req.apiAuth{userId,tokenId}` (user harus ACTIVE, rate limit 60/mnt/token, env tes `INGEST_RATE_LIMIT`).
 - `modules/ingest` (`POST /ingest/transaction|income`): pintu Shortcut; `Idempotency-Key` → `emailId`/`externalId = ing:<key>` (dedup per user). Income memakai `IncomeService.createQuick(userId, dto, {externalId, receivedAt, streamId})`.
-- Frontend: tab **Shortcut** di `/app/settings` (sumber di `.dc.html` + `logic.tsx` batch3 `setTok…` + `useLive` `tokens`/`tokCreate`/`tokRevoke`). `/income/quick` lama MASIH ada (dihapus di P6-06 setelah Shortcut Arzaka pindah).
+- Frontend: tab **Shortcut** di `/app/settings` (sumber di `.dc.html` + `logic.tsx` batch3 `setTok…` + `useLive` `tokens`/`tokCreate`/`tokRevoke`). `/income/quick` lama sudah dihapus (P6-06).
 - Tes: `scripts/ingest-e2e.mjs` (backend jalan dgn `INGEST_RATE_LIMIT=30`), `api-token.util.check.ts`, `ingest.util.check.ts`.
 
 ## Multi-user (transisi, F0–F1 selesai di branch `feat/multi-user`, belum di prod)

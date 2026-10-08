@@ -2,9 +2,7 @@ import {
   Body,
   Controller,
   Delete,
-  ForbiddenException,
   Get,
-  Headers,
   Param,
   ParseIntPipe,
   Patch,
@@ -18,45 +16,12 @@ import { IncomeService } from './income.service';
 import { CreateIncomeDto } from './dto/create-income.dto';
 import { UpdateIncomeDto } from './dto/update-income.dto';
 import { ResolveIncomeDto } from './dto/resolve-income.dto';
-import { QuickIncomeDto } from './dto/quick-income.dto';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { AuthUser, CurrentUser } from '../../common/decorators/current-user.decorator';
-import { getOwnerUserId } from '../../common/owner';
-import { PrismaService } from '../../prisma.service';
 
 @Controller('income')
 export class IncomeController {
-  constructor(
-    private incomeService: IncomeService,
-    private prisma: PrismaService,
-  ) {}
-
-  /**
-   * Endpoint cepat untuk iOS Shortcut / webhook eksternal tanpa JWT token.
-   * Dilindungi secret key via header x-api-key, query ?key=, atau body.secret / body.key.
-   * Otomatis auto-match kategori ke IncomeStream & kirim konfirmasi ke Telegram bot.
-   */
-  @Post('quick')
-  async createQuick(
-    @Body() dto: QuickIncomeDto,
-    @Query('key') queryKey?: string,
-    @Query('secret') querySecret?: string,
-    @Headers('x-api-key') headerKey?: string,
-  ) {
-    const providedSecret = dto.secret || dto.key || querySecret || queryKey || headerKey;
-    const validSecrets = [
-      process.env.QUICK_INCOME_SECRET,
-      process.env.TELEGRAM_WEBHOOK_SECRET,
-      process.env.JWT_SECRET,
-    ].filter(Boolean);
-
-    if (!providedSecret || !validSecrets.includes(providedSecret)) {
-      throw new ForbiddenException('Secret key tidak valid');
-    }
-
-    // Endpoint legacy tanpa JWT (Shortcut Arzaka) -> selalu milik user ADMIN pertama. Dihapus di Fase 6 (diganti ApiToken per user).
-    return this.incomeService.createQuick(await getOwnerUserId(this.prisma), dto);
-  }
+  constructor(private incomeService: IncomeService) {}
 
   @UseGuards(JwtAuthGuard)
   @Get()

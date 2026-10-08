@@ -35,12 +35,4 @@ export class QuickIncomeDto {
   @IsOptional()
   @IsEnum(Source)
   source?: Source;
-
-  @IsOptional()
-  @IsString()
-  secret?: string;
-
-  @IsOptional()
-  @IsString()
-  key?: string;
 }
