@@ -26,6 +26,11 @@ export class ParserRegistryService {
     ];
   }
 
+  /** Pengirim dikenali salah satu parser bank? Dipakai inbound sebagai allowlist (satu sumber kebenaran). */
+  canHandle(email: RawEmail): boolean {
+    return this.parsers.some(({ parser }) => parser.canHandle(email));
+  }
+
   parseEmail(email: RawEmail, ctx: OwnerContext): ParseResult | null {
     return this.parseEmailWithSource(email, ctx).result;
   }

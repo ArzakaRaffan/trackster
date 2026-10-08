@@ -24,6 +24,7 @@ import { AnalyticsModule } from './modules/analytics/analytics.module';
 import { ReportModule } from './modules/report/report.module';
 import { ApiTokenModule } from './modules/api-token/api-token.module';
 import { IngestModule } from './modules/ingest/ingest.module';
+import { InboundModule } from './modules/inbound/inbound.module';
 
 @Module({
   imports: [
@@ -52,6 +53,7 @@ import { IngestModule } from './modules/ingest/ingest.module';
     ReportModule,
     ApiTokenModule,
     IngestModule,
+    InboundModule,
   ],
 })
 export class AppModule {}

@@ -211,6 +211,7 @@ enum ParseStatus {
   UNPARSED
   DUPLICATE
   ERROR
+  SHADOW // inbound shadow mode: di-parse tapi tidak ditulis ke Transaction/Income/saldo
 }
 
 // Hasil parse tiap email yang discan sync, satu baris per emailId — biar email yang gagal
