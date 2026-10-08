@@ -1,0 +1,100 @@
+/* Lapisan motion landing (/). Aktif hanya saat <LandingMotion/> memasang html[data-lpm] — tanpa atribut itu landing
+   tampil persis seperti markup generator. Selector menempel ke markup LandingView (data-sec / data-rv / #alat).
+   Satu kurva (--lpm-e = kurva design system) + satu kurva pantul untuk "pop", supaya semua gerak konsisten. */
+:root[data-lpm]{--lpm-e:cubic-bezier(.2,0,0,1);--lpm-pop:cubic-bezier(.34,1.56,.64,1)}
+
+@media (prefers-reduced-motion:no-preference){
+
+/* ── Hero: masuk berurutan (badge → judul → teks → tombol → catatan) ── */
+:root[data-lpm] [data-sec=hero]{position:relative;isolation:isolate}
+:root[data-lpm] [data-sec=hero] > div:first-child > *{animation:lpmUp 800ms var(--lpm-e) both}
+:root[data-lpm] [data-sec=hero] > div:first-child > :nth-child(1){animation:lpmPop 600ms var(--lpm-pop) 60ms both}
+:root[data-lpm] [data-sec=hero] > div:first-child > :nth-child(2){animation:lpmBlurUp 1000ms var(--lpm-e) 140ms both}
+:root[data-lpm] [data-sec=hero] > div:first-child > :nth-child(3){animation-delay:320ms}
+:root[data-lpm] [data-sec=hero] > div:first-child > :nth-child(4){animation-delay:440ms}
+:root[data-lpm] [data-sec=hero] > div:first-child > :nth-child(5){animation-delay:560ms}
+
+/* Kartu struk hero: naik + miring 3D mengikuti kursor (--tx/--ty diisi LandingMotion), maskot bergerak lebih jauh (berlapis). */
+:root[data-lpm] [data-sec=hero] > div:nth-child(2){animation:lpmRise 1000ms var(--lpm-e) 220ms both;transform:perspective(1000px) rotateX(calc(var(--ty,0) * -5deg)) rotateY(calc(var(--tx,0) * 7deg));transition:transform 500ms var(--lpm-e);transform-style:preserve-3d}
+:root[data-lpm] [data-sec=hero] > div:nth-child(2) > div:last-child{transform:translate3d(calc(var(--tx,0) * 14px),calc(var(--ty,0) * 10px),40px);transition:transform 500ms var(--lpm-e)}
+
+/* Cahaya ambient di belakang hero: loop pelan, tidak menarik perhatian dari isi. */
+:root[data-lpm] [data-sec=hero]::before{content:'';position:absolute;z-index:-1;inset:-120px -80px;pointer-events:none;
+  background:radial-gradient(420px 320px at 72% 40%,rgba(30,215,96,.16),transparent 70%),radial-gradient(360px 280px at 18% 70%,rgba(192,132,252,.10),transparent 70%);
+  animation:lpmDrift 16s ease-in-out infinite alternate}
+
+/* Petunjuk scroll (antisipasi): panah memantul di bawah hero, hilang saat mulai scroll. */
+:root[data-lpm] [data-sec=hero]::after{content:'↓';position:absolute;left:50%;bottom:-34px;translate:-50% 0;font:500 18px 'DM Mono',monospace;color:var(--text-subtle);pointer-events:none;animation:lpmCue 1.8s ease-in-out 1.4s infinite both}
+@media (max-width:719px){:root[data-lpm] [data-sec=hero]::after{display:none}}
+
+/* ── Reveal saat scroll (data-mr diisi LandingMotion; --d = jeda stagger) ── */
+:root[data-lpm] [data-mr]{transition:opacity 700ms var(--lpm-e),transform 700ms var(--lpm-e),background 150ms,box-shadow 250ms}
+:root[data-lpm] [data-mr="0"]{opacity:0;transform:translateY(26px)}
+:root[data-lpm] [data-mr="1"]{transition-delay:var(--d,0ms)}
+:root[data-lpm] [data-sec=cta][data-mr="0"]{transform:translateY(30px) scale(.96)}
+
+/* ── Baris fitur: teks berurutan, kartu demo naik, visual di dalamnya ikut bergerak ── */
+:root[data-lpm] [data-rv] > div:first-child > *{transition:opacity 700ms var(--lpm-e),transform 700ms var(--lpm-e);transition-delay:calc(120ms + var(--i,0) * 90ms)}
+:root[data-lpm] [data-rv]:not([data-m]) > div:first-child > *{opacity:0;transform:translateY(16px)}
+:root[data-lpm] [data-rv] > div:last-child{position:relative;transition:opacity 800ms var(--lpm-e) 200ms,transform 800ms var(--lpm-e) 200ms,box-shadow 250ms}
+:root[data-lpm] [data-rv]:not([data-m]) > div:last-child{opacity:0;transform:translateY(32px) scale(.97)}
+:root[data-lpm] [data-rv][data-m="2"] > div:last-child{transition-delay:0ms}
+
+/* 02 grafik 7 hari: bar tumbuh satu per satu */
+:root[data-lpm] [data-rv="1"] > div:last-child > div > span:nth-child(2) > span{transform-origin:left;transition:transform 900ms var(--lpm-e);transition-delay:calc(450ms + var(--i,0) * 80ms)}
+:root[data-lpm] [data-rv="1"]:not([data-m]) > div:last-child > div > span:nth-child(2) > span{transform:scaleX(0)}
+/* 03 opsi budget masuk dari kanan; 04 baris pemasukan naik + badge status memantul */
+:root[data-lpm] :is([data-rv="2"],[data-rv="3"]) > div:last-child > div{transition:opacity 600ms var(--lpm-e),transform 600ms var(--lpm-e);transition-delay:calc(400ms + var(--i,0) * 110ms)}
+:root[data-lpm] [data-rv="2"]:not([data-m]) > div:last-child > div{opacity:0;transform:translateX(28px)}
+:root[data-lpm] [data-rv="3"]:not([data-m]) > div:last-child > div{opacity:0;transform:translateY(12px)}
+:root[data-lpm] [data-rv="3"][data-m] > div:last-child > div > span:last-child > span{animation:lpmPop 500ms var(--lpm-pop) calc(600ms + var(--i,0) * 110ms) both}
+/* 06 donat berputar masuk, heatmap menyala bertahap */
+:root[data-lpm] [data-rv="5"] svg{transition:transform 1200ms var(--lpm-e) 350ms,opacity 600ms var(--lpm-e) 350ms}
+:root[data-lpm] [data-rv="5"]:not([data-m]) svg{transform:rotate(-140deg) scale(.6);opacity:0}
+:root[data-lpm] [data-rv="5"] svg + div > span{transition:transform 450ms var(--lpm-pop),opacity 450ms;transition-delay:calc(500ms + var(--i,0) * 18ms)}
+:root[data-lpm] [data-rv="5"]:not([data-m]) svg + div > span{transform:scale(0);opacity:0}
+
+/* ── Hover: kartu terangkat + sorotan mengikuti kursor (--mx/--my) ── */
+:root[data-lpm] [data-rv][data-m="2"] > div:last-child:hover,
+:root[data-lpm] [data-sec=harga] > div:nth-child(2) > div[data-mr="2"]:hover{transform:translateY(-4px);box-shadow:0 0 0 1.5px var(--border-bold),0 18px 40px -18px rgba(0,0,0,.45)!important}
+:root[data-lpm] :is([data-rv] > div:last-child,[data-sec=harga] > div:nth-child(2) > div)::after{content:'';position:absolute;inset:0;border-radius:inherit;pointer-events:none;opacity:0;transition:opacity 300ms;
+  background:radial-gradient(260px circle at var(--mx,50%) var(--my,50%),rgba(30,215,96,.10),transparent 65%)}
+:root[data-lpm] :is([data-rv] > div:last-child,[data-sec=harga] > div:nth-child(2) > div):hover::after{opacity:1}
+/* Badge "Semua fitur" berdenyut pelan */
+:root[data-lpm] [data-sec=harga] span[style*="position: absolute"]{animation:lpmRing 2.6s ease-out 1.5s infinite}
+
+/* Baris alat gratis: nomor menyala, panah "Buka" bergeser */
+:root[data-lpm] #alat a > span:first-child{transition:background 200ms,color 200ms,transform 300ms var(--lpm-pop)}
+:root[data-lpm] #alat a:hover > span:first-child{background:var(--brand-subtle);color:var(--brand-text);transform:rotate(-6deg) scale(1.08)}
+:root[data-lpm] #alat a > span:last-child{transition:transform 250ms var(--lpm-e)}
+:root[data-lpm] #alat a:hover > span:last-child{transform:translateX(5px)}
+
+/* Tombol utama: kilau lewat berkala (mengundang klik) */
+:root[data-lpm] .scp1.scp2{position:relative;overflow:hidden}
+:root[data-lpm] .scp1.scp2::after{content:'';position:absolute;top:0;bottom:0;left:0;width:40%;pointer-events:none;background:linear-gradient(90deg,transparent,rgba(255,255,255,.38),transparent);animation:lpmShine 5s var(--lpm-e) 1.6s infinite}
+
+/* ── Scroll-driven (Chrome/Edge/Safari baru; browser lain cukup tanpa efek ini) ── */
+@supports (animation-timeline:scroll()){
+  /* Bar progres baca di bawah header + bayangan header muncul setelah mulai scroll */
+  :root[data-lpm] [data-lp-head]{animation:lpmHead linear both;animation-timeline:scroll();animation-range:0 120px}
+  :root[data-lpm] [data-lp-head]::after{content:'';position:absolute;left:0;right:0;bottom:-1.5px;height:2px;background:var(--brand);transform-origin:left;animation:lpmProg linear both;animation-timeline:scroll()}
+  /* Parallax hero: teks naik lebih cepat & memudar, kartu turun pelan */
+  :root[data-lpm] [data-sec=hero] > div:first-child{animation:lpmAway linear both;animation-timeline:scroll();animation-range:0 600px}
+  :root[data-lpm] [data-sec=hero] > div:nth-child(2){animation:lpmRise 1000ms var(--lpm-e) 220ms both,lpmSink linear both;animation-timeline:auto,scroll();animation-range:normal,0 700px}
+  :root[data-lpm] [data-sec=hero]::after{animation:lpmCue 1.8s ease-in-out 1.4s infinite both,lpmGone linear both;animation-timeline:auto,scroll();animation-range:normal,0 160px}
+}
+}
+
+@keyframes lpmUp{from{opacity:0;transform:translateY(22px)}to{opacity:1;transform:none}}
+@keyframes lpmBlurUp{from{opacity:0;transform:translateY(28px);filter:blur(10px);letter-spacing:-.01em}to{opacity:1;transform:none;filter:none}}
+@keyframes lpmPop{from{opacity:0;transform:scale(.6)}to{opacity:1;transform:none}}
+@keyframes lpmRise{from{opacity:0;scale:.94}to{opacity:1;scale:1}}
+@keyframes lpmSink{to{translate:0 90px}}
+@keyframes lpmAway{to{translate:0 -70px;opacity:.15}}
+@keyframes lpmDrift{0%{transform:translate(0,0) scale(1)}50%{transform:translate(-30px,20px) scale(1.08)}100%{transform:translate(25px,-15px) scale(.96)}}
+@keyframes lpmCue{0%,100%{transform:translateY(0);opacity:.35}50%{transform:translateY(8px);opacity:1}}
+@keyframes lpmGone{to{opacity:0;visibility:hidden}}
+@keyframes lpmRing{0%{box-shadow:0 0 0 0 rgba(30,215,96,.55)}70%,100%{box-shadow:0 0 0 10px rgba(30,215,96,0)}}
+@keyframes lpmShine{0%,72%{transform:translateX(-120%) skewX(-20deg)}100%{transform:translateX(320%) skewX(-20deg)}}
+@keyframes lpmHead{to{box-shadow:0 10px 30px -18px rgba(0,0,0,.55)}}
+@keyframes lpmProg{from{transform:scaleX(0)}to{transform:scaleX(1)}}

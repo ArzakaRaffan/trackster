@@ -1,0 +1,65 @@
+/* Motion halaman publik (tools, kalkulator, split bill, trip). CSS saja: struk "tercetak" dari atas, isinya muncul
+   berurutan, lalu umpan balik kecil di tombol/pilihan. Matikan sementara: tambahkan `?motion=0` di URL
+   (layout memasang html[data-motion=off]). Kurva sama dengan landing (design system). */
+@media (prefers-reduced-motion:no-preference){
+:root:not([data-motion=off]){--pm-e:cubic-bezier(.2,0,0,1);--pm-pop:cubic-bezier(.34,1.56,.64,1)}
+
+/* Masuk halaman: bar atas turun, struk tercetak, isi struk menyusul satu per satu, sobekan & CTA terakhir */
+:root:not([data-motion=off]) .pb-top{animation:pmDown 500ms var(--pm-e) backwards}
+:root:not([data-motion=off]) .pb-receipt{animation:pmPrint 800ms var(--pm-e) 80ms backwards}
+:root:not([data-motion=off]) .pb-sticky .pb-receipt,:root:not([data-motion=off]) .pb-receipt + .pb-tear + .pb-receipt{animation-delay:220ms}
+:root:not([data-motion=off]) .pb-receipt > *{animation:pmUp 550ms var(--pm-e) 520ms backwards}
+:root:not([data-motion=off]) .pb-receipt > :nth-child(1){animation-delay:200ms}
+:root:not([data-motion=off]) .pb-receipt > :nth-child(2){animation-delay:250ms}
+:root:not([data-motion=off]) .pb-receipt > :nth-child(3){animation-delay:300ms}
+:root:not([data-motion=off]) .pb-receipt > :nth-child(4){animation-delay:340ms}
+:root:not([data-motion=off]) .pb-receipt > :nth-child(5){animation-delay:380ms}
+:root:not([data-motion=off]) .pb-receipt > :nth-child(6){animation-delay:420ms}
+:root:not([data-motion=off]) .pb-receipt > :nth-child(7){animation-delay:450ms}
+:root:not([data-motion=off]) .pb-receipt > :nth-child(8){animation-delay:480ms}
+:root:not([data-motion=off]) .pb-receipt > :nth-child(9){animation-delay:500ms}
+:root:not([data-motion=off]) .pb-tear{animation:pmFade 400ms var(--pm-e) 650ms backwards}
+:root:not([data-motion=off]) .pb-cta,:root:not([data-motion=off]) .pb-foot{animation:pmUp 600ms var(--pm-e) 700ms backwards}
+
+/* Hub tools: tiap alat masuk dari kanan berurutan; hover = nomor menyala & panah bergeser */
+:root:not([data-motion=off]) .pb-tool{animation:pmSlide 550ms var(--pm-e) backwards;transition:background 150ms}
+:root:not([data-motion=off]) .pb-tool:nth-of-type(1){animation-delay:420ms}
+:root:not([data-motion=off]) .pb-tool:nth-of-type(2){animation-delay:500ms}
+:root:not([data-motion=off]) .pb-tool:nth-of-type(3){animation-delay:580ms}
+:root:not([data-motion=off]) .pb-tool:nth-of-type(4){animation-delay:660ms}
+:root:not([data-motion=off]) .pb-tool .no{transition:background 200ms,color 200ms,transform 300ms var(--pm-pop)}
+:root:not([data-motion=off]) .pb-tool:hover .no{background:var(--brand-subtle);color:var(--brand-text);transform:rotate(-6deg) scale(1.08)}
+:root:not([data-motion=off]) .pb-tool .go{transition:transform 250ms var(--pm-e)}
+:root:not([data-motion=off]) .pb-tool:hover .go{transform:translateX(5px)}
+
+/* Umpan balik tombol & pilihan: tekan = mengecil sedikit, tombol utama terangkat saat hover */
+:root:not([data-motion=off]) :is(.pb-btn,.pb-pill,.pb-chip.tog,.pb-seg button,.pb-inst button,.pb-av,.pb-icon){transition:background 150ms,color 150ms,box-shadow 200ms,transform 150ms var(--pm-e)}
+:root:not([data-motion=off]) :is(.pb-btn,.pb-pill,.pb-chip.tog,.pb-seg button,.pb-inst button,.pb-icon):active:not(:disabled){transform:scale(.96)}
+:root:not([data-motion=off]) .pb-btn.pri:hover:not(:disabled){transform:translateY(-1px);box-shadow:0 8px 20px -10px var(--brand)}
+:root:not([data-motion=off]) :is(.pb-pill,.pb-chip.tog,.pb-inst button)[aria-pressed=true]{animation:pmPop 350ms var(--pm-pop)}
+:root:not([data-motion=off]) .pb-av:hover{transform:scale(1.06)}
+
+/* Status: langkah terisi, peserta lunas, catatan hasil, pesta lunas semua */
+:root:not([data-motion=off]) .pb-steps i.on{transform-origin:left;animation:pmGrow 450ms var(--pm-e)}
+:root:not([data-motion=off]) .pb-p.paid .pb-av{animation:pmPop 450ms var(--pm-pop)}
+:root:not([data-motion=off]) :is(.pb-note,.pb-err,.pb-warn,.pb-ok,.pb-bad){animation:pmUp 350ms var(--pm-e) backwards}
+:root:not([data-motion=off]) .pb-party{animation:pmPop 600ms var(--pm-pop) backwards}
+:root:not([data-motion=off]) .pb-itemrow,:root:not([data-motion=off]) .pb-prow{animation:pmUp 300ms var(--pm-e) backwards}
+
+/* Data: bar progres & milestone tumbuh, baris tabel menyusul */
+:root:not([data-motion=off]) .pb-ms i s{transform-origin:left;animation:pmGrow 800ms var(--pm-e) 500ms backwards;transition:width 400ms var(--pm-e)}
+:root:not([data-motion=off]) .pb-ms:nth-child(2) i s{animation-delay:580ms}
+:root:not([data-motion=off]) .pb-ms:nth-child(3) i s{animation-delay:660ms}
+:root:not([data-motion=off]) .pb-ms:nth-child(n+4) i s{animation-delay:740ms}
+:root:not([data-motion=off]) .pb-bar i{transform-origin:left;animation:pmGrow 900ms var(--pm-e) 450ms backwards}
+:root:not([data-motion=off]) .pb-tbl tbody tr{animation:pmFade 400ms var(--pm-e) 550ms backwards}
+:root:not([data-motion=off]) .pb-tbl tr.cur td{transition:background 250ms}
+}
+
+@keyframes pmDown{from{opacity:0;transform:translateY(-10px)}to{opacity:1;transform:none}}
+@keyframes pmPrint{from{clip-path:inset(-20px -20px 100% -20px);transform:translateY(-14px)}to{clip-path:inset(-20px -20px -40px -20px);transform:none}}
+@keyframes pmUp{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
+@keyframes pmSlide{from{opacity:0;transform:translateX(18px)}to{opacity:1;transform:none}}
+@keyframes pmFade{from{opacity:0}to{opacity:1}}
+@keyframes pmPop{0%{transform:scale(.88)}100%{transform:none}}
+@keyframes pmGrow{from{transform:scaleX(0)}to{transform:none}}

@@ -4,6 +4,7 @@ import dynamic from 'next/dynamic';
 import { useState } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 import { useLive } from './live/useLive';
+import { LandingMotion } from './LandingMotion';
 
 // Prototipe memakai DOM/ResizeObserver/localStorage: client-only.
 const V3Logic: React.ComponentType<any> = dynamic(() => import('./logic').then((m) => m.V3Logic as any), { ssr: false });
@@ -26,18 +27,21 @@ export function V3Host() {
   // Tunggu data inti sebelum menggambar layar privat, supaya tidak ada kilatan keadaan kosong.
   if (!demo && !live.ready) return <div suppressHydrationWarning style={{ position: 'fixed', inset: 0, background: pageBg() }} />;
   return (
-    <V3Logic
-      path={path}
-      base={demo ? '/demo' : '/app'}
-      live={demo ? undefined : live}
-      onNavigate={(p: string) => router.push(p)}
-      onChatActive={setChatActive}
-      mulai="beranda"
-      theme="dark"
-      density="lega"
-      heroFocus="sisa"
-      mascot="aktif"
-      reducedMotion={false}
-    />
+    <>
+      {path === '/' && <LandingMotion />}
+      <V3Logic
+        path={path}
+        base={demo ? '/demo' : '/app'}
+        live={demo ? undefined : live}
+        onNavigate={(p: string) => router.push(p)}
+        onChatActive={setChatActive}
+        mulai="beranda"
+        theme="dark"
+        density="lega"
+        heroFocus="sisa"
+        mascot="aktif"
+        reducedMotion={false}
+      />
+    </>
   );
 }

@@ -67,6 +67,10 @@ Dua root layout: `app/(v3)/layout.tsx` (tanpa `globals.css`/Tailwind preflight �
 - Data: `lib/api.ts` (fetcher, auto-redirect `/login` on 401) + SWR. Auth redirect: `middleware.ts` (`/demo` & `/setup` publik).
 - Pemeriksaan fidelitas: bandingkan DOM/geometri dengan `Trackster v3 App (standalone).html` (lihat `docs/Rework Design Trackster/PLAN.md`).
 
+**Motion landing & publik (2026-10-08)** — `v3/LandingMotion.tsx` + `v3/landing-motion.css` (dipasang `V3Host` hanya di `/`; reveal scroll,
+tilt hero, sorotan kursor; semua gaya di bawah `html[data-lpm]`, menempel ke `data-sec`/`data-rv` markup generator). Publik: `(public)/pub-motion.css`
+(CSS saja). Matikan sementara: `?motion=0`. Rollback: `docs/landing-motion-ROLLBACK.md`.
+
 **Logo (SVG)** — `MerchantAlias.icon` + tabel `CategoryIcon` (endpoint di `merchant-aliases`: `PUT /icon`, `GET|PUT /category-icons`).
 Nilai = path relatif di `apps/frontend/public/icons/` (mis. `indonesia/bca.svg`). Katalog dibuat `node scripts/build-icons.mjs`
 (sumber `<repo>/svg`, skip `undraw_*` & file >100KB) → `src/lib/icon-catalog.ts`; render `src/lib/icons.ts` (`iconCss`), picker `v3/IconPicker.tsx`.
