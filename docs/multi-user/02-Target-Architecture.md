@@ -172,7 +172,7 @@ Pipeline hilir **sama** dengan sekarang (`TransactionService.createFromParsed`, 
 
 1. **Alamat**: `u-<localPart>@in.trackster.dev`. `localPart` acak (≥ 96 bit) → tak bisa ditebak; ini penghalang spoofing utama.
 2. **Cloudflare Email Routing** (subdomain `in.`) → aturan "catch-all → Email Worker". Worker (±20 baris): ambil `message.to`, `message.from`, `message.raw`;
-   `POST https://api.trackster.dev/ingest/email` dengan body = raw MIME, header: `X-Trackster-To`, `X-Trackster-Timestamp`, `X-Trackster-Signature = HMAC-SHA256(secret, timestamp + "." + sha256(body))`.
+   `POST https://api.trackster.dev/ingest/email` dengan body = raw MIME, header: `X-Trackster-To`, `X-Trackster-Timestamp`, `X-Trackster-Signature = HMAC-SHA256(secret, timestamp + "." + to + "." + sha256(body))` (`to` = nilai `X-Trackster-To`, ditandatangani agar tak bisa diputar ulang ke alamat lain)`.
    Retry 3× (backoff). Jika gagal total: `message.forward(<alamat dead-letter admin>)` supaya email tidak hilang (replay aman karena dedup).
 3. **Backend `/ingest/email`** (publik tapi **bukan** pakai JWT): verifikasi HMAC + timestamp ±5 menit (anti replay) + batas ukuran (mis. 2MB; Nginx sudah 20M) → cari `InboundAddress` dari `X-Trackster-To` → `userId`.
    Tolak/abaikan (HTTP 200 agar tak ada retry & tak bocor info) bila alamat tak dikenal/nonaktif.

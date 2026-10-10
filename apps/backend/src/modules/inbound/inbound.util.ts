@@ -4,16 +4,17 @@ export const MAX_SKEW_MS = 5 * 60 * 1000;
 
 export const sha256hex = (b: Buffer | string) => createHash('sha256').update(b).digest('hex');
 
-/** Tanda tangan Worker: HMAC-SHA256(secret, `${timestampMs}.${sha256hex(body)}`) dalam hex. */
-export function signBody(secret: string, timestamp: string, body: Buffer): string {
-  return createHmac('sha256', secret).update(`${timestamp}.${sha256hex(body)}`).digest('hex');
+/** Tanda tangan Worker: HMAC-SHA256(secret, `${timestampMs}.${to}.${sha256hex(body)}`) dalam hex. `to` ikut ditandatangani:
+ * tanpa itu request sah yang tertangkap bisa diputar ulang (≤5 mnt) ke alamat inbound user lain dengan header To diganti. */
+export function signBody(secret: string, timestamp: string, to: string, body: Buffer): string {
+  return createHmac('sha256', secret).update(`${timestamp}.${to}.${sha256hex(body)}`).digest('hex');
 }
 
 /** Cek tanda tangan (timing-safe) + timestamp (epoch ms) dalam ±5 menit — anti replay. */
-export function verifySignature(secret: string, timestamp: string | undefined, signature: string | undefined, body: Buffer, now = Date.now()): boolean {
+export function verifySignature(secret: string, timestamp: string | undefined, signature: string | undefined, to: string | undefined, body: Buffer, now = Date.now()): boolean {
   if (!secret || !timestamp || !signature || !/^\d{10,16}$/.test(timestamp)) return false;
   if (Math.abs(now - Number(timestamp)) > MAX_SKEW_MS) return false;
-  const want = Buffer.from(signBody(secret, timestamp, body), 'hex');
+  const want = Buffer.from(signBody(secret, timestamp, to ?? '', body), 'hex');
   const got = Buffer.from(signature, 'hex');
   return got.length === want.length && timingSafeEqual(got, want);
 }

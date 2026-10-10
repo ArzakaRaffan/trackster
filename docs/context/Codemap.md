@@ -97,5 +97,5 @@ Dipakai di baris Hari ini, detail transaksi, Setting → Alias merchant (+ logo 
 
 ## Inbound email (F7, branch feat/multi-user)
 - `modules/gmail/email-pipeline.service.ts` — pipeline email->parse->saldo/kategori/Telegram, dipakai Gmail sync DAN inbound (opsi `shadow` = log `ParseStatus.SHADOW`, tanpa tulis data).
-- `modules/inbound/` — `POST /ingest/email` (HMAC `X-Trackster-Signature` = HMAC(secret, `ts.sha256(body)`), ts ms ±5 mnt, body MIME mentah via `express.raw` di `main.ts`, maks 3MB). Alamat `u-<24 char base32>@in.trackster.dev` -> `InboundAddress`. Bukan pengirim bank (`ParserRegistryService.canHandle`) = dibuang. Email konfirmasi Gmail -> `lastForwardCode`.
+- `modules/inbound/` — `POST /ingest/email` (HMAC `X-Trackster-Signature` = HMAC(secret, `ts.to.sha256(body)`) — `to` = header `X-Trackster-To`, ts ms ±5 mnt, body MIME mentah via `express.raw` di `main.ts`, maks 3MB). Alamat `u-<24 char base32>@in.trackster.dev` -> `InboundAddress`. Bukan pengirim bank (`ParserRegistryService.canHandle`) = dibuang. Email konfirmasi Gmail -> `lastForwardCode`.
 - CLI: `node prisma/user-admin.js inbound --username u [--shadow on|off] [--rotate]`. Tes: `inbound.util.check.ts`, `scripts/inbound-e2e.mjs`.

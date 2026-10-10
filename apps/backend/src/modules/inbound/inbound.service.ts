@@ -22,7 +22,7 @@ export class InboundService {
   async handle(body: Buffer, h: { to?: string; timestamp?: string; signature?: string }): Promise<{ ok: true; result: string }> {
     const secret = process.env.INGEST_HMAC_SECRET;
     if (!secret) throw new ServiceUnavailableException('Inbound email belum dikonfigurasi');
-    if (!verifySignature(secret, h.timestamp, h.signature, body)) throw new UnauthorizedException('Tanda tangan tidak valid');
+    if (!verifySignature(secret, h.timestamp, h.signature, h.to, body)) throw new UnauthorizedException('Tanda tangan tidak valid');
 
     const domain = process.env.INBOUND_DOMAIN || 'in.trackster.dev';
     const localPart = parseLocalPart(h.to, domain);

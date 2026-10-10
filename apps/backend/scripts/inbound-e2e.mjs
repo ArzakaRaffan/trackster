@@ -33,7 +33,7 @@ const mime = ({ from = 'BCA <bcamobile@bca.co.id>', subject = 'Transaksi', id, a
 
 function post(body, { to, ts = String(Date.now()), sig, big = false } = {}) {
   const buf = Buffer.from(big ? 'x'.repeat(4 * 1024 * 1024) : body);
-  const signature = sig ?? createHmac('sha256', SECRET).update(`${ts}.${sha(buf)}`).digest('hex');
+  const signature = sig ?? createHmac('sha256', SECRET).update(`${ts}.${to ?? ''}.${sha(buf)}`).digest('hex');
   return fetch(BASE + '/ingest/email', {
     method: 'POST',
     headers: { 'content-type': 'message/rfc822', 'x-trackster-to': to ?? '', 'x-trackster-timestamp': ts, 'x-trackster-signature': signature },
@@ -94,7 +94,8 @@ await test('email non-bank -> dibuang, tidak disimpan', async () => {
 await test('isolasi: email ke alamat B tidak muncul di A', async () => {
   const w = `WarungB${RUN}`;
   const r = await post(mime({ id: `b${RUN}`, subject: `bankB ${RUN}`, who: w }), { to: toB });
-  expect((await j(r)).result === 'recorded', 'B harus tercatat');
+  const rb = await j(r);
+  expect(rb.result === 'recorded', 'B harus tercatat: ' + JSON.stringify(rb));
   expect((await txCount(B.id, w)) === 1 && (await txCount(A.id, w)) === 0, 'harus hanya di B');
 });
 await test('shadow=on -> log SHADOW, tanpa Transaction', async () => {
