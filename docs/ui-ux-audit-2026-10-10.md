@@ -46,6 +46,43 @@ Hasil setelah perbaikan: 0 overflow horizontal di 21 layar pada 320/375/768/1280
 
 ## Konvensi baru (untuk perubahan berikutnya)
 - Kelas responsif di `src/components/v3/v3.css`, dipakai lewat `class="…"` di `.dc.html` (generator sekarang menggabungkan `class` dengan
-  kelas hover/active): `v3-ph` (hanya ponsel < 720px), `v3-nph` (sembunyi di ponsel), `v3-wrap`, `v3-minw0`, `v3-col`, `v3-tight`.
+  kelas hover/active): `v3-ph` (hanya ponsel < 720px), `v3-nph` (sembunyi di ponsel), `v3-wrap`, `v3-minw0`, `v3-col`, `v3-tight`,
+  `v3-g3` (grid jadi `auto 1fr auto` di ponsel).
 - Pola baris daftar di ponsel: chip status diduplikasi di kolom info (`v3-ph`), yang di kolom sendiri `v3-nph`.
 - Field form minimal 16px; chip tinggi tetap wajib `white-space:nowrap`.
+
+---
+
+# Lanjutan — audit `/app` dengan backend lokal (2026-10-10)
+
+Data: user dari `ADMIN_USERNAME` diisi data ekstrem lewat API (nominal Rp125.000.000, nama merchant/langganan/split/target sangat panjang,
+37 transaksi, pemasukan "perlu dicek", langganan jatuh tempo hari ini & besok, target 100%); akun kosong = user baru lewat undangan.
+Lebar 320/375/768/1280, gelap & terang. Skrip audit ditambah deteksi **teks terpotong oleh ancestor `overflow:hidden`** (audit /demo
+tidak menangkapnya) dan `document.getAnimations().finish()` sebelum mengukur kontras (animasi masuk tertahan = kontras palsu 1.0).
+
+| # | Tingkat | Layar | Masalah | Perbaikan |
+|---|---|---|---|---|
+| 21 | Tinggi | Loading/error (semua) | Backend mati → layar menampilkan angka bawaan prototipe ("Sisa hari ini Rp200.000 AMAN", "Runway Rp4.049.000", "Belum ada transaksi") tanpa tanda error. | `useLive` ekspos `failed` (data inti error tanpa data); `V3Host` menampilkan "Data belum bisa dimuat" + **Coba lagi**. Loading lama: "Memuat data…" (muncul setelah 600 ms). |
+| 22 | Tinggi | Mingguan (ponsel) | Nominal "Per hari" terpotong di tepi kartu (grid tetap 120+180+20px). Rincian hari: judul transaksi terjepit jadi 1–4 huruf. | Di ponsel bar progres disembunyikan, grid `v3-g3`; meta transaksi turun ke baris kedua. |
+| 23 | Tinggi | Sumber data | `/app` menampilkan alamat penerus palsu (`kamu-k3j9x@…`, bisa disalin) + chip "Simulasi Flip"; status Terputus menyalahkan alamat penerus padahal Gmail belum terhubung; tombolnya membuka wizard yang cuma tampilan. | Di live keduanya disembunyikan; teks "Gmail belum terhubung…", tombol **Hubungkan Gmail** → Setting. |
+| 24 | Tinggi | Hari ini | "Alert Telegram sudah dikirim" selalu tampil walau Telegram belum diatur. | Kalimat hanya muncul kalau Telegram terkonfigurasi. |
+| 25 | Sedang | Mingguan | Label batang "136345rb" menimpa batang sebelah. | ≥ 1 jt jadi "1,3jt"/"136jt". |
+| 26 | Sedang | Rencana (ponsel) | Tab aktif di strip geser (mis. Langganan) berada di luar layar. | Tab aktif digulir ke tengah strip saat berganti. |
+| 27 | Sedang | Tanya Track (ponsel/tablet) | Kolom input di bawah lipatan (tinggi `100vh − 150px` mengabaikan judul + bottom nav). | Non-desktop: `100dvh − 256px`. |
+| 28 | Sedang | Pemasukan | Bar progres hero hardcode 48% (tampil terisi walau "Rp0 dari Rp0"). | Lebar = diterima / perkiraan (`/demo` tetap 48%). |
+| 29 | Sedang | Analisis | Anomali memakai deskripsi mentah (alias diabaikan) dan nominal tertulis dua kali. | Nama pakai alias (juga di Pembelian besar), nominal hanya di kolom kanan. |
+| 30 | Sedang | Akun kosong | Beranda "Isi struk" kosong tanpa teks + tip maskot mengarang kebiasaan ("biasanya jajan jam 3"); Check-in hanya "Rp0 · Simpan semua"; Analisis (Anomali/Kebiasaan/Pembelian besar/donat), Laporan (Kategori) dan Rapikan kosong tanpa teks; bar "rutin" penuh hijau saat Rp0; Langganan "Aktif (0)" di bawah pesan kosong. | Teks keadaan kosong di tiap bagian; tip maskot live netral; Check-in mengarahkan ke tab Sumber (ringkasan disembunyikan); bar netral; judul Langganan di atas. |
+| 31 | Rendah | Hari ini (ponsel) | Label "Runway akhir bulan" pecah 3 baris saat nilai besar + chip. | Label & nilai `nowrap`, chip turun ke baris kedua. |
+| 32 | Rendah | Setting | Footer "API: https://api.trackster.app" (domain prototipe). | Memakai URL API yang sama dengan tab Shortcut. |
+| 33 | Rendah | Laporan | "Masuk Rp0rb · Keluar Rp0rb"; net negatif jadi "Rp-13710rb". | `< 1000` ditulis apa adanya, tanda minus di depan "Rp". |
+
+Hasil: 0 overflow / teks terpotong di 20 layar `/app` pada 320/375/768/1280 (gelap & terang); 0 kegagalan kontras (tab "Minggu" di Laporan
+terdeteksi 1.43 = positif palsu: pill hijau elemen terpisah, kontras nyata ≈ 11:1). `/demo` tetap 1:1. `tsc --noEmit` dan `next build` lolos.
+
+### Tidak diubah (perlu keputusan)
+- **"Masuk minggu ini" di Pemasukan/Budget hanya menghitung pemasukan yang terkait sumber rutin** (forecast). Pemasukan manual tanpa sumber
+  (mis. Rp125 jt minggu ini) tidak terhitung → hero "Rp0", sementara Laporan "Masuk Rp125,0jt". Mengubahnya = keputusan produk/backend.
+- Nama langganan sangat panjang di ponsel membungkus sampai 7 baris (tetap terbaca); meta "Calendar belum sync" selalu ter-ellipsis di ponsel.
+- Nama transaksi panjang di Hari ini/Beranda tetap 1 baris ber-ellipsis (detail lengkap dengan ketuk).
+- "+Rp0 SURPLUS" di Net hari ini akun kosong.
+- Strip chip saran di Tanya Track dan carousel Beranda memang scroller horizontal (bukan overflow).
