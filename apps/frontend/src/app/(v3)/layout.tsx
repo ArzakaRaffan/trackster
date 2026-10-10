@@ -22,7 +22,7 @@ export const metadata: Metadata = {
 // Tidak mengimpor globals.css (Tailwind preflight): desain v3 bergantung pada default browser, bukan reset Tailwind.
 export default function V3Layout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="id">
+    <html lang="id" suppressHydrationWarning>
       <head>
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="" />
@@ -32,6 +32,8 @@ export default function V3Layout({ children }: { children: React.ReactNode }) {
         />
       </head>
       <body>
+        {/* Tema terang tersimpan: latar body ikut sebelum JS v3 termuat (hindari kilatan gelap). */}
+        <script dangerouslySetInnerHTML={{ __html: "try{var t=localStorage.getItem('v3-theme');if(t)document.documentElement.dataset.theme=t}catch(e){}" }} />
         <V3Host />
         {children}
         <Script src="/track-mascot.js" strategy="afterInteractive" />

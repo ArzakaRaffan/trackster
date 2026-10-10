@@ -23,3 +23,14 @@ input::placeholder,textarea::placeholder{color:var(--text-subtlest,#8C8C8C)}
 @keyframes tsModal{from{transform:translateY(12px) scale(.98);opacity:0}to{transform:none;opacity:1}}
 @media (prefers-reduced-motion: reduce){*{transition-duration:1ms!important;animation-duration:1ms!important;animation-iteration-count:1!important}}
 [data-rm="1"] *{transition-duration:1ms!important;animation-duration:1ms!important;animation-iteration-count:1!important}
+/* Responsive helpers (bukan dari prototipe) — dipakai lewat class="…" di .dc.html. 719px = batas bp 'm' di logic.tsx. */
+html,body{overflow-x:clip}
+html[data-theme=light] body{background:#F2ECDD}
+@media (max-width:719px){
+  .v3-nph{display:none!important}
+  .v3-wrap{flex-wrap:wrap!important}
+  .v3-minw0{min-width:0!important}
+  .v3-col{flex-direction:column!important;align-items:flex-end!important;gap:6px!important}
+  .v3-tight{padding-left:12px!important;padding-right:12px!important}
+}
+@media (min-width:720px){.v3-ph{display:none!important}}

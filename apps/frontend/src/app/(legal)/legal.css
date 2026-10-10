@@ -1,5 +1,5 @@
 /* Token disalin dari DARK/LIGHT di components/v3/logic.tsx — jaga tetap sama. */
-:root,[data-theme='light']{--page:#F2ECDD;--card:#FBF8EE;--text:#2B2924;--text-subtle:#6B6656;--border:#D9D0B8;--hover:rgba(43,41,36,.06);--brand:#1ED760;--brand-hover:#19C455;--on-brand:#04120A;--brand-text:#1B7A3E;--brand-subtle:#D3EBD0;--danger-text:#AE3B30;--danger-subtle:#F4D0C9;--warning-text:#9A5808;--warning-subtle:#F7DCC0}
+:root,[data-theme='light']{--page:#F2ECDD;--card:#FBF8EE;--text:#2B2924;--text-subtle:#5E594B;--border:#D9D0B8;--hover:rgba(43,41,36,.06);--brand:#1ED760;--brand-hover:#19C455;--on-brand:#04120A;--brand-text:#19713A;--brand-subtle:#D3EBD0;--danger-text:#A4372D;--danger-subtle:#F4D0C9;--warning-text:#915308;--warning-subtle:#F7DCC0}
 [data-theme='dark']{--page:#1B1814;--card:#26221C;--text:#EFE8D6;--text-subtle:#ADA48E;--border:#4A4336;--hover:rgba(239,232,214,.07);--brand:#1ED760;--brand-hover:#3BE477;--on-brand:#04120A;--brand-text:#4EDD85;--brand-subtle:#25402C;--danger-text:#F09A8C;--danger-subtle:#4A2B27;--warning-text:#E9B36F;--warning-subtle:#4A3826}
 
 html{scroll-behavior:smooth}

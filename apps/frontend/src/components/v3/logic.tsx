@@ -43,23 +43,24 @@ const I = {
 const RP = n => 'Rp' + Math.abs(Math.round(n)).toLocaleString('id-ID');
 const DARK = {
   '--page':'#1B1814','--card':'#26221C','--card-hover':'#2C2720','--overlay':'#2C2720','--hover':'rgba(239,232,214,.07)','--neutral':'#342E25','--neutral-hover':'#3D362C',
-  '--text':'#EFE8D6','--text-subtle':'#ADA48E','--text-subtlest':'#968D77','--border':'#4A4336','--border-bold':'#6B6352','--focus':'#EFE8D6',
+  '--text':'#EFE8D6','--text-subtle':'#ADA48E','--text-subtlest':'#A1977F','--border':'#4A4336','--border-bold':'#6B6352','--focus':'#EFE8D6',
   '--brand':'#1ED760','--brand-hover':'#3BE477','--on-brand':'#04120A','--brand-text':'#4EDD85','--brand-subtle':'#25402C',
   '--success-text':'#4EDD85','--success-bold':'#1ED760','--success-subtle':'#25402C',
   '--warning-text':'#E9B36F','--warning-bold':'#FFA42B','--warning-subtle':'#4A3826',
   '--danger-text':'#F09A8C','--danger-bold':'#F3727F','--danger-subtle':'#4A2B27',
   '--shadow-card':'0 0 0 1.5px #4A4336','--shadow-overlay':'0 12px 32px rgba(0,0,0,.5), 0 0 0 1.5px #4A4336','--blanket':'rgba(10,8,5,.6)'
 };
+// Teks *-subtle/-text digelapkan sedikit dari prototipe supaya lolos WCAG AA (>=4.5:1) di page/card/neutral/subtle.
 const LIGHT = {
   '--page':'#F2ECDD','--card':'#FBF8EE','--card-hover':'#F6F1E3','--overlay':'#FBF8EE','--hover':'rgba(43,41,36,.06)','--neutral':'#E8E0CC','--neutral-hover':'#DFD6BF',
-  '--text':'#2B2924','--text-subtle':'#6B6656','--text-subtlest':'#7A7462','--border':'#D9D0B8','--border-bold':'#A89F86','--focus':'#2B2924',
-  '--brand':'#1ED760','--brand-hover':'#19C455','--on-brand':'#04120A','--brand-text':'#1B7A3E','--brand-subtle':'#D3EBD0',
-  '--success-text':'#1B7A3E','--success-bold':'#1ED760','--success-subtle':'#D3EBD0',
-  '--warning-text':'#9A5808','--warning-bold':'#FFA42B','--warning-subtle':'#F7DCC0',
-  '--danger-text':'#AE3B30','--danger-bold':'#D2433A','--danger-subtle':'#F4D0C9',
+  '--text':'#2B2924','--text-subtle':'#5E594B','--text-subtlest':'#676253','--border':'#D9D0B8','--border-bold':'#A89F86','--focus':'#2B2924',
+  '--brand':'#1ED760','--brand-hover':'#19C455','--on-brand':'#04120A','--brand-text':'#19713A','--brand-subtle':'#D3EBD0',
+  '--success-text':'#19713A','--success-bold':'#1ED760','--success-subtle':'#D3EBD0',
+  '--warning-text':'#915308','--warning-bold':'#FFA42B','--warning-subtle':'#F7DCC0',
+  '--danger-text':'#A4372D','--danger-bold':'#D2433A','--danger-subtle':'#F4D0C9',
   '--shadow-card':'0 0 0 1.5px #D9D0B8','--shadow-overlay':'0 12px 32px rgba(40,34,20,.25), 0 0 0 1.5px #D9D0B8','--blanket':'rgba(30,26,18,.5)'
 };
-const DENSITY = { lega:{ '--pad':'24px','--stack':'28px','--gap':'16px','--row-h':'60px','--hero-fs':'52px' }, ringkas:{ '--pad':'18px','--stack':'20px','--gap':'12px','--row-h':'48px','--hero-fs':'40px' } };
+const DENSITY = { lega:{ '--pad':'24px','--stack':'28px','--gap':'16px','--row-h':'60px','--hero-fs':'clamp(34px, 10.5vw, 52px)' }, ringkas:{ '--pad':'18px','--stack':'20px','--gap':'12px','--row-h':'48px','--hero-fs':'clamp(30px, 9vw, 40px)' } };
 const CAT_L = { MAKANAN:'Makanan', TRANSPORT:'Transport', BELANJA:'Belanja', TAGIHAN:'Tagihan', HIBURAN:'Hiburan', KESEHATAN:'Kesehatan', LAINNYA:'Lainnya', TRANSFER:'Transfer', TOPUP:'Top-up', PENDIDIKAN:'Pendidikan', PERAWATAN:'Perawatan', INVESTASI:'Investasi', ROKOK:'Rokok/Vape' };
 const DAYN = ['Minggu','Senin','Selasa','Rabu','Kamis','Jumat','Sabtu'];
 let DAYS = [['Kam','Kamis, 24 Sep',180000],['Jum','Jumat, 25 Sep',200000],['Sab','Sabtu, 26 Sep',250000],['Min','Minggu, 27 Sep',250000],['Sen','Senin, 28 Sep',180000],['Sel','Selasa, 29 Sep',180000],['Rab','Rabu, 30 Sep',200000]];
@@ -130,8 +131,9 @@ export class V3Logic extends React.Component {
   liveCall(fn) { const L = this.props.live; if (L === undefined) return false; Promise.resolve().then(fn).then(() => L.refresh && L.refresh()).catch(e => { this.toast((e && e.message) || 'Gagal menyimpan.'); L.refresh && L.refresh(); }); return true; }
   syncLive(pl) { const L = this.props.live; if (!L) return; const cur = L.flat || {}, prev = (pl && pl.flat) || {}, patch = {}; for (const k of Object.keys(cur)) if (cur[k] !== prev[k]) patch[k] = cur[k]; for (const g of ['chat', 'st', 'split']) if (L[g] && L[g] !== (pl && pl[g])) patch[g] = { ...this.state[g], ...L[g] }; if (patch.budget && patch.budget.rec && !this._optSet) { this._optSet = 1; patch.opt = patch.budget.rec; } if (Object.keys(patch).length) this.setState(patch); }
   chatInputRef = React.createRef(); rootRef = React.createRef(); mascotRef = React.createRef(); chatScrollRef = React.createRef(); lpRef = React.createRef(); lpBoxRef = React.createRef();
-  componentDidUpdate(pp, ps) { this.loadAna(); this.loadReport(); this.searchLive(ps); if (ps && ps.chat && ps.chat.active !== this.state.chat.active && this.props.onChatActive) this.props.onChatActive(this.state.chat.active); this.syncLive(pp.live); this.syncPath(pp); this.persistPrefs(ps); if (pp && pp.mulai !== this.props.mulai) this.v3start(this.props.mulai); this.v3tr(); this.lpScan(); { const bx = this.lpBoxRef.current, k = (this.state.lpChat || []).length + (this.state.lpTyping ? .5 : 0); if (bx && this._boxN !== k) { this._boxN = k; bx.scrollTop = bx.scrollHeight; } } const el = this.chatScrollRef.current; if (el && this.state.page === 'chat') { const n = el.scrollHeight; if (n !== this._lastH) { this._lastH = n; el.scrollTop = n; } } }
-  state = { pre:null, bp:'d', page:'dash', more:true, car:0, txs:TX0, runway:false, openDay:6, opt:'seimbang', basis:false, applyState:'idle', manual:[250000,180000,180000,180000,200000,200000,250000], manualOpen:false, saveState:'idle',
+  componentDidUpdate(pp, ps) { this.modalFocus(ps); this.loadAna(); this.loadReport(); this.searchLive(ps); if (ps && ps.chat && ps.chat.active !== this.state.chat.active && this.props.onChatActive) this.props.onChatActive(this.state.chat.active); this.syncLive(pp.live); this.syncPath(pp); this.persistPrefs(ps); if (pp && pp.mulai !== this.props.mulai) this.v3start(this.props.mulai); this.v3tr(); this.lpScan(); { const bx = this.lpBoxRef.current, k = (this.state.lpChat || []).length + (this.state.lpTyping ? .5 : 0); if (bx && this._boxN !== k) { this._boxN = k; bx.scrollTop = bx.scrollHeight; } } const el = this.chatScrollRef.current; if (el && this.state.page === 'chat') { const n = el.scrollHeight; if (n !== this._lastH) { this._lastH = n; el.scrollTop = n; } } }
+  // bp awal dari lebar jendela (client-only) supaya ponsel tidak sempat merender layout desktop sebelum ResizeObserver jalan
+  state = { pre:null, bp:(w => w < 720 ? 'm' : w < 1024 ? 't' : 'd')(typeof window === 'undefined' ? 1280 : window.innerWidth), page:'dash', more:true, car:0, txs:TX0, runway:false, openDay:6, opt:'seimbang', basis:false, applyState:'idle', manual:[250000,180000,180000,180000,200000,200000,250000], manualOpen:false, saveState:'idle',
     streams:STREAMS0, incomes:INCOMES0, pending:true, pick:'', incTab:0, period:'month', periodOpen:false, fc:0, rowMenu:null,
     ci:{ 2:{ units:0, extra:0, amount:'' }, 3:{ units:0, extra:0, amount:'' }, 4:{ units:0, extra:0, amount:'' }, 5:{ units:0, extra:0, amount:'' } }, ciState:'open',
     modal:null, txId:null, aliasDraft:'', noteDraft:'', rb:[], rbName:'', rbAmt:'', rbSrc:'BCA', rbBusy:false, ex:null, exSaving:false, inf:null, infId:null, sf:null, sfId:null, sfAdv:false, cf:null,
@@ -169,7 +171,7 @@ export class V3Logic extends React.Component {
   applyPath(path) { if (path == null) return; const t = pathToState(this.props.base || '/app', path); this._lastPath = path; if (t && (t.page !== this.state.page || t.pre !== (this.state.pre ?? null))) this.setState(t); }
   syncPath() { const path = this.props.path; if (path == null) return; if (this._lastPath !== path) { this.applyPath(path); return; } const want = stateToPath(this.props.base || '/app', { pre:this.state.pre ?? null, page:this.state.page }); if (want && want !== path) { this._lastPath = want; this.props.onNavigate && this.props.onNavigate(want); } }
   restorePrefs() { try { if (localStorage.getItem('v3-coach-hide') === '1') this.setState({ coachHide:true }); const th = localStorage.getItem('v3-theme'), lg = localStorage.getItem('v3-lang'); if (th === 'dark' || th === 'light') this.setState({ themeOv:th }); if (lg === 'id' || lg === 'en') this.setState({ lang:lg }, () => this.v3tr()); } catch (e) {} }
-  persistPrefs(ps) { if (!ps) return; try { if (ps.themeOv !== this.state.themeOv && this.state.themeOv) localStorage.setItem('v3-theme', this.state.themeOv); if (ps.lang !== this.state.lang && this.state.lang) localStorage.setItem('v3-lang', this.state.lang); } catch (e) {} }
+  persistPrefs(ps) { if (!ps) return; try { if (ps.themeOv !== this.state.themeOv && this.state.themeOv) { localStorage.setItem('v3-theme', this.state.themeOv); document.documentElement.dataset.theme = this.state.themeOv; } if (ps.lang !== this.state.lang && this.state.lang) localStorage.setItem('v3-lang', this.state.lang); } catch (e) {} }
   loadReport() { if (this.props.live !== undefined === false || this.state.page !== 'reports') return; const r = this.state.rp, key = r.tab + ':' + r.off; if (this._rpKey === key) return; this._rpKey = key; this.props.live.actions.reportData(r.tab, r.off).then(v => { if (this._rpKey === key) this.setState({ rpView:v }); }).catch(e => { this._rpKey = null; this.toast((e && e.message) || 'Gagal memuat laporan.'); }); }
   searchLive(ps) { if (this.props.live !== undefined === false || !ps || !ps.rp) return; const a = ps.rp, b = this.state.rp; if (a.search === b.search && a.cat === b.cat && a.src === b.src) return; clearTimeout(this._sq); const on = !!b.search.trim() || b.cat !== 'ALL' || b.src !== 'ALL'; if (!on) { this.setState({ searchTxs:[] }); return; } this._sq = setTimeout(() => this.props.live.actions.searchTx(b.search.trim(), b.cat, b.src).then(l => this.setState({ searchTxs:l })).catch(() => {}), 300); }
   openDay(b) { this.setState({ modal:'day', dayIdx:-1, dayTotal:b.total, dayLabel:b.full, dayTxs:null }); this.props.live.actions.dayTxs(b.iso).then(l => this.setState({ dayTxs:l })).catch(e => this.toast((e && e.message) || 'Gagal memuat transaksi.')); }
@@ -208,8 +210,9 @@ export class V3Logic extends React.Component {
   spent() { return this.state.txs.filter(t => t.d === 6).reduce((a, t) => a + t.amt, 0); }
   addTx(n, time, amt, src, back) { const id = Date.now() + Math.floor(Math.random() * 1000); this.setState(st => ({ txs:[...st.txs, { id, d:6 - back, raw:n.toUpperCase(), alias:n, cap:null, src, time, cat:'MAKANAN', amt, note:'' }] })); }
   v3h(s) { const bp = s.bp, RP = n => (n < 0 ? '−' : '') + 'Rp' + Math.abs(Math.round(n)).toLocaleString('id-ID'); const seg = (id, l, cur, set) => ({ l, sel:String(cur === id), bg:cur === id ? 'var(--brand)' : 'transparent', c:cur === id ? 'var(--on-brand)' : 'var(--text)', bd:cur === id ? 'var(--brand)' : 'var(--border)', go:() => set(id) }); return { RP, NUM:n => Math.abs(Math.round(n)).toLocaleString('id-ID'), seg, isMob:bp !== 'd', isTab:false, isDesk:bp === 'd' }; }
-  componentDidMount() { this.loadAna(); this.loadReport(); this.syncLive(undefined); this.v3mount(); this.later(() => this.lpScan(), 150); this.iv = setInterval(() => { if (this.state.page === 'settings') this.setState({ nowTick:Date.now() }); }, 1000); if ((this.props.mascot ?? 'aktif') === 'aktif') { this.setState({ tipOpen:true }); this.autoHide(); } }
-  componentWillUnmount() { this.v3ro && this.v3ro.disconnect(); this.kd && window.removeEventListener('keydown', this.kd); (this.tms || []).forEach(clearTimeout); clearInterval(this.iv); ['t1','t2','t3','t4'].forEach(k => clearTimeout(this[k])); }
+  componentDidMount() { this.loadAna(); this.loadReport(); this.syncLive(undefined); this.v3mount(); this.later(() => this.lpScan(), 150); this.iv = setInterval(() => { if (this.state.page === 'settings') this.setState({ nowTick:Date.now() }); }, 1000); if ((this.props.mascot ?? 'aktif') === 'aktif' && window.innerWidth >= 720) { this.setState({ tipOpen:true }); this.autoHide(); } }
+  componentWillUnmount() { document.documentElement.style.overflow = ''; this.v3ro && this.v3ro.disconnect(); this.kd && window.removeEventListener('keydown', this.kd); (this.tms || []).forEach(clearTimeout); clearInterval(this.iv); ['t1','t2','t3','t4'].forEach(k => clearTimeout(this[k])); }
+  modalFocus(ps) { const was = !!(ps && ps.modal), now = !!this.state.modal; if (was === now) return; if (now) this._modalOpener = document.activeElement; document.documentElement.style.overflow = now && this.state.bp !== 'd' ? 'hidden' : ''; if (!now) { const el = this._modalOpener; this._modalOpener = null; if (el && el.isConnected && el.focus) el.focus(); } }
   autoHide() { clearTimeout(this.t3); this.t3 = setTimeout(() => this.setState({ tipOpen:false }), 6000); }
   toast(m) { clearTimeout(this.t1); this.setState({ toast:m, toastOn:true }); this.t1 = setTimeout(() => this.setState({ toastOn:false }), 3000); }
   go(p) { this.setState({ page:p, rowMenu:null, periodOpen:false, bell:false }); window.scrollTo && window.scrollTo({ top:0 }); }
@@ -651,7 +654,7 @@ export class V3Logic extends React.Component {
     const strip = TXG.includes(pg) ? chips([['today', 'Hari ini'], ['weekly', 'Mingguan']]) : PLG.includes(pg) ? chips([['budget', 'Budget'], ['income', 'Pemasukan'], ['checkin', 'Check-in'], ['goals', 'Target'], ['subs', 'Langganan']]) : [];
     return {
       isMob:mob, isDesk:desk, showSide:desk, showBottom:mob && !s.pre, mascotStill:String((props.mascot ?? 'aktif') !== 'aktif'),
-      mainPad:desk ? '28px 64px 120px 48px' : '8px 16px 120px', h1s:desk ? '32px' : '26px', h1l:desk ? '40px' : '32px',
+      mainPad:desk ? '28px 64px 120px 48px' : '8px 16px 168px', h1s:desk ? '32px' : '26px', h1l:desk ? '40px' : '32px',
       mAlign:desk ? 'center' : 'flex-end', mPad:desk ? '24px' : '0', mMax:desk ? 'calc(100vh - 48px)' : '90vh', mRad:desk ? '12px' : '14px 14px 0 0',
       fabR:desk ? '24px' : '16px', fabB:desk ? '24px' : '96px', toastB:desk ? '28px' : '96px',
       v3tabs:[tb('dash', 'Beranda'), tb('today', 'Transaksi'), tb('budget', 'Rencana'), tb('insight', 'Insight'), tb('me', 'Menu')], txManual:TXG.includes(pg),
@@ -1065,7 +1068,7 @@ export class V3Logic extends React.Component {
       bud, toggleManual:() => this.setState({ manualOpen:!s.manualOpen }), manualExpanded:String(s.manualOpen), manualRot: s.manualOpen ? '180deg' : '0deg', manualRows: s.manualOpen ? '1fr' : '0fr', manualTab: s.manualOpen ? 0 : -1,
       saveLabel:{ idle:'Simpan budget', saving:'Menyimpan...', saved:'✓ Tersimpan' }[s.saveState],
       saveManual:() => { this.setState({ saveState:'saving' }); if (this.props.live !== undefined) { this.props.live.actions.saveBudget(s.manual).then(() => this.props.live.refresh()).then(() => this.setState({ saveState:'saved' })).catch(e => { this.setState({ saveState:'idle' }); this.toast((e && e.message) || 'Gagal menyimpan budget.'); }); return; } this.t4 = setTimeout(() => this.setState({ saveState:'saved' }), 700); },
-      showMascot: presence !== 'sembunyi', mascotSm:this.mascot(28, 'happy'), mascotMd:this.mascot(44, tipOpen ? (isRem ? 'alert' : 'happy') : (isRem && !s.tipDismissed ? 'alert' : 'idle')),
+      showMascot: presence !== 'sembunyi' && s.page !== 'chat', mascotSm:this.mascot(28, 'happy'), mascotMd:this.mascot(44, tipOpen ? (isRem ? 'alert' : 'happy') : (isRem && !s.tipDismissed ? 'alert' : 'idle')),
       options, basis, toggleBasis:() => this.setState({ basis:!s.basis }), basisExpanded:String(s.basis), basisRot: s.basis ? '180deg' : '0deg', basisRows: s.basis ? '1fr' : '0fr',
       applyBusy:String(s.applyState === 'applying'), applyLabel:{ idle:`Terapkan opsi ${optObj.label}`, applying:'Menerapkan...', applied:'✓ Diterapkan!' }[s.applyState],
       applyOption:() => { if (s.applyState !== 'idle') return; this.setState({ applyState:'applying' }); if (this.props.live !== undefined) { this.props.live.actions.applyBudget(s.opt, s.budget && s.budget.weekStart).then(() => this.props.live.refresh()).then(() => { this.setState({ applyState:'applied' }); setTimeout(() => this.setState({ applyState:'idle' }), 3000); }).catch(e => { this.setState({ applyState:'idle' }); this.toast((e && e.message) || 'Gagal menerapkan budget.'); }); return; } this.t4 = setTimeout(() => { this.setState({ applyState:'applied', manual:[...optObj.days] }); setTimeout(() => this.setState({ applyState:'idle' }), 3000); }, 800); },
@@ -1073,7 +1076,7 @@ export class V3Logic extends React.Component {
       pendingBtnBg: s.pick ? 'var(--text)' : 'var(--neutral)', pendingBtnFg: s.pick ? 'var(--page)' : 'var(--text-subtlest)',
       resolvePending:() => { if (!s.pick) return; const st = s.streams.find(x => String(x.id) === s.pick); if (this.props.live !== undefined) { const it = s.pendingList && s.pendingList[0]; if (!it) return; this.liveCall(() => this.props.live.actions.resolveIncome(it.id, { streamId:Number(s.pick) })); this.setState({ pick:'' }); this.toast('Dicatat sebagai ' + (st ? st.name : 'pemasukan') + '.'); return; } this.setState(z => ({ pending:false, incomes:[INC(750000,'TRSF E-BANKING ANDI PRATAMA','BCA','2026-09-29',st && st.name), ...z.incomes] })); this.toast(`Dicatat sebagai ${st ? st.name : 'pemasukan'}.`); },
       markInternal:() => { if (this.props.live !== undefined) { const it = s.pendingList && s.pendingList[0]; if (it) this.liveCall(() => this.props.live.actions.resolveIncome(it.id, { notIncome:true })); this.toast('Ditandai bukan pemasukan.'); return; } this.setState({ pending:false }); this.toast('Ditandai bukan pemasukan.'); },
-      incTabs, incTabX:(s.incTab * 108) + 'px', tabHist:s.incTab === 0, tabSrc:s.incTab === 1, tabFc:s.incTab === 2,
+      incTabs, incTabX:`calc(${s.incTab} * var(--inc-tw))`, tabHist:s.incTab === 0, tabSrc:s.incTab === 1, tabFc:s.incTab === 2,
       togglePeriod:() => this.setState({ periodOpen:!s.periodOpen }), periodOpen:s.periodOpen, periodExpanded:String(s.periodOpen), periodLabel:PL[s.period], periodItems,
       histGroups, histEmpty:list.length === 0, streamRows, fcTiles, fcSegs, fcX:(s.fc * 100) + '%',
       openIncomeNew:() => this.setState({ modal:'income', infId:null, inf:{ amount:'', desc:'', src:'BCA', date:TODAY_ISO } }),

@@ -38,6 +38,8 @@ Branch kerja: `feat/v3-redesign`. Push ke `main` sekali di akhir (CD main = auto
 - "Hapus akun" (Privasi) belum ada di backend: setelah konfirmasi hanya menampilkan toast, data tidak diubah.
 - Fitur lama yang tidak ada di desain v3 tidak punya UI lagi (backend tetap): patungan/reimbursement, toggle rollover budget, health score, daftar transaksi lengkap berhalaman (`/app/transactions`).
 - Landing sekarang dirender di client (teks tidak ada di HTML awal; metadata/OG tetap).
+- Audit UI/UX 2026-10-10 (`docs/ui-ux-audit-2026-10-10.md`): perbaikan layout ponsel (baris daftar, topbar, angka hero `clamp()`), field form 16px,
+  token teks tema terang/gelap digelapkan/diterangkan sedikit agar lolos WCAG AA. Template `.dc.html` sudah memuat perubahan ini.
 
 ## Cara memperbarui
 - Desain berubah: ganti `Trackster v3 App.dc.html`, jalankan `node scripts/dc-to-tsx.mjs` (dari `apps/frontend`), cek `git diff` pada `views/`. Teks contoh baru di markup → tambahkan ke tabel `LITERALS` di generator + kunci `*Txt` di `rv_live()` (`logic.tsx`).
