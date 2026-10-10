@@ -121,8 +121,10 @@ else {
       expect(!text.includes(TAG), 'penanda A muncul di respons B — KEBOCORAN');
     });
   }
-  await test('B kosong: /balance = [] dan /transactions total 0', async () => {
-    expect(JSON.stringify(await body(await call('GET', '/balance', cookieB))) === '[]', '/balance B tidak kosong');
+  await test('B kosong: /balance hanya baris saldo 0 milik B dan /transactions total 0', async () => {
+    // Daftar via undangan memprovisikan baris saldo 0 (provisionUser) — kosong = tak ada saldo bernilai / milik orang lain.
+    const bal = await body(await call('GET', '/balance', cookieB));
+    expect(Array.isArray(bal) && bal.every((b) => Number(b.balance) === 0 && b.userId !== tx.userId), `/balance B tidak kosong: ${JSON.stringify(bal)}`);
     const t = await body(await call('GET', '/transactions', cookieB));
     expect(t.total === 0, `total transaksi B = ${t.total}`);
   });

@@ -87,6 +87,11 @@ Dipakai di baris Hari ini, detail transaksi, Setting → Alias merchant (+ logo 
 - ~~`.env.example` domain lama / env belum lengkap~~ — dirapikan 2026-10-06 (multi-user F0). `TELEGRAM_BOT_TOKEN` di compose prod tidak dibaca kode.
 - `Source.GOPAY` masih di enum & tipe frontend walau nggak ada sumber aktif.
 
+## Keamanan (audit 2026-10-10, `docs/multi-user/09-Security-Audit.md`)
+- `common/guards/ai-rate-limit.guard.ts` — kuota AI per user per rute (`AiRateLimitGuard`, `aiQuotaOk()` juga dipakai webhook Telegram). Endpoint baru yang memanggil AI WAJIB memasang guard ini.
+- `telegram.service.ts`: `escHtml()` wajib untuk teks dinamis di pesan Telegram (parse_mode HTML); Bot API lewat `tgCall()` (fetch, tanpa library). Chat ID manual hanya pemilik; member via `POST /telegram/link-code` + `/start <kode>`.
+- `main.ts`: query parser `simple`, header keamanan API. `next.config.js`: header keamanan frontend. Tes serangan: `scripts/security-e2e.mjs`.
+
 ## Multi-user — F6 (di branch)
 - `modules/api-token` (`/api-tokens`, JWT): buat/daftar/cabut token API per user (`trk_`+40 base62, hash SHA-256, maks 5 aktif). `common/guards/api-token.guard.ts` = Bearer → `req.apiAuth{userId,tokenId}` (user harus ACTIVE, rate limit 60/mnt/token, env tes `INGEST_RATE_LIMIT`).
 - `modules/ingest` (`POST /ingest/transaction|income`): pintu Shortcut; `Idempotency-Key` → `emailId`/`externalId = ing:<key>` (dedup per user). Income memakai `IncomeService.createQuick(userId, dto, {externalId, receivedAt, streamId})`.

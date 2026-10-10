@@ -40,6 +40,7 @@ Perubahan besar yang sudah diputuskan (detail di [`00-Decisions.md`](00-Decision
 | [`06-Runbooks.md`](06-Runbooks.md) | Prosedur operasional (backup, migrasi, DNS Cloudflare, cutover, rollback) | Saat menyentuh DB/DNS/deploy |
 | [`07-Onboarding-UX.md`](07-Onboarding-UX.md) | Spek wizard, tutorial, checklist aktivasi, zero-state | Fase 8 |
 | [`08-Progress-Log.md`](08-Progress-Log.md) | Log kerja per sesi (append-only) | Awal & akhir **setiap** sesi |
+| [`09-Security-Audit.md`](09-Security-Audit.md) | Audit keamanan 2026-10-10: temuan, perbaikan, sisa risiko | Sebelum menyentuh auth/Telegram/AI/ekspor/deploy |
 
 ## 3. Protokol sesi (WAJIB)
 

@@ -140,3 +140,12 @@ deviasi dari rencana (+alasan), env baru yang Arzaka harus tambahkan, langkah be
 - Verifikasi hidup (backend build bersih + frontend lokal ke restore): Arzaka login dan membandingkan dengan prod — saldo BCA/Jago, budget hari ini sama persis.
 - Catatan: token Gmail/Telegram dihapus dari SALINAN restore sebelum backend dijalankan (cegah cron memakai kredensial asli). `BudgetSetting` kosong di data prod (bukan akibat migrasi). `pg_dump` baru menyisipkan `\unrestrict` yang tak dikenali psql — error tak berbahaya di akhir restore.
 - Belum: P0-06 (cek `TELEGRAM_BOT_TOKEN` env VPS = token bot), merge/deploy ⛔, P6-05/06, rotasi `JWT_SECRET`.
+
+## 2026-10-10 — Audit keamanan menyeluruh (branch `fix/security-audit` dari `origin/main`)
+- Sesi oleh: Claude (Opus 5.5)   Branch: `fix/security-audit` (lokal, belum di-push) + 1 commit di `feat/multi-user` (HMAC inbound).
+- Catatan status: `origin/main` (prod) ternyata sudah berisi F1–F6 + penghapusan `/income/quick`; `feat/multi-user` lokal tertinggal 5 commit.
+- Selesai & terverifikasi (DB scratch lokal): 15 temuan diperbaiki — Next 15.5.27/React 19, Telegram config owner-only + UI kode tautan member,
+  library Telegram → fetch, bcrypt 6, kuota AI per user, escape HTML Telegram, JWT purpose ditolak, kunci login 15 mnt, CSV injection,
+  query parser simple, header keamanan, batas DTO publik, dll. Detail & bukti: [`09-Security-Audit.md`](09-Security-Audit.md).
+- Tes baru: `scripts/security-e2e.mjs` (10/10), `report/csv.check.ts`. Regresi: check 25/25, tenancy 0, auth 9/9, ingest 18/18, isolasi 176/176.
+- Butuh Arzaka: persetujuan merge `fix/security-audit` → `main`; R1 rotasi `JWT_SECRET`/`TELEGRAM_WEBHOOK_SECRET`; R4–R9 di dokumen audit.
