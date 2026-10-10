@@ -38,7 +38,7 @@ untuk data; ikon divalidasi regex), riwayat git (tak ada token/kunci; hit `AIza�
 
 | # | Tingkat | Hal | Rekomendasi |
 | --- | --- | --- | --- |
-| R1 | Sedang | Rotasi rahasia lama: `/income/quick` dulu menerima `JWT_SECRET` & `TELEGRAM_WEBHOOK_SECRET` sebagai kunci (dihapus di P6-06). | Pastikan `JWT_SECRET` **sudah** dirotasi (semua sesi logout sekali) dan rotasi juga `TELEGRAM_WEBHOOK_SECRET` (+ `setWebhook` ulang). |
+| R1 | Sedang | Rotasi rahasia lama: `/income/quick` dulu menerima `JWT_SECRET` & `TELEGRAM_WEBHOOK_SECRET` sebagai kunci (dihapus di P6-06). | `JWT_SECRET` sudah dirotasi (dikonfirmasi Arzaka 2026-10-10). Sisa: rotasi `TELEGRAM_WEBHOOK_SECRET` (+ `setWebhook` ulang). |
 | R2 | Sedang | Sisa advisory backend (tanpa critical): `@nestjs/platform-express`/`multer`/`lodash`/`body-parser` — perbaikan hanya di Nest 11/12 (major). Jalur rentan tak terjangkau (tak ada upload file, `_.template` tak dipakai, limit body tak diubah). | Rencanakan upgrade Nest 11 terpisah (Express 5, uji penuh). |
 | R3 | Sedang | Email masuk (F7) bisa dipalsukan oleh siapa pun yang tahu alamat inbound user (header From tak diverifikasi). | Lanjutkan P7-06: cek DKIM bank sebelum cutover. |
 | R4 | Rendah | Kontainer backend & frontend jalan sebagai root. | `USER node` (+`chown` cache Next) — butuh uji `docker build` (Docker tidak tersedia di sesi audit). |
