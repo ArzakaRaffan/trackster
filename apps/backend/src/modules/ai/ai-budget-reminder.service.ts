@@ -1,7 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { Cron } from '@nestjs/schedule';
-import * as TelegramBot from 'node-telegram-bot-api';
-import { TelegramService } from '../telegram/telegram.service';
+import { InlineKeyboardButton, TelegramService, escHtml } from '../telegram/telegram.service';
 import { BudgetService } from '../budget/budget.service';
 import { BudgetAdvisorService } from '../budget/budget-advisor.service';
 import { AiBudgetService } from './ai-budget.service';
@@ -49,7 +48,7 @@ export class AiBudgetReminderService {
     }
   }
 
-  private async buildMessage(userId: number, weekStart: string): Promise<{ text: string; keyboard: TelegramBot.InlineKeyboardButton[][] }> {
+  private async buildMessage(userId: number, weekStart: string): Promise<{ text: string; keyboard: InlineKeyboardButton[][] }> {
     const suggestion = await this.budgetAdvisorService.getSuggestions(userId, weekStart);
     const advice = await this.aiBudgetService.explain(userId, weekStart);
     const chosen = suggestion.options.find(o => o.option === advice.recommended) ?? suggestion.options[1];
@@ -64,11 +63,11 @@ export class AiBudgetReminderService {
       ``,
       `<b>${OPTION_LABEL[chosen.option]}</b>: ${weekdayLo === weekdayHi ? fmt(weekdayLo) : `${fmt(weekdayLo)}–${fmt(weekdayHi)}`}/hari Sen–Jum, ${fmt(weekendAvg)}/hari Sab–Min`,
     ];
-    if (advice.reason) lines.push(``, advice.reason);
-    if (advice.tip) lines.push(``, `💡 ${advice.tip}`);
-    if (chosen.realismFlag) lines.push(``, `⚠️ ${chosen.realismFlag}`);
+    if (advice.reason) lines.push(``, escHtml(advice.reason));
+    if (advice.tip) lines.push(``, `💡 ${escHtml(advice.tip)}`);
+    if (chosen.realismFlag) lines.push(``, `⚠️ ${escHtml(chosen.realismFlag)}`);
 
-    const keyboard: TelegramBot.InlineKeyboardButton[][] = [
+    const keyboard: InlineKeyboardButton[][] = [
       [{ text: `✅ Terapkan ${OPTION_LABEL[chosen.option]}`, callback_data: `ba:${weekStart}:${chosen.option}` }],
       [{ text: '📊 Lihat opsi lain', url: `${process.env.FRONTEND_URL || 'http://localhost:3000'}/app/budget?week=${weekStart}` }],
     ];

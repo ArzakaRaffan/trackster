@@ -1,4 +1,5 @@
 import { CheckinDraft } from './income-checkin.service';
+import { escHtml } from '../telegram/telegram.service';
 
 export interface CheckinKeyboardButton {
   text: string;
@@ -34,15 +35,15 @@ export function buildCheckinMessage(kind: 'prompt' | 'reminder', draft: CheckinD
     if (s.kind === 'IRREGULAR' || !s.scheduled) continue;
 
     if (s.alreadyFilled) {
-      lines.push(`✓ ${s.name} ${formatRp(s.recordedAmount)} — sudah masuk`);
+      lines.push(`✓ ${escHtml(s.name)} ${formatRp(s.recordedAmount)} — sudah masuk`);
       continue;
     }
 
     if (s.kind === 'FIXED') {
-      lines.push(`• ${s.name}: belum masuk (${formatRp(s.expected)})`);
+      lines.push(`• ${escHtml(s.name)}: belum masuk (${formatRp(s.expected)})`);
       keyboard.push([{ text: `✅ ${s.name} sudah masuk`, callback_data: `ci:${s.id}:${draft.weekStart}:fixed` }]);
     } else if (s.kind === 'DEDUCTION') {
-      lines.push(`• ${s.name}: berapa hari absen?`);
+      lines.push(`• ${escHtml(s.name)}: berapa hari absen?`);
       keyboard.push(
         [0, 1, 2, 3].map((d) => ({
           text: d === 3 ? '3+' : String(d),
@@ -50,7 +51,7 @@ export function buildCheckinMessage(kind: 'prompt' | 'reminder', draft: CheckinD
         })),
       );
     } else {
-      lines.push(`• ${s.name}: isi di web`);
+      lines.push(`• ${escHtml(s.name)}: isi di web`);
     }
   }
 

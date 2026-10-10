@@ -3,7 +3,7 @@ import { Cron } from '@nestjs/schedule';
 import { ReportPeriod } from '@prisma/client';
 import { PrismaService } from '../../prisma.service';
 import { AiService } from './ai.service';
-import { TelegramService } from '../telegram/telegram.service';
+import { TelegramService, escHtml } from '../telegram/telegram.service';
 import { BudgetService } from '../budget/budget.service';
 import { GoalService } from '../goal/goal.service';
 import { SubscriptionService } from '../subscription/subscription.service';
@@ -70,7 +70,7 @@ export class AiReportsService {
 
       const text = narrative?.content?.trim();
       if (text) {
-        await this.telegramService.sendMessage(userId, `🌙 <b>Recap Hari Ini</b>\n\n${text}`);
+        await this.telegramService.sendMessage(userId, `🌙 <b>Recap Hari Ini</b>\n\n${escHtml(text)}`);
       }
     } catch (err: any) {
       this.logger.error(`sendDailyRecap error: ${err?.message}`);
@@ -97,7 +97,7 @@ export class AiReportsService {
 
       const text = narrative?.content?.trim();
       if (text) {
-        await this.telegramService.sendMessage(userId, `🎯 <b>Progres Goal</b>\n\n${text}`);
+        await this.telegramService.sendMessage(userId, `🎯 <b>Progres Goal</b>\n\n${escHtml(text)}`);
       }
     } catch (err: any) {
       this.logger.error(`sendGoalNudge error: ${err?.message}`);
@@ -143,7 +143,7 @@ export class AiReportsService {
 
       const text = narrative?.content?.trim();
       if (text) {
-        await this.telegramService.sendMessage(userId, `📦 <b>Review Langganan</b>\n\n${text}`);
+        await this.telegramService.sendMessage(userId, `📦 <b>Review Langganan</b>\n\n${escHtml(text)}`);
       }
     } catch (err: any) {
       this.logger.error(`sendSubscriptionReview error: ${err?.message}`);
@@ -219,7 +219,7 @@ export class AiReportsService {
         const link = `${this.frontendUrl()}/app/reports?period=week&date=${wibDateKey(new Date(report.start))}`;
         await this.telegramService.sendMessage(
           userId,
-          `📊 <b>Laporan Minggu Ini</b>\n\n${report.narrative}\n\n<a href="${link}">Lihat detail</a>`,
+          `📊 <b>Laporan Minggu Ini</b>\n\n${escHtml(report.narrative)}\n\n<a href="${link}">Lihat detail</a>`,
         );
       }
 
@@ -250,7 +250,7 @@ export class AiReportsService {
         const link = `${this.frontendUrl()}/app/reports?period=month&date=${wibDateKey(new Date(report.start))}`;
         await this.telegramService.sendMessage(
           userId,
-          `📅 <b>Report Card ${monthName}</b>\n\n${report.narrative}\n\n<a href="${link}">Lihat detail</a>`,
+          `📅 <b>Report Card ${monthName}</b>\n\n${escHtml(report.narrative)}\n\n<a href="${link}">Lihat detail</a>`,
         );
       }
     } catch (err: any) {

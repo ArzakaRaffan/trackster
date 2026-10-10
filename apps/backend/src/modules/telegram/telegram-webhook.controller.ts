@@ -7,10 +7,15 @@ import {
   Logger,
   ForbiddenException,
 } from '@nestjs/common';
-import { TelegramService } from './telegram.service';
+import { createHash, timingSafeEqual } from 'crypto';
+import { TelegramService, escHtml } from './telegram.service';
+import { aiQuotaOk } from '../../common/guards/ai-rate-limit.guard';
 import { AiChatService } from '../ai/ai-chat.service';
 import { IncomeCheckinReminderService } from '../income-checkin/income-checkin-reminder.service';
 import { AiBudgetReminderService } from '../ai/ai-budget-reminder.service';
+
+const digest = (s: string) => createHash('sha256').update(s).digest();
+const safeEqual = (a: string, b: string) => timingSafeEqual(digest(a), digest(b)); // panjang sama -> tak bocor lewat waktu
 
 @Controller('telegram')
 export class TelegramWebhookController {
@@ -33,7 +38,7 @@ export class TelegramWebhookController {
   ) {
     // 1. Validasi secret
     const expectedSecret = process.env.TELEGRAM_WEBHOOK_SECRET;
-    if (!expectedSecret || secret !== expectedSecret) {
+    if (!expectedSecret || !safeEqual(secret, expectedSecret)) {
       this.logger.warn('Webhook secret tidak valid, akses ditolak.');
       throw new ForbiddenException('Invalid secret');
     }
@@ -99,10 +104,14 @@ export class TelegramWebhookController {
     // Proses async — langsung return 200 ke Telegram, jawaban dikirim terpisah
     // (Telegram timeout 5 detik kalau webhook tidak segera respond)
     const userId = config.userId;
+    if (!aiQuotaOk(`${userId}|telegram-chat`)) {
+      await this.telegramService.sendMessage(userId, 'Batas chat AI tercapai. Coba lagi nanti ya.');
+      return { ok: true };
+    }
     setImmediate(async () => {
       try {
         const reply = await this.aiChatService.handleMessage(userId, text, { channel: 'telegram' });
-        await this.telegramService.sendMessage(userId, reply);
+        await this.telegramService.sendMessage(userId, escHtml(reply));
       } catch (err: any) {
         this.logger.error(`Error handle telegram message: ${err?.message}`);
         await this.telegramService.sendMessage(userId, 'Maaf, ada gangguan teknis. Coba lagi ya!');

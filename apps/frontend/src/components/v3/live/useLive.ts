@@ -295,6 +295,7 @@ export function useLive(enabled: boolean, path: string, chatActive: number | nul
       saveTelegram: (botToken: string, chatId: string) => api.put('/telegram/config', { botToken, chatId }),
       tgNotify: (v: boolean) => api.put('/telegram/config', { notifyEveryTransaction: v }),
       tgTest: () => api.post<{ success: boolean }>('/telegram/test'),
+      tgLinkCode: () => api.post<{ code: string; expiresInMinutes: number }>('/telegram/link-code'),
       tokCreate: (label: string) => api.post<{ id: number; token: string }>('/api-tokens', { label }),
       tokRevoke: (id: number) => api.delete(`/api-tokens/${id}`),
       correctBalance: (source: string, newBalance: number, note: string) => api.put(`/balance/${source}`, { newBalance, note: note || undefined }),
@@ -349,6 +350,8 @@ export function useLive(enabled: boolean, path: string, chatActive: number | nul
     ready,
     refresh,
     actions,
+    // Hanya ADMIN (pemilik) yang boleh isi chat ID manual; member menautkan lewat kode `/start` (backend menolak chat ID manual).
+    isAdmin: (meRes.data?.user ?? meRes.data)?.role === 'ADMIN',
     todayISO,
     st,
     chat,

@@ -1,8 +1,28 @@
-import { BadRequestException, Injectable, Logger } from '@nestjs/common';
-import * as TelegramBot from 'node-telegram-bot-api';
+import { BadRequestException, ForbiddenException, Injectable, Logger } from '@nestjs/common';
 import { createHash, randomBytes } from 'crypto';
 import { PrismaService } from '../../prisma.service';
+import { getOwnerUserId } from '../../common/owner';
 import { TelegramConfigDto } from './dto/telegram-config.dto';
+
+export type InlineKeyboardButton = { text: string; callback_data?: string; url?: string };
+
+/** Panggil Bot API langsung (fetch) — pengganti node-telegram-bot-api yang membawa dependensi `request` usang & rentan.
+ * Token tak pernah masuk pesan error/log. */
+async function tgCall<T = any>(token: string, method: string, body: Record<string, unknown>): Promise<T> {
+  if (!/^\d+:[\w-]+$/.test(token)) throw new Error('format bot token tidak valid');
+  const res = await fetch(`https://api.telegram.org/bot${token}/${method}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+    signal: AbortSignal.timeout(15_000),
+  });
+  const json: any = await res.json().catch(() => null);
+  if (!json?.ok) throw new Error(`${method} gagal: ${json?.description ?? res.status}`);
+  return json.result as T;
+}
+
+/** Pesan dikirim dgn parse_mode HTML: teks dari email bank / AI / user WAJIB lewat ini supaya tak bisa menyisipkan tag (mis. link phishing). */
+export const escHtml = (s: unknown) => String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 
 @Injectable()
 export class TelegramService {
@@ -65,7 +85,7 @@ export class TelegramService {
     const token = process.env.TELEGRAM_BOT_TOKEN;
     if (!token) return;
     try {
-      await new TelegramBot(token, { polling: false }).sendMessage(chatId, text);
+      await tgCall(token, 'sendMessage', { chat_id: chatId, text });
     } catch (err) {
       this.logger.error(`Gagal balas Telegram: ${err.message}`);
     }
@@ -92,11 +112,21 @@ export class TelegramService {
   // Partial update: field yang tidak dikirim (undefined) tidak menimpa nilai lama —
   // ini yang bikin toggle notifyEveryTransaction bisa PUT tanpa perlu botToken/chatId.
   async updateConfig(userId: number, dto: TelegramConfigDto) {
-    // Satu chat = satu user: webhook memetakan chatId -> userId, jadi chatId tidak boleh dipakai dua user.
-    if (dto.chatId) {
-      // tenancy-ok: cek keunikan lintas user (sengaja tanpa userId)
-      const taken = await this.prisma.telegramConfig.findFirst({ where: { chatId: dto.chatId, userId: { not: userId } } });
-      if (taken) throw new BadRequestException('Chat ID ini sudah dipakai akun lain');
+    if (dto.chatId !== undefined || dto.botToken !== undefined) {
+      // Config lama (chatId diketik bebas) tidak membuktikan kepemilikan chat: user lain bisa menyuruh bot bersama mengirim
+      // pesan ke chat siapa pun. Hanya pemilik (jalur legacy); user lain wajib tautan `/start <kode>` (createLinkCode).
+      if ((await getOwnerUserId(this.prisma)) !== userId) {
+        throw new ForbiddenException('Hubungkan Telegram lewat kode tautan (Setting → Telegram), bukan chat ID manual.');
+      }
+      // Satu chat = satu user: webhook memetakan chatId -> userId, jadi chatId tidak boleh dipakai dua user.
+      if (dto.chatId) {
+        // tenancy-ok: cek keunikan lintas user (sengaja tanpa userId), di config lama DAN tautan bot bersama
+        const [cfg, link] = await Promise.all([
+          this.prisma.telegramConfig.findFirst({ where: { chatId: dto.chatId, userId: { not: userId } } }),
+          this.prisma.telegramLink.findFirst({ where: { chatId: dto.chatId, userId: { not: userId } } }),
+        ]);
+        if (cfg || link) throw new BadRequestException('Chat ID ini sudah dipakai akun lain');
+      }
     }
     if (dto.notifyEveryTransaction !== undefined) {
       await this.prisma.telegramLink.updateMany({ where: { userId }, data: { notifyEveryTransaction: dto.notifyEveryTransaction } });
@@ -133,8 +163,7 @@ export class TelegramService {
     }
 
     try {
-      const bot = new TelegramBot(config.botToken, { polling: false });
-      await bot.sendMessage(config.chatId, text, { parse_mode: 'HTML' });
+      await tgCall(config.botToken, 'sendMessage', { chat_id: config.chatId, text, parse_mode: 'HTML' });
       return true;
     } catch (err) {
       this.logger.error(`Gagal kirim pesan Telegram: ${err.message}`);
@@ -147,7 +176,7 @@ export class TelegramService {
   async sendMessageWithKeyboard(
     userId: number,
     text: string,
-    keyboard: TelegramBot.InlineKeyboardButton[][],
+    keyboard: InlineKeyboardButton[][],
   ): Promise<{ chatId: string; messageId: number } | null> {
     const config = await this.activeConfig(userId);
     if (!config) {
@@ -156,8 +185,9 @@ export class TelegramService {
     }
 
     try {
-      const bot = new TelegramBot(config.botToken, { polling: false });
-      const sent = await bot.sendMessage(config.chatId, text, {
+      const sent = await tgCall<{ message_id: number }>(config.botToken, 'sendMessage', {
+        chat_id: config.chatId,
+        text,
         parse_mode: 'HTML',
         reply_markup: { inline_keyboard: keyboard },
       });
@@ -170,13 +200,13 @@ export class TelegramService {
 
   /** Edit pesan yang sudah terkirim — dipakai setelah tombol inline keyboard di-tap, biar status
    * ("sudah masuk") ter-refresh tanpa kirim pesan baru. */
-  async editMessage(userId: number, chatId: string, messageId: number, text: string, keyboard?: TelegramBot.InlineKeyboardButton[][]) {
+  async editMessage(userId: number, chatId: string, messageId: number, text: string, keyboard?: InlineKeyboardButton[][]) {
     const config = await this.activeConfig(userId);
     if (!config) return;
 
     try {
-      const bot = new TelegramBot(config.botToken, { polling: false });
-      await bot.editMessageText(text, {
+      await tgCall(config.botToken, 'editMessageText', {
+        text,
         chat_id: chatId,
         message_id: messageId,
         parse_mode: 'HTML',
@@ -192,8 +222,7 @@ export class TelegramService {
     if (!config) return;
 
     try {
-      const bot = new TelegramBot(config.botToken, { polling: false });
-      await bot.answerCallbackQuery(callbackQueryId, text ? { text } : undefined);
+      await tgCall(config.botToken, 'answerCallbackQuery', { callback_query_id: callbackQueryId, ...(text ? { text } : {}) });
     } catch (err) {
       this.logger.error(`Gagal answerCallbackQuery Telegram: ${err.message}`);
     }
@@ -232,7 +261,7 @@ export class TelegramService {
       `Kelebihan: ${formatRp(over)}`,
       '',
       'Transaksi terakhir:',
-      `${lastTransaction.source} - ${formatRp(lastTransaction.amount)} (${lastTransaction.description})`,
+      `${escHtml(lastTransaction.source)} - ${formatRp(lastTransaction.amount)} (${escHtml(lastTransaction.description)})`,
     ].join('\n');
 
     return this.sendMessage(userId, text);
@@ -262,8 +291,8 @@ export class TelegramService {
     const text = [
       '💸 <b>Transaksi baru</b>',
       '',
-      `${formatRp(amount)} — ${description}`,
-      `${jam} · ${source}`,
+      `${formatRp(amount)} — ${escHtml(description)}`,
+      `${jam} · ${escHtml(source)}`,
     ].join('\n');
 
     return this.sendMessage(userId, text);
@@ -282,8 +311,8 @@ export class TelegramService {
     const text = [
       '💰 <b>Pemasukan baru</b>',
       '',
-      `${formatRp(amount)} dari ${sender}`,
-      `${jam} · ${source}`,
+      `${formatRp(amount)} dari ${escHtml(sender)}`,
+      `${jam} · ${escHtml(source)}`,
     ].join('\n');
 
     return this.sendMessage(userId, text);

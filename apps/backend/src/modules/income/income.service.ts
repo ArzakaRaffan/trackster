@@ -3,7 +3,7 @@ import { IncomeOrigin, IncomeStatus, ParseStatus, Source } from '@prisma/client'
 import { PrismaService } from '../../prisma.service';
 import { BalanceService, shouldAdjustBalance } from '../balance/balance.service';
 import { IncomeForecastService } from '../income-forecast/income-forecast.service';
-import { TelegramService } from '../telegram/telegram.service';
+import { TelegramService, escHtml } from '../telegram/telegram.service';
 import { CreateIncomeDto } from './dto/create-income.dto';
 import { UpdateIncomeDto } from './dto/update-income.dto';
 import { ResolveIncomeDto } from './dto/resolve-income.dto';
@@ -159,8 +159,8 @@ export class IncomeService {
         userId,
         `💰 <b>Pemasukan Dicatat via Shortcut</b>\n` +
         `• <b>Jumlah:</b> ${formattedAmount}\n` +
-        `• <b>Kategori:</b> ${streamName}\n` +
-        `• <b>Keterangan:</b> ${income.description}\n` +
+        `• <b>Kategori:</b> ${escHtml(streamName)}\n` +
+        `• <b>Keterangan:</b> ${escHtml(income.description)}\n` +
         `• <b>Rekening:</b> ${income.source}`
       );
     } catch (err: any) {
