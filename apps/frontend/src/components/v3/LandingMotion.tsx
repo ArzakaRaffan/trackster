@@ -22,11 +22,10 @@ const SPOT = '[data-rv] > div:last-child, [data-sec=harga] > div:nth-child(2) > 
 
 /**
  * Motion landing: reveal saat scroll, tilt 3D kartu hero, sorotan kursor di kartu. Semua gaya ada di landing-motion.css
- * dan hanya berlaku selama html[data-lpm] terpasang. Matikan sementara: buka `/?motion=0`.
+ * dan hanya berlaku selama html[data-lpm] terpasang.
  */
 export function LandingMotion() {
   useEffect(() => {
-    if (new URLSearchParams(location.search).get('motion') === '0') return;
     if (matchMedia('(prefers-reduced-motion: reduce)').matches) return;
     const root = document.documentElement;
     root.setAttribute('data-lpm', '');

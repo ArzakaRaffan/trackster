@@ -9,8 +9,7 @@ export const metadata: Metadata = {
 };
 
 // Tema dibaca dari localStorage yang sama dengan app v3 ('v3-theme'), sebelum paint supaya tidak berkedip.
-// `?motion=0` mematikan pub-motion.css (pembanding cepat tampilan lama).
-const THEME_INIT = `try{var d=document.documentElement;d.dataset.theme=localStorage.getItem('v3-theme')==='dark'?'dark':'light';if(/[?&]motion=0/.test(location.search))d.dataset.motion='off'}catch(e){}`;
+const THEME_INIT = `try{document.documentElement.dataset.theme=localStorage.getItem('v3-theme')==='dark'?'dark':'light'}catch(e){}`;
 
 export default function PublicLayout({ children }: { children: React.ReactNode }) {
   return (

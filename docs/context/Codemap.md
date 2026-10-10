@@ -69,7 +69,7 @@ Dua root layout: `app/(v3)/layout.tsx` (tanpa `globals.css`/Tailwind preflight �
 
 **Motion landing & publik (2026-10-08)** — `v3/LandingMotion.tsx` + `v3/landing-motion.css` (dipasang `V3Host` hanya di `/`; reveal scroll,
 tilt hero, sorotan kursor; semua gaya di bawah `html[data-lpm]`, menempel ke `data-sec`/`data-rv` markup generator). Publik: `(public)/pub-motion.css`
-(CSS saja). Matikan sementara: `?motion=0`. Rollback: `docs/landing-motion-ROLLBACK.md`.
+(CSS saja). Rollback: `docs/landing-motion-ROLLBACK.md`.
 
 **Logo (SVG)** — `MerchantAlias.icon` + tabel `CategoryIcon` (endpoint di `merchant-aliases`: `PUT /icon`, `GET|PUT /category-icons`).
 Nilai = path relatif di `apps/frontend/public/icons/` (mis. `indonesia/bca.svg`). Katalog dibuat `node scripts/build-icons.mjs`
