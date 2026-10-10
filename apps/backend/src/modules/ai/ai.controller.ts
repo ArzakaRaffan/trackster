@@ -1,8 +1,9 @@
-import { Controller, Post, Body, Get, Patch, Delete, Param, ParseIntPipe, Query, Res, UseGuards } from '@nestjs/common';
+import { Controller, Post, Body, Get, Patch, Delete, HttpException, Param, ParseIntPipe, Query, Res, UseGuards } from '@nestjs/common';
 import { Response } from 'express';
-import { IsBoolean, IsEnum, IsInt, IsNumber, IsOptional, IsString, Max, Min, MinLength } from 'class-validator';
+import { IsBoolean, IsEnum, IsInt, IsNumber, IsOptional, IsString, Max, MaxLength, Min, MinLength } from 'class-validator';
 import { MemoryKind } from '@prisma/client';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
+import { AiRateLimitGuard } from '../../common/guards/ai-rate-limit.guard';
 import { AuthUser, CurrentUser } from '../../common/decorators/current-user.decorator';
 import { AiChatService } from './ai-chat.service';
 import { AiReportsService } from './ai-reports.service';
@@ -17,18 +18,21 @@ import { PrismaService } from '../../prisma.service';
 class ChatDto {
   @IsString()
   @MinLength(1)
+  @MaxLength(4000)
   message: string;
 }
 
 class SendThreadMessageDto {
   @IsString()
   @MinLength(1)
+  @MaxLength(4000)
   text: string;
 }
 
 class UpdateThreadDto {
   @IsOptional()
   @IsString()
+  @MaxLength(120)
   title?: string;
 
   @IsOptional()
@@ -39,6 +43,7 @@ class UpdateThreadDto {
 class SuggestCategoryDto {
   @IsString()
   @MinLength(1)
+  @MaxLength(200)
   description: string;
 
   @IsNumber()
@@ -48,6 +53,7 @@ class SuggestCategoryDto {
 class CreateMemoryDto {
   @IsString()
   @MinLength(1)
+  @MaxLength(1000)
   content: string;
 
   @IsEnum(MemoryKind)
@@ -68,6 +74,7 @@ class UpdateMemoryDto {
   @IsOptional()
   @IsString()
   @MinLength(1)
+  @MaxLength(1000)
   content?: string;
 
   @IsOptional()
@@ -104,6 +111,7 @@ export class AiController {
     private prisma: PrismaService,
   ) {}
 
+  @UseGuards(AiRateLimitGuard)
   @Get('mascot-tip')
   async mascotTip(@CurrentUser() user: AuthUser) {
     return this.aiMascotService.getTip(user.id);
@@ -139,6 +147,7 @@ export class AiController {
 
   /** Legacy — bikin/lanjutkan thread "Quick chat" tunggal. Dipertahankan sampai frontend
    *  sepenuhnya pindah ke /ai/threads. */
+  @UseGuards(AiRateLimitGuard)
   @Post('chat')
   async chat(@CurrentUser() user: AuthUser, @Body() body: ChatDto) {
     const reply = await this.aiChatService.handleMessage(user.id, body.message, { channel: 'web' });
@@ -160,6 +169,7 @@ export class AiController {
     return this.aiChatService.getMessages(user.id, id);
   }
 
+  @UseGuards(AiRateLimitGuard)
   @Post('threads/:id/messages')
   async sendThreadMessage(@CurrentUser() user: AuthUser, @Param('id', ParseIntPipe) id: number, @Body() body: SendThreadMessageDto) {
     const reply = await this.aiChatService.sendMessage(user.id, id, body.text);
@@ -169,6 +179,7 @@ export class AiController {
   /** Sama dengan `POST threads/:id/messages`, tapi balasan dialirkan sebagai SSE:
    *  `{type:'token',text}` · `{type:'reset'}` (tool dipanggil, buang teks pembuka) · `{type:'done',reply}` · `{type:'error'}`.
    *  Pesan tetap disimpan lengkap oleh `sendMessage` — client yang putus di tengah tidak kehilangan balasan. */
+  @UseGuards(AiRateLimitGuard)
   @Post('threads/:id/messages/stream')
   async streamThreadMessage(
     @CurrentUser() user: AuthUser,
@@ -193,7 +204,7 @@ export class AiController {
       });
       send({ type: 'done', reply });
     } catch (err: any) {
-      send({ type: 'error', message: err?.message ?? 'Gagal memproses pesan' });
+      send({ type: 'error', message: err instanceof HttpException ? err.message : 'Gagal memproses pesan' });
     } finally {
       clearInterval(ping);
       res.end();
@@ -214,6 +225,7 @@ export class AiController {
   /** Dipakai halaman "Rapikan kategori" — saran kategori AI buat merchant yang masih LAINNYA.
    * Nggak nyimpen rule, cuma saran; rule baru kesimpen pas user beneran apply lewat
    * PATCH /transactions/:id/category?applyToAll. */
+  @UseGuards(AiRateLimitGuard)
   @Post('suggest-category')
   async suggestCategory(@Body() body: SuggestCategoryDto) {
     const category = await this.aiChatService.categorize(body.description, body.amount);
@@ -221,6 +233,7 @@ export class AiController {
   }
 
   /** "3 hal yang perlu kamu tahu" — kartu AI ringkas dari PeriodStats, di-cache per range per hari WIB. */
+  @UseGuards(AiRateLimitGuard)
   @Get('insight-card')
   async insightCard(@CurrentUser() user: AuthUser, @Query('range') range?: string) {
     return this.aiInsightCardService.getInsightCard(user.id, range ?? '30d');
@@ -239,6 +252,7 @@ export class AiController {
   /** E05-S2: 3 opsi budget (E05-S1) + saran AI (opsi yang direkomendasikan, alasan, tips) — dipakai
    *  halaman /app/budget & kartu chat, digabung di sini (bukan di /budget) supaya BudgetModule
    *  tidak perlu bergantung ke AiModule (hindari circular module dependency). */
+  @UseGuards(AiRateLimitGuard)
   @Get('budget-suggestions')
   async budgetSuggestions(@CurrentUser() user: AuthUser, @Query('week') week?: string) {
     const [suggestion, advice] = await Promise.all([
@@ -249,6 +263,7 @@ export class AiController {
   }
 
   /** Manual trigger weekly insight (untuk testing) */
+  @UseGuards(AiRateLimitGuard)
   @Post('reports/trigger-weekly')
   async triggerWeekly(@CurrentUser() user: AuthUser) {
     await this.aiReportsService.sendWeeklyInsight(user.id);
@@ -256,6 +271,7 @@ export class AiController {
   }
 
   /** Manual trigger health score compute */
+  @UseGuards(AiRateLimitGuard)
   @Post('reports/trigger-health-score')
   async triggerHealthScore(@CurrentUser() user: AuthUser) {
     const result = await this.aiReportsService.computeAndSaveHealthScore(user.id);

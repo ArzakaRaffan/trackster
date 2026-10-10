@@ -3,6 +3,7 @@ import { IncomeCheckinService } from './income-checkin.service';
 import { IncomeCheckinReminderService } from './income-checkin-reminder.service';
 import { SubmitCheckinDto } from './dto/submit-checkin.dto';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
+import { AiRateLimitGuard } from '../../common/guards/ai-rate-limit.guard';
 import { AuthUser, CurrentUser } from '../../common/decorators/current-user.decorator';
 
 @UseGuards(JwtAuthGuard)
@@ -24,6 +25,7 @@ export class IncomeCheckinController {
   }
 
   /** Manual trigger prompt Minggu 19:00 (untuk testing) */
+  @UseGuards(AiRateLimitGuard)
   @Post('trigger-prompt')
   async triggerPrompt(@CurrentUser() user: AuthUser) {
     await this.incomeCheckinReminderService.sendWeeklyPrompt(user.id);
@@ -31,6 +33,7 @@ export class IncomeCheckinController {
   }
 
   /** Manual trigger reminder Senin 12:00 (untuk testing) */
+  @UseGuards(AiRateLimitGuard)
   @Post('trigger-reminder')
   async triggerReminder(@CurrentUser() user: AuthUser) {
     await this.incomeCheckinReminderService.sendMondayReminder(user.id);

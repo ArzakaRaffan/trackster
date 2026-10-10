@@ -4,6 +4,7 @@ import { ThrottlerGuard } from '@nestjs/throttler';
 import { SplitBillService } from './split-bill.service';
 import { SplitBillAiService } from './split-bill-ai.service';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
+import { AiRateLimitGuard } from '../../common/guards/ai-rate-limit.guard';
 import { CreateSplitBillDto } from './dto/create-split-bill.dto';
 import { AssignSharesDto } from './dto/assign-shares.dto';
 import { ScanReceiptDto } from './dto/scan-receipt.dto';
@@ -52,7 +53,7 @@ export class SplitBillController {
   // Scan struk TETAP login-only meskipun create bill sekarang publik — ini manggil AI API
   // berbayar (mwapi.dev), buka ke traffic anonim tanpa proteksi bisa habisin quota. Pembuat
   // bill anonim tetap bisa pakai fitur ini, cuma harus input item manual.
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, AiRateLimitGuard)
   @Post('scan-receipt')
   async scanReceipt(@Body() dto: ScanReceiptDto) {
     const items = await this.splitBillAiService.scanReceipt(dto.imageBase64);

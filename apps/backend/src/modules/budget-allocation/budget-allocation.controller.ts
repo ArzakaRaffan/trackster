@@ -1,6 +1,7 @@
 import { Controller, Get, Post, UseGuards } from '@nestjs/common';
 import { BudgetAllocationService } from './budget-allocation.service';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
+import { AiRateLimitGuard } from '../../common/guards/ai-rate-limit.guard';
 import { AuthUser, CurrentUser } from '../../common/decorators/current-user.decorator';
 
 @UseGuards(JwtAuthGuard)
@@ -15,6 +16,7 @@ export class BudgetAllocationController {
   }
 
   /** Manual trigger alokasi Minggu 21:00 (untuk testing) */
+  @UseGuards(AiRateLimitGuard)
   @Post('trigger-weekly')
   async triggerWeekly(@CurrentUser() user: AuthUser) {
     await this.budgetAllocationService.runWeeklyAllocation(user.id);
