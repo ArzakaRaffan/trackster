@@ -10,14 +10,15 @@ export const contentType = 'image/png';
 const INK = '#2B2924', SUBTLE = '#6B6656', PAPER = '#FBF8EE', PAGE = '#F2ECDD', LINE = '#D9D0B8';
 
 // Gaya struk v3 (token = tema terang di legal.css). Font bawaan satori: tidak ada DM Mono di edge.
-export default async function Image({ params }: { params: { slug: string } }) {
+export default async function Image({ params }: { params: Promise<{ slug: string }> }) {
+  const { slug } = await params;
   let restaurantName = 'Split Bill';
   let total = 0;
   let people: { name: string; avatar?: string | null; isPaid: boolean }[] = [];
 
   try {
     const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
-    const res = await fetch(`${API_URL}/split-bills/public/${params.slug}`);
+    const res = await fetch(`${API_URL}/split-bills/public/${encodeURIComponent(slug)}`);
     if (res.ok) {
       const data = await res.json();
       restaurantName = data.restaurantName || restaurantName;

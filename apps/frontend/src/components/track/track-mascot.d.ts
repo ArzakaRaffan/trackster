@@ -15,7 +15,8 @@ type TrackMascotProps = {
   still?: boolean | 'true' | 'false';
 };
 
-declare global {
+// React 19: namespace JSX global dihapus, augmentasi lewat modul 'react'.
+declare module 'react' {
   // eslint-disable-next-line @typescript-eslint/no-namespace
   namespace JSX {
     interface IntrinsicElements {

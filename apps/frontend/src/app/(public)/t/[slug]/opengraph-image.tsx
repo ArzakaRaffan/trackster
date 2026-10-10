@@ -10,7 +10,8 @@ export const contentType = 'image/png';
 const INK = '#2B2924', SUBTLE = '#6B6656', PAPER = '#FBF8EE', PAGE = '#F2ECDD', LINE = '#D9D0B8';
 
 // Gaya struk v3 (tema terang). Font bawaan satori.
-export default async function Image({ params }: { params: { slug: string } }) {
+export default async function Image({ params }: { params: Promise<{ slug: string }> }) {
+  const { slug } = await params;
   let tripName = 'Patungan Trip';
   let total = 0;
   let members: { name: string; avatar?: string | null }[] = [];
@@ -18,7 +19,7 @@ export default async function Image({ params }: { params: { slug: string } }) {
 
   try {
     const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
-    const res = await fetch(`${API_URL}/trips/public/${params.slug}`);
+    const res = await fetch(`${API_URL}/trips/public/${encodeURIComponent(slug)}`);
     if (res.ok) {
       const data = await res.json();
       tripName = data.name || tripName;
