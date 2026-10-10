@@ -60,7 +60,10 @@ export class TransactionService {
     page?: number;
     limit?: number;
   }) {
-    const { startDate, endDate, source, category, search, minAmount, page = 1, limit = 50 } = params;
+    const { startDate, endDate, source, category, search, minAmount } = params;
+    // ?limit=1e9 / ?page=-1 dari query string: jepit supaya satu request tak bisa menarik/menghitung tanpa batas.
+    const limit = Math.min(Math.max(Math.trunc(params.limit || 50), 1), 500);
+    const page = Math.max(Math.trunc(params.page || 1), 1);
     const where: any = { userId };
     if (startDate || endDate) {
       where.occurredAt = {};

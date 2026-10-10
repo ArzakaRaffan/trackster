@@ -105,8 +105,9 @@ export class SplitBillService {
         const shares: any[] = [];
         if (i.shares && i.shares.length > 0) {
           for (const s of i.shares) {
-            const p = participants[s.participantIndex];
-            if (p) {
+            // `shares` tak divalidasi DTO (bentuk bebas dari endpoint publik): indeks & bobot dicek manual.
+            const p = Number.isInteger(s?.participantIndex) ? participants[s.participantIndex] : undefined;
+            if (p && typeof s.weight === 'number' && s.weight > 0 && s.weight <= 1000) {
               const share = await tx.splitBillItemShare.create({
                 data: {
                   itemId: item.id,

@@ -1,5 +1,5 @@
 import { Type } from 'class-transformer';
-import { IsArray, IsInt, IsNumber, Min, ValidateNested } from 'class-validator';
+import { ArrayMaxSize, IsArray, IsInt, IsNumber, Max, Min, ValidateNested } from 'class-validator';
 
 class ShareInputDto {
   @IsInt()
@@ -7,11 +7,13 @@ class ShareInputDto {
 
   @IsNumber()
   @Min(0.01)
+  @Max(9_999_999_999)
   weight: number;
 }
 
 export class AssignSharesDto {
   @IsArray()
+  @ArrayMaxSize(200)
   @ValidateNested({ each: true })
   @Type(() => ShareInputDto)
   shares: ShareInputDto[];

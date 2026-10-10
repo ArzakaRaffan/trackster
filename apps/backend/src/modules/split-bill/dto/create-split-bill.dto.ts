@@ -1,9 +1,10 @@
 import { Type } from 'class-transformer';
-import { ArrayMinSize, IsArray, IsInt, IsISO8601, IsNumber, IsOptional, IsString, Matches, Min, MinLength, ValidateNested } from 'class-validator';
+import { ArrayMaxSize, ArrayMinSize, IsArray, IsISO8601, IsInt, IsNumber, IsOptional, IsString, Matches, Max, MaxLength, Min, MinLength, ValidateNested } from 'class-validator';
 import { AVATAR_SPEC_RE } from './set-avatar.dto';
 
 class ParticipantInputDto {
   @IsString()
+  @MaxLength(200)
   @MinLength(1)
   name: string;
 
@@ -14,11 +15,13 @@ class ParticipantInputDto {
 
 class ItemInputDto {
   @IsString()
+  @MaxLength(200)
   @MinLength(1)
   description: string;
 
   @IsNumber()
   @Min(0)
+  @Max(9_999_999_999)
   amount: number;
 
   @IsOptional()
@@ -28,11 +31,13 @@ class ItemInputDto {
 
   @IsOptional()
   @IsArray()
+  @ArrayMaxSize(200)
   shares?: any[];
 }
 
 export class CreateSplitBillDto {
   @IsString()
+  @MaxLength(200)
   @MinLength(1)
   restaurantName: string;
 
@@ -42,36 +47,43 @@ export class CreateSplitBillDto {
   @IsOptional()
   @IsNumber()
   @Min(0)
+  @Max(9_999_999_999)
   taxAmount?: number;
 
   @IsOptional()
   @IsNumber()
   @Min(0)
+  @Max(9_999_999_999)
   serviceFeeAmount?: number;
 
   @IsOptional()
   @IsNumber()
   @Min(0)
+  @Max(9_999_999_999)
   taxPercent?: number;
 
   @IsOptional()
   @IsNumber()
   @Min(0)
+  @Max(9_999_999_999)
   servicePercent?: number;
 
   @IsOptional()
   @IsNumber()
   @Min(0)
+  @Max(9_999_999_999)
   discountAmount?: number;
 
   @IsOptional()
   @IsNumber()
   @Min(0)
+  @Max(9_999_999_999)
   discountPercent?: number;
 
   @IsOptional()
   @IsNumber()
   @Min(0)
+  @Max(9_999_999_999)
   deliveryFee?: number;
 
   @IsOptional()
@@ -83,23 +95,28 @@ export class CreateSplitBillDto {
 
   @IsOptional()
   @IsString()
+  @MaxLength(200)
   payerBankName?: string;
 
   @IsOptional()
   @IsString()
+  @MaxLength(200)
   payerAccountNumber?: string;
 
   @IsOptional()
   @IsString()
+  @MaxLength(200)
   payerAccountName?: string;
 
   @IsArray()
+  @ArrayMaxSize(200)
   @ArrayMinSize(1)
   @ValidateNested({ each: true })
   @Type(() => ParticipantInputDto)
   participants: ParticipantInputDto[];
 
   @IsArray()
+  @ArrayMaxSize(200)
   @ValidateNested({ each: true })
   @Type(() => ItemInputDto)
   items: ItemInputDto[];

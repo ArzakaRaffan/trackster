@@ -5,6 +5,11 @@ import { AuthUser, CurrentUser } from '../../common/decorators/current-user.deco
 import { startOfWibDay, addWibDays, wibDateKey } from '../../common/wib';
 import { Response } from 'express';
 
+const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+/** Sel CSV teks. Deskripsi berasal dari email bank (bisa dipalsukan): awalan = + - @ tab CR dinetralkan dengan ' supaya
+ * Excel/Sheets tidak mengeksekusinya sebagai formula (CSV/formula injection). */
+export const csvText = (v: string) => `"${(/^[=+\-@\t\r]/.test(v) ? `'${v}` : v).replace(/"/g, '""')}"`;
+
 @UseGuards(JwtAuthGuard)
 @Controller('reports')
 export class ReportController {
@@ -38,6 +43,7 @@ export class ReportController {
     @Query('to') to: string,
     @Res() res: Response,
   ) {
+    if ((from && !DATE_RE.test(from)) || (to && !DATE_RE.test(to))) throw new BadRequestException('from/to harus YYYY-MM-DD');
     const fromDate = from ? startOfWibDay(from) : addWibDays(startOfWibDay(new Date()), -30);
     const toDate = to ? addWibDays(startOfWibDay(to), 1) : addWibDays(startOfWibDay(new Date()), 1);
     const rows = await this.reportService.getDataExportRows(user.id, fromDate, toDate);
@@ -50,11 +56,11 @@ export class ReportController {
     const lines = rows.map(r =>
       [
         wibDateKey(r.occurredAt),
-        `"${r.description.replace(/"/g, '""')}"`,
+        csvText(r.description),
         Number(r.amount),
         r.category,
         r.source,
-        `"${(r.note ?? '').replace(/"/g, '""')}"`,
+        csvText(r.note ?? ''),
       ].join(',')
     );
     
