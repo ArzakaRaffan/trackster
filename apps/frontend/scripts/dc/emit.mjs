@@ -177,9 +177,14 @@ export function createEmitter() {
       else props.push(`${key}={${v}}`);
     }
     if (props.some((p) => p.startsWith('value={')) && !props.some((p) => p.startsWith('onChange=')) && n.tag !== 'option') props.push('onChange={noop}');
-    if (props.filter((p) => p.startsWith('className')).length > 0 && pseudos.length) throw new Error(`className + pseudo on <${n.tag}> line ${n.line}`);
     const cls = pseudos.map(([p, css]) => pseudoClass(p, css, scope, styleExtras));
-    if (cls.length) props.push(`className="${cls.join(' ')}"`);
+    if (cls.length) {
+      // static class="…" (responsive helpers in v3.css) + generated pseudo classes
+      const i = props.findIndex((p) => p.startsWith('className='));
+      if (i >= 0 && !/^className="[^"]*"$/.test(props[i])) throw new Error(`dynamic className + pseudo on <${n.tag}> line ${n.line}`);
+      const own = i >= 0 ? props.splice(i, 1)[0].slice(11, -1) + ' ' : '';
+      props.push(`className="${own}${cls.join(' ')}"`);
+    }
     if (style != null || styleExtras.length) {
       let s;
       if (style == null) s = '{}';
