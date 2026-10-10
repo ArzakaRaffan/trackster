@@ -119,6 +119,7 @@ export function useLive(enabled: boolean, path: string, chatActive: number | nul
     const sum = (k: string) => hz.reduce((a, x) => a + (x.totals?.[k] ?? 0), 0);
     return {
       weekLabel: `Masuk minggu ini (${dm(w.weekStart)})`, received: RPf(w.totals.received), expected: `dari perkiraan ${RPf(w.totals.expected)}`, rows,
+      pct: (Number(w.totals.expected) > 0 ? Math.min(100, Number(w.totals.received) / Number(w.totals.expected) * 100) : 0).toFixed(0) + '%',
       fc: [[w.totals.conservative, w.totals.expected, w.totals.max], [sum('conservative'), sum('expected'), sum('max')]],
       upside: RPf(w.upsideMonthly ?? 0), irregular: w.streams.find((s: any) => s.kind === 'IRREGULAR')?.name ?? 'Project desain',
     };
@@ -242,6 +243,8 @@ export function useLive(enabled: boolean, path: string, chatActive: number | nul
 
   const settled = (r: { data?: unknown; error?: unknown }) => r.data !== undefined || r.error !== undefined; // error ≠ blank screen selamanya
   const ready = !enabled || [budgets, today, txRes, incRes, streamsRes].every(settled);
+  // Data inti gagal dimuat (server mati/offline): jangan gambar layar dengan angka bawaan prototipe.
+  const failed = enabled && [budgets, today, txRes].some((r) => r.error !== undefined && r.data === undefined);
   const refresh = () => mutate(() => true);
 
   const actions = useMemo(
@@ -348,6 +351,7 @@ export function useLive(enabled: boolean, path: string, chatActive: number | nul
 
   return {
     ready,
+    failed,
     refresh,
     actions,
     // Hanya ADMIN (pemilik) yang boleh isi chat ID manual; member menautkan lewat kode `/start` (backend menolak chat ID manual).

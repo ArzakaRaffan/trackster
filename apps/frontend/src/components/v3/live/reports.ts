@@ -10,7 +10,7 @@ const MON_L = ['Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', '
 const DAY_S = ['Min', 'Sen', 'Sel', 'Rab', 'Kam', 'Jum', 'Sab'];
 
 const RP = (n: number) => (n < 0 ? '−' : '') + RPf(n);
-const cmp = (n: number) => 'Rp' + (n >= 1e6 ? (n / 1e6).toFixed(1).replace('.', ',') + 'jt' : Math.round(n / 1000) + 'rb');
+const cmp = (n: number) => { const a = Math.abs(n); return (n < 0 ? '−' : '') + 'Rp' + (a >= 1e6 ? (a / 1e6).toFixed(1).replace('.', ',') + 'jt' : a >= 1000 ? Math.round(a / 1000) + 'rb' : Math.round(a)); };
 const parts = (iso: string) => { const [y, m, d] = iso.slice(0, 10).split('-').map(Number); return { y, m, d }; };
 const dowOf = (iso: string) => { const { y, m, d } = parts(iso); return new Date(Date.UTC(y, m - 1, d)).getUTCDay(); };
 export const dayLabelOf = (iso: string) => { const { m, d } = parts(iso); return `${DAYN[dowOf(iso)]}, ${d} ${MON_S[m - 1]}`; };

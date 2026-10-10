@@ -31,6 +31,7 @@ html[data-theme=light] body{background:#F2ECDD}
   .v3-wrap{flex-wrap:wrap!important}
   .v3-minw0{min-width:0!important}
   .v3-col{flex-direction:column!important;align-items:flex-end!important;gap:6px!important}
+  .v3-g3{grid-template-columns:auto minmax(0,1fr) auto!important;gap:10px!important}
   .v3-tight{padding-left:12px!important;padding-right:12px!important}
 }
 @media (min-width:720px){.v3-ph{display:none!important}}

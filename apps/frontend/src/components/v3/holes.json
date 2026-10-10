@@ -173,6 +173,9 @@
     "ana",
     "anaCatNote",
     "anaDonut",
+    "anaNoAn",
+    "anaNoBig",
+    "anaNoHab",
     "anaTabs",
     "anomalies",
     "bigs",
@@ -191,6 +194,7 @@
     "srcCards",
     "srcChange",
     "srcCopy",
+    "srcDemo",
     "srcPause"
   ],
   "Privacy": [
@@ -200,6 +204,7 @@
     "logRows"
   ],
   "Tidy": [
+    "tidyEmpty",
     "tidyLeft",
     "tidyPct",
     "tidyRows"
@@ -226,6 +231,7 @@
     "carPrev",
     "carX",
     "dashAsk",
+    "dashEmpty",
     "dashInsight",
     "dashMood",
     "dashRows",
@@ -289,6 +295,7 @@
     "histEmpty",
     "histGroups",
     "ic",
+    "incPct",
     "incTabX",
     "incTabs",
     "markInternal",
@@ -317,6 +324,7 @@
     "ciBtn",
     "ciBusy",
     "ciDone",
+    "ciEmpty",
     "ciOpen",
     "ciReset",
     "ciRows",
@@ -437,6 +445,7 @@
     "tokRows"
   ],
   "Chat": [
+    "chatH",
     "chatHist",
     "chatHistW",
     "chatInput",
@@ -575,6 +584,7 @@
     "rpPrev",
     "rpSide",
     "rpSideCat",
+    "rpSideEmpty",
     "rpSideTabs",
     "rpTabs",
     "rpX",
