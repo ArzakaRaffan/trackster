@@ -29,6 +29,10 @@ export class JwtAuthGuard implements CanActivate {
     } catch {
       throw new UnauthorizedException('Invalid or expired token');
     }
+    // JWT lain yang ditandatangani JWT_SECRET (mis. `state` OAuth Gmail, ada `purpose`) bukan token sesi.
+    if (payload.purpose !== undefined || !Number.isInteger(payload.sub)) {
+      throw new UnauthorizedException('Invalid or expired token');
+    }
 
     let u = cache.get(payload.sub);
     if (!u || Date.now() - u.at > CACHE_MS) {

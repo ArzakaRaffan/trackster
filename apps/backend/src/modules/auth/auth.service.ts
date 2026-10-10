@@ -11,9 +11,10 @@ import { RegisterDto } from './dto/register.dto';
 const { provisionUser } = require('../../../prisma/provision-user');
 
 export const sha256 = (s: string) => createHash('sha256').update(s).digest('hex');
-const FAIL_WINDOW_MS = 60_000;
+// 10 gagal per username per 15 menit (≈960 tebakan/hari maks walau IP berganti-ganti); selain throttler per-IP.
+const FAIL_WINDOW_MS = 15 * 60_000;
 const DUMMY_HASH = bcrypt.hashSync('dummy-password', 10);
-const FAIL_LIMIT = 10; // gagal login per username per menit sebelum ditolak sementara (selain throttler per-IP)
+const FAIL_LIMIT = 10;
 
 @Injectable()
 export class AuthService {
@@ -41,7 +42,10 @@ export class AuthService {
 
   private noteFail(key: string) {
     const f = this.fails.get(key);
-    if (!f || Date.now() - f.since >= FAIL_WINDOW_MS) this.fails.set(key, { n: 1, since: Date.now() });
+    if (!f || Date.now() - f.since >= FAIL_WINDOW_MS) {
+      if (this.fails.size > 10_000) this.fails.clear(); // jaga memori dari username acak
+      this.fails.set(key, { n: 1, since: Date.now() });
+    }
     else f.n++;
   }
 
