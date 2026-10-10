@@ -66,6 +66,8 @@ Dua root layout: `app/(v3)/layout.tsx` (tanpa `globals.css`/Tailwind preflight �
   `live/dates.ts` (tanggal WIB). `V3Host.tsx` — pathname ↔ `page`/`pre` (`lib/v3-routes.ts`), tema/bahasa di localStorage.
 - Data: `lib/api.ts` (fetcher, auto-redirect `/login` on 401) + SWR. Auth redirect: `middleware.ts` (`/demo` & `/setup` publik).
 - Pemeriksaan fidelitas: bandingkan DOM/geometri dengan `Trackster v3 App (standalone).html` (lihat `docs/Rework Design Trackster/PLAN.md`).
+- Responsif ponsel: kelas helper di `v3/v3.css` (`v3-ph`, `v3-nph`, `v3-wrap`, `v3-minw0`, `v3-col`, `v3-tight`; batas 719px = bp `'m'`), dipasang
+  lewat `class="…"` di `.dc.html`. Temuan & konvensi: `docs/ui-ux-audit-2026-10-10.md`.
 
 **Motion landing & publik (2026-10-08)** — `v3/LandingMotion.tsx` + `v3/landing-motion.css` (dipasang `V3Host` hanya di `/`; reveal scroll,
 tilt hero, sorotan kursor; semua gaya di bawah `html[data-lpm]`, menempel ke `data-sec`/`data-rv` markup generator). Publik: `(public)/pub-motion.css`
