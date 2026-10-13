@@ -141,6 +141,20 @@ deviasi dari rencana (+alasan), env baru yang Arzaka harus tambahkan, langkah be
 - Catatan: token Gmail/Telegram dihapus dari SALINAN restore sebelum backend dijalankan (cegah cron memakai kredensial asli). `BudgetSetting` kosong di data prod (bukan akibat migrasi). `pg_dump` baru menyisipkan `\unrestrict` yang tak dikenali psql — error tak berbahaya di akhir restore.
 - Belum: P0-06 (cek `TELEGRAM_BOT_TOKEN` env VPS = token bot), merge/deploy ⛔, P6-05/06, rotasi `JWT_SECRET`.
 
+## 2026-10-08 — F7 dibuka: O1 & O8 dijawab
+- Sesi oleh: Claude (Sonnet 5.5)   Branch: `feat/multi-user`
+- O1: inventaris DNS name.com = A `@`, A `api` (43.157.208.202, TTL 300), TXT google-site-verification (3600). Tidak ada MX/CAA/www. **DNSSEC belum dikonfirmasi** — wajib dicek sebelum P7-02.
+- O8: `in.trackster.dev` disetujui.
+- Gerbang tersisa: ⛔ persetujuan eksplisit **per langkah DNS** (P7-02, P7-03), P3/P6 untuk cutover. Kode P7-04 (modul `inbound`) boleh dikerjakan tanpa menyentuh DNS.
+
+## 2026-10-08 — P7-04 modul inbound (kode selesai, belum merge)
+- Sesi oleh: Claude (Sonnet 5.5)   Branch: `feat/multi-user`
+- **Selesai:** (1) Refactor: logika `processMessage/processIncome/applyBalanceOnlyDebit/resolveCategory/logParseResult/checkAndAlertIfOverBudget` dipindah dari `GmailSyncService` ke `EmailPipelineService` (satu implementasi untuk Gmail & inbound). (2) Modul `inbound`: `POST /ingest/email` (HMAC + timestamp ±5 mnt + 3MB), lookup `InboundAddress` (alamat salah/nonaktif -> 200 diam), `mailparser`, penyaringan pengirim bank via `ParserRegistryService.canHandle`, deteksi konfirmasi forwarding Gmail (format **belum diverifikasi**, P7-05), `lastEmailAt`/`forwardVerifiedAt`, mode shadow. (3) Migrasi `20261008100000_parse_status_shadow` (`ALTER TYPE ParseStatus ADD VALUE 'SHADOW'`, aditif). (4) CLI `user-admin.js inbound`. (5) `mailparser` + `@types/mailparser` (lockfile diregenerasi).
+- **Verifikasi (DB scratch, bukan prod):** `tsc` bersih; build backend bersih; `npm run check` 25/25; `tenancy-audit` 0; `scripts/inbound-e2e.mjs` 11/11 (401 sig salah, 401 replay, alamat asing diam, tercatat hanya untuk pemilik alamat, dedup Message-ID, non-bank dibuang, isolasi A/B, shadow tanpa tulis data, alamat nonaktif, konfirmasi Gmail, 413 >3MB). **Belum diuji:** regresi Gmail sync terhadap Gmail asli (refactor murni pindah kode; cron prod belum dijalankan dgn kode ini) dan `docker build`/CI dengan dependensi baru.
+- **Keputusan kecil:** timestamp HMAC = epoch **ms**; localPart = 24 char base32 (120 bit); body email = text/plain bila ada, kalau tidak `htmlToText(html)` (meniru jalur Gmail) — divalidasi sampel nyata di P7-06. Anti-spoof baru lapis (i) alamat rahasia; lapis (ii)-(iii) menunggu sampel (P7-06).
+- **Env VPS baru (sebelum deploy):** `INGEST_HMAC_SECRET` (acak panjang; nilai SAMA dgn Worker), opsional `INBOUND_DOMAIN`. Migrasi baru otomatis jalan saat start.
+- **Belum:** P7-01 (baca dok Cloudflare), P7-03 Worker `infra/cloudflare-worker/`, P7-05 UI kode konfirmasi, `compare-shadow.ts`, P7-02 DNS (⛔ + DNSSEC belum dikonfirmasi).
+- **Langkah berikutnya:** P7-03 (Worker ±20 baris) lalu P7-01 baca dokumentasi Cloudflare; DNS menunggu Arzaka.
 ## 2026-10-10 — Audit keamanan menyeluruh (branch `fix/security-audit` dari `origin/main`)
 - Sesi oleh: Claude (Opus 5.5)   Branch: `fix/security-audit` (lokal, belum di-push) + 1 commit di `feat/multi-user` (HMAC inbound).
 - Catatan status: `origin/main` (prod) ternyata sudah berisi F1–F6 + penghapusan `/income/quick`; `feat/multi-user` lokal tertinggal 5 commit.
@@ -149,3 +163,32 @@ deviasi dari rencana (+alasan), env baru yang Arzaka harus tambahkan, langkah be
   query parser simple, header keamanan, batas DTO publik, dll. Detail & bukti: [`09-Security-Audit.md`](09-Security-Audit.md).
 - Tes baru: `scripts/security-e2e.mjs` (10/10), `report/csv.check.ts`. Regresi: check 25/25, tenancy 0, auth 9/9, ingest 18/18, isolasi 176/176.
 - Butuh Arzaka: persetujuan merge `fix/security-audit` → `main`; R1 rotasi `JWT_SECRET`/`TELEGRAM_WEBHOOK_SECRET`; R4–R9 di dokumen audit.
+
+## 2026-10-13 — Kesiapan peluncuran: audit "masih personal", wizard nyata, Worker, copy, EN
+- Sesi oleh: Claude (Opus 5.5)   Branch: `feat/multi-user-launch` (dari `fix/ui-ux-audit` + merge `feat/multi-user`; lokal, **belum di-push**)
+- Permintaan Arzaka: identifikasi bagian yang terasa app pribadi + percepat multi-user (wizard belum dicek, belum ada user nyata,
+  bug tersembunyi, copy terasa AI, forwarding belum dites, ganti bahasa aneh). Hasil audit: [`10-Launch-Readiness.md`](10-Launch-Readiness.md).
+- **Selesai & terverifikasi (DB scratch `trackster_launch`, akun undangan baru, browser):**
+  - Merge `feat/multi-user` (P7-04 inbound) ke cabang ini; konflik `package.json`/lockfile (lib Telegram sudah dihapus di main) & `main.ts` diselesaikan.
+  - P8-01 modul `profile`; P8-02 wizard nyata + redirect akun baru; Setting email bank/profil; saldo semua bank; Sumber data per bank user.
+  - P7-03 kode Worker (`infra/cloudflare-worker/`) — diuji memanggil backend lokal (HMAC diterima, `recorded`). `scripts/send-eml.mjs` untuk uji .eml asli.
+  - Telegram member: tautan `t.me/<bot>?start=<kode>` (username dari `getMe`, butuh `TELEGRAM_BOT_TOKEN` di env — sudah ada di prod).
+  - Copy: hapus janji palsu (QR, kirim tautan, impor file, tarik email lama, "minat tercatat", retensi 7 hari di Privasi), teks BCA/Jago-only, "Arzaka".
+  - EN: aturan teks dinamis + 66 entri kamus, `<html lang>`, Tanya Track menjawab sesuai bahasa UI (field `lang` opsional di `POST /ai/threads/:id/messages[/stream]`).
+  - Bug: variabel CSS prototipe tak terdefinisi (`--ink/--line/--acc/...`) → progress bar wizard & tombol Salin tak terlihat; saldo negatif tampil positif.
+- **Verifikasi:** build backend bersih (dist+tsbuildinfo dihapus dulu); `tsc` frontend bersih; `npm run check` 26/26; `tenancy-audit` 0; `inbound-e2e` 11/11.
+  **Tidak dijalankan:** `isolation-e2e`, `next build`, AI chat EN (tak ada kunci AI lokal), Gmail asli (butuh DNS).
+- **Belum / butuh Arzaka:** keputusan §G di 10-Launch-Readiness (harga/Plus, email support, O6, DNS P7-02, O9); push & merge ⛔.
+  Teks landing/harga belum diubah (keputusan produk). Halaman di luar app v3 (`/invite`, `/reset`, tools publik, legal) belum punya EN.
+- **Env VPS baru saat deploy:** `INGEST_HMAC_SECRET` (dari P7-04), opsional `INBOUND_DOMAIN`. Tidak ada migrasi baru selain `20261008100000_parse_status_shadow` (aditif).
+- **Efek ke Arzaka:** tidak diarahkan ke wizard (punya transaksi). Alamat penerusannya dibuat dalam mode shadow (punya GmailToken) — aman dari transaksi ganda.
+- **Langkah berikutnya:** (1) Arzaka review & izinkan push branch. (2) P7-02 DNS ke Cloudflare (runbook §4, per langkah). (3) Deploy Worker, uji Gmail asli dgn alamat Arzaka shadow. (4) Undang 1 tester.
+
+## 2026-10-13 (lanjutan) — jawaban Arzaka, push, perbaikan login/sidebar, alat parse-eml
+- Arzaka: setuju P3 + mulai P7-02 (DNS) bertahap; email support = arzakaraffan@gmail.com (O10); BNI/Mandiri/BRI/Raya wajib siap (O6-b); minta push.
+- Push `feat/multi-user-launch` ke origin (bukan `main`, CD tidak jalan).
+- Tambahan: `scripts/parse-eml.ts` (uji parser offline dgn .eml asli, jalur teks sama dgn inbound via `mailBodyText`); login live pakai Username
+  (dulu label Email), Google & Plus palsu disembunyikan di live, status sidebar dari /profile; bug lama regex bulan (karakter backspace) → "Oktober" tak terjemah.
+- Verifikasi: tsc FE/BE bersih, `npm run check` 26/26, browser: login username, lupa password, sidebar, halaman Menu, tanggal EN.
+- Biaya forwarding: Rp0 (Cloudflare Email Routing + Worker free plan; tidak perlu mailbox perusahaan).
+- **Langkah berikutnya:** (1) Arzaka cek DNSSEC di name.com (P7-02 langkah 1). (2) Kumpulkan sampel .eml BNI/Mandiri/BRI/Raya (§H). (3) Deploy backend (butuh izin merge ke main + `INGEST_HMAC_SECRET` di .env VPS) sebelum Worker/Email Routing.

@@ -105,3 +105,14 @@ Dipakai di baris Hari ini, detail transaksi, Setting → Alias merchant (+ logo 
 - Alat (di `apps/backend`): `npm run check` (semua `*.check.ts`), `npm run tenancy-audit` (daftar kerja scoping), `npm run golden`/`isolation-e2e` (`scripts/`), `prisma/data-fixes/{verify-backfill,2026-10-multiuser-backfill-owner}.js`, `prisma/provision-user.js`. Detail & status: `docs/multi-user/08-Progress-Log.md`.
 - **F2 (scoping backend, di branch):** semua service tenant menerima `userId` sebagai parameter pertama; controller memakai `@CurrentUser()` (`common/decorators/current-user.decorator.ts`). Cron per user lewat `common/per-user.ts#forEachActiveUser`; jalur legacy tanpa konteks user (`/income/quick`, Gmail/`/sync/*`) memakai/mengunci ke pemilik (`common/owner.ts`). Upsert-by-unique-global diganti `findFirst`+`update/create` sampai C1. **Jangan buat user kedua sebelum C1** (unik global masih ada) — lihat Progress Log 2026-10-06 (lanjutan).
 
+
+## Inbound email (F7, branch feat/multi-user)
+- `modules/gmail/email-pipeline.service.ts` — pipeline email->parse->saldo/kategori/Telegram, dipakai Gmail sync DAN inbound (opsi `shadow` = log `ParseStatus.SHADOW`, tanpa tulis data).
+- `modules/inbound/` — `POST /ingest/email` (HMAC `X-Trackster-Signature` = HMAC(secret, `ts.to.sha256(body)`) — `to` = header `X-Trackster-To`, ts ms ±5 mnt, body MIME mentah via `express.raw` di `main.ts`, maks 3MB). Alamat `u-<24 char base32>@in.trackster.dev` -> `InboundAddress`. Bukan pengirim bank (`ParserRegistryService.canHandle`) = dibuang. Email konfirmasi Gmail -> `lastForwardCode`.
+- CLI: `node prisma/user-admin.js inbound --username u [--shadow on|off] [--rotate]`. Tes: `inbound.util.check.ts`, `scripts/inbound-e2e.mjs`.
+
+## Profil & onboarding (P8, branch feat/multi-user-launch)
+- `modules/profile/` — `GET /profile` (nama, nama di rekening, `OwnAccount`, bank = baris `BankBalance`, alamat inbound dibuat malas — shadow bila user punya `GmailToken`, hasil email forward terakhir, checklist aktivasi), `PATCH /profile`, `PUT /profile/accounts` (ganti semua), `POST /profile/banks` (tambah saja), `POST /profile/onboarded`.
+- Frontend: `useLive` memuat `/profile` (poll 4 dtk di `/setup`); `V3Host` mengarahkan akun baru (belum onboarded & tanpa transaksi) ke `/setup`; wizard live di `logic.tsx#rv_pre` (langkah diturunkan dari data server). `/setup` tidak lagi publik (`middleware.ts`).
+- Setting → Koneksi: baris Email bank + Nama & rekening (semua user); kartu Gmail & Calendar hanya pemilik (`live.isAdmin`).
+- Worker Cloudflare: `infra/cloudflare-worker/` (`wrangler.toml`, secret `INGEST_HMAC_SECRET`). Uji email asli tanpa DNS: `apps/backend/scripts/send-eml.mjs`.

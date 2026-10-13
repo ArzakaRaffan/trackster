@@ -1,0 +1,10 @@
+name = "trackster-inbound"
+main = "src/index.js"
+compatibility_date = "2026-10-01"
+
+[vars]
+INGEST_URL = "https://api.trackster.dev/ingest/email"
+# DEAD_LETTER = "alamat-admin@gmail.com"   # opsional; harus Destination Address terverifikasi di Email Routing
+
+# Rahasia (jangan ditulis di sini):
+#   npx wrangler secret put INGEST_HMAC_SECRET   -> nilai SAMA dengan INGEST_HMAC_SECRET di .env backend (VPS)

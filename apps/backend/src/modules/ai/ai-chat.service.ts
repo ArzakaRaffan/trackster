@@ -168,6 +168,7 @@ export class AiChatService {
     threadId: number,
     text: string,
     stream?: { onToken: (text: string) => void; onToolRound: () => void },
+    lang: 'id' | 'en' = 'id',
   ): Promise<string> {
     const thread = await this.assertThreadExists(userId, threadId);
     this.logger.log(`sendMessage user=${userId} thread=${threadId}: ${text.slice(0, 100)}`);
@@ -208,6 +209,8 @@ export class AiChatService {
           ? `\nPercakapan/laporan lama yang mungkin relevan (rujuk kalau memang nyambung, jangan dipaksakan):\n${retrievalBlock}`
           : '',
         thread.summary ? `\nRingkasan percakapan lama dengan ${name} di thread ini:\n${thread.summary}` : '',
+        // UI berbahasa Inggris: aturan "Bahasa Indonesia santai" di atas diganti, sisanya tetap.
+        lang === 'en' ? `\nPENTING: ${name} memakai tampilan bahasa Inggris. Jawab dalam bahasa Inggris yang santai dan ringkas; nominal tetap format Rupiah.` : '',
       ]
         .filter(Boolean)
         .join('\n');

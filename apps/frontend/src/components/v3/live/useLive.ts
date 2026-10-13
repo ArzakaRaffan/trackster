@@ -71,6 +71,8 @@ export function useLive(enabled: boolean, path: string, chatActive: number | nul
   const tidyRes = useGet(k('/transactions/uncategorized-merchants'));
   const billsRes = useGet(k('/split-bills'));
   const meRes = useGet(k('/auth/me'));
+  // Profil & onboarding (wizard /setup): di wizard di-poll supaya kode Gmail & email pertama muncul sendiri.
+  const profileRes = useGet(k('/profile'), { refreshInterval: path === '/setup' ? 4000 : 0 });
   const sugRes = useGet(enabled && path.startsWith('/app/budget') ? '/ai/budget-suggestions' : null);
 
   const manual = useMemo(() => {
@@ -119,6 +121,7 @@ export function useLive(enabled: boolean, path: string, chatActive: number | nul
     const sum = (k: string) => hz.reduce((a, x) => a + (x.totals?.[k] ?? 0), 0);
     return {
       weekLabel: `Masuk minggu ini (${dm(w.weekStart)})`, received: RPf(w.totals.received), expected: `dari perkiraan ${RPf(w.totals.expected)}`, rows,
+      pct: (Number(w.totals.expected) > 0 ? Math.min(100, Number(w.totals.received) / Number(w.totals.expected) * 100) : 0).toFixed(0) + '%',
       fc: [[w.totals.conservative, w.totals.expected, w.totals.max], [sum('conservative'), sum('expected'), sum('max')]],
       upside: RPf(w.upsideMonthly ?? 0), irregular: w.streams.find((s: any) => s.kind === 'IRREGULAR')?.name ?? 'Project desain',
     };
@@ -158,14 +161,15 @@ export function useLive(enabled: boolean, path: string, chatActive: number | nul
   const st = useMemo(() => {
     const bal: Record<string, any> = {};
     const adjOf = (a: any[] | undefined) => (a ?? []).map((x) => ({ delta: Number(x.delta), note: x.note ?? '', at: new Date(x.createdAt).getTime() }));
-    for (const b of balRes.data ?? []) if (b.source === 'BCA' || b.source === 'JAGO') bal[b.source] = { balance: Number(b.balance), updated: new Date(b.lastUpdatedAt).getTime(), adj: adjOf(b.source === 'BCA' ? adjBca.data : adjJago.data) };
+    // Semua bank milik user (bukan cuma BCA/Jago). Riwayat koreksi dimuat untuk BCA/Jago saja (endpoint per bank).
+    for (const b of balRes.data ?? []) bal[b.source] = { balance: Number(b.balance), updated: new Date(b.lastUpdatedAt).getTime(), adj: adjOf(b.source === 'BCA' ? adjBca.data : b.source === 'JAGO' ? adjJago.data : []) };
     const empty = { balance: 0, updated: Date.now(), adj: [] };
     const tg = tgRes.data;
     return {
       gmail: !!gmailRes.data?.connected, gmailEmail: gmailRes.data?.email ?? '',
       tgConfigured: !!tg?.configured, tgPreview: tg?.botTokenPreview ?? '', tgChat: tg?.chatId ?? '', tgEvery: !!tg?.notifyEveryTransaction,
       nextRun: nextRunRes.data?.nextRunAt ? new Date(nextRunRes.data.nextRunAt).getTime() : Date.now(),
-      balances: { BCA: bal.BCA ?? empty, JAGO: bal.JAGO ?? empty },
+      balances: Object.keys(bal).length ? bal : { BCA: empty, JAGO: empty },
       tokens: (tokRes.data ?? []).map((x: any) => ({ id: x.id, label: x.label, prefix: x.prefix, createdAt: new Date(x.createdAt).getTime(), lastUsedAt: x.lastUsedAt ? new Date(x.lastUsedAt).getTime() : null, revokedAt: x.revokedAt ? new Date(x.revokedAt).getTime() : null })),
       aliases: (aliasRes.data ?? []).map((a: any) => ({ id: a.id, name: a.displayName ?? '', raw: a.rawDescription, icon: a.icon || null })),
       logs: (parseLogRes.data ?? []).map((l: any) => ({ id: l.emailId, status: l.status, subject: l.subject, from: l.from, reason: l.reason, date: wibLogDate(l.receivedAt) })),
@@ -208,10 +212,10 @@ export function useLive(enabled: boolean, path: string, chatActive: number | nul
     const agoMs = (iso: string | null) => (iso ? now - new Date(iso).getTime() : null);
     const short = (ms: number | null) => (ms === null ? 'menunggu' : ms < 90_000 ? 'baru saja' : ms < 3600e3 ? Math.round(ms / 60e3) + ' mnt lalu' : ms < 86400e3 ? Math.round(ms / 3600e3) + ' jam lalu' : Math.round(ms / 86400e3) + ' hari lalu');
     const long = (ms: number | null) => (ms === null ? '' : ms < 90_000 ? 'baru saja' : ms < 3600e3 ? Math.round(ms / 60e3) + ' menit lalu' : ms < 86400e3 ? Math.round(ms / 3600e3) + ' jam lalu' : Math.round(ms / 86400e3) + ' hari lalu');
-    const bankOf = (l: any) => { const f = String(l.from ?? '').toLowerCase() + ' ' + String(l.parser ?? '').toLowerCase(); return f.includes('flip') ? 'FLIP' : f.includes('jago') ? 'JAGO' : f.includes('bca') ? 'BCA' : null; };
-    const connected = !!gmailRes.data?.connected;
+    const bankOf = (l: any) => { if (l.parser) return String(l.parser).toUpperCase(); const f = String(l.from ?? '').toLowerCase(); return f.includes('flip') ? 'FLIP' : f.includes('jago') ? 'JAGO' : f.includes('bca') ? 'BCA' : null; };
+    const connected = !!gmailRes.data?.connected || !!profileRes.data?.inbound?.verified; // Gmail (pemilik) atau penerusan aktif
     const out: Record<string, any> = {};
-    for (const b of ['BCA', 'JAGO', 'FLIP']) {
+    for (const b of ['BCA', 'JAGO', 'FLIP', 'MANDIRI', 'BNI', 'BRI', 'RAYA']) {
       const mine = logs.filter((l) => bankOf(l) === b);
       const lastIso = mine.length ? mine.reduce((a, l) => (new Date(l.receivedAt) > new Date(a) ? l.receivedAt : a), mine[0].receivedAt) : null;
       const recorded = mine.filter((l) => l.status === 'RECORDED' && wibISO(new Date(l.receivedAt).getTime()).startsWith(monthStart)).length;
@@ -221,7 +225,7 @@ export function useLive(enabled: boolean, path: string, chatActive: number | nul
       out[b] = { cond, short: short(ms), long: long(ms), recorded, unparsed, days: ms === null ? 0 : Math.round(ms / 86400e3) };
     }
     return out;
-  }, [parseLogRes.data, gmailRes.data]);
+  }, [parseLogRes.data, gmailRes.data, profileRes.data]);
   const srcLog = useMemo(() => {
     const today = wibISO(), yday = addDaysISO(today, -1);
     return ((parseLogRes.data ?? []) as any[]).slice(0, 12).map((l) => {
@@ -242,6 +246,8 @@ export function useLive(enabled: boolean, path: string, chatActive: number | nul
 
   const settled = (r: { data?: unknown; error?: unknown }) => r.data !== undefined || r.error !== undefined; // error ≠ blank screen selamanya
   const ready = !enabled || [budgets, today, txRes, incRes, streamsRes].every(settled);
+  // Data inti gagal dimuat (server mati/offline): jangan gambar layar dengan angka bawaan prototipe.
+  const failed = enabled && [budgets, today, txRes].some((r) => r.error !== undefined && r.data === undefined);
   const refresh = () => mutate(() => true);
 
   const actions = useMemo(
@@ -299,11 +305,11 @@ export function useLive(enabled: boolean, path: string, chatActive: number | nul
       tokCreate: (label: string) => api.post<{ id: number; token: string }>('/api-tokens', { label }),
       tokRevoke: (id: number) => api.delete(`/api-tokens/${id}`),
       correctBalance: (source: string, newBalance: number, note: string) => api.put(`/balance/${source}`, { newBalance, note: note || undefined }),
-      chatSend: async (threadId: number | null, text: string) => {
+      chatSend: async (threadId: number | null, text: string, lang: 'id' | 'en' = 'id') => {
         let id = threadId;
         if (!id) id = (await api.post<{ id: number }>('/ai/threads')).id;
         let failed: string | null = null;
-        await api.postStream(`/ai/threads/${id}/messages/stream`, { text }, (e) => { if (e.type === 'error') failed = e.message; });
+        await api.postStream(`/ai/threads/${id}/messages/stream`, { text, lang }, (e) => { if (e.type === 'error') failed = e.message; });
         if (failed) throw new Error(failed);
         return id as number;
       },
@@ -342,17 +348,25 @@ export function useLive(enabled: boolean, path: string, chatActive: number | nul
       contribute: (id: number, b: { amount: number; note?: string }) => api.post(`/goal/${id}/contribute`, b),
       archiveGoal: (id: number) => api.patch(`/goal/${id}/archive`, {}),
       simulateGoal: (id: number, cutPercent: number) => api.post<any>(`/goal/${id}/simulate`, { cutPercent }),
+      // profil & wizard
+      saveProfile: (b: { displayName?: string; fullName?: string }) => api.patch<any>('/profile', b),
+      saveAccounts: (accounts: { source?: string; accountNumber: string }[]) => api.put<any>('/profile/accounts', { accounts }),
+      addBanks: (sources: string[]) => api.post<any>('/profile/banks', { sources }),
+      finishOnboarding: () => api.post<any>('/profile/onboarded'),
     }),
     [],
   );
 
   return {
     ready,
+    failed,
     refresh,
     actions,
     // Hanya ADMIN (pemilik) yang boleh isi chat ID manual; member menautkan lewat kode `/start` (backend menolak chat ID manual).
     isAdmin: (meRes.data?.user ?? meRes.data)?.role === 'ADMIN',
     todayISO,
+    profile: profileRes.data ?? null,
+    refreshProfile: () => profileRes.mutate(),
     st,
     chat,
     split,

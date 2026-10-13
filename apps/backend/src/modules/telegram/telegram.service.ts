@@ -52,7 +52,18 @@ export class TelegramService {
     await this.prisma.telegramLinkCode.create({
       data: { userId, codeHash: this.hashCode(code), expiresAt: new Date(Date.now() + 15 * 60 * 1000) },
     });
-    return { code, expiresInMinutes: 15 };
+    return { code, expiresInMinutes: 15, botUsername: await this.botUsername() };
+  }
+
+  private botName?: Promise<string | null>;
+  /** Username bot bersama (getMe, di-cache) supaya frontend bisa memberi tautan t.me/<bot>?start=<kode>. null = tidak ada token/gagal. */
+  private botUsername(): Promise<string | null> {
+    const token = process.env.TELEGRAM_BOT_TOKEN;
+    if (!token) return Promise.resolve(null);
+    this.botName ??= tgCall<{ username?: string }>(token, 'getMe', {})
+      .then((r) => r.username ?? null)
+      .catch((e) => { this.botName = undefined; this.logger.warn(`getMe gagal: ${e.message}`); return null; });
+    return this.botName;
   }
 
   private hashCode(code: string) {
