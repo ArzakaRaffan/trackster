@@ -226,7 +226,9 @@ export class V3Logic extends React.Component {
   openTx(t) { this.setState({ modal:'tx', txId:t.id, txObj:t, aliasDraft:t.alias || '', noteDraft:t.note || '', rb:[], rbName:'', rbAmt:'', rbSrc:t.src === 'JAGO' ? 'JAGO' : 'BCA', rbBusy:false }); this.loadRb(t.id); }
   // Patungan (reimbursement) per transaksi — hanya mode nyata. Nominal efektif (amt) ikut disegarkan supaya header modal tak basi.
   loadRb(id) { const L = this.props.live; if (L === undefined) return Promise.resolve(); return L.actions.rbList(id).then(list => { if (this.state.txId !== id) return; const got = list.filter(r => r.status === 'RECEIVED').reduce((a, r) => a + Number(r.amount), 0); this.setState(z => { const fix = x => x.id === id && x.gross !== undefined ? { ...x, amt:x.gross - got } : x; return { rb:list, txs:z.txs.map(fix), txObj:z.txObj ? fix(z.txObj) : z.txObj }; }); }).catch(() => {}); }
-  rbRun(fn, msg) { this.setState({ rbBusy:true }); return Promise.resolve().then(fn).then(() => { this.toast(msg); return Promise.all([this.loadRb(this.state.txId), this.props.live.refresh()]); }).catch(e => this.toast((e && e.message) || 'Gagal menyimpan patungan.')).then(() => this.setState({ rbBusy:false })); }
+  // Tombol dibuka lagi begitu daftar patungan termuat; refresh seluruh data jalan di latar (di prod bisa beberapa detik,
+  // dulu ditunggu sehingga "Sudah transfer" tak bisa diklik tepat setelah menambah orang).
+  rbRun(fn, msg) { this.setState({ rbBusy:true }); return Promise.resolve().then(fn).then(() => { this.toast(msg); this.props.live.refresh(); return this.loadRb(this.state.txId); }).catch(e => this.toast((e && e.message) || 'Gagal menyimpan patungan.')).then(() => this.setState({ rbBusy:false })); }
   confirm(cf) { this.setState({ modal:'confirm', cf, prevModal:this.state.modal }); }
   closeModal() { this.setState({ modal:null, cf:null }); }
   mascot(px, mood) {
