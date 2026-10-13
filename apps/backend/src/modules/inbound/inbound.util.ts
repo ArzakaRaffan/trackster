@@ -32,10 +32,12 @@ export function forwardEmailId(messageId: string | undefined, fallbackSeed: stri
   return 'fwd:' + sha256hex(messageId?.trim() ? `mid:${messageId.trim()}` : `seed:${fallbackSeed}`).slice(0, 32);
 }
 
-/** Email konfirmasi forwarding dari Gmail. ponytail: format belum diverifikasi dengan sampel nyata (audit §10.5). */
+/** Email konfirmasi forwarding dari Gmail. Sampel nyata 2026-10-13: TANPA kode angka, hanya link `https://mail.google.com/mail/vf-…`
+ *  (link `uf-…` = batalkan, jangan diambil). `code` = link itu; format lama berkode angka tetap dikenali. */
 export function parseForwardConfirmation(from: string, subject: string, text: string): { code: string; gmailSource?: string } | null {
   if (!/forwarding-noreply@google\.com/i.test(from)) return null;
-  const code = /confirmation code:\s*(\d{6,12})/i.exec(text)?.[1] ?? /\(#(\d{6,12})\)/.exec(subject)?.[1];
+  const code = /https:\/\/mail\.google\.com\/mail\/vf-[^\s<>"]+/.exec(text)?.[0]
+    ?? /confirmation code:\s*(\d{6,12})/i.exec(text)?.[1] ?? /\(#(\d{6,12})\)/.exec(subject)?.[1];
   if (!code) return null;
   return { code, gmailSource: /from\s+([^\s@]+@[^\s@]+)/i.exec(subject)?.[1] };
 }
