@@ -37,6 +37,8 @@ const regB = await req('POST', '/auth/register', { inviteCode: code, username: B
 expect(regB.status === 201, `register B ${regB.status}`);
 const cookieB = cookieOf(regB);
 const adminId = (await (await req('GET', '/auth/me', undefined, admin)).json()).user.id;
+// tokenVersion asli dari cookie sesi admin (naik setiap reset password) — dipakai JWT kontrol di bawah.
+const adminTv = JSON.parse(Buffer.from(/trackster_jwt=([^;]+)/.exec(admin)[1].split('.')[1], 'base64url').toString()).tv ?? 0;
 
 await test('header keamanan API ada, X-Powered-By hilang', async () => {
   const r = await req('GET', '/auth/me');
@@ -50,7 +52,7 @@ await test('JWT state OAuth (purpose) ditolak sebagai cookie sesi', async () => 
   const forged = signJwt({ sub: adminId, purpose: 'gmail-oauth' });
   expect((await req('GET', '/auth/me', undefined, `trackster_jwt=${forged}`)).status === 401, 'token purpose diterima');
   // kontrol: JWT sesi asli bentuknya sama tapi tanpa purpose -> lolos (membuktikan tes di atas bukan gagal karena tanda tangan)
-  expect((await req('GET', '/auth/me', undefined, `trackster_jwt=${signJwt({ sub: adminId, username: 'x', tv: 0 })}`)).status === 200, 'kontrol gagal');
+  expect((await req('GET', '/auth/me', undefined, `trackster_jwt=${signJwt({ sub: adminId, username: 'x', tv: adminTv })}`)).status === 200, 'kontrol gagal');
 });
 
 await test('member tidak bisa set chat ID Telegram manual (bot bersama)', async () => {
