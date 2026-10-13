@@ -161,14 +161,15 @@ export function useLive(enabled: boolean, path: string, chatActive: number | nul
   const st = useMemo(() => {
     const bal: Record<string, any> = {};
     const adjOf = (a: any[] | undefined) => (a ?? []).map((x) => ({ delta: Number(x.delta), note: x.note ?? '', at: new Date(x.createdAt).getTime() }));
-    for (const b of balRes.data ?? []) if (b.source === 'BCA' || b.source === 'JAGO') bal[b.source] = { balance: Number(b.balance), updated: new Date(b.lastUpdatedAt).getTime(), adj: adjOf(b.source === 'BCA' ? adjBca.data : adjJago.data) };
+    // Semua bank milik user (bukan cuma BCA/Jago). Riwayat koreksi dimuat untuk BCA/Jago saja (endpoint per bank).
+    for (const b of balRes.data ?? []) bal[b.source] = { balance: Number(b.balance), updated: new Date(b.lastUpdatedAt).getTime(), adj: adjOf(b.source === 'BCA' ? adjBca.data : b.source === 'JAGO' ? adjJago.data : []) };
     const empty = { balance: 0, updated: Date.now(), adj: [] };
     const tg = tgRes.data;
     return {
       gmail: !!gmailRes.data?.connected, gmailEmail: gmailRes.data?.email ?? '',
       tgConfigured: !!tg?.configured, tgPreview: tg?.botTokenPreview ?? '', tgChat: tg?.chatId ?? '', tgEvery: !!tg?.notifyEveryTransaction,
       nextRun: nextRunRes.data?.nextRunAt ? new Date(nextRunRes.data.nextRunAt).getTime() : Date.now(),
-      balances: { BCA: bal.BCA ?? empty, JAGO: bal.JAGO ?? empty },
+      balances: Object.keys(bal).length ? bal : { BCA: empty, JAGO: empty },
       tokens: (tokRes.data ?? []).map((x: any) => ({ id: x.id, label: x.label, prefix: x.prefix, createdAt: new Date(x.createdAt).getTime(), lastUsedAt: x.lastUsedAt ? new Date(x.lastUsedAt).getTime() : null, revokedAt: x.revokedAt ? new Date(x.revokedAt).getTime() : null })),
       aliases: (aliasRes.data ?? []).map((a: any) => ({ id: a.id, name: a.displayName ?? '', raw: a.rawDescription, icon: a.icon || null })),
       logs: (parseLogRes.data ?? []).map((l: any) => ({ id: l.emailId, status: l.status, subject: l.subject, from: l.from, reason: l.reason, date: wibLogDate(l.receivedAt) })),
@@ -212,7 +213,7 @@ export function useLive(enabled: boolean, path: string, chatActive: number | nul
     const short = (ms: number | null) => (ms === null ? 'menunggu' : ms < 90_000 ? 'baru saja' : ms < 3600e3 ? Math.round(ms / 60e3) + ' mnt lalu' : ms < 86400e3 ? Math.round(ms / 3600e3) + ' jam lalu' : Math.round(ms / 86400e3) + ' hari lalu');
     const long = (ms: number | null) => (ms === null ? '' : ms < 90_000 ? 'baru saja' : ms < 3600e3 ? Math.round(ms / 60e3) + ' menit lalu' : ms < 86400e3 ? Math.round(ms / 3600e3) + ' jam lalu' : Math.round(ms / 86400e3) + ' hari lalu');
     const bankOf = (l: any) => { const f = String(l.from ?? '').toLowerCase() + ' ' + String(l.parser ?? '').toLowerCase(); return f.includes('flip') ? 'FLIP' : f.includes('jago') ? 'JAGO' : f.includes('bca') ? 'BCA' : null; };
-    const connected = !!gmailRes.data?.connected;
+    const connected = !!gmailRes.data?.connected || !!profileRes.data?.inbound?.verified; // Gmail (pemilik) atau penerusan aktif
     const out: Record<string, any> = {};
     for (const b of ['BCA', 'JAGO', 'FLIP']) {
       const mine = logs.filter((l) => bankOf(l) === b);
@@ -224,7 +225,7 @@ export function useLive(enabled: boolean, path: string, chatActive: number | nul
       out[b] = { cond, short: short(ms), long: long(ms), recorded, unparsed, days: ms === null ? 0 : Math.round(ms / 86400e3) };
     }
     return out;
-  }, [parseLogRes.data, gmailRes.data]);
+  }, [parseLogRes.data, gmailRes.data, profileRes.data]);
   const srcLog = useMemo(() => {
     const today = wibISO(), yday = addDaysISO(today, -1);
     return ((parseLogRes.data ?? []) as any[]).slice(0, 12).map((l) => {

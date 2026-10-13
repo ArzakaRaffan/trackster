@@ -663,6 +663,23 @@ input::placeholder,textarea::placeholder{color:var(--text-subtlest,#8C8C8C)}
 
     <sc-if value="{{ setConn }}" hint-placeholder-val="{{ true }}">
       <section style="background:var(--card);box-shadow:var(--shadow-card);border-radius:10px;overflow:hidden">
+        <sc-if value="{{ showFwd }}" hint-placeholder-val="{{ false }}">
+        <div class="v3-wrap" style="display:flex;align-items:center;gap:14px;padding:18px var(--pad)">
+          <span style="width:40px;height:40px;flex:none;border-radius:10px;background:var(--neutral);color:var(--text);display:flex;align-items:center;justify-content:center;{{ gmLogo }}"></span>
+          <span style="flex:1 1 180px;min-width:0;display:flex;flex-direction:column"><span style="display:flex;align-items:center;flex-wrap:wrap;gap:4px 8px"><span style="font-size:16px;font-weight:700">Email bank</span><span style="height:22px;display:flex;align-items:center;border:0;border-radius:4px;padding:0 8px;font-size:11px;font-family:'DM Mono',monospace;letter-spacing:.06em;text-transform:uppercase;font-weight:600;color:{{ fw.color }};background:{{ fw.bg }};white-space:nowrap">{{ fw.status }}</span></span><span style="font-size:13px;color:var(--text-subtle);word-break:break-all">{{ fw.addr }}</span></span>
+          <button onClick="{{ copyFwd }}" style="height:36px;padding:0 14px;border:0;border-radius:8px;background:var(--neutral);color:var(--text);font-size:14px;font-weight:600;cursor:pointer" style-hover="background:var(--neutral-hover)">Salin alamat</button>
+          <button onClick="{{ goSetupFwd }}" style="height:36px;padding:0 14px;border:0;border-radius:8px;background:transparent;color:var(--text-subtle);font-size:14px;font-weight:600;cursor:pointer" style-hover="background:var(--hover);color:var(--text)">Panduan</button>
+        </div>
+        <p style="margin:0;padding:0 var(--pad) 16px 78px;font-size:13px;line-height:18px;color:var(--text-subtlest);text-wrap:pretty">{{ fw.note }}</p>
+        <div style="height:1px;background:var(--border)"></div>
+        <div class="v3-wrap" style="display:flex;align-items:center;gap:14px;padding:18px var(--pad)">
+          <span style="width:40px;height:40px;flex:none;border-radius:10px;background:var(--neutral);color:var(--text);display:flex;align-items:center;justify-content:center;{{ pfLogo }}"></span>
+          <span style="flex:1 1 180px;min-width:0;display:flex;flex-direction:column"><span style="font-size:16px;font-weight:700">Nama &amp; rekening</span><span style="font-size:13px;color:var(--text-subtle)">{{ pfSub }}</span></span>
+          <button onClick="{{ goSetupProfile }}" style="height:36px;padding:0 14px;border:0;border-radius:8px;background:transparent;color:var(--text-subtle);font-size:14px;font-weight:600;cursor:pointer" style-hover="background:var(--hover);color:var(--text)">Ubah</button>
+        </div>
+        <div style="height:1px;background:var(--border)"></div>
+        </sc-if>
+        <sc-if value="{{ showGmail }}" hint-placeholder-val="{{ true }}">
         <div class="v3-wrap" style="display:flex;align-items:center;gap:14px;padding:18px var(--pad)">
           <span style="display:flex;gap:6px;flex:none"><span style="width:40px;height:40px;flex:none;border-radius:12px;background:var(--neutral);color:var(--text);display:flex;align-items:center;justify-content:center;{{ gmLogo }};width:40px;height:40px;border-radius:10px"></span><span style="width:40px;height:40px;flex:none;border-radius:12px;background:var(--neutral);color:var(--text);display:flex;align-items:center;justify-content:center;{{ calLogo }};width:40px;height:40px;border-radius:10px"></span></span>
           <span style="flex:1 1 180px;min-width:0;display:flex;flex-direction:column"><span style="display:flex;align-items:center;flex-wrap:wrap;gap:4px 8px"><span style="font-size:16px;font-weight:700">Gmail &amp; Google Calendar</span><span style="height:22px;display:flex;align-items:center;border:0;border-radius:4px;padding:0 8px;font-size:11px;font-family:'DM Mono',monospace;letter-spacing:.06em;text-transform:uppercase;font-weight:600;color:{{ gm.color }};background:{{ gm.bg }};white-space:nowrap">{{ gm.status }}</span></span><span style="font-size:13px;color:var(--text-subtle)">{{ gm.sub }}</span></span>
@@ -671,6 +688,7 @@ input::placeholder,textarea::placeholder{color:var(--text-subtlest,#8C8C8C)}
         </div>
         <p style="margin:0;padding:0 var(--pad) 16px 78px;font-size:13px;line-height:18px;color:var(--text-subtlest);text-wrap:pretty">Dipakai untuk baca notifikasi bank dan bikin reminder langganan. Setelah update scope Calendar, putuskan lalu hubungkan ulang.</p>
         <div style="height:1px;background:var(--border)"></div>
+        </sc-if>
         <div class="v3-wrap" style="display:flex;align-items:center;gap:14px;padding:18px var(--pad)">
           <span style="width:40px;height:40px;flex:none;border-radius:12px;background:var(--neutral);color:var(--text);display:flex;align-items:center;justify-content:center;{{ tgLogo }};width:40px;height:40px;border-radius:10px"></span>
           <span style="flex:1 1 180px;min-width:0;display:flex;flex-direction:column"><span style="display:flex;align-items:center;flex-wrap:wrap;gap:4px 8px"><span style="font-size:16px;font-weight:700">Telegram</span><span style="height:22px;display:flex;align-items:center;border:0;border-radius:4px;padding:0 8px;font-size:11px;font-family:'DM Mono',monospace;letter-spacing:.06em;text-transform:uppercase;font-weight:600;color:{{ tg.color }};background:{{ tg.bg }};white-space:nowrap">{{ tg.status }}</span></span><span style="font-size:13px;color:var(--text-subtle)">{{ tg.sub }}</span></span>
