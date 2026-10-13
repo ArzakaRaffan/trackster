@@ -16,7 +16,8 @@ export class ProfileService {
       this.prisma.bankBalance.findMany({ where: { userId }, orderBy: { source: 'asc' }, select: { source: true } }),
       this.inbound(userId),
       this.prisma.emailParseLog.findFirst({
-        where: { userId, emailId: { startsWith: 'fwd:' } },
+        // Promo/info bank (EXCLUDED tanpa nominal) bukan hasil uji wizard — lewati supaya langkah uji tetap menunggu email transaksi.
+        where: { userId, emailId: { startsWith: 'fwd:' }, NOT: { status: 'EXCLUDED', amount: null } },
         orderBy: { createdAt: 'desc' },
         select: { status: true, createdAt: true, counterparty: true, amount: true, parser: true },
       }),
