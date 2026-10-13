@@ -221,3 +221,25 @@ deviasi dari rencana (+alasan), env baru yang Arzaka harus tambahkan, langkah be
 - Arzaka: backup DB VPS ✅, `INGEST_HMAC_SECRET` ditambah ke `.env` VPS ✅ (container belum di-restart; deploy PR #8 yang membuat ulang backend).
 - PR [#8](https://github.com/ArzakaRaffan/trackster/pull/8) `feat/multi-user-launch` → `main` dibuka (fix compose + docs), **Arzaka merge sendiri**. Saat sesi ini ditutup: masih OPEN, `/ingest/email` prod masih 503.
 - **Langkah berikutnya:** (1) setelah PR #8 merge + CD sukses: cek situs/API/login/Telegram/log backend, `/ingest/email` tanpa tanda tangan harus 401. (2) Runbook §5 per langkah dengan izin: Email Routing `in.trackster.dev` → deploy Worker (`wrangler deploy` + `wrangler secret put INGEST_HMAC_SECRET`) → catch-all ke Worker → tes ke alamat shadow Arzaka.
+
+## 2026-10-13 (lanjutan) — runbook §5: Email Routing + Worker live, format konfirmasi Gmail nyata
+- Sesi oleh: Claude (Opus 5.5)   Branch: `fix/inbound-subaddress` (PR #9, di-merge Arzaka) → `fix/gmail-confirm-link`
+- **PR #8** di-merge 08:22 UTC, CD sukses: situs 200, `/auth/me` 401, `/ingest/email` tanpa tanda tangan **401** (bukan 503). Login browser & cek Telegram/log VPS: diserahkan ke Arzaka (auto-mode menolak baca log prod via SSH).
+- **Dok Cloudflare dibaca 2026-10-13** (subdomains diperbarui 2026-09-25, addresses 2026-10-12, runtime API 2026-06-15): **catch-all hanya untuk apex**;
+  subdomain butuh rule literal per alamat; Subaddressing (RFC 5233) harus diaktifkan di Settings. Batas: inbound 25 MiB, 200 rule/domain, 30 domain/zona.
+  → Keputusan Arzaka: alamat jadi **`u+<kode>@in.trackster.dev`** + satu rule `u@in.trackster.dev` → Worker (O8 diperbarui). PR #9 (parser hanya terima `u+`), deploy sukses 08:47 UTC.
+- **Cloudflare (dilakukan Arzaka di dashboard, per langkah):** onboard Email Routing apex `trackster.dev` (MX route1/2/3 + SPF + DKIM `cf2024-1`; A `@`/`api` & TXT google tak berubah),
+  subdomain `in` (MX+SPF terverifikasi via julian.ns & 8.8.8.8), Subaddressing ON, rule `u@in.trackster.dev` → Worker `trackster-inbound` (Active).
+- **Worker:** `wrangler deploy` (perlu `workers_dev = false` — akun belum punya subdomain workers.dev, Email Worker tak butuh URL publik). Secret `INGEST_HMAC_SECRET`
+  dipipa langsung dari `.env` VPS via SSH ke `wrangler secret put` (nilai tak pernah tampil).
+- **Uji routing:** email ke `u+tesrouting@in.trackster.dev` → Activity log "Handled" → nginx `POST /ingest/email 200` dari IP Cloudflare → backend `ignored` (HMAC cocok).
+- **Uji alamat asli (shadow):** alamat Arzaka dibuat `--shadow on`. Email konfirmasi Gmail sampai (`lastEmailAt` 09:08:39) tapi **dibuang sebagai non-bank**:
+  **format nyata Gmail tidak punya kode angka** — subjek `(Gmail Forwarding Confirmation - Receive Mail from <gmail>`, isi hanya link `https://mail.google.com/mail/vf-…` (konfirmasi) dan `uf-…` (batal).
+  Sampel diambil via rule sementara `u+<kode>@` → Gmail Arzaka (Show original). **Rule sementara itu harus dihapus** (cek di Routing rules).
+- **Perbaikan (branch `fix/gmail-confirm-link`):** `parseForwardConfirmation` mengambil link `vf-` (bukan `uf-`), fallback kode angka; tes dari sampel nyata (link disamarkan).
+  Wizard langkah 4: tombol "Konfirmasi di Gmail ↗" membuka link (`noopener`), teks ID+EN diganti (jalur resmi `.dc.html` → `dc-to-tsx`).
+  Verifikasi (DB scratch, akun undangan baru): `inbound.util.check` OK, `npm run check` 26/26, `inbound-e2e` 11/11, tsc FE/BE bersih, build BE bersih;
+  browser: alamat tampil `u+…`, email konfirmasi tiruan via HMAC → `forward-confirmation`, langkah 4 tampil "Email konfirmasi masuk ✓", tombol membuka link `vf-` tepat.
+- Catatan: wizard melompat ke langkah 5 saat reload bila link sudah ada (perilaku lama `inb.forwardCode ? 4`), bukan regresi. Warning compose `INBOUND_DOMAIN not set` tak berbahaya (default dipakai).
+- **Langkah berikutnya:** (1) Arzaka merge PR `fix/gmail-confirm-link`. (2) Hapus rule sementara `u+pf42…@` → Gmail. (3) Gmail → Forwarding → "Kirim ulang email" → cek wizard/Setting
+  memunculkan tombol konfirmasi (uji P7-05 di prod) → klik → konfirmasi. (4) Buat filter Gmail bank → forward (shadow) → tunggu email bank nyata → cek `EmailParseLog` SHADOW (runbook §6).
