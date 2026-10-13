@@ -1,7 +1,7 @@
 'use client';
 
 import dynamic from 'next/dynamic';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 import { useLive } from './live/useLive';
 import { LandingMotion } from './LandingMotion';
@@ -42,9 +42,14 @@ export function V3Host() {
   const router = useRouter();
   const demo = path === '/demo' || path.startsWith('/demo/');
   const [chatActive, setChatActive] = useState<number | null>(null);
-  const live = useLive(!demo && path.startsWith('/app'), path, chatActive);
+  const live = useLive(!demo && (path.startsWith('/app') || path === '/setup'), path, chatActive);
+  // Akun baru (belum selesai wizard & belum ada transaksi) diarahkan ke wizard. Akun lama tanpa onboardedAt
+  // (mis. pemilik) punya transaksi, jadi tidak ikut terarah — tanpa perlu mengubah data mereka.
+  const p = live.profile;
+  const needsSetup = !demo && path.startsWith('/app') && !!p && !p.onboardedAt && !p.checklist?.firstTransaction;
+  useEffect(() => { if (needsSetup) router.replace('/setup'); }, [needsSetup, router]);
   // Tunggu data inti sebelum menggambar layar privat, supaya tidak ada kilatan keadaan kosong.
-  if (!demo && (!live.ready || live.failed)) return <LiveGate failed={live.failed} retry={live.refresh} />;
+  if (!demo && (!live.ready || live.failed || needsSetup)) return <LiveGate failed={live.failed} retry={live.refresh} />;
   return (
     <>
       {path === '/' && <LandingMotion />}

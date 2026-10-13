@@ -326,7 +326,7 @@ export class V3Logic extends React.Component {
       connectGmail:() => { if (this.props.live !== undefined) { this.props.live.actions.gmailAuthUrl().then(r => { window.location.href = r.url; }).catch(e => this.toast((e && e.message) || 'Gagal membuka Google.')); return; } setT({ gmail:true }); this.toast('Google terhubung.'); },
       tg: t.tgConfigured ? { configured:true, status:'Aktif', color:'var(--success-text)', bg:'var(--success-subtle)', sub:`Token ${t.tgPreview} · Chat ID ${t.tgChat}`, editLabel:'Ubah' } : { configured:false, status:'Belum diatur', color:'var(--text-subtle)', bg:'var(--neutral)', sub:'Alert saat budget harian terlampaui', editLabel:'Atur' },
       testTg:() => { if (this.props.live !== undefined) { setT({ tgResult:null }); this.props.live.actions.tgTest().then(r => setT({ tgResult:r && r.success ? 'Terkirim! Cek Telegram kamu.' : 'Gagal kirim. Cek konfigurasi.' })).catch(e => setT({ tgResult:(e && e.message) || 'Gagal kirim. Cek konfigurasi.' })); return; } setT({ tgResult:'Terkirim! Cek Telegram kamu.' }); }, hasTgResult:!!t.tgResult, tgResult:t.tgResult || '',
-      openTg:() => { const lv = this.props.live; if (lv !== undefined && !lv.isAdmin) { lv.actions.tgLinkCode().then(r => this.confirm({ title:'Hubungkan Telegram', body:`Buka bot Telegram Trackster, lalu kirim pesan: /start ${r.code} (berlaku ${r.expiresInMinutes} menit). Setelah bot membalas, muat ulang halaman ini.`, primary:'Selesai', secondary:'Tutup', onPrimary:() => { this.closeModal(); lv.refresh(); }, onSecondary:() => this.closeModal() })).catch(e => this.toast((e && e.message) || 'Gagal membuat kode tautan.')); return; } this.setState({ modal:'tg', tf:{ token:'', chat:t.tgChat || '' } }); },
+      openTg:() => { const lv = this.props.live; if (lv !== undefined && !lv.isAdmin) return this.linkTelegram(); this.setState({ modal:'tg', tf:{ token:'', chat:t.tgChat || '' } }); },
       tgEveryStr:String(t.tgEvery), toggleTgEvery:() => { setT({ tgEvery:!t.tgEvery }); this.liveCall(() => this.props.live.actions.tgNotify(!t.tgEvery)); }, tgSwBg: t.tgEvery ? 'var(--brand)' : 'var(--border-bold)', tgSwX: t.tgEvery ? '16px' : '0px',
       countdown:mmss(left), manualSync:() => { if (!t.gmail || t.syncing) return; setT({ syncing:true, syncResult:null }); if (this.props.live !== undefined) { this.props.live.actions.sync().then(r => this.props.live.refresh().then(() => setT({ syncing:false, syncResult:r && r.error ? 'Error: ' + r.error : (r && r.synced != null ? r.synced : 0) + ' transaksi baru disinkronkan.' }))).catch(e => setT({ syncing:false, syncResult:'Error: ' + ((e && e.message) || 'sinkron gagal') })); return; } setTimeout(() => setT({ syncing:false, syncResult:'2 transaksi baru disinkronkan.', nextRun:Date.now() + 5 * 60000 }), 1200); },
       syncOff:String(!t.gmail), syncBtnBg: t.gmail ? 'var(--brand)' : off[0], syncBtnFg: t.gmail ? 'var(--on-brand)' : off[1], mSyncing:t.syncing, syncBtn: t.syncing ? 'Sinkronisasi...' : 'Sync manual sekarang', hasSyncResult:!!t.syncResult, syncResult:t.syncResult || '',
@@ -577,27 +577,50 @@ export class V3Logic extends React.Component {
     return Number(digits(e.amount)) || 0;
   }
   renderVals() { this.S = this.state; if (this.props.live !== undefined) v3SetupDates(this.S.manual); const v = this.rv0(); for (const k of Object.getOwnPropertyNames(Object.getPrototypeOf(this))) if (k.startsWith('rv_')) Object.assign(v, this[k](this.S, this.props, v)); return v; }
-  rv_pre(s0, props) { const h = this.v3h(s0); const s = { ...s0, ckS:s0.ckS ?? {}, budget:s0.wzBudget ?? 150000 };
+  rv_pre(s0, props) { const h = this.v3h(s0); const s = { ...s0, ckS:s0.ckS ?? {}, budget:s0.wzBudget ?? ((props.live !== undefined && s0.manual && Math.max(...s0.manual)) || 150000) };
     const { RP, NUM, seg, isMob, isDesk, isTab } = h;
     const PRE = ['landing', 'auth', 'wizard'];
     const A = { mode:s.authMode ?? 'masuk', email:s.email ?? '', pw:s.pw ?? '', show:!!s.showPw, focus:!!s.pwFocus, err:s.authErr ?? '', forgot:!!s.forgot };
-    const wiz = s.wiz ?? 0, banks = s.banks ?? { BCA:true, Jago:true, Flip:false, Lainnya:false }, codeSt = s.codeSt ?? 'wait', testSt = s.testSt ?? 'wait';
-    const BANKS = [['BCA', 'Notifikasi m-BCA / KlikBCA', V3SHAPE.BCA], ['Jago', 'Bank Jago', V3SHAPE.Jago], ['Flip', 'Flip', V3SHAPE.Flip], ['Lainnya', 'Bank lain', 'border-radius:1px']];
-    const bankList = BANKS.map(([k, sub, shape]) => ({ l:k, sub, shape, logoCss:brandCss(k), on:String(!!banks[k]), bd:banks[k] ? 'var(--ink)' : 'var(--line)', bg:banks[k] ? 'var(--card)' : 'transparent', fill:banks[k] ? 'var(--ink)' : 'transparent', go:() => this.setState(st => ({ banks:{ ...(st.banks ?? banks), [k]: !(st.banks ?? banks)[k] } })) }));
+    // Wizard nyata (live): data dari GET /profile (di-poll tiap 4 dtk di /setup). Demo tetap simulasi.
+    const lv = this.props.live, isLive = lv !== undefined, pf = isLive ? lv.profile : null, inb = pf ? pf.inbound : null;
+    // [label, keterangan, bentuk logo, Source di backend (null = bukan rekening, mis. Flip), kata di filter Gmail]
+    const BANKS = [['BCA', 'm-BCA / KlikBCA', V3SHAPE.BCA, 'BCA', 'bca'], ['Jago', 'Bank Jago', V3SHAPE.Jago, 'JAGO', 'jago'], ['Flip', 'Transfer lewat Flip', V3SHAPE.Flip, null, 'flip'], ['Mandiri', 'Livin\' by Mandiri', 'border-radius:2px', 'MANDIRI', 'bankmandiri'], ['BNI', 'BNI Mobile', 'border-radius:2px', 'BNI', 'bni'], ['BRI', 'BRImo', 'border-radius:2px', 'BRI', 'bri.co.id'], ['Raya', 'Bank Raya', 'border-radius:50%', 'RAYA', 'bankraya'], ['Lainnya', 'Bank lain', 'border-radius:1px', null, null]];
+    const pfBanks = pf ? Object.fromEntries(BANKS.map(([k, , , src]) => [k, !!src && pf.banks.includes(src)])) : null;
+    // Progres wizard diturunkan dari data server, jadi bisa dilanjutkan di perangkat lain (mis. mulai di HP, Gmail di laptop).
+    const wiz = s.wiz ?? (pf ? (!pf.fullName ? 0 : inb.verified ? 5 : inb.forwardCode ? 4 : 1) : 0), banks = s.banks ?? pfBanks ?? { BCA:true, Jago:true, Flip:false, Lainnya:false };
+    const lr = inb && inb.lastResult, codeSt = isLive ? (inb && inb.forwardCode ? 'got' : 'wait') : (s.codeSt ?? 'wait');
+    const testSt = !isLive ? (s.testSt ?? 'wait') : !lr ? 'wait' : (lr.status === 'UNPARSED' || lr.status === 'ERROR') ? 'bad' : 'got';
+    if (isLive && testSt === 'got' && !this._wzGot) { this._wzGot = true; setTimeout(() => lv.refresh(), 0); } // sisa hari ini ikut transaksi baru
+    const picked = BANKS.filter(([k, , , , q]) => q && banks[k]);
+    const fwdFilter = (picked.length ? picked : BANKS.slice(0, 3)).map(b => b[4]).join(' OR ');
+    const fwdBanksTxt = 'Notifikasi transaksi ' + (picked.length ? picked : BANKS.slice(0, 3)).map(b => b[0]).join(', ');
+    const copy = (v, ok) => { if (typeof navigator !== 'undefined' && navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(v).then(() => this.toast(ok)).catch(() => this.toast('Gagal menyalin. Salin manual.')); else this.toast('Gagal menyalin. Salin manual.'); };
+    const finishLive = () => { const m = [0, 1, 2, 3, 4, 5, 6].map(() => s.budget); return Promise.all([s.wzBudget ? lv.actions.saveBudget(m) : null, lv.actions.finishOnboarding()]).then(() => lv.refreshProfile()).then(() => { lv.refresh(); this.setState({ pre:null, page:'dash' }); }).catch(e => this.toast((e && e.message) || 'Gagal menyimpan. Coba lagi.')); };
+    const saveStep0 = () => {
+      const nums = (s.accNums ?? (pf ? pf.accounts.map(a => a.accountNumber).join(', ') : '')).split(/[,;\n]/).map(x => x.replace(/\D/g, '')).filter(Boolean);
+      if (nums.some(x => x.length < 6 || x.length > 20)) return this.setState({ wzErr0:'Nomor rekening harus 6–20 digit.' });
+      const fullName = (s.fullName ?? (pf ? pf.fullName : '')).trim(), nick = (s.nick ?? (pf ? pf.displayName : '')).trim();
+      const srcs = BANKS.filter(([k, , , src]) => src && banks[k]).map(b => b[3]);
+      this.setState({ wzErr0:'' });
+      Promise.all([lv.actions.saveProfile({ ...(nick ? { displayName:nick } : {}), fullName }), lv.actions.saveAccounts(nums.map(n => ({ accountNumber:n }))), srcs.length ? lv.actions.addBanks(srcs) : null])
+        .then(() => { lv.refreshProfile(); this.setState({ wiz:1 }); })
+        .catch(e => this.setState({ wzErr0:(e && e.message) || 'Gagal menyimpan. Coba lagi.' }));
+    };
+    const bankList = BANKS.map(([k, sub, shape]) => ({ l:k, sub, shape, logoCss:brandCss(k), on:String(!!banks[k]), bd:banks[k] ? 'var(--text)' : 'var(--border)', bg:banks[k] ? 'var(--card)' : 'transparent', fill:banks[k] ? 'var(--text)' : 'transparent', go:() => this.setState(st => ({ banks:{ ...(st.banks ?? banks), [k]: !(st.banks ?? banks)[k] } })) }));
     const em = A.email, emOk = /^\S+@\S+\.\S+$/.test(em);
     const say = [
-      'Halo! Aku Track. Bilang saja banknya, aku yang urus sisanya.',
-      'Alamat ini milikmu saja. Cuma email yang kamu teruskan yang sampai ke sini.',
-      'Bagian ini memang paling ribet, dan cuma sekali. Setelah itu aku jaga sendiri.',
-      codeSt === 'got' ? 'Kodenya sudah masuk. Tempel di Gmail ya.' : 'Aku menunggu email dari Gmail…',
-      'Filter ini yang menjamin aku hanya melihat email bank.',
-      testSt === 'got' ? 'Masuk! Sisa hari ini langsung kuhitung ulang.' : testSt === 'bad' ? 'Emailnya sampai, tapi aku belum paham formatnya. Aman, kutandai dulu.' : testSt === 'idle' ? 'Sepi, ya. Aku tidur sebentar, panggil kalau ada kabar.' : 'Menunggu email bank pertamamu…',
-      'Hampir selesai. Semua ini bisa diubah nanti.'
+      'Isi sekali saja. Semuanya bisa diubah nanti di Setting.',
+      'Hanya email yang kamu teruskan ke alamat ini yang sampai ke Trackster.',
+      'Langkah ini paling panjang, tapi cukup sekali.',
+      codeSt === 'got' ? 'Kodenya sudah masuk. Tempel di Gmail.' : 'Menunggu email dari Gmail…',
+      'Dengan filter ini, hanya email bank yang diteruskan.',
+      testSt === 'got' ? 'Email bank pertama sudah tercatat.' : testSt === 'bad' ? 'Emailnya sampai, tapi formatnya belum dikenali.' : testSt === 'idle' ? 'Belum ada email masuk.' : 'Menunggu email bank pertamamu…',
+      'Selesai setelah ini.'
     ];
     const mood = wiz === 3 && codeSt === 'wait' ? 'think' : wiz === 5 ? (testSt === 'got' ? 'happy' : testSt === 'bad' ? 'alert' : 'think') : wiz === 6 ? 'happy' : 'idle';
-        const newRow = testSt === 'got' && s.newTxView ? [s.newTxView] : [];
+        const newRow = testSt !== 'got' ? [] : isLive ? [{ n:lr.counterparty || (lr.status === 'SHADOW' ? 'Email bank (mode uji)' : 'Email bank'), m:String(lr.parser || '').toUpperCase() + ' · ' + (lr.status === 'RECORDED' ? 'tercatat' : lr.status === 'SHADOW' ? 'mode uji, tidak dicatat' : 'diabaikan (transfer ke rekening sendiri)'), a:lr.amount == null ? '' : '−' + RP(lr.amount) }] : s.newTxView ? [s.newTxView] : [];
     const oldN = s.oldPulled ?? 0;
-    const titles = { wait:'Menunggu email bank pertamamu', got:'Transaksi pertamamu tercatat.', bad:'Emailnya sampai.', idle:'Belum ada email masuk' };
+    const titles = { wait:'Menunggu email bank pertamamu', got:'Email bank pertamamu sampai.', bad:'Emailnya sampai.', idle:'Belum ada email masuk' };
     return {
       isPre:!!s.pre, vLanding:s.pre === 'landing', vAuth:s.pre === 'auth', vWizard:s.pre === 'wizard',
       lpad:isMob ? '16px 16px 40px' : '24px 40px 56px', lgap:isMob ? '28px' : '56px', heroCols:isDesk || isTab ? '1.1fr .9fr' : '1fr', h1Size:isMob ? '42px' : '64px', h2Size:isMob ? '28px' : '38px', twoCols:isMob ? '1fr' : '1fr 1fr', twoColsW:isMob ? '1fr' : '1fr 1fr',
@@ -611,7 +634,7 @@ export class V3Logic extends React.Component {
       authTabs:[['masuk', 'Masuk'], ['daftar', 'Daftar']].map(([id, l]) => ({ ...seg(id, l, A.mode, x => this.setState({ authMode:x, authErr:'', forgot:false })) })),
       authFields:!A.forgot, authForgot:A.forgot, authMood:A.focus && !A.show ? 'hide' : 'idle',
       email:A.email, pw:A.pw, pwType:A.show ? 'text' : 'password', pwLabel:A.show ? 'Sembunyikan password' : 'Tampilkan password', pwBtn:A.show ? 'SEMBUNYI' : 'LIHAT', pwFocus:() => this.setState({ pwFocus:true }), pwBlur:() => this.setState({ pwFocus:false }),
-      emailBd:A.err && !emOk ? 'var(--bad)' : 'var(--line)', pwBd:A.err && A.pw.length < 8 ? 'var(--bad)' : 'var(--line)', authErr:A.err,
+      emailBd:A.err && !emOk ? 'var(--danger-bold)' : 'var(--border)', pwBd:A.err && A.pw.length < 8 ? 'var(--danger-bold)' : 'var(--border)', authErr:A.err,
       onEmail:e => this.setState({ email:e.target.value, authErr:'' }), onPw:e => this.setState({ pw:e.target.value, authErr:'' }), togglePw:() => this.setState(st => ({ showPw:!st.showPw })),
       submitAuth:e => { e.preventDefault(); if (A.mode === 'daftar' && this.props.live !== undefined) return this.setState({ authErr:'Pendaftaran hanya lewat tautan undangan dari admin.' }); if (A.mode === 'masuk' && this.props.live !== undefined) { const u = A.email.trim(); if (!u || !A.pw) return this.setState({ authErr:'Isi email dan password dulu.' }); this.setState({ authErr:'' }); api.post('/auth/login', { username:u, password:A.pw }).then(() => this.setState({ pre:null, page:'dash', demo:false, authErr:'' })).catch(err => this.setState({ authErr:(err && err.message) || 'Login gagal' })); return; } if (!emOk) return this.setState({ authErr:'Emailnya belum lengkap. Contoh: nama@gmail.com' }); if (A.pw.length < 8) return this.setState({ authErr:'Password minimal 8 karakter.' });
         if (A.mode === 'daftar') this.setState({ pre:'wizard', demo:false, wiz:0, authErr:'', testSt:'wait', oldPulled:0 });
@@ -620,28 +643,41 @@ export class V3Logic extends React.Component {
       googleId:() => this.toast('Prototipe: masuk Google hanya untuk identitas.'),
       wpad:isMob ? '12px 16px 32px' : '24px 32px 48px', wH:isMob ? '30px' : '40px', wizCols:isDesk ? 'minmax(0,1.3fr) minmax(0,.7fr)' : '1fr', wizTrackInline:!isDesk,
       w0:wiz === 0, w1:wiz === 1, w2:wiz === 2, w3:wiz === 3, w4:wiz === 4, w5:wiz === 5, w6:wiz === 6,
-      wizStepLabel:'LANGKAH ' + (wiz + 1) + ' DARI 7', wizNow:wiz + 1, wizSeg:[0, 1, 2, 3, 4, 5, 6].map(i => ({ bg:i < wiz ? 'var(--ink)' : i === wiz ? 'var(--acc)' : 'var(--line)' })),
+      wizStepLabel:'LANGKAH ' + (wiz + 1) + ' DARI 7', wizNow:wiz + 1, wizSeg:[0, 1, 2, 3, 4, 5, 6].map(i => ({ bg:i < wiz ? 'var(--text)' : i === wiz ? 'var(--brand)' : 'var(--border)' })),
       wizMood:mood, wizSay:say[wiz],
       wizBack:() => wiz === 0 ? this.setState({ pre:'auth' }) : this.setState({ wiz:wiz - 1 }),
-      wizSkip:() => this.setState({ pre:null, page:'dash' }), wizNext:() => { const n = wiz + 1; this.setState({ wiz:n }); if (n === 3) { this.setState({ codeSt:'wait' }); this.later(() => this.setState({ codeSt:'got' }), 2400); } if (n === 5) this.setState({ testSt:'wait' }); },
-      nick:s.nick ?? '', onNick:e => this.setState({ nick:e.target.value }), bankList, bankOther:!!banks.Lainnya,
+      wizSkip:() => (isLive ? finishLive() : this.setState({ pre:null, page:'dash' })), wizNext:() => { if (isLive && wiz === 0) return saveStep0(); const n = wiz + 1; this.setState({ wiz:n }); if (isLive) return; if (n === 3) { this.setState({ codeSt:'wait' }); this.later(() => this.setState({ codeSt:'got' }), 2400); } if (n === 5) this.setState({ testSt:'wait' }); },
+      nick:s.nick ?? (pf ? pf.displayName : ''), onNick:e => this.setState({ nick:e.target.value }), bankList, bankOther:!!banks.Lainnya,
+      fullName:s.fullName ?? (pf ? pf.fullName : ''), onFullName:e => this.setState({ fullName:e.target.value }),
+      accNums:s.accNums ?? (pf ? pf.accounts.map(a => a.accountNumber).join(', ') : ''), onAccNums:e => this.setState({ accNums:e.target.value, wzErr0:'' }), wzErr0:s.wzErr0 || '',
+      inAddr:inb ? inb.address : 'kamu-k3j9x@in.trackster.dev', fwdCode:inb && inb.forwardCode ? inb.forwardCode : '482 913', fwdFilter, fwdBanksTxt, simShow:!isLive && testSt === 'wait',
       toastImport:() => this.toast('Impor CSV/PDF: fase berikutnya.'), toastWait:() => this.toast('Kamu masuk daftar tunggu bank itu.'),
-      copyAddr:() => { this.setState({ copied:true }); this.toast('Alamat disalin.'); }, copyLabel:s.copied ? '✓ Tersalin' : 'Salin alamat', copyBg:s.copied ? 'var(--ok)' : 'var(--ink)',
+      copyAddr:() => { this.setState({ copied:true }); if (isLive && inb) copy(inb.address, 'Alamat disalin.'); else this.toast('Alamat disalin.'); }, copyLabel:s.copied ? '✓ Tersalin' : 'Salin alamat', copyBg:s.copied ? 'var(--success-bold)' : 'var(--text)',
       sendLink:() => { this.setState({ linkSent:true }); this.toast('Tautan dikirim ke emailmu.'); }, linkLabel:s.linkSent ? '✓ Tautan terkirim' : 'Kirim tautan ke emailku',
       togglePhone:() => this.setState(st => ({ phoneTry:!st.phoneTry })), phoneTry:String(!!s.phoneTry), phoneOpen:!!s.phoneTry, toggleAdmin:() => this.setState(st => ({ adminOpen:!st.adminOpen })), adminOpen:!!s.adminOpen,
       gmailSteps:[{ no:'1', t:'Gmail → ikon gear → Lihat semua setelan' }, { no:'2', t:'Tab “Penerusan dan POP/IMAP” → Tambahkan alamat penerusan' }, { no:'3', t:'Tempel alamat dari langkah 2, lalu Berikutnya' }, { no:'4', t:'Gmail mengirim kode. Kamu lihat kodenya di layar berikut.' }],
-      codeWait:codeSt === 'wait', codeGot:codeSt === 'got', codeOff:codeSt !== 'got', codeOp:codeSt === 'got' ? 1 : .4,
-      copyCode:() => this.toast('Kode disalin.'), resendCode:() => { this.setState({ codeSt:'wait' }); this.later(() => this.setState({ codeSt:'got' }), 2000); this.toast('Kode baru dikirim.'); },
-      copyFilter:() => this.toast('Teks filter disalin.'), filterOld:s.filterOld ?? true, toggleOld:() => this.setState(st => ({ filterOld:!(st.filterOld ?? true) })),
+      codeWait:codeSt === 'wait', codeGot:codeSt === 'got', codeOff:!isLive && codeSt !== 'got', codeOp:isLive || codeSt === 'got' ? 1 : .4,
+      copyCode:() => (isLive && inb && inb.forwardCode ? copy(inb.forwardCode, 'Kode disalin.') : this.toast('Kode disalin.')), resendCode:() => { if (isLive) { lv.refreshProfile(); return this.toast('Mengecek ulang. Kalau belum ada, klik “Kirim ulang” di Gmail.'); } this.setState({ codeSt:'wait' }); this.later(() => this.setState({ codeSt:'got' }), 2000); this.toast('Kode baru dikirim.'); },
+      copyFilter:() => (isLive ? copy(fwdFilter, 'Teks filter disalin.') : this.toast('Teks filter disalin.')), filterOld:s.filterOld ?? true, toggleOld:() => this.setState(st => ({ filterOld:!(st.filterOld ?? true) })),
       testTitle:titles[testSt], testWait:testSt === 'wait', testGot:testSt === 'got', testBad:testSt === 'bad', testIdle:testSt === 'idle', testDone:testSt === 'got' || testSt === 'bad', newRow, newTx:newRow, sisaTxt:RP(s.budget - this.spent()), oldCount:oldN || '',
       simGood:() => { const old = (s.filterOld ?? true); this.addTx('Kopi Kenangan', '13.22', 32000, 'BCA', 0); if (old) { this.addTx('Warung Padang Sederhana', '13.10', 38000, 'BCA', 1); this.addTx('Tokopedia · Kabel data', '14.20', 64000, 'BCA', 2); this.addTx('Spotify', '06.00', 54990, 'JAGO', 3); } this.setState({ testSt:'got', oldPulled:old ? 3 : 0, newTxView:{ n:'Kopi Kenangan', m:'13.22 · BCA · Makanan', a:'−Rp32.000' } }); },
       simBad:() => this.setState({ testSt:'bad' }),
       simIdle:() => this.setState({ testSt:'idle' }),
       budgetTxt2:RP(s.budget), budgetVal:String(s.budget), onBudget:e => this.setState({ wzBudget:parseInt(e.target.value, 10) }),
-      tgLabel:s.tgOn ? '✓ Terhubung' : 'Hubungkan', tgBg:s.tgOn ? 'var(--sage)' : 'transparent', tgC:'var(--ink)', connectTg:() => { this.setState(st => ({ tgOn:!st.tgOn })); this.toast(s.tgOn ? 'Telegram diputus.' : 'Telegram terhubung.'); },
+      tgLabel:(isLive ? !!(pf && pf.checklist.telegram) : s.tgOn) ? '✓ Terhubung' : 'Hubungkan', tgBg:(isLive ? !!(pf && pf.checklist.telegram) : s.tgOn) ? 'var(--brand-subtle)' : 'transparent', tgC:'var(--text)', connectTg:() => { if (isLive) return this.linkTelegram(); this.setState(st => ({ tgOn:!st.tgOn })); this.toast(s.tgOn ? 'Telegram diputus.' : 'Telegram terhubung.'); },
       toastPwa:() => this.toast('iOS: Bagikan → Tambah ke Layar Utama. Android: menu ⋮ → Instal aplikasi.'),
-      finishWiz:() => { this.setState({ pre:null, page:'dash' }); this.toast('Selamat datang di Trackster!'); }
+      finishWiz:() => { if (isLive) return finishLive(); this.setState({ pre:null, page:'dash' }); this.toast('Selamat datang di Trackster!'); }
     };
+  }
+
+  /** Member menautkan Telegram ke bot bersama: kode sekali pakai + tautan t.me yang mengirim /start <kode> otomatis. */
+  linkTelegram() {
+    const lv = this.props.live;
+    lv.actions.tgLinkCode().then(r => {
+      const url = r.botUsername ? `https://t.me/${r.botUsername}?start=${r.code}` : null;
+      this.confirm({ title:'Hubungkan Telegram', body:url ? `Tekan “Buka Telegram”, lalu tekan Start di chat bot. Kode berlaku ${r.expiresInMinutes} menit.` : `Kirim pesan /start ${r.code} ke bot Telegram Trackster. Kode berlaku ${r.expiresInMinutes} menit.`, primary:url ? 'Buka Telegram' : 'Selesai', secondary:'Tutup',
+        onPrimary:() => { if (url) window.open(url, '_blank', 'noopener'); this.closeModal(); lv.refresh(); lv.refreshProfile && lv.refreshProfile(); }, onSecondary:() => this.closeModal() });
+    }).catch(e => this.toast((e && e.message) || 'Gagal membuat kode tautan.'));
   }
 
   rv_shell(s, props) {

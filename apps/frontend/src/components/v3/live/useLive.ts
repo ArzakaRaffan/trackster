@@ -71,6 +71,8 @@ export function useLive(enabled: boolean, path: string, chatActive: number | nul
   const tidyRes = useGet(k('/transactions/uncategorized-merchants'));
   const billsRes = useGet(k('/split-bills'));
   const meRes = useGet(k('/auth/me'));
+  // Profil & onboarding (wizard /setup): di wizard di-poll supaya kode Gmail & email pertama muncul sendiri.
+  const profileRes = useGet(k('/profile'), { refreshInterval: path === '/setup' ? 4000 : 0 });
   const sugRes = useGet(enabled && path.startsWith('/app/budget') ? '/ai/budget-suggestions' : null);
 
   const manual = useMemo(() => {
@@ -345,6 +347,11 @@ export function useLive(enabled: boolean, path: string, chatActive: number | nul
       contribute: (id: number, b: { amount: number; note?: string }) => api.post(`/goal/${id}/contribute`, b),
       archiveGoal: (id: number) => api.patch(`/goal/${id}/archive`, {}),
       simulateGoal: (id: number, cutPercent: number) => api.post<any>(`/goal/${id}/simulate`, { cutPercent }),
+      // profil & wizard
+      saveProfile: (b: { displayName?: string; fullName?: string }) => api.patch<any>('/profile', b),
+      saveAccounts: (accounts: { source?: string; accountNumber: string }[]) => api.put<any>('/profile/accounts', { accounts }),
+      addBanks: (sources: string[]) => api.post<any>('/profile/banks', { sources }),
+      finishOnboarding: () => api.post<any>('/profile/onboarded'),
     }),
     [],
   );
@@ -357,6 +364,8 @@ export function useLive(enabled: boolean, path: string, chatActive: number | nul
     // Hanya ADMIN (pemilik) yang boleh isi chat ID manual; member menautkan lewat kode `/start` (backend menolak chat ID manual).
     isAdmin: (meRes.data?.user ?? meRes.data)?.role === 'ADMIN',
     todayISO,
+    profile: profileRes.data ?? null,
+    refreshProfile: () => profileRes.mutate(),
     st,
     chat,
     split,
