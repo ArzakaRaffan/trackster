@@ -1,4 +1,4 @@
-import { createHash, createHmac, timingSafeEqual } from 'crypto';
+import { createHash, createHmac, randomBytes, timingSafeEqual } from 'crypto';
 
 export const MAX_SKEW_MS = 5 * 60 * 1000;
 
@@ -36,4 +36,13 @@ export function parseForwardConfirmation(from: string, subject: string, text: st
   const code = /confirmation code:\s*(\d{6,12})/i.exec(text)?.[1] ?? /\(#(\d{6,12})\)/.exec(subject)?.[1];
   if (!code) return null;
   return { code, gmailSource: /from\s+([^\s@]+@[^\s@]+)/i.exec(subject)?.[1] };
+}
+
+/** localPart acak: 15 byte (120 bit) -> 24 karakter base32 huruf kecil (a-z2-7). Sama dengan `user-admin.js inbound`. */
+export function newLocalPart(): string {
+  const A = 'abcdefghijklmnopqrstuvwxyz234567';
+  let bits = '', out = '';
+  for (const b of randomBytes(15)) bits += b.toString(2).padStart(8, '0');
+  for (let i = 0; i < bits.length; i += 5) out += A[parseInt(bits.slice(i, i + 5), 2)];
+  return out;
 }

@@ -1,6 +1,6 @@
 import * as assert from 'assert';
 import { simpleParser } from 'mailparser';
-import { forwardEmailId, parseForwardConfirmation, parseLocalPart, signBody, verifySignature } from './inbound.util';
+import { forwardEmailId, newLocalPart, parseForwardConfirmation, parseLocalPart, signBody, verifySignature } from './inbound.util';
 
 const secret = 's3cret';
 const body = Buffer.from('From: a@b.c\r\n\r\nhalo');
@@ -49,3 +49,6 @@ assert.strictEqual(parseForwardConfirmation('x@bca.co.id', 'Confirmation code: 1
   assert.ok(m.html && m.html.includes('Nominal'));
   console.log('inbound.util.check OK');
 })();
+
+// alamat baru dari newLocalPart lolos parseLocalPart (format sama dgn CLI)
+{ const lp = newLocalPart(); assert.match(lp, /^[a-z2-7]{24}$/); assert.strictEqual(parseLocalPart(`u-${lp}@in.trackster.dev`, 'in.trackster.dev'), lp); assert.notStrictEqual(newLocalPart(), lp); }
