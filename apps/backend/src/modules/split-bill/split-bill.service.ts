@@ -1,4 +1,4 @@
-import { Injectable, ForbiddenException, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Injectable, ForbiddenException, NotFoundException } from '@nestjs/common';
 import { randomBytes } from 'crypto';
 import { Prisma, SplitBillItem, SplitBillParticipant, SplitBillItemShare, SplitBill } from '@prisma/client';
 import { PrismaService } from '../../prisma.service';
@@ -122,8 +122,59 @@ export class SplitBillService {
         items.push({ ...item, shares });
       }
 
+      if (userId !== null && dto.transactionId) await this.linkTransaction(tx, bill.id, userId, dto.transactionId);
       return { ...bill, participants, items };
     });
+  }
+
+  /** Tautkan bill (milik akun) ke transaksi pemiliknya lalu buat patungan untuk peserta selain pembuat. */
+  private async linkTransaction(tx: Prisma.TransactionClient, billId: number, userId: number, transactionId: number) {
+    const t = await tx.transaction.findFirst({ where: { id: transactionId, userId }, include: { splitBill: { select: { id: true } } } });
+    if (!t) throw new NotFoundException('Transaksi tidak ditemukan');
+    if (t.splitBill) throw new BadRequestException('Transaksi ini sudah punya split bill');
+    await tx.splitBill.update({ where: { id: billId }, data: { transactionId } });
+    await this.syncLinked(tx, billId);
+  }
+
+  /**
+   * Samakan Reimbursement tertaut dengan bagian tiap peserta (selain peserta pertama = pembuat) + status lunasnya.
+   * Patungan tertaut hanya mengubah `reimbursedAmount` (pengeluaran efektif), TIDAK saldo bank (keputusan Arzaka 2026-10-13:
+   * uang masuk tercatat lewat email bank/income, menghindari saldo dobel). Dipanggil setelah create, assign, dan tandai lunas.
+   */
+  async syncLinked(tx: Prisma.TransactionClient, billId: number) {
+    const bill = await tx.splitBill.findUnique({
+      where: { id: billId },
+      include: { participants: { orderBy: { id: 'asc' } }, items: { include: { shares: true } } },
+    });
+    if (!bill?.transactionId || bill.createdByUserId === null) return;
+    const userId = bill.createdByUserId;
+    const t = await tx.transaction.findFirst({ where: { id: bill.transactionId, userId } });
+    if (!t) return;
+
+    const totals = new Map(this.calculateTotals(bill).map((r) => [r.participantId, Math.round(r.total)]));
+    const existing = new Map(
+      (await tx.reimbursement.findMany({ where: { userId, transactionId: t.id, splitParticipantId: { not: null } } }))
+        .map((r) => [r.splitParticipantId!, r]),
+    );
+    let delta = 0; // perubahan reimbursedAmount
+    for (const p of bill.participants.slice(1)) {
+      const amount = totals.get(p.id) ?? 0, r = existing.get(p.id), wasReceived = r?.status === 'RECEIVED';
+      const paidData = p.isPaid
+        ? { status: 'RECEIVED' as const, receivedAt: p.paidAt ?? new Date(), receivedSource: t.source, balanceApplied: false }
+        : { status: 'PENDING' as const, receivedAt: null, receivedSource: null, balanceApplied: false };
+      if (amount <= 0) {
+        if (r) { await tx.reimbursement.deleteMany({ where: { id: r.id, userId } }); if (wasReceived) delta -= Number(r.amount); }
+        continue;
+      }
+      if (r) await tx.reimbursement.updateMany({ where: { id: r.id, userId }, data: { amount, personName: p.name, ...paidData } });
+      else await tx.reimbursement.create({ data: { userId, transactionId: t.id, personName: p.name, amount, splitParticipantId: p.id, ...paidData } });
+      delta += (p.isPaid ? amount : 0) - (wasReceived ? Number(r!.amount) : 0);
+    }
+    const all = await tx.reimbursement.aggregate({ where: { userId, transactionId: t.id }, _sum: { amount: true } });
+    if (Number(all._sum.amount ?? 0) > Number(t.amount)) {
+      throw new BadRequestException(`Total patungan (${Number(all._sum.amount)}) melebihi nominal transaksi (${Number(t.amount)})`);
+    }
+    if (delta) await tx.transaction.updateMany({ where: { id: t.id, userId }, data: { reimbursedAmount: { increment: delta } } });
   }
 
   async create(userId: number, dto: CreateSplitBillDto) {
@@ -180,6 +231,7 @@ export class SplitBillService {
           }
         });
       }
+      await this.syncLinked(tx, billId);
       return tx.splitBillItem.findUnique({
         where: { id: itemId },
         include: { shares: true }
@@ -266,9 +318,13 @@ export class SplitBillService {
     }
 
     const nextIsPaid = !participant.isPaid;
-    return this.prisma.splitBillParticipant.update({
-      where: { id: participantId },
-      data: { isPaid: nextIsPaid, paidAt: nextIsPaid ? new Date() : null },
+    return this.prisma.$transaction(async (tx) => {
+      const updated = await tx.splitBillParticipant.update({
+        where: { id: participantId },
+        data: { isPaid: nextIsPaid, paidAt: nextIsPaid ? new Date() : null },
+      });
+      await this.syncLinked(tx, bill.id); // bill tertaut: lunas langsung mengurangi pengeluaran pemilik (keputusan Arzaka)
+      return updated;
     });
   }
 }
