@@ -1,6 +1,7 @@
 name = "trackster-inbound"
 main = "src/index.js"
 compatibility_date = "2026-10-01"
+workers_dev = false   # Email Worker saja; tak perlu URL publik workers.dev
 
 [vars]
 INGEST_URL = "https://api.trackster.dev/ingest/email"

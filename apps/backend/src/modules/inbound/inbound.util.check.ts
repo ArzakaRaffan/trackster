@@ -39,6 +39,15 @@ assert.deepStrictEqual(
   parseForwardConfirmation('Gmail Team <forwarding-noreply@google.com>', '(#123456789) Gmail Forwarding Confirmation - Receive Mail from me@gmail.com', 'Confirmation code: 123456789'),
   { code: '123456789', gmailSource: 'me@gmail.com' },
 );
+// format nyata Gmail 2026-10-13 (link disamarkan): tanpa kode angka, ambil link vf- bukan uf- (batal)
+{
+  const vf = 'https://mail.google.com/mail/vf-%5BANGjdJ8yTEST%5D-NVG5z5TEST';
+  const body = `me@gmail.com has requested to automatically forward mail to your email\naddress u+x@in.trackster.dev.\n\nplease click the link below to confirm the request:\n\n${vf}\n\nIf you accidentally\nclicked the link ... click this link to cancel this\nverification:\nhttps://mail.google.com/mail/uf-%5BANGjdJ_CANCEL%5D-NVG5z5TEST\n`;
+  assert.deepStrictEqual(
+    parseForwardConfirmation('Gmail Team <forwarding-noreply@google.com>', '(Gmail Forwarding Confirmation - Receive Mail from me@gmail.com', body),
+    { code: vf, gmailSource: 'me@gmail.com' },
+  );
+}
 assert.strictEqual(parseForwardConfirmation('x@bca.co.id', 'Confirmation code: 123456', 'Confirmation code: 123456'), null, 'bukan dari Google');
 
 // MIME HTML-only (seperti email bank) terbaca mailparser

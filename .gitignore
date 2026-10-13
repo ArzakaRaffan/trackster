@@ -20,3 +20,6 @@ docs/context/Gotchas.md
 docs/context/Product.md
 apps/backend/prisma/seed-income-streams.js
 .claude/settings.local.json
+
+# wrangler (Cloudflare Worker) cache lokal
+.wrangler/

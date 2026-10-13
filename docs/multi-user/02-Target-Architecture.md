@@ -187,8 +187,8 @@ Pipeline hilir **sama** dengan sekarang (`TransactionService.createFromParsed`, 
 
 ### 6.2 Konfirmasi forwarding Gmail
 
-Gmail mewajibkan alamat tujuan forward diverifikasi: Gmail mengirim email ber-kode ke alamat itu. Backend mengenali (pengirim/subjek — **uji nyata**, audit §10.5) dan menyimpan kode/tautan ke
-`InboundAddress.lastForwardCode(+At)`, kedaluwarsa singkat; wizard menampilkan kode itu ke user ("Salin kode ini ke Gmail"). Kode **tidak** diproses sebagai transaksi dan tidak disimpan lama.
+Gmail mewajibkan alamat tujuan forward diverifikasi: Gmail mengirim email konfirmasi ke alamat itu (sampel nyata 2026-10-13: **hanya link** `https://mail.google.com/mail/vf-…`, tanpa kode angka). Backend mengenali (pengirim/subjek — **uji nyata**, audit §10.5) dan menyimpan kode/tautan ke
+`InboundAddress.lastForwardCode(+At)`, kedaluwarsa singkat; wizard menampilkan tombol "Konfirmasi di Gmail ↗" yang membuka link itu (format lama berkode angka: tampil & disalin). Kode **tidak** diproses sebagai transaksi dan tidak disimpan lama.
 Setelah user menyelesaikan dan email bank pertama masuk → `forwardVerifiedAt` terisi → checklist aktivasi hijau.
 
 ### 6.3 API token (B)
