@@ -243,3 +243,11 @@ deviasi dari rencana (+alasan), env baru yang Arzaka harus tambahkan, langkah be
 - Catatan: wizard melompat ke langkah 5 saat reload bila link sudah ada (perilaku lama `inb.forwardCode ? 4`), bukan regresi. Warning compose `INBOUND_DOMAIN not set` tak berbahaya (default dipakai).
 - **Langkah berikutnya:** (1) Arzaka merge PR `fix/gmail-confirm-link`. (2) Hapus rule sementara `u+pf42…@` → Gmail. (3) Gmail → Forwarding → "Kirim ulang email" → cek wizard/Setting
   memunculkan tombol konfirmasi (uji P7-05 di prod) → klik → konfirmasi. (4) Buat filter Gmail bank → forward (shadow) → tunggu email bank nyata → cek `EmailParseLog` SHADOW (runbook §6).
+- **Susulan (2026-10-13 malam):** PR #10 di-merge & ter-deploy (09:39 UTC; situs 200, `/auth/me` 401, `/ingest/email` 401). Rule sementara `u+pf42…@` → Gmail dihapus Arzaka.
+  Gmail "Kirim ulang email" → wizard langkah 4 menampilkan tombol "Konfirmasi di Gmail ↗" → konfirmasi Gmail sukses; wizard full flow di prod tanpa masalah. **P7-05 ✅.**
+- **Filter Gmail Arzaka:** awalnya belum dibuat (wizard selesai, tapi 3 email BCA 10:55–11:55 UTC hanya tercatat lewat Gmail sync, tak ada `POST /ingest/email`).
+  Dibuat manual: `from:(bca OR jago OR flip)` → Forward to `u+pf42…@in.trackster.dev`; opsi global Gmail = **Disable forwarding** (opsi "Forward a copy of incoming mail" meneruskan SEMUA email — jangan).
+  Catatan UX: wizard langkah 5 sebaiknya menegaskan "klik Create filter → centang Forward it to" dan memperingatkan opsi forward-semua (belum diubah).
+  Alamat Arzaka tetap `shadow=true` → email bank yang diteruskan hanya jadi `EmailParseLog` SHADOW, tidak menulis transaksi. Email promo "blu by BCA Digital" ikut lolos `canHandle` (kata "bca") → diharapkan unparsed/shadow tanpa efek.
+- **Langkah berikutnya:** (1) setelah transaksi BCA/Jago/Flip berikutnya: cek nginx `POST /ingest/email 200` + `EmailParseLog` SHADOW `would: EXPENSE…`. (2) Runbook §6: ≥7 hari SHADOW
+  mencakup semua jenis email; bangun `compare-shadow.ts` (P7-07); cutover ⛔ hanya dgn izin Arzaka.
