@@ -19,7 +19,7 @@ Snapshot 2026-10-05. Kalau nambah module/route/cron, update file ini.
 | subscription | `/subscriptions` | CRUD + sync event Google Calendar (`googleCalendarEventId`). |
 | telegram | `/telegram` | config/test (JWT) + `POST /telegram/webhook/:secret` (public; cek secret + chatId). |
 | ai | `/ai` | `chat`, `mascot-tip`, health-score history, trigger manual laporan. |
-| split-bill | `/split-bills` | privat (JWT) + `public`, `manage/:ownerToken`, `public/:slug`. Scan struk: `split-bill-ai.service.ts`. |
+| split-bill | `/split-bills` | privat (JWT) + `public`, `manage/:ownerToken`, `public/:slug`. Scan struk: `split-bill-ai.service.ts`. Bill akun bisa ditautkan ke 1 transaksi (`transactionId`): peserta selain yang pertama (= pembuat) jadi `Reimbursement` tertaut (`splitParticipantId`), disinkronkan `syncLinked()` setelah create/assign/tandai lunas; patungan tertaut hanya mengurangi `reimbursedAmount`, tidak menggerakkan saldo. |
 
 ### AI internals (`modules/ai/`)
 - `ai.service.ts` — client OpenAI-compat/Anthropic-style + `runToolLoop()`. Env: `AI_BASE_URL`,
