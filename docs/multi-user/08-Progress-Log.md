@@ -218,3 +218,6 @@ deviasi dari rencana (+alasan), env baru yang Arzaka harus tambahkan, langkah be
 - **Verifikasi pasca-merge (DB scratch `trackster` di Postgres 17 lokal :5434, bukan prod):** build backend bersih (dist dihapus dulu); `tsc` frontend bersih;
   `npm run check` 26/26; `tenancy-audit` 0; `inbound-e2e` 11/11; **`isolation-e2e` 176/176** (A=`owner_test`, B=user undangan baru, `ISO_PRE_C1=0`).
   `next build` tidak dijalankan lokal — sudah lolos di CI (Dockerfile frontend `npm run build`, job build sukses untuk `05b42af`). Backend & Postgres lokal dimatikan.
+- Arzaka: backup DB VPS ✅, `INGEST_HMAC_SECRET` ditambah ke `.env` VPS ✅ (container belum di-restart; deploy PR #8 yang membuat ulang backend).
+- PR [#8](https://github.com/ArzakaRaffan/trackster/pull/8) `feat/multi-user-launch` → `main` dibuka (fix compose + docs), **Arzaka merge sendiri**. Saat sesi ini ditutup: masih OPEN, `/ingest/email` prod masih 503.
+- **Langkah berikutnya:** (1) setelah PR #8 merge + CD sukses: cek situs/API/login/Telegram/log backend, `/ingest/email` tanpa tanda tangan harus 401. (2) Runbook §5 per langkah dengan izin: Email Routing `in.trackster.dev` → deploy Worker (`wrangler deploy` + `wrangler secret put INGEST_HMAC_SECRET`) → catch-all ke Worker → tes ke alamat shadow Arzaka.
