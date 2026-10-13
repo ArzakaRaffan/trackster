@@ -163,3 +163,23 @@ deviasi dari rencana (+alasan), env baru yang Arzaka harus tambahkan, langkah be
   query parser simple, header keamanan, batas DTO publik, dll. Detail & bukti: [`09-Security-Audit.md`](09-Security-Audit.md).
 - Tes baru: `scripts/security-e2e.mjs` (10/10), `report/csv.check.ts`. Regresi: check 25/25, tenancy 0, auth 9/9, ingest 18/18, isolasi 176/176.
 - Butuh Arzaka: persetujuan merge `fix/security-audit` → `main`; R1 rotasi `JWT_SECRET`/`TELEGRAM_WEBHOOK_SECRET`; R4–R9 di dokumen audit.
+
+## 2026-10-13 — Kesiapan peluncuran: audit "masih personal", wizard nyata, Worker, copy, EN
+- Sesi oleh: Claude (Opus 5.5)   Branch: `feat/multi-user-launch` (dari `fix/ui-ux-audit` + merge `feat/multi-user`; lokal, **belum di-push**)
+- Permintaan Arzaka: identifikasi bagian yang terasa app pribadi + percepat multi-user (wizard belum dicek, belum ada user nyata,
+  bug tersembunyi, copy terasa AI, forwarding belum dites, ganti bahasa aneh). Hasil audit: [`10-Launch-Readiness.md`](10-Launch-Readiness.md).
+- **Selesai & terverifikasi (DB scratch `trackster_launch`, akun undangan baru, browser):**
+  - Merge `feat/multi-user` (P7-04 inbound) ke cabang ini; konflik `package.json`/lockfile (lib Telegram sudah dihapus di main) & `main.ts` diselesaikan.
+  - P8-01 modul `profile`; P8-02 wizard nyata + redirect akun baru; Setting email bank/profil; saldo semua bank; Sumber data per bank user.
+  - P7-03 kode Worker (`infra/cloudflare-worker/`) — diuji memanggil backend lokal (HMAC diterima, `recorded`). `scripts/send-eml.mjs` untuk uji .eml asli.
+  - Telegram member: tautan `t.me/<bot>?start=<kode>` (username dari `getMe`, butuh `TELEGRAM_BOT_TOKEN` di env — sudah ada di prod).
+  - Copy: hapus janji palsu (QR, kirim tautan, impor file, tarik email lama, "minat tercatat", retensi 7 hari di Privasi), teks BCA/Jago-only, "Arzaka".
+  - EN: aturan teks dinamis + 66 entri kamus, `<html lang>`, Tanya Track menjawab sesuai bahasa UI (field `lang` opsional di `POST /ai/threads/:id/messages[/stream]`).
+  - Bug: variabel CSS prototipe tak terdefinisi (`--ink/--line/--acc/...`) → progress bar wizard & tombol Salin tak terlihat; saldo negatif tampil positif.
+- **Verifikasi:** build backend bersih (dist+tsbuildinfo dihapus dulu); `tsc` frontend bersih; `npm run check` 26/26; `tenancy-audit` 0; `inbound-e2e` 11/11.
+  **Tidak dijalankan:** `isolation-e2e`, `next build`, AI chat EN (tak ada kunci AI lokal), Gmail asli (butuh DNS).
+- **Belum / butuh Arzaka:** keputusan §G di 10-Launch-Readiness (harga/Plus, email support, O6, DNS P7-02, O9); push & merge ⛔.
+  Teks landing/harga belum diubah (keputusan produk). Halaman di luar app v3 (`/invite`, `/reset`, tools publik, legal) belum punya EN.
+- **Env VPS baru saat deploy:** `INGEST_HMAC_SECRET` (dari P7-04), opsional `INBOUND_DOMAIN`. Tidak ada migrasi baru selain `20261008100000_parse_status_shadow` (aditif).
+- **Efek ke Arzaka:** tidak diarahkan ke wizard (punya transaksi). Alamat penerusannya dibuat dalam mode shadow (punya GmailToken) — aman dari transaksi ganda.
+- **Langkah berikutnya:** (1) Arzaka review & izinkan push branch. (2) P7-02 DNS ke Cloudflare (runbook §4, per langkah). (3) Deploy Worker, uji Gmail asli dgn alamat Arzaka shadow. (4) Undang 1 tester.

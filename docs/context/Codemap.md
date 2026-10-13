@@ -110,3 +110,9 @@ Dipakai di baris Hari ini, detail transaksi, Setting → Alias merchant (+ logo 
 - `modules/gmail/email-pipeline.service.ts` — pipeline email->parse->saldo/kategori/Telegram, dipakai Gmail sync DAN inbound (opsi `shadow` = log `ParseStatus.SHADOW`, tanpa tulis data).
 - `modules/inbound/` — `POST /ingest/email` (HMAC `X-Trackster-Signature` = HMAC(secret, `ts.to.sha256(body)`) — `to` = header `X-Trackster-To`, ts ms ±5 mnt, body MIME mentah via `express.raw` di `main.ts`, maks 3MB). Alamat `u-<24 char base32>@in.trackster.dev` -> `InboundAddress`. Bukan pengirim bank (`ParserRegistryService.canHandle`) = dibuang. Email konfirmasi Gmail -> `lastForwardCode`.
 - CLI: `node prisma/user-admin.js inbound --username u [--shadow on|off] [--rotate]`. Tes: `inbound.util.check.ts`, `scripts/inbound-e2e.mjs`.
+
+## Profil & onboarding (P8, branch feat/multi-user-launch)
+- `modules/profile/` — `GET /profile` (nama, nama di rekening, `OwnAccount`, bank = baris `BankBalance`, alamat inbound dibuat malas — shadow bila user punya `GmailToken`, hasil email forward terakhir, checklist aktivasi), `PATCH /profile`, `PUT /profile/accounts` (ganti semua), `POST /profile/banks` (tambah saja), `POST /profile/onboarded`.
+- Frontend: `useLive` memuat `/profile` (poll 4 dtk di `/setup`); `V3Host` mengarahkan akun baru (belum onboarded & tanpa transaksi) ke `/setup`; wizard live di `logic.tsx#rv_pre` (langkah diturunkan dari data server). `/setup` tidak lagi publik (`middleware.ts`).
+- Setting → Koneksi: baris Email bank + Nama & rekening (semua user); kartu Gmail & Calendar hanya pemilik (`live.isAdmin`).
+- Worker Cloudflare: `infra/cloudflare-worker/` (`wrangler.toml`, secret `INGEST_HMAC_SECRET`). Uji email asli tanpa DNS: `apps/backend/scripts/send-eml.mjs`.
