@@ -192,3 +192,32 @@ deviasi dari rencana (+alasan), env baru yang Arzaka harus tambahkan, langkah be
 - Verifikasi: tsc FE/BE bersih, `npm run check` 26/26, browser: login username, lupa password, sidebar, halaman Menu, tanggal EN.
 - Biaya forwarding: Rp0 (Cloudflare Email Routing + Worker free plan; tidak perlu mailbox perusahaan).
 - **Langkah berikutnya:** (1) Arzaka cek DNSSEC di name.com (P7-02 langkah 1). (2) Kumpulkan sampel .eml BNI/Mandiri/BRI/Raya (§H). (3) Deploy backend (butuh izin merge ke main + `INGEST_HMAC_SECRET` di .env VPS) sebelum Worker/Email Routing.
+
+## 2026-10-13 (lanjutan) — P7-02 langkah 2–4: zona Cloudflare siap
+- Langkah 2: TTL A `@`/`api` sudah 300 (tidak perlu diubah).
+- Langkah 3–4: zona `trackster.dev` dibuat (Free), impor otomatis = 2 A + 1 TXT, cocok dengan inventaris O1. Kedua A di-set **DNS only**.
+  Diverifikasi query langsung ke `julian.ns.cloudflare.com`: `@`/`api` → 43.157.208.202 (IP asli = bukan proxy), TXT google-site-verification ada.
+- NS Cloudflare: `julian.ns.cloudflare.com`, `sierra.ns.cloudflare.com`. NS lama (rollback): `ns1bcp/ns2nsw/ns3npv/ns4cpw.name.com`.
+- Abaikan saran Cloudflare "only allow Cloudflare IPs at origin" — record DNS only, firewall seperti itu akan mematikan situs.
+- **Langkah berikutnya:** langkah 5 (ganti NS di name.com) — dilakukan Arzaka.
+- Langkah 5–6 (2026-10-13 ±11:00 WIB): NS di name.com diganti ke Cloudflare; registry `.dev` & 8.8.8.8 sudah Cloudflare, 1.1.1.1 masih cache NS lama (IP sama → tak berpengaruh).
+  `@`/`api` → 43.157.208.202, TXT verifikasi ada, situs 200, `api/auth/me` 401 (normal), sertifikat Let's Encrypt s/d 2026-12-29.
+  Catatan: perintah dry-run runbook §4.7 (`--entrypoint "certbot renew --dry-run"`) diganti `--entrypoint certbot certbot renew --dry-run` (entrypoint berspasi tidak dipecah compose).
+- Langkah 7: dry-run `--cert-name trackster.dev` gagal `rateLimited: Service busy` (staging Let's Encrypt kelebihan beban, bukan konfigurasi). Jalur HTTP-01
+  dibuktikan manual: file uji di webroot certbot → `http://{trackster.dev,api.trackster.dev}/.well-known/acme-challenge/p702-test` = 200 `ok-p702` dari internet.
+  Susulan: dry-run `trackster.dev` ✅ `all simulated renewals succeeded`; file uji dihapus (404). Catatan: renew terjadwal 03:55 UTC memperpanjang `api.ai.trackster.my.id` (proyek lain) ±6 mnt; sertifikat baru butuh reload Nginx.
+- **Langkah berikutnya:** langkah 8 pantau 24–48 jam (situs, API, webhook Telegram, CD). Lalu runbook §5 (Email Routing + Worker) — butuh backend dgn modul inbound ter-deploy dulu.
+
+## 2026-10-13 (lanjutan) — persiapan deploy inbound + runbook §5
+- Sesi oleh: Claude (Opus 5.5)   Branch: `feat/multi-user-launch`
+- **Temuan 1:** branch ini **sudah di-merge ke `main`** oleh Arzaka (PR #7, 10:46 WIB) dan ter-deploy (CD sukses). `fix/security-audit` juga sudah di main (0 commit tertinggal).
+  Migrasi `20261008100000_parse_status_shadow` sudah jalan di prod (backend start normal). Prod: situs 200, `auth/me` 401, `POST /ingest/email` = **503 "Inbound email belum dikonfigurasi"** (secret belum ada).
+  Selisih branch vs main kini hanya docs P7-02 + perbaikan compose di bawah.
+- **Temuan 2 (bug deploy):** `docker-compose.prod.yml` tidak meneruskan `INGEST_HMAC_SECRET`/`INBOUND_DOMAIN` ke container backend → isi `.env` VPS tidak sampai. Diperbaiki (commit `fix(deploy)`), perlu masuk `main`.
+  Catatan: `MAX_USERS` (runbook §7) juga tidak diteruskan; default 10 cukup untuk ≤5 tester, sengaja tidak ditambah.
+- **Verifikasi pasca-merge (DB scratch `trackster` di Postgres 17 lokal :5434, bukan prod):** build backend bersih (dist dihapus dulu); `tsc` frontend bersih;
+  `npm run check` 26/26; `tenancy-audit` 0; `inbound-e2e` 11/11; **`isolation-e2e` 176/176** (A=`owner_test`, B=user undangan baru, `ISO_PRE_C1=0`).
+  `next build` tidak dijalankan lokal — sudah lolos di CI (Dockerfile frontend `npm run build`, job build sukses untuk `05b42af`). Backend & Postgres lokal dimatikan.
+- Arzaka: backup DB VPS ✅, `INGEST_HMAC_SECRET` ditambah ke `.env` VPS ✅ (container belum di-restart; deploy PR #8 yang membuat ulang backend).
+- PR [#8](https://github.com/ArzakaRaffan/trackster/pull/8) `feat/multi-user-launch` → `main` dibuka (fix compose + docs), **Arzaka merge sendiri**. Saat sesi ini ditutup: masih OPEN, `/ingest/email` prod masih 503.
+- **Langkah berikutnya:** (1) setelah PR #8 merge + CD sukses: cek situs/API/login/Telegram/log backend, `/ingest/email` tanpa tanda tangan harus 401. (2) Runbook §5 per langkah dengan izin: Email Routing `in.trackster.dev` → deploy Worker (`wrangler deploy` + `wrangler secret put INGEST_HMAC_SECRET`) → catch-all ke Worker → tes ke alamat shadow Arzaka.
