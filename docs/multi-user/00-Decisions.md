@@ -41,7 +41,7 @@ Mengubah status ke LOCKED hanya setelah Arzaka menyetujui di chat. Catat tanggal
 
 | ID | Pertanyaan | Dibutuhkan sebelum |
 | --- | --- | --- |
-| O1 | ✅ **Dijawab 2026-10-08 (sebagian).** Record name.com: A `@` & A `api` → 43.157.208.202 (TTL 300), TXT `google-site-verification=GzdUlTXG…` (TTL 3600). **Tidak ada** MX/CAA/www/CNAME. **DNSSEC: belum dikonfirmasi** (harus dicek & dimatikan sebelum ganti NS). | Fase 7 (runbook DNS) |
+| O1 | ✅ **Dijawab 2026-10-08 (sebagian).** Record name.com: A `@` & A `api` → 43.157.208.202 (TTL 300), TXT `google-site-verification=GzdUlTXG…` (TTL 3600). **Tidak ada** MX/CAA/www/CNAME. **DNSSEC: mati** (dicek Arzaka 2026-10-13: tidak ada DNSKEY maupun DS di registry) — aman ganti NS. | Fase 7 (runbook DNS) |
 | O2 | Berapa maksimum user tester (menentukan perlu/tidaknya batas di sistem)? Usulan: hard cap 10 lewat env `MAX_USERS`. | Fase 5 |
 | O3 | Angka kuota AI per user per hari? | Fase 9 |
 | O10 | ✅ **Dijawab 2026-10-13:** email support/kontak (privasi, syarat, lupa password) = `arzakaraffan@gmail.com`. Tidak ada mailbox perusahaan berbayar: alamat inbound `u-…@in.trackster.dev` memakai Cloudflare Email Routing + Worker (gratis, tanpa mailbox). | Fase 7/9 |
