@@ -1,4 +1,6 @@
 import { createHash, createHmac, randomBytes, timingSafeEqual } from 'crypto';
+import type { ParsedMail } from 'mailparser';
+import { htmlToText } from '../gmail/parsers/parser.interface';
 
 export const MAX_SKEW_MS = 5 * 60 * 1000;
 
@@ -45,4 +47,11 @@ export function newLocalPart(): string {
   for (const b of randomBytes(15)) bits += b.toString(2).padStart(8, '0');
   for (let i = 0; i < bits.length; i += 5) out += A[parseInt(bits.slice(i, i + 5), 2)];
   return out;
+}
+
+/** Teks body yang dibaca parser: text/plain bila ada, kalau tidak html->teks (meniru jalur Gmail, parser dibuat untuk itu).
+ *  Dipakai inbound DAN scripts/parse-eml.ts supaya uji offline memakai jalur yang persis sama. */
+export function mailBodyText(raw: Buffer, mail: Pick<ParsedMail, 'text' | 'html'>): string {
+  const hasPlain = /^content-type:\s*text\/plain/im.test(raw.toString('latin1'));
+  return (hasPlain && mail.text) || (mail.html ? htmlToText(mail.html) : mail.text) || '';
 }

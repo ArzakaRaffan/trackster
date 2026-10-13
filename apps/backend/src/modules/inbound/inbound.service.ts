@@ -3,9 +3,9 @@ import { simpleParser } from 'mailparser';
 import { PrismaService } from '../../prisma.service';
 import { EmailPipelineService } from '../gmail/email-pipeline.service';
 import { ParserRegistryService } from '../gmail/parsers/parser-registry.service';
-import { RawEmail, htmlToText } from '../gmail/parsers/parser.interface';
+import { RawEmail } from '../gmail/parsers/parser.interface';
 import { TelegramService } from '../telegram/telegram.service';
-import { forwardEmailId, parseForwardConfirmation, parseLocalPart, sha256hex, verifySignature } from './inbound.util';
+import { forwardEmailId, mailBodyText, parseForwardConfirmation, parseLocalPart, sha256hex, verifySignature } from './inbound.util';
 
 @Injectable()
 export class InboundService {
@@ -49,9 +49,7 @@ export class InboundService {
       return { ok: true, result: 'forward-confirmation' };
     }
 
-    // ponytail: text/plain bila ada, kalau tidak html->teks — sama dengan jalur Gmail (parser dibuat untuk itu); sampel nyata P7-06 yang memvalidasi.
-    const hasPlain = /^content-type:\s*text\/plain/im.test(body.toString('latin1'));
-    const text = (hasPlain && mail.text) || (mail.html ? htmlToText(mail.html) : mail.text) || '';
+    const text = mailBodyText(body, mail);
     const emailId = forwardEmailId(mail.messageId, `${from}|${subject}|${receivedAt.toISOString()}|${sha256hex(body)}`);
     const raw: RawEmail = { id: emailId, from, subject, body: text, internalDate: String(receivedAt.getTime()) };
 
