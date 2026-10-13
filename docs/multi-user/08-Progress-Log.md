@@ -243,18 +243,3 @@ deviasi dari rencana (+alasan), env baru yang Arzaka harus tambahkan, langkah be
 - Catatan: wizard melompat ke langkah 5 saat reload bila link sudah ada (perilaku lama `inb.forwardCode ? 4`), bukan regresi. Warning compose `INBOUND_DOMAIN not set` tak berbahaya (default dipakai).
 - **Langkah berikutnya:** (1) Arzaka merge PR `fix/gmail-confirm-link`. (2) Hapus rule sementara `u+pf42…@` → Gmail. (3) Gmail → Forwarding → "Kirim ulang email" → cek wizard/Setting
   memunculkan tombol konfirmasi (uji P7-05 di prod) → klik → konfirmasi. (4) Buat filter Gmail bank → forward (shadow) → tunggu email bank nyata → cek `EmailParseLog` SHADOW (runbook §6).
-
-## 2026-10-13 (malam) — bug nominal Rp603, patungan ↔ split bill, mulai audit menyeluruh
-- Sesi oleh: Claude (Opus 5.5). Arzaka memberi izin: audit + fix tanpa minta izin per langkah, push ke **branch baru** (bukan `main`; Arzaka yang merge). Data prod/DNS tetap minta izin.
-- **Forwarding live:** `POST /ingest/email 200` (29 byte = `shadow`) dari Cloudflare 14:45 UTC — filter Gmail Arzaka bekerja.
-- **Bug nominal** (`fix/parse-rupiah-decimal`, commit `ecc9571`): `parseRupiah("IDR 603.00")` = 60300 (cabang "titik = ribuan" membuang titik desimal) — semua nominal BCA < Rp1.000 ×100. Aturan baru: pemisah + tepat 2 digit di akhir = sen. 67/67 asersi parser.
-  Transaksi Rp60.300 Arzaka (14:32 UTC) perlu dikoreksi manual (skrip node dry-run → `APPLY=1` diberikan ke Arzaka, setelah backup) — **status: menunggu Arzaka**.
-- **Patungan** (`feat/patungan-split`):
-  1. Bug: "Sudah transfer" tak bisa diklik tepat setelah menambah orang — `rbRun` menunggu `live.refresh()` penuh (prod: detik). Kunci dibuka setelah daftar patungan termuat (terukur 219 ms lokal).
-  2. Bug prod: **membuat split bill dari app selalu 400** — `useLive` membaca `/auth/me` sebagai objek user padahal bentuknya `{ user }` → peserta pertama bernama kosong. Diperbaiki (+ fallback "Saya").
-  3. Bug: item tanpa assignee ("kosong = dibagi rata") dikirim tanpa shares → backend menghitung Rp0 (halaman teman juga Rp0). Payload kini mengirim semua peserta.
-  4. Fitur: split bill ditautkan ke transaksi (migrasi aditif `20261014100000_split_bill_transaction_link`: `SplitBill.transactionId`, `Reimbursement.splitParticipantId`, unik + FK SET NULL).
-     Keputusan Arzaka: teman menandai lunas di halaman publik → pengeluaran **langsung** berkurang; patungan tertaut **hanya** mengurangi pengeluaran (saldo tidak bergerak — uang masuk tercatat lewat email bank/income, hindari dobel). Patungan biasa tetap seperti dulu.
-     UI kartu transaksi: tombol "Bagi lewat split bill" (wizard terisi nama/tanggal/subtotal struk), baris tertaut berlabel "· split bill" tanpa tombol hapus, "Buka split bill".
-  Verifikasi (DB scratch): `split-link.check.ts` (baru), `npm run check` 27/27, `tenancy-audit` 0, tsc FE/BE bersih, build BE bersih; browser: buat dari transaksi → lunas di split → kartu "Lunas · split bill" & pengeluaran 60rb→40rb; "Sudah transfer" di kartu → split LUNAS, pengeluaran 20rb, saldo BCA tetap.
-- **Env/migrasi saat deploy:** migrasi aditif baru (otomatis saat container start). Tidak ada env baru.
