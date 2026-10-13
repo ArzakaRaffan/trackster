@@ -36,7 +36,7 @@ export class ProfileService {
       accounts,
       banks: balances.map((b) => b.source),
       inbound: {
-        address: `u-${inbound.localPart}@${domain}`,
+        address: `u+${inbound.localPart}@${domain}`,
         verified: !!inbound.forwardVerifiedAt,
         lastEmailAt: inbound.lastEmailAt,
         forwardCode: inbound.lastForwardCode,

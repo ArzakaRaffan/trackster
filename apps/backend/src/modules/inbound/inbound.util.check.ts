@@ -21,11 +21,12 @@ assert.ok(!verifySignature('', ts, sig, to, body, now), 'secret kosong tak boleh
 
 // alamat
 const lp = 'abcdefghijklmnopqrst2345';
-assert.strictEqual(parseLocalPart(`u-${lp}@in.trackster.dev`, 'in.trackster.dev'), lp);
-assert.strictEqual(parseLocalPart(`<U-${lp.toUpperCase()}@IN.Trackster.dev>`, 'in.trackster.dev'), lp);
-assert.strictEqual(parseLocalPart(`u-${lp}@trackster.dev`, 'in.trackster.dev'), null, 'domain salah');
-assert.strictEqual(parseLocalPart('u-abc@in.trackster.dev', 'in.trackster.dev'), null, 'terlalu pendek (bisa ditebak)');
+assert.strictEqual(parseLocalPart(`u+${lp}@in.trackster.dev`, 'in.trackster.dev'), lp);
+assert.strictEqual(parseLocalPart(`<U+${lp.toUpperCase()}@IN.Trackster.dev>`, 'in.trackster.dev'), lp);
+assert.strictEqual(parseLocalPart(`u+${lp}@trackster.dev`, 'in.trackster.dev'), null, 'domain salah');
+assert.strictEqual(parseLocalPart('u+abc@in.trackster.dev', 'in.trackster.dev'), null, 'terlalu pendek (bisa ditebak)');
 assert.strictEqual(parseLocalPart(undefined, 'in.trackster.dev'), null);
+assert.strictEqual(parseLocalPart(`u-${lp}@in.trackster.dev`, 'in.trackster.dev'), null, 'format lama u- tak dirutekan Cloudflare');
 
 // dedup id stabil
 assert.strictEqual(forwardEmailId('<m1@x>', 'a'), forwardEmailId(' <m1@x> ', 'b'));
@@ -51,4 +52,4 @@ assert.strictEqual(parseForwardConfirmation('x@bca.co.id', 'Confirmation code: 1
 })();
 
 // alamat baru dari newLocalPart lolos parseLocalPart (format sama dgn CLI)
-{ const lp = newLocalPart(); assert.match(lp, /^[a-z2-7]{24}$/); assert.strictEqual(parseLocalPart(`u-${lp}@in.trackster.dev`, 'in.trackster.dev'), lp); assert.notStrictEqual(newLocalPart(), lp); }
+{ const lp = newLocalPart(); assert.match(lp, /^[a-z2-7]{24}$/); assert.strictEqual(parseLocalPart(`u+${lp}@in.trackster.dev`, 'in.trackster.dev'), lp); assert.notStrictEqual(newLocalPart(), lp); }

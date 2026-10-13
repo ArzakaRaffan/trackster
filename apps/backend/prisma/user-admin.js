@@ -2,7 +2,7 @@
 //   node prisma/user-admin.js invite --for "Nama"        cetak URL undangan sekali pakai (kedaluwarsa 7 hari)
 //   node prisma/user-admin.js reset --username <u>        cetak URL reset password sekali pakai (24 jam)
 //   node prisma/user-admin.js list
-//   node prisma/user-admin.js inbound --username <u> [--shadow on|off] [--rotate]   buat/lihat alamat email-forward (u-<acak>@in.trackster.dev)
+//   node prisma/user-admin.js inbound --username <u> [--shadow on|off] [--rotate]   buat/lihat alamat email-forward (u+<acak>@in.trackster.dev)
 //   node prisma/user-admin.js disable|enable --username <u>
 // Hanya HASH kode/token yang disimpan; URL dicetak sekali di sini. Kirim ke user lewat kanal pribadi.
 // Catatan: backend menyimpan status user di cache ≤30 dtk, jadi `disable` efektif paling lama 30 dtk kemudian.
@@ -40,7 +40,7 @@ async function main(prisma) {
     const addr = existing
       ? (Object.keys(data).length ? await prisma.inboundAddress.update({ where: { id: existing.id }, data }) : existing)
       : await prisma.inboundAddress.create({ data: { userId: user.id, localPart: b32(), shadow: shadow === 'on' } });
-    console.log(`${user.username}: u-${addr.localPart}@${inboundDomain}  (shadow=${addr.shadow}, aktif=${addr.isActive}, terverifikasi=${addr.forwardVerifiedAt ? 'ya' : 'belum'})`);
+    console.log(`${user.username}: u+${addr.localPart}@${inboundDomain}  (shadow=${addr.shadow}, aktif=${addr.isActive}, terverifikasi=${addr.forwardVerifiedAt ? 'ya' : 'belum'})`);
   } else if (cmd === 'reset' || cmd === 'disable' || cmd === 'enable') {
     const username = arg('username');
     if (!username) throw new Error('--username wajib');

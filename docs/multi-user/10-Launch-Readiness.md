@@ -46,10 +46,10 @@ Tiga tingkat, dari yang tidak butuh DNS sampai end-to-end nyata:
 
 1. **Lokal, email sintetis** (sudah ada): `node scripts/inbound-e2e.mjs` — 11 skenario (HMAC salah, replay, alamat asing, dedup, non-bank dibuang, isolasi A/B, shadow, konfirmasi Gmail, >3MB).
 2. **Lokal, email bank ASLI** (baru): di Gmail buka email notifikasi bank → ⋮ → *Download message* (`.eml`). Lalu
-   `node scripts/send-eml.mjs --file contoh.eml --to u-xxxx@in.trackster.dev` (backend lokal, secret sama dengan `INGEST_HMAC_SECRET`).
+   `node scripts/send-eml.mjs --file contoh.eml --to u+xxxx@in.trackster.dev` (backend lokal, secret sama dengan `INGEST_HMAC_SECRET`).
    Ini menguji parser terhadap format MIME asli tanpa Cloudflare. File `.eml` asli **jangan di-commit** (repo publik).
 3. **End-to-end nyata** (butuh P7-02/P7-03 — DNS ke Cloudflare, ⛔ izin Arzaka per langkah): deploy Worker `infra/cloudflare-worker/`,
-   aktifkan Email Routing `in.trackster.dev` catch-all → Worker, lalu dari Gmail tambahkan alamat penerusan → kode konfirmasi muncul di
+   aktifkan Email Routing `in.trackster.dev` rule `u@in.trackster.dev` → Worker (subaddressing; catch-all tak ada di subdomain), lalu dari Gmail tambahkan alamat penerusan → kode konfirmasi muncul di
    wizard langkah 4 → buat filter → kirim email uji. Mulai dengan alamat Arzaka `shadow=on` (P3) agar tidak dobel dengan Gmail sync.
 
 ## E. Copywriting

@@ -3,8 +3,8 @@
 // Dipakai untuk menguji parser dengan email bank ASLI tanpa DNS/Cloudflare: di Gmail buka email → ⋮ → "Download message".
 // File .eml asli berisi data pribadi: simpan di luar repo, JANGAN di-commit.
 //
-//   INGEST_HMAC_SECRET=<sama dgn backend> node scripts/send-eml.mjs --file email.eml --to u-xxxx@in.trackster.dev [--base http://localhost:4000]
-//   ... --gmail-confirm --to u-xxxx@in.trackster.dev    kirim email konfirmasi penerusan Gmail tiruan (kode acak) untuk menguji wizard langkah 4
+//   INGEST_HMAC_SECRET=<sama dgn backend> node scripts/send-eml.mjs --file email.eml --to u+xxxx@in.trackster.dev [--base http://localhost:4000]
+//   ... --gmail-confirm --to u+xxxx@in.trackster.dev    kirim email konfirmasi penerusan Gmail tiruan (kode acak) untuk menguji wizard langkah 4
 import { createHash, createHmac, randomInt } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 
@@ -13,7 +13,7 @@ const base = arg('--base') ?? 'http://localhost:4000';
 const to = arg('--to');
 const secret = process.env.INGEST_HMAC_SECRET;
 if (!secret || !to) {
-  console.error('Pakai: INGEST_HMAC_SECRET=... node scripts/send-eml.mjs (--file x.eml | --gmail-confirm) --to u-xxxx@in.trackster.dev [--base URL]');
+  console.error('Pakai: INGEST_HMAC_SECRET=... node scripts/send-eml.mjs (--file x.eml | --gmail-confirm) --to u+xxxx@in.trackster.dev [--base URL]');
   process.exit(1);
 }
 

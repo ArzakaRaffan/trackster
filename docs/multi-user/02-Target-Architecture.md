@@ -48,7 +48,7 @@ User Arzaka (id 1 — verifikasi, P13) → `role=ADMIN`, `fullName`/`displayName
 | `Invite` | `id, codeHash (sha256), createdByUserId, forUsernameHint?, expiresAt, usedAt?, usedByUserId?` | Kode acak ≥ 128 bit, **hanya hash disimpan**; sekali pakai; kedaluwarsa 7 hari. Kode ditampilkan sekali oleh CLI. |
 | `OneTimeToken` (atau `PasswordResetToken`) | `id, userId, kind (RESET), tokenHash, expiresAt, usedAt?` | Reset password buatan admin (P14). Boleh digabung dengan `Invite` via kolom `kind`. |
 | `ApiToken` | `id, userId, label, tokenHash (sha256), prefix (6 char utk tampilan), scopes[] ('INGEST'), createdAt, lastUsedAt?, revokedAt?` | Token plaintext ditampilkan **sekali** saat dibuat. Format: `trk_<base62 32+ char>`. Cari via hash. |
-| `InboundAddress` | `id, userId @unique, localPart @unique (acak ≥ 96 bit, base32), gmailSource? (alamat Gmail pengirim-forward), forwardVerifiedAt?, lastEmailAt?, lastForwardCode?, lastForwardCodeAt?, isActive, rotatedAt?` | Alamat lengkap `u-<localPart>@in.trackster.dev` (usulan O8). Rotasi = ganti `localPart` (alamat lama mati). |
+| `InboundAddress` | `id, userId @unique, localPart @unique (acak ≥ 96 bit, base32), gmailSource? (alamat Gmail pengirim-forward), forwardVerifiedAt?, lastEmailAt?, lastForwardCode?, lastForwardCodeAt?, isActive, rotatedAt?` | Alamat lengkap `u+<localPart>@in.trackster.dev` (usulan O8). Rotasi = ganti `localPart` (alamat lama mati). |
 | `OwnAccount` | `id, userId, source Source?, label?, accountNumber (digit-only), createdAt` ; `@@unique([userId, accountNumber])` | Pengganti `OWNER_ACCOUNT_NUMBERS`. Nama pemilik di `User.fullName` (+ opsional `aliases String[]`). |
 | `TelegramLink` | `id, userId @unique, chatId @unique, linkedAt, isActive, notifyEveryTransaction` ; + `TelegramLinkCode(userId, codeHash, expiresAt)` | Bot bersama (P2). Menggantikan `TelegramConfig`. |
 | `AiUsage` | `userId, dayKey (WIB), kind ('CHAT'…), count` ; `@@unique([userId, dayKey, kind])` | Kuota (P9). |
@@ -170,8 +170,8 @@ Pipeline hilir **sama** dengan sekarang (`TransactionService.createFromParsed`, 
 
 ### 6.1 Email forwarding (A)
 
-1. **Alamat**: `u-<localPart>@in.trackster.dev`. `localPart` acak (≥ 96 bit) → tak bisa ditebak; ini penghalang spoofing utama.
-2. **Cloudflare Email Routing** (subdomain `in.`) → aturan "catch-all → Email Worker". Worker (±20 baris): ambil `message.to`, `message.from`, `message.raw`;
+1. **Alamat**: `u+<localPart>@in.trackster.dev`. `localPart` acak (≥ 96 bit) → tak bisa ditebak; ini penghalang spoofing utama.
+2. **Cloudflare Email Routing** (subdomain `in.`) → rule literal `u@in.trackster.dev` + Subaddressing → Email Worker (catch-all hanya apex). Worker (±20 baris): ambil `message.to`, `message.from`, `message.raw`;
    `POST https://api.trackster.dev/ingest/email` dengan body = raw MIME, header: `X-Trackster-To`, `X-Trackster-Timestamp`, `X-Trackster-Signature = HMAC-SHA256(secret, timestamp + "." + to + "." + sha256(body))` (`to` = nilai `X-Trackster-To`, ditandatangani agar tak bisa diputar ulang ke alamat lain)`.
    Retry 3× (backoff). Jika gagal total: `message.forward(<alamat dead-letter admin>)` supaya email tidak hilang (replay aman karena dedup).
 3. **Backend `/ingest/email`** (publik tapi **bukan** pakai JWT): verifikasi HMAC + timestamp ±5 menit (anti replay) + batas ukuran (mis. 2MB; Nginx sudah 20M) → cari `InboundAddress` dari `X-Trackster-To` → `userId`.

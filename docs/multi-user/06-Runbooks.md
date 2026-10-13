@@ -76,10 +76,14 @@ Prasyarat: O1 terjawab. Lakukan di jam sepi. Siapkan **catatan NS lama** (`ns1bc
 
 ## 5. Email Routing + Worker (F7)
 
-1. Di zona Cloudflare: Email → Email Routing → aktifkan untuk subdomain `in.trackster.dev` (menambah MX/TXT Cloudflare). Baca dokumentasi terbaru dulu (dukungan subdomain, batas) — catat versi/tanggal di Progress Log.
-2. Buat Worker `trackster-inbound` (kode di `infra/cloudflare-worker/` repo, tanpa rahasia); `wrangler secret put INGEST_HMAC_SECRET` (nilai sama dengan env backend); var `INGEST_URL=https://api.trackster.dev/ingest/email`, `DEAD_LETTER=<alamat admin terverifikasi>`.
-3. Routing: catch-all `*@in.trackster.dev` → Worker.
-4. Tes: kirim email ke `u-<localPart>@in.trackster.dev` dari Gmail Arzaka → cek log backend + `EmailParseLog`.
+> Dok Cloudflare dibaca 2026-10-13 (subdomains: diperbarui 2026-09-25; addresses: 2026-10-12): **catch-all hanya untuk apex**, subdomain
+> butuh rule literal per alamat. Karena itu alamat user = `u+<localPart>@in.trackster.dev` (subaddressing RFC 5233): **satu** rule literal
+> `u@in.trackster.dev` → Worker; `+<localPart>` tetap ada di `message.to`. Batas: inbound ≤25 MiB, 200 rule/domain, 30 domain/zona.
+
+1. Compute → Email Service → Email Routing → pilih `trackster.dev` → Settings → **Subdomains**: tambah `in` (Cloudflare menambah record DNS-nya sendiri). Settings → aktifkan **Subaddressing**.
+2. Worker `trackster-inbound` (kode di `infra/cloudflare-worker/` repo, tanpa rahasia): `npx wrangler deploy` lalu `npx wrangler secret put INGEST_HMAC_SECRET` (nilai sama dengan env backend); var `INGEST_URL=https://api.trackster.dev/ingest/email`, opsional `DEAD_LETTER=<alamat admin terverifikasi>`.
+3. Routing rules (domain `in.trackster.dev`): rule literal `u@in.trackster.dev` → action *Send to a Worker* → `trackster-inbound`.
+4. Tes routing (tanpa data): `npx wrangler tail trackster-inbound`, kirim email ke `u+tesrouting@in.trackster.dev` → Worker harus terpicu, backend balas 200 `ignored` (alamat tak dikenal). Lalu tes nyata: email ke alamat user (`user-admin.js inbound --username <u>`) dari Gmail Arzaka → cek log backend + `EmailParseLog`.
 5. Monitoring: bila Worker gagal POST → `message.forward(DEAD_LETTER)`; cek dashboard Workers → Logs.
 
 ## 6. Shadow mode & cutover owner (F7)

@@ -34,7 +34,7 @@ tetapi **belum diuji untuk user bulanan-murni**; ini wajib diuji di F8 (P8-06) d
 ## 3. Tutorial: Forward email bank (Gmail)
 
 Layar bertahap dengan gambar (screenshot **tanpa data nyata**):
-1. Tampilkan alamat unik user: `u-xxxxxxxx@in.trackster.dev` + tombol Salin. Peringatan: "rahasiakan alamat ini".
+1. Tampilkan alamat unik user: `u+xxxxxxxx@in.trackster.dev` + tombol Salin. Peringatan: "rahasiakan alamat ini".
 2. "Di Gmail → Setelan → Penerusan dan POP/IMAP → Tambahkan alamat penerusan → tempel alamat ini."
 3. Gmail mengirim kode ke alamat itu → Trackster **menampilkan kodenya di sini** (auto-refresh); user menyalinnya ke Gmail → konfirmasi. (Verifikasi format email konfirmasi dulu — audit §10.5.)
 4. **Buat filter** (bukan teruskan semua email!): tombol "Salin query filter" menghasilkan `from:(<domain bank pilihan>)`; instruksi: Gmail → Setelan → Filter → buat filter → "Teruskan ke" alamat ini.
