@@ -200,3 +200,6 @@ deviasi dari rencana (+alasan), env baru yang Arzaka harus tambahkan, langkah be
 - NS Cloudflare: `julian.ns.cloudflare.com`, `sierra.ns.cloudflare.com`. NS lama (rollback): `ns1bcp/ns2nsw/ns3npv/ns4cpw.name.com`.
 - Abaikan saran Cloudflare "only allow Cloudflare IPs at origin" — record DNS only, firewall seperti itu akan mematikan situs.
 - **Langkah berikutnya:** langkah 5 (ganti NS di name.com) — dilakukan Arzaka.
+- Langkah 5–6 (2026-10-13 ±11:00 WIB): NS di name.com diganti ke Cloudflare; registry `.dev` & 8.8.8.8 sudah Cloudflare, 1.1.1.1 masih cache NS lama (IP sama → tak berpengaruh).
+  `@`/`api` → 43.157.208.202, TXT verifikasi ada, situs 200, `api/auth/me` 401 (normal), sertifikat Let's Encrypt s/d 2026-12-29.
+  Catatan: perintah dry-run runbook §4.7 (`--entrypoint "certbot renew --dry-run"`) diganti `--entrypoint certbot certbot renew --dry-run` (entrypoint berspasi tidak dipecah compose).

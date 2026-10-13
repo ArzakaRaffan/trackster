@@ -68,7 +68,7 @@ Prasyarat: O1 terjawab. Lakukan di jam sepi. Siapkan **catatan NS lama** (`ns1bc
    ```
 7. Verifikasi pembaruan sertifikat (di VPS, hormati CAUTION). Mekanisme renew proyek: service `certbot` di `docker-compose.prod.yml` menjalankan `certbot renew` tiap 12 jam (webroot `/var/www/certbot`, HTTP-01 lewat Nginx port 80). Uji tanpa efek:
    ```bash
-   docker compose -f docker-compose.prod.yml run --rm --entrypoint "certbot renew --dry-run" certbot   # verifikasi sintaks perintah sebelum menjalankan
+   docker compose -f docker-compose.prod.yml run --rm --entrypoint certbot certbot renew --dry-run
    ```
    HTTP-01 hanya berhasil bila domain menunjuk langsung ke VPS (karena itu record **DNS only**, bukan proxy oranye).
 8. Pantau 24–48 jam (situs, API, Telegram webhook, CD).
