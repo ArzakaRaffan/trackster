@@ -212,10 +212,10 @@ export function useLive(enabled: boolean, path: string, chatActive: number | nul
     const agoMs = (iso: string | null) => (iso ? now - new Date(iso).getTime() : null);
     const short = (ms: number | null) => (ms === null ? 'menunggu' : ms < 90_000 ? 'baru saja' : ms < 3600e3 ? Math.round(ms / 60e3) + ' mnt lalu' : ms < 86400e3 ? Math.round(ms / 3600e3) + ' jam lalu' : Math.round(ms / 86400e3) + ' hari lalu');
     const long = (ms: number | null) => (ms === null ? '' : ms < 90_000 ? 'baru saja' : ms < 3600e3 ? Math.round(ms / 60e3) + ' menit lalu' : ms < 86400e3 ? Math.round(ms / 3600e3) + ' jam lalu' : Math.round(ms / 86400e3) + ' hari lalu');
-    const bankOf = (l: any) => { const f = String(l.from ?? '').toLowerCase() + ' ' + String(l.parser ?? '').toLowerCase(); return f.includes('flip') ? 'FLIP' : f.includes('jago') ? 'JAGO' : f.includes('bca') ? 'BCA' : null; };
+    const bankOf = (l: any) => { if (l.parser) return String(l.parser).toUpperCase(); const f = String(l.from ?? '').toLowerCase(); return f.includes('flip') ? 'FLIP' : f.includes('jago') ? 'JAGO' : f.includes('bca') ? 'BCA' : null; };
     const connected = !!gmailRes.data?.connected || !!profileRes.data?.inbound?.verified; // Gmail (pemilik) atau penerusan aktif
     const out: Record<string, any> = {};
-    for (const b of ['BCA', 'JAGO', 'FLIP']) {
+    for (const b of ['BCA', 'JAGO', 'FLIP', 'MANDIRI', 'BNI', 'BRI', 'RAYA']) {
       const mine = logs.filter((l) => bankOf(l) === b);
       const lastIso = mine.length ? mine.reduce((a, l) => (new Date(l.receivedAt) > new Date(a) ? l.receivedAt : a), mine[0].receivedAt) : null;
       const recorded = mine.filter((l) => l.status === 'RECORDED' && wibISO(new Date(l.receivedAt).getTime()).startsWith(monthStart)).length;
