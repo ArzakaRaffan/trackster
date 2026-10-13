@@ -183,3 +183,12 @@ deviasi dari rencana (+alasan), env baru yang Arzaka harus tambahkan, langkah be
 - **Env VPS baru saat deploy:** `INGEST_HMAC_SECRET` (dari P7-04), opsional `INBOUND_DOMAIN`. Tidak ada migrasi baru selain `20261008100000_parse_status_shadow` (aditif).
 - **Efek ke Arzaka:** tidak diarahkan ke wizard (punya transaksi). Alamat penerusannya dibuat dalam mode shadow (punya GmailToken) — aman dari transaksi ganda.
 - **Langkah berikutnya:** (1) Arzaka review & izinkan push branch. (2) P7-02 DNS ke Cloudflare (runbook §4, per langkah). (3) Deploy Worker, uji Gmail asli dgn alamat Arzaka shadow. (4) Undang 1 tester.
+
+## 2026-10-13 (lanjutan) — jawaban Arzaka, push, perbaikan login/sidebar, alat parse-eml
+- Arzaka: setuju P3 + mulai P7-02 (DNS) bertahap; email support = arzakaraffan@gmail.com (O10); BNI/Mandiri/BRI/Raya wajib siap (O6-b); minta push.
+- Push `feat/multi-user-launch` ke origin (bukan `main`, CD tidak jalan).
+- Tambahan: `scripts/parse-eml.ts` (uji parser offline dgn .eml asli, jalur teks sama dgn inbound via `mailBodyText`); login live pakai Username
+  (dulu label Email), Google & Plus palsu disembunyikan di live, status sidebar dari /profile; bug lama regex bulan (karakter backspace) → "Oktober" tak terjemah.
+- Verifikasi: tsc FE/BE bersih, `npm run check` 26/26, browser: login username, lupa password, sidebar, halaman Menu, tanggal EN.
+- Biaya forwarding: Rp0 (Cloudflare Email Routing + Worker free plan; tidak perlu mailbox perusahaan).
+- **Langkah berikutnya:** (1) Arzaka cek DNSSEC di name.com (P7-02 langkah 1). (2) Kumpulkan sampel .eml BNI/Mandiri/BRI/Raya (§H). (3) Deploy backend (butuh izin merge ke main + `INGEST_HMAC_SECRET` di .env VPS) sebelum Worker/Email Routing.

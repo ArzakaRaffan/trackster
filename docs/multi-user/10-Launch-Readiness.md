@@ -73,3 +73,19 @@ Cara kerja: `v3tr()` menerjemahkan **node teks DOM** lewat kamus (1.137 entri) +
 3. **O6** bank yang dipakai tester (parser BNI/Mandiri/BRI/Raya belum pernah diuji email asli).
 4. **DNS Cloudflare** (P7-02) — langkah per langkah dengan izin.
 5. **O9** reminder langganan untuk tester (Telegram atau tidak ada).
+
+## H. Kesiapan parser BNI / Mandiri / BRI / Raya (O6-b)
+Parser & fixture dibuat dari **teks yang ditempel**, bukan email MIME asli. Risiko utama: tata letak HTML asli setelah `htmlToText`
+berbeda dari teks contoh → `UNPARSED` (email tidak hilang dari log, tapi transaksi tidak tercatat otomatis).
+
+Yang dibutuhkan per bank (masing-masing ≥1 `.eml`, Gmail → ⋮ → *Download message*):
+| Bank | Sudah ada (teks) | Masih perlu sampel |
+|---|---|---|
+| Mandiri (Livin') | QRIS, top-up, transfer online | transfer sesama Mandiri, bayar tagihan/VA, uang masuk |
+| BNI (wondr) | "Transaksi Berhasil" QRIS | transfer, top-up e-wallet, VA, uang masuk |
+| BRI (BRImo) | transfer sesama BRI; QRIS (label tujuan **ditebak**) | QRIS asli, transfer antar bank, top-up, VA |
+| Raya | QRIS, uang masuk, cashback | transfer keluar |
+
+Alur per sampel (±5–15 menit): `npx ts-node -T scripts/parse-eml.ts sampel.eml` → kalau `UNPARSED`, perbaiki parser →
+`--fixture … --redact "Nama Asli"` → baca ulang fixture (hapus data pribadi) → tambah assert di `parsers.check.ts` → `npm run check`.
+Catatan: notifikasi email harus diaktifkan di aplikasi bank (BRImo khususnya). Wizard sudah mengingatkan.
