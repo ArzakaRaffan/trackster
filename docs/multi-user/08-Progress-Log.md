@@ -192,3 +192,11 @@ deviasi dari rencana (+alasan), env baru yang Arzaka harus tambahkan, langkah be
 - Verifikasi: tsc FE/BE bersih, `npm run check` 26/26, browser: login username, lupa password, sidebar, halaman Menu, tanggal EN.
 - Biaya forwarding: Rp0 (Cloudflare Email Routing + Worker free plan; tidak perlu mailbox perusahaan).
 - **Langkah berikutnya:** (1) Arzaka cek DNSSEC di name.com (P7-02 langkah 1). (2) Kumpulkan sampel .eml BNI/Mandiri/BRI/Raya (§H). (3) Deploy backend (butuh izin merge ke main + `INGEST_HMAC_SECRET` di .env VPS) sebelum Worker/Email Routing.
+
+## 2026-10-13 (lanjutan) — P7-02 langkah 2–4: zona Cloudflare siap
+- Langkah 2: TTL A `@`/`api` sudah 300 (tidak perlu diubah).
+- Langkah 3–4: zona `trackster.dev` dibuat (Free), impor otomatis = 2 A + 1 TXT, cocok dengan inventaris O1. Kedua A di-set **DNS only**.
+  Diverifikasi query langsung ke `julian.ns.cloudflare.com`: `@`/`api` → 43.157.208.202 (IP asli = bukan proxy), TXT google-site-verification ada.
+- NS Cloudflare: `julian.ns.cloudflare.com`, `sierra.ns.cloudflare.com`. NS lama (rollback): `ns1bcp/ns2nsw/ns3npv/ns4cpw.name.com`.
+- Abaikan saran Cloudflare "only allow Cloudflare IPs at origin" — record DNS only, firewall seperti itu akan mematikan situs.
+- **Langkah berikutnya:** langkah 5 (ganti NS di name.com) — dilakukan Arzaka.
