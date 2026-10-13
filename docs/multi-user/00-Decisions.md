@@ -41,14 +41,14 @@ Mengubah status ke LOCKED hanya setelah Arzaka menyetujui di chat. Catat tanggal
 
 | ID | Pertanyaan | Dibutuhkan sebelum |
 | --- | --- | --- |
-| O1 | Apakah ada record DNS lain di name.com untuk `trackster.dev` yang harus dibawa (MX apex, TXT verifikasi, CAA)? Apakah **DNSSEC** aktif di name.com? (Harus dimatikan sebelum ganti NS.) | Fase 7 (runbook DNS) |
+| O1 | ✅ **Dijawab 2026-10-08 (sebagian).** Record name.com: A `@` & A `api` → 43.157.208.202 (TTL 300), TXT `google-site-verification=GzdUlTXG…` (TTL 3600). **Tidak ada** MX/CAA/www/CNAME. **DNSSEC: belum dikonfirmasi** (harus dicek & dimatikan sebelum ganti NS). | Fase 7 (runbook DNS) |
 | O2 | Berapa maksimum user tester (menentukan perlu/tidaknya batas di sistem)? Usulan: hard cap 10 lewat env `MAX_USERS`. | Fase 5 |
 | O3 | Angka kuota AI per user per hari? | Fase 9 |
 | O4 | Teks privasi: apakah halaman `/app/privacy` perlu ditulis ulang untuk kondisi multi-user (siapa admin, apa yang admin bisa lihat, penghapusan akun)? Arzaka secara teknis bisa membaca DB — harus dijelaskan jujur ke tester. | Fase 9 (sebelum undang tester pertama) |
 | O5 | Kebijakan hapus akun & ekspor data (usulan: ekspor JSON + hapus permanen oleh admin atas permintaan, 1 perintah skrip). | Fase 9 |
 | O6 | Daftar bank/dompet yang tester pakai (menentukan parser baru yang dibutuhkan; parser sekarang: BCA, Jago, Flip, BNI, Mandiri, Raya, BRI). | Fase 8 (untuk "bank yang didukung" di wizard) |
 | O7 | Perangkat tester: iPhone semua (Shortcuts) atau ada Android (perlu alternatif: HTTP Shortcuts/Tasker/aplikasi, atau Telegram sebagai jalur input)? | Fase 6 |
-| O8 | Nama/alamat inbound: `in.trackster.dev` (usulan) — setuju? | Fase 7 |
+| O8 | ✅ **Disetujui 2026-10-08:** `in.trackster.dev`, alamat `u-<kode-acak>@in.trackster.dev`. | Fase 7 |
 | O9 | Reminder langganan untuk non-owner: bikin cron reminder Telegram (kecil, ~½ hari), atau v1 tanpa reminder? | Fase 4 |
 
 ## D. Catatan konsekuensi dari keputusan terkunci

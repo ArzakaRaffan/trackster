@@ -2,6 +2,7 @@ import { Module, forwardRef } from '@nestjs/common';
 import { GmailController } from './gmail.controller';
 import { GmailAuthService } from './gmail-auth.service';
 import { GmailSyncService } from './gmail-sync.service';
+import { EmailPipelineService } from './email-pipeline.service';
 import { ParserRegistryService } from './parsers/parser-registry.service';
 import { BcaParser } from './parsers/bca.parser';
 import { JagoParser } from './parsers/jago.parser';
@@ -35,6 +36,7 @@ import { BalanceModule } from '../balance/balance.module';
   providers: [
     GmailAuthService,
     GmailSyncService,
+    EmailPipelineService,
     ParserRegistryService,
     BcaParser,
     JagoParser,
@@ -45,6 +47,6 @@ import { BalanceModule } from '../balance/balance.module';
     BriParser,
     PrismaService,
   ],
-  exports: [GmailSyncService, GmailAuthService],
+  exports: [GmailSyncService, GmailAuthService, EmailPipelineService, ParserRegistryService],
 })
 export class GmailModule {}

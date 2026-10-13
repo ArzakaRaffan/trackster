@@ -33,6 +33,7 @@
     "class-validator": "^0.14.1",
     "cookie-parser": "^1.4.6",
     "googleapis": "^144.0.0",
+    "mailparser": "^3.9.36",
     "passport": "^0.7.0",
     "passport-jwt": "^4.0.1",
     "reflect-metadata": "^0.2.2",
@@ -45,6 +46,7 @@
     "@types/bcrypt": "^5.0.2",
     "@types/cookie-parser": "^1.4.7",
     "@types/express": "^4.17.21",
+    "@types/mailparser": "^3.9.0",
     "@types/node": "^20.14.0",
     "@types/passport-jwt": "^4.0.1",
     "prisma": "^5.19.0"

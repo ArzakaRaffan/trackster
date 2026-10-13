@@ -141,6 +141,20 @@ deviasi dari rencana (+alasan), env baru yang Arzaka harus tambahkan, langkah be
 - Catatan: token Gmail/Telegram dihapus dari SALINAN restore sebelum backend dijalankan (cegah cron memakai kredensial asli). `BudgetSetting` kosong di data prod (bukan akibat migrasi). `pg_dump` baru menyisipkan `\unrestrict` yang tak dikenali psql — error tak berbahaya di akhir restore.
 - Belum: P0-06 (cek `TELEGRAM_BOT_TOKEN` env VPS = token bot), merge/deploy ⛔, P6-05/06, rotasi `JWT_SECRET`.
 
+## 2026-10-08 — F7 dibuka: O1 & O8 dijawab
+- Sesi oleh: Claude (Sonnet 5.5)   Branch: `feat/multi-user`
+- O1: inventaris DNS name.com = A `@`, A `api` (43.157.208.202, TTL 300), TXT google-site-verification (3600). Tidak ada MX/CAA/www. **DNSSEC belum dikonfirmasi** — wajib dicek sebelum P7-02.
+- O8: `in.trackster.dev` disetujui.
+- Gerbang tersisa: ⛔ persetujuan eksplisit **per langkah DNS** (P7-02, P7-03), P3/P6 untuk cutover. Kode P7-04 (modul `inbound`) boleh dikerjakan tanpa menyentuh DNS.
+
+## 2026-10-08 — P7-04 modul inbound (kode selesai, belum merge)
+- Sesi oleh: Claude (Sonnet 5.5)   Branch: `feat/multi-user`
+- **Selesai:** (1) Refactor: logika `processMessage/processIncome/applyBalanceOnlyDebit/resolveCategory/logParseResult/checkAndAlertIfOverBudget` dipindah dari `GmailSyncService` ke `EmailPipelineService` (satu implementasi untuk Gmail & inbound). (2) Modul `inbound`: `POST /ingest/email` (HMAC + timestamp ±5 mnt + 3MB), lookup `InboundAddress` (alamat salah/nonaktif -> 200 diam), `mailparser`, penyaringan pengirim bank via `ParserRegistryService.canHandle`, deteksi konfirmasi forwarding Gmail (format **belum diverifikasi**, P7-05), `lastEmailAt`/`forwardVerifiedAt`, mode shadow. (3) Migrasi `20261008100000_parse_status_shadow` (`ALTER TYPE ParseStatus ADD VALUE 'SHADOW'`, aditif). (4) CLI `user-admin.js inbound`. (5) `mailparser` + `@types/mailparser` (lockfile diregenerasi).
+- **Verifikasi (DB scratch, bukan prod):** `tsc` bersih; build backend bersih; `npm run check` 25/25; `tenancy-audit` 0; `scripts/inbound-e2e.mjs` 11/11 (401 sig salah, 401 replay, alamat asing diam, tercatat hanya untuk pemilik alamat, dedup Message-ID, non-bank dibuang, isolasi A/B, shadow tanpa tulis data, alamat nonaktif, konfirmasi Gmail, 413 >3MB). **Belum diuji:** regresi Gmail sync terhadap Gmail asli (refactor murni pindah kode; cron prod belum dijalankan dgn kode ini) dan `docker build`/CI dengan dependensi baru.
+- **Keputusan kecil:** timestamp HMAC = epoch **ms**; localPart = 24 char base32 (120 bit); body email = text/plain bila ada, kalau tidak `htmlToText(html)` (meniru jalur Gmail) — divalidasi sampel nyata di P7-06. Anti-spoof baru lapis (i) alamat rahasia; lapis (ii)-(iii) menunggu sampel (P7-06).
+- **Env VPS baru (sebelum deploy):** `INGEST_HMAC_SECRET` (acak panjang; nilai SAMA dgn Worker), opsional `INBOUND_DOMAIN`. Migrasi baru otomatis jalan saat start.
+- **Belum:** P7-01 (baca dok Cloudflare), P7-03 Worker `infra/cloudflare-worker/`, P7-05 UI kode konfirmasi, `compare-shadow.ts`, P7-02 DNS (⛔ + DNSSEC belum dikonfirmasi).
+- **Langkah berikutnya:** P7-03 (Worker ±20 baris) lalu P7-01 baca dokumentasi Cloudflare; DNS menunggu Arzaka.
 ## 2026-10-10 — Audit keamanan menyeluruh (branch `fix/security-audit` dari `origin/main`)
 - Sesi oleh: Claude (Opus 5.5)   Branch: `fix/security-audit` (lokal, belum di-push) + 1 commit di `feat/multi-user` (HMAC inbound).
 - Catatan status: `origin/main` (prod) ternyata sudah berisi F1–F6 + penghapusan `/income/quick`; `feat/multi-user` lokal tertinggal 5 commit.
