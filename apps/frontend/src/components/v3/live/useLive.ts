@@ -305,11 +305,11 @@ export function useLive(enabled: boolean, path: string, chatActive: number | nul
       tokCreate: (label: string) => api.post<{ id: number; token: string }>('/api-tokens', { label }),
       tokRevoke: (id: number) => api.delete(`/api-tokens/${id}`),
       correctBalance: (source: string, newBalance: number, note: string) => api.put(`/balance/${source}`, { newBalance, note: note || undefined }),
-      chatSend: async (threadId: number | null, text: string) => {
+      chatSend: async (threadId: number | null, text: string, lang: 'id' | 'en' = 'id') => {
         let id = threadId;
         if (!id) id = (await api.post<{ id: number }>('/ai/threads')).id;
         let failed: string | null = null;
-        await api.postStream(`/ai/threads/${id}/messages/stream`, { text }, (e) => { if (e.type === 'error') failed = e.message; });
+        await api.postStream(`/ai/threads/${id}/messages/stream`, { text, lang }, (e) => { if (e.type === 'error') failed = e.message; });
         if (failed) throw new Error(failed);
         return id as number;
       },

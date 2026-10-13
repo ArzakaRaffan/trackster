@@ -1,6 +1,6 @@
 import { Controller, Post, Body, Get, Patch, Delete, HttpException, Param, ParseIntPipe, Query, Res, UseGuards } from '@nestjs/common';
 import { Response } from 'express';
-import { IsBoolean, IsEnum, IsInt, IsNumber, IsOptional, IsString, Max, MaxLength, Min, MinLength } from 'class-validator';
+import { IsBoolean, IsEnum, IsIn, IsInt, IsNumber, IsOptional, IsString, Max, MaxLength, Min, MinLength } from 'class-validator';
 import { MemoryKind } from '@prisma/client';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { AiRateLimitGuard } from '../../common/guards/ai-rate-limit.guard';
@@ -27,6 +27,10 @@ class SendThreadMessageDto {
   @MinLength(1)
   @MaxLength(4000)
   text: string;
+
+  @IsOptional()
+  @IsIn(['id', 'en'])
+  lang?: 'id' | 'en';
 }
 
 class UpdateThreadDto {
@@ -172,7 +176,7 @@ export class AiController {
   @UseGuards(AiRateLimitGuard)
   @Post('threads/:id/messages')
   async sendThreadMessage(@CurrentUser() user: AuthUser, @Param('id', ParseIntPipe) id: number, @Body() body: SendThreadMessageDto) {
-    const reply = await this.aiChatService.sendMessage(user.id, id, body.text);
+    const reply = await this.aiChatService.sendMessage(user.id, id, body.text, undefined, body.lang);
     return { reply };
   }
 
@@ -201,7 +205,7 @@ export class AiController {
       const reply = await this.aiChatService.sendMessage(user.id, id, body.text, {
         onToken: (text) => send({ type: 'token', text }),
         onToolRound: () => send({ type: 'reset' }),
-      });
+      }, body.lang);
       send({ type: 'done', reply });
     } catch (err: any) {
       send({ type: 'error', message: err instanceof HttpException ? err.message : 'Gagal memproses pesan' });
