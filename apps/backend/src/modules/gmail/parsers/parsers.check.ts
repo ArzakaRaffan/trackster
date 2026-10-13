@@ -100,10 +100,6 @@ check('IDR 117,492.00 → 117492', () => assert.strictEqual(parseRupiah('IDR 117
 check('Rp10.000 → 10000', () => assert.strictEqual(parseRupiah('Rp10.000'), 10000));
 check('IDR 1,000.00 (admin fee) → 1000', () => assert.strictEqual(parseRupiah('IDR 1,000.00'), 1000));
 
-// looksTransactional: semua fixture email transaksi lolos; promo bank tidak (bug 2026-10-13: promo BCA -> "Perlu dicek")
-for (const f of fs.readdirSync(FIXTURES_DIR)) check(`looksTransactional fixture ${f}`, () => assert.ok(looksTransactional('', loadFixture(f))));
-check('promo BCA bukan transaksi', () => assert.ok(!looksTransactional('Menang Banyak 600 Ribu+ Hadiah Langsung', 'Halo Sobat BCA, ikuti undian berhadiah! Transaksi minimal Rp100.000.')));
-check('promo blu bukan transaksi', () => assert.ok(!looksTransactional('Hobi Happy, Finansial Tetap Healthy!', 'Halo Sobatblu, punya hobi yang ingin dikembangkan?')));
 
 // ─── 3. Unit: parseEmailDate ──────────────────────────────────────────────────
 
@@ -144,6 +140,11 @@ check('buang <script> block', () => {
   assert.ok(!result.includes('alert'), `script masih ada: ${result}`);
   assert.ok(result.includes('Value'));
 });
+
+// looksTransactional: semua fixture email transaksi lolos; promo bank tidak (bug 2026-10-13: promo BCA -> "Perlu dicek")
+for (const f of fs.readdirSync(FIXTURES_DIR)) check(`looksTransactional fixture ${f}`, () => assert.ok(looksTransactional('', loadFixture(f))));
+check('promo BCA bukan transaksi', () => assert.ok(!looksTransactional('Menang Banyak 600 Ribu+ Hadiah Langsung', 'Halo Sobat BCA, ikuti undian berhadiah! Transaksi minimal Rp100.000.')));
+check('promo blu bukan transaksi', () => assert.ok(!looksTransactional('Hobi Happy, Finansial Tetap Healthy!', 'Halo Sobatblu, punya hobi yang ingin dikembangkan?')));
 
 // ─── 5. Integrasi: BcaParser dengan fixture ───────────────────────────────────
 
