@@ -203,3 +203,7 @@ deviasi dari rencana (+alasan), env baru yang Arzaka harus tambahkan, langkah be
 - Langkah 5–6 (2026-10-13 ±11:00 WIB): NS di name.com diganti ke Cloudflare; registry `.dev` & 8.8.8.8 sudah Cloudflare, 1.1.1.1 masih cache NS lama (IP sama → tak berpengaruh).
   `@`/`api` → 43.157.208.202, TXT verifikasi ada, situs 200, `api/auth/me` 401 (normal), sertifikat Let's Encrypt s/d 2026-12-29.
   Catatan: perintah dry-run runbook §4.7 (`--entrypoint "certbot renew --dry-run"`) diganti `--entrypoint certbot certbot renew --dry-run` (entrypoint berspasi tidak dipecah compose).
+- Langkah 7: dry-run `--cert-name trackster.dev` gagal `rateLimited: Service busy` (staging Let's Encrypt kelebihan beban, bukan konfigurasi). Jalur HTTP-01
+  dibuktikan manual: file uji di webroot certbot → `http://{trackster.dev,api.trackster.dev}/.well-known/acme-challenge/p702-test` = 200 `ok-p702` dari internet.
+  Sisa: ulang dry-run saat LE normal + hapus file uji `p702-test`. Catatan: renew terjadwal 03:55 UTC memperpanjang `api.ai.trackster.my.id` (proyek lain) ±6 mnt; sertifikat baru butuh reload Nginx.
+- **Langkah berikutnya:** langkah 8 pantau 24–48 jam (situs, API, webhook Telegram, CD). Lalu runbook §5 (Email Routing + Worker) — butuh backend dgn modul inbound ter-deploy dulu.
