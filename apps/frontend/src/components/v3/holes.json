@@ -351,10 +351,12 @@
   "Subs": [
     "closeSubBanner",
     "copyIcs2",
+    "gcalNote",
     "hasSubBanner",
     "hasSubInactive",
     "howIcs2",
     "ic",
+    "icsOn",
     "openSubNew",
     "subActive",
     "subActiveCount",
