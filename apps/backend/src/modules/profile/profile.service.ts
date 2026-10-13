@@ -38,6 +38,7 @@ export class ProfileService {
       inbound: {
         address: `u+${inbound.localPart}@${domain}`,
         verified: !!inbound.forwardVerifiedAt,
+        active: inbound.isActive,
         lastEmailAt: inbound.lastEmailAt,
         forwardCode: inbound.lastForwardCode,
         forwardCodeAt: inbound.lastForwardCodeAt,
@@ -74,11 +75,15 @@ export class ProfileService {
     }
   }
 
-  async update(userId: number, dto: { displayName?: string; fullName?: string }) {
+  async update(userId: number, dto: { displayName?: string; fullName?: string; forwarding?: boolean }) {
+    if (dto.forwarding !== undefined) {
+      await this.inbound(userId); // pastikan baris ada
+      await this.prisma.inboundAddress.updateMany({ where: { userId }, data: { isActive: dto.forwarding } });
+    }
     const data: { displayName?: string; fullName?: string | null } = {};
     if (dto.displayName !== undefined) data.displayName = dto.displayName.trim();
     if (dto.fullName !== undefined) data.fullName = dto.fullName.trim().replace(/\s+/g, ' ') || null;
-    await this.prisma.user.update({ where: { id: userId }, data });
+    if (Object.keys(data).length) await this.prisma.user.update({ where: { id: userId }, data });
     return this.get(userId);
   }
 

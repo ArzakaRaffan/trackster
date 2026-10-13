@@ -1,5 +1,5 @@
 import { Type } from 'class-transformer';
-import { ArrayMaxSize, IsArray, IsEnum, IsOptional, IsString, Matches, MaxLength, MinLength, ValidateNested } from 'class-validator';
+import { ArrayMaxSize, IsArray, IsBoolean, IsEnum, IsOptional, IsString, Matches, MaxLength, MinLength, ValidateNested } from 'class-validator';
 import { Source } from '@prisma/client';
 
 export class UpdateProfileDto {
@@ -9,6 +9,10 @@ export class UpdateProfileDto {
   /** Nama persis seperti di rekening bank — parser memakainya untuk mengenali transfer ke diri sendiri. */
   @IsOptional() @IsString() @MaxLength(80)
   fullName?: string;
+
+  /** Email forwarding aktif (InboundAddress.isActive). false = catat manual; email ke alamat diabaikan. */
+  @IsOptional() @IsBoolean()
+  forwarding?: boolean;
 }
 
 export class OwnAccountDto {
