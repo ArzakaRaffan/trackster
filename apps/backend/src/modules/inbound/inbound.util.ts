@@ -21,9 +21,9 @@ export function verifySignature(secret: string, timestamp: string | undefined, s
   return got.length === want.length && timingSafeEqual(got, want);
 }
 
-/** `u-<localPart>@<domain>` -> localPart (huruf kecil), atau null bila bukan alamat inbound yang valid. */
+/** `u+<localPart>@<domain>` (subaddressing: satu rule Cloudflare `u@in.trackster.dev` -> Worker; catch-all tak tersedia di subdomain) -> localPart (huruf kecil), atau null bila bukan alamat inbound yang valid. */
 export function parseLocalPart(to: string | undefined, domain: string): string | null {
-  const m = /^<?u-([a-z2-7]{20,64})@([^>\s]+)>?$/i.exec((to ?? '').trim());
+  const m = /^<?u\+([a-z2-7]{20,64})@([^>\s]+)>?$/i.exec((to ?? '').trim());
   return m && m[2].toLowerCase() === domain.toLowerCase() ? m[1].toLowerCase() : null;
 }
 

@@ -1,4 +1,4 @@
-// Cloudflare Email Worker `trackster-inbound` (P7-03): catch-all *@in.trackster.dev -> POST /ingest/email.
+// Cloudflare Email Worker `trackster-inbound` (P7-03): rule `u@in.trackster.dev` (alamat user u+<kode>, subaddressing) -> POST /ingest/email.
 // Body = MIME mentah; tanda tangan HMAC-SHA256(secret, `${tsMs}.${to}.${sha256hex(body)}`) — sama dengan
 // apps/backend/src/modules/inbound/inbound.util.ts (signBody). Tanpa rahasia di repo: `wrangler secret put INGEST_HMAC_SECRET`.
 // Dok runtime: https://developers.cloudflare.com/email-routing/email-workers/runtime-api/ (dibaca 2026-10-13).

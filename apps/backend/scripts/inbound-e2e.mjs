@@ -45,9 +45,9 @@ const j = async (r) => { const t = await r.text(); try { return JSON.parse(t); }
 const users = await prisma.user.findMany({ where: { status: 'ACTIVE' }, orderBy: { id: 'asc' }, take: 2 });
 expect(users.length === 2, 'butuh 2 user aktif di DB scratch');
 const [A, B] = users;
-const addrOf = (u) => cli('inbound', '--username', u.username).match(/u-([a-z2-7]+)@/)[1];
+const addrOf = (u) => cli('inbound', '--username', u.username).match(/u\+([a-z2-7]+)@/)[1];
 const lpA = addrOf(A), lpB = addrOf(B);
-const toA = `u-${lpA}@${DOMAIN}`, toB = `u-${lpB}@${DOMAIN}`;
+const toA = `u+${lpA}@${DOMAIN}`, toB = `u+${lpB}@${DOMAIN}`;
 const txCount = (userId, id) => prisma.transaction.count({ where: { userId, description: { contains: id } } });
 const logs = (userId, status) => prisma.emailParseLog.findMany({ where: { userId, subject: { contains: RUN }, ...(status ? { status } : {}) } });
 // pastikan tidak shadow di awal
@@ -63,7 +63,7 @@ await test('timestamp lama (replay) -> 401', async () => {
   expect(r.status === 401, `status ${r.status}`);
 });
 await test('alamat tak dikenal -> 200 ignored, tidak ada data', async () => {
-  const r = await post(mime({ id: `u${RUN}`, subject: `unknown ${RUN}` }), { to: `u-${'a'.repeat(24)}@${DOMAIN}` });
+  const r = await post(mime({ id: `u${RUN}`, subject: `unknown ${RUN}` }), { to: `u+${'a'.repeat(24)}@${DOMAIN}` });
   const b = await j(r);
   expect(r.status === 200 && b.result === 'ignored', `${r.status} ${JSON.stringify(b)}`);
   expect((await logs(A.id)).length === 0 && (await logs(B.id)).length === 0, 'log tak boleh terbentuk');
