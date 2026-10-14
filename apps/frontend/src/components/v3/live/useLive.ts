@@ -349,7 +349,7 @@ export function useLive(enabled: boolean, path: string, chatActive: number | nul
       archiveGoal: (id: number) => api.patch(`/goal/${id}/archive`, {}),
       simulateGoal: (id: number, cutPercent: number) => api.post<any>(`/goal/${id}/simulate`, { cutPercent }),
       // profil & wizard
-      saveProfile: (b: { displayName?: string; fullName?: string }) => api.patch<any>('/profile', b),
+      saveProfile: (b: { displayName?: string; fullName?: string; forwarding?: boolean }) => api.patch<any>('/profile', b),
       saveAccounts: (accounts: { source?: string; accountNumber: string }[]) => api.put<any>('/profile/accounts', { accounts }),
       addBanks: (sources: string[]) => api.post<any>('/profile/banks', { sources }),
       finishOnboarding: () => api.post<any>('/profile/onboarded'),
