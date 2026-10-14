@@ -1034,6 +1034,8 @@ export class V3Logic extends React.Component {
     return { dashMood:over ? 'alert' : 'happy', dashInsight:over ? 'Budget hari ini sudah terlewati. Besok mulai lagi dengan angka baru.' : this.props.live === undefined ? 'Satu pengeluaran kecil lagi masih aman. Biasanya kamu jajan lagi sekitar jam 3.' : (v.todayRows || []).length ? 'Masih aman. Tanya Track dulu sebelum beli yang besar.' : 'Belum ada pengeluaran hari ini. Budget-mu masih utuh.', dashAsk:() => this.go('chat'), dashSrcGo:() => this.go('sources'),
       dashSrc:(this.props.live !== undefined && s.srcInfo ? [['BCA', s.srcInfo.BCA.short, 'border-radius:2px', s.srcInfo.BCA.cond === 'menunggu' ? 'transparent' : 'var(--text)'], ['Jago', s.srcInfo.JAGO.short, 'border-radius:50%', s.srcInfo.JAGO.cond === 'menunggu' ? 'transparent' : 'var(--text)'], ['Flip', s.srcInfo.FLIP.short, 'transform:rotate(45deg)', s.srcInfo.FLIP.cond === 'menunggu' ? 'transparent' : 'var(--text)']] : [['BCA', '12 mnt lalu', 'border-radius:2px', 'var(--text)'], ['Jago', '2 jam lalu', 'border-radius:50%', 'var(--text)'], ['Flip', 'menunggu', 'transform:rotate(45deg)', 'transparent']]).map(([name, short, shape, fill]) => ({ name, short, shape, fill, logoCss:brandCss(name) })),
       dashRows:(v.todayRows || []).slice(0, 4), dashEmpty:!(v.todayRows || []).length,
+      // .ics belum ada endpointnya (galeri: SEGERA) -> sembunyikan di live; catatan Google Calendar hanya untuk akun yang tersambung Google.
+      icsOn:this.props.live === undefined, gcalNote:this.props.live === undefined || !!s.st.gmail,
       copyIcs2:() => this.toast('Tautan kalender disalin.'), howIcs2:() => this.toast('Google Calendar: Setelan, Tambah kalender, Dari URL. Apple: File, Langganan Kalender Baru.') };
   }
 
