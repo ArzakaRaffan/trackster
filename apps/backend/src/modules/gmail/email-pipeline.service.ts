@@ -1,7 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { Category, ParseStatus } from '@prisma/client';
 import { ParserRegistryService } from './parsers/parser-registry.service';
-import { RawEmail, ParseResult } from './parsers/parser.interface';
+import { RawEmail, ParseResult, looksTransactional } from './parsers/parser.interface';
 import { TransactionService } from '../transaction/transaction.service';
 import { BudgetService } from '../budget/budget.service';
 import { TelegramService } from '../telegram/telegram.service';
@@ -82,6 +82,16 @@ export class EmailPipelineService {
     }
 
     const { parser, result: parsed } = this.parserRegistry.parseEmailWithSource(rawEmail, await getOwnerContext(this.prisma, userId));
+    if (!parsed && !looksTransactional(subject, rawEmail.body)) {
+      // Promo/info dari domain bank (mis. "Menang Banyak Hadiah..."): bukan gagal dibaca, jangan tandai "Perlu dicek".
+      callbacks.onExcluded();
+      await this.logParseResult(userId, emailId, meta, {
+        status: opts?.shadow ? ParseStatus.SHADOW : ParseStatus.EXCLUDED,
+        reason: opts?.shadow ? 'would: EXCLUDED (bukan notifikasi transaksi)' : 'bukan notifikasi transaksi (promo/info)',
+        parser,
+      });
+      return;
+    }
     if (!parsed) {
       callbacks.onUnparsed();
       await this.logParseResult(userId, emailId, meta, {
