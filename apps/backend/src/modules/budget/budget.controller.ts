@@ -2,6 +2,7 @@ import { BadRequestException, Body, Controller, Get, Post, Put, Query, UseGuards
 import { BudgetService } from './budget.service';
 import { BudgetAdvisorService } from './budget-advisor.service';
 import { UpdateBudgetDto } from './dto/update-budget.dto';
+import { UpdateBudgetSettingsDto } from './dto/update-budget-settings.dto';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { AuthUser, CurrentUser } from '../../common/decorators/current-user.decorator';
 
@@ -32,6 +33,16 @@ export class BudgetController {
   async setRollover(@CurrentUser() user: AuthUser, @Body() body: { enabled?: unknown }) {
     if (typeof body.enabled !== 'boolean') throw new BadRequestException('enabled harus boolean');
     return this.budgetService.setRolloverEnabled(user.id, body.enabled);
+  }
+
+  @Get('settings')
+  async getSettings(@CurrentUser() user: AuthUser) {
+    return this.budgetService.getSettings(user.id);
+  }
+
+  @Put('settings')
+  async updateSettings(@CurrentUser() user: AuthUser, @Body() dto: UpdateBudgetSettingsDto) {
+    return this.budgetService.updateSettings(user.id, dto);
   }
 
   @Get('today')

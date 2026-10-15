@@ -1,6 +1,11 @@
-import { Injectable } from '@nestjs/common';
+import { BadRequestException, Injectable } from '@nestjs/common';
+import { BudgetMode, IncomeCadence, IncomeStatus } from '@prisma/client';
 import { PrismaService } from '../../prisma.service';
 import { UpdateBudgetDto } from './dto/update-budget.dto';
+import { UpdateBudgetSettingsDto } from './dto/update-budget-settings.dto';
+import { computeBalanceAllowance, computeCycleAllowance, cycleBounds, normalizeWeights } from './budget-cycle';
+import { calcStreamForecast } from '../income-forecast/income-forecast.service';
+import { isBigPurchase, median } from '../analytics/period-stats.util';
 import { MerchantAliasService } from '../merchant-alias/merchant-alias.service';
 import { addWibDays, startOfWibDay, startOfWibWeek, wibDateKey, wibDayOfWeek, wibRange } from '../../common/wib';
 import { calcRollover } from './budget-rollover';
@@ -81,13 +86,126 @@ export class BudgetService {
     return calcRollover(days);
   }
 
+  async getSettings(userId: number) {
+    const s = await this.prisma.budgetSetting.findFirst({ where: { userId } });
+    return {
+      rolloverEnabled: s?.rolloverEnabled ?? false,
+      mode: s?.mode ?? BudgetMode.FIXED,
+      anchorStreamId: s?.anchorStreamId ?? null,
+      reservePct: s?.reservePct ?? 10,
+      horizonDays: s?.horizonDays ?? 30,
+    };
+  }
+
+  async updateSettings(userId: number, dto: UpdateBudgetSettingsDto) {
+    const current = await this.getSettings(userId);
+    const next = { ...current, ...dto };
+    if (next.anchorStreamId != null) {
+      const stream = await this.prisma.incomeStream.findFirst({ where: { id: next.anchorStreamId, userId, isActive: true } });
+      if (!stream || stream.cadence === IncomeCadence.NONE) {
+        throw new BadRequestException('anchorStreamId harus income rutin (mingguan/bulanan) yang aktif');
+      }
+    }
+    if (next.mode === BudgetMode.CYCLE && next.anchorStreamId == null) {
+      throw new BadRequestException('Mode siklus butuh income utama (anchorStreamId)');
+    }
+    const data = { mode: next.mode, anchorStreamId: next.anchorStreamId, reservePct: next.reservePct, horizonDays: next.horizonDays };
+    const existing = await this.prisma.budgetSetting.findFirst({ where: { userId }, select: { id: true } });
+    if (existing) await this.prisma.budgetSetting.updateMany({ where: { id: existing.id, userId }, data });
+    else await this.prisma.budgetSetting.create({ data: { userId, ...data } });
+    return this.getSettings(userId);
+  }
+
+  /** Jatah dinamis hari ini untuk mode CYCLE/BALANCE (docs/siklus-gajian.md). Anchor hilang/nonaktif → BALANCE. */
+  private async computeDynamic(userId: number, now: Date, setting: Awaited<ReturnType<BudgetService['getSettings']>>) {
+    const todayStart = startOfWibDay(now);
+    const rows = await this.prisma.dailyBudget.findMany({ where: { userId } });
+    const amounts: number[] = [];
+    for (const r of rows) amounts[r.dayOfWeek] = Number(r.amount);
+    const weights = normalizeWeights(amounts);
+    // `nextDueDate` itu @db.Date: Prisma memotong parameter ke tanggal UTC, jadi batas 00:00 WIB (= 17:00 UTC kemarin)
+    // harus dikirim sebagai tanggal kalender WIB-nya, kalau tidak langganan di hari terakhir rentang ikut terbuang.
+    const asDate = (x: Date) => new Date(`${wibDateKey(x)}T00:00:00Z`);
+    const dueBetween = async (from: Date, to: Date) => {
+      const subs = await this.prisma.subscription.findMany({
+        where: { userId, isActive: true, nextDueDate: { gte: asDate(from), lt: asDate(to) } },
+        select: { amount: true },
+      });
+      return subs.reduce((s, x) => s + Number(x.amount), 0);
+    };
+    const spentBetween = async (from: Date, to: Date) =>
+      sumSpend((await this.prisma.transaction.aggregate({
+        _sum: { amount: true, reimbursedAmount: true },
+        where: { userId, occurredAt: { gte: from, lt: to } },
+      }))._sum);
+
+    const stream = setting.mode === BudgetMode.CYCLE && setting.anchorStreamId != null
+      ? await this.prisma.incomeStream.findFirst({ where: { id: setting.anchorStreamId, userId, isActive: true } })
+      : null;
+
+    const cadence = stream?.cadence;
+    if (stream && (cadence === IncomeCadence.WEEKLY || cadence === IncomeCadence.MONTHLY)) {
+      const anchor = { cadence, payDayOfWeek: stream.payDayOfWeek, payDayOfMonth: stream.payDayOfMonth };
+      const anchorIncomes = await this.prisma.income.findMany({
+        where: { userId, streamId: stream.id, status: IncomeStatus.CONFIRMED, receivedAt: { lte: now } },
+        orderBy: { receivedAt: 'desc' },
+        take: 3,
+        select: { amount: true, receivedAt: true },
+      });
+      const { start, end } = cycleBounds(anchor, now, anchorIncomes[0]?.receivedAt);
+      const inCycle = await this.prisma.income.findMany({
+        where: { userId, status: IncomeStatus.CONFIRMED, receivedAt: { gte: start, lte: now } },
+        select: { amount: true, streamId: true },
+      });
+      const anchorSum = inCycle.filter((i) => i.streamId === stream.id).reduce((s, i) => s + Number(i.amount), 0);
+      // ponytail: expected = rata-rata 3 pembayaran anchor terakhir; belum ada histori → konfigurasi stream.
+      const anchorExpected = anchorIncomes.length
+        ? anchorIncomes.reduce((s, i) => s + Number(i.amount), 0) / anchorIncomes.length
+        : calcStreamForecast(
+            {
+              kind: stream.kind, cadence: stream.cadence,
+              amount: stream.amount && Number(stream.amount), sessionRate: stream.sessionRate && Number(stream.sessionRate),
+              sessionExtra: stream.sessionExtra && Number(stream.sessionExtra), maxUnits: stream.maxUnits,
+              deductionPerUnit: stream.deductionPerUnit && Number(stream.deductionPerUnit), typicalUnits: stream.typicalUnits && Number(stream.typicalUnits),
+            },
+            { historicalAmounts: [], historicalAbsences: [], isScheduledThisWeek: true },
+          ).expected;
+      const result = computeCycleAllowance({
+        now, cycleStart: start, cycleEnd: end, weights,
+        anchorExpected,
+        anchorReceived: anchorSum > 0 ? anchorSum : null,
+        otherIncome: inCycle.filter((i) => i.streamId !== stream.id).reduce((s, i) => s + Number(i.amount), 0),
+        carry: 0, // ponytail: carry antar siklus belum ada (Fase 3); rolloverEnabled diabaikan di mode CYCLE.
+        // Komitmen yang sudah lewat jatuh tempo sudah terbayar → masuk `spentBeforeToday`, jadi hanya hitung yang akan datang.
+        commitments: await dueBetween(todayStart, end),
+        reservePct: setting.reservePct,
+        spentBeforeToday: await spentBetween(start, todayStart),
+      });
+      return { mode: BudgetMode.CYCLE, cycleStart: wibDateKey(start), cycleEnd: wibDateKey(end), runwayDays: null, ...result };
+    }
+
+    const balances = await this.prisma.bankBalance.findMany({ where: { userId }, select: { balance: true } });
+    const horizonEnd = addWibDays(todayStart, setting.horizonDays);
+    const result = computeBalanceAllowance({
+      now, weights,
+      balance: balances.reduce((s, b) => s + Number(b.balance), 0),
+      spentToday: await spentBetween(todayStart, addWibDays(todayStart, 1)),
+      commitments: await dueBetween(todayStart, horizonEnd),
+      horizonDays: setting.horizonDays,
+      burnRatePerDay: (await spentBetween(addWibDays(todayStart, -7), todayStart)) / 7,
+    });
+    return { mode: BudgetMode.BALANCE, cycleStart: null, cycleEnd: null, ...result };
+  }
+
   async getTodaySummary(userId: number) {
     const now = new Date();
     const dayOfWeek = wibDayOfWeek(now);
-    const baseBudget = await this.getBudgetForDay(userId, dayOfWeek);
+    const setting = await this.getSettings(userId);
+    const dynamic = setting.mode === BudgetMode.FIXED ? null : await this.computeDynamic(userId, now, setting);
     // `budget` = budget efektif hari ini (termasuk sisa kemarin kalau rollover aktif), supaya semua
     // pemakai summary (alert over-budget, progress bar, snapshot AI) otomatis konsisten.
-    const rollover = (await this.getRolloverEnabled(userId)) ? await this.computeRollover(userId, now) : 0;
+    const baseBudget = dynamic ? dynamic.allowance : await this.getBudgetForDay(userId, dayOfWeek);
+    const rollover = !dynamic && setting.rolloverEnabled ? await this.computeRollover(userId, now) : 0;
     const budget = baseBudget + rollover;
 
     const { start: startOfDay, end: endOfDay } = wibRange('day', now);
@@ -107,14 +225,29 @@ export class BudgetService {
     const totalIncome = incomes.reduce((sum, i) => sum + Number(i.amount), 0);
     const transactionsWithDisplay = await this.merchantAliasService.attachDisplayNames(userId, transactions);
 
+    // Mode dinamis: pembelian besar sudah mengurangi sisa siklus, jadi tidak ikut alert "over budget hari ini".
+    let bigSpent = 0;
+    if (dynamic && transactions.length) {
+      const window90d = await this.prisma.transaction.findMany({
+        where: { userId, occurredAt: { gte: addWibDays(startOfDay, -90), lt: startOfDay } },
+        select: { amount: true, reimbursedAmount: true },
+      });
+      const median90d = median(window90d.map(spend));
+      bigSpent = transactions.filter((t) => isBigPurchase(spend(t), median90d, t.isBig)).reduce((s, t) => s + spend(t), 0);
+    }
+    const budgetSpent = totalSpent - bigSpent;
+
     return {
       date: wibDateKey(now),
+      mode: setting.mode,
       budget,
       baseBudget,
       rollover,
       totalSpent,
-      remaining: budget - totalSpent,
-      isOverBudget: totalSpent > budget,
+      bigSpent,
+      remaining: budget - budgetSpent,
+      isOverBudget: budgetSpent > budget,
+      cycle: dynamic,
       totalIncome,
       netAmount: totalIncome - totalSpent,
       isNetPositive: totalIncome - totalSpent >= 0,
