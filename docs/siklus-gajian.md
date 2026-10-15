@@ -120,3 +120,16 @@ otomatis vs median 90 hari).
 ## Progres
 
 - [x] Fase 1 — `apps/backend/src/modules/budget/budget-cycle.ts` + `budget-cycle.check.ts` (15 kasus).
+- [x] Fase 2 — kolom `mode` (default **FIXED** = perilaku lama, supaya merge tidak mengubah angka tester) + `anchorStreamId`/
+  `reservePct`/`horizonDays` (migrasi aditif `20261015100000_budget_cycle_mode`), `GET/PUT /budget/settings`, `getTodaySummary()`
+  memanggil engine; respons bertambah `mode`, `bigSpent`, `cycle`. Expected anchor = rata-rata 3 pembayaran terakhir (fallback
+  konfigurasi stream).
+
+### Sisa untuk fase 3–4 (ditemukan saat fase 2)
+
+- **UI** `/app/today` menghitung "lewat budget" sendiri dari `totalSpent` → pembelian besar tetap tampil OVER BUDGET. Pakai
+  `isOverBudget`/`remaining` dari backend.
+- **Analytics** kepatuhan budget (`budgetByDow` di `analytics.service.ts`) masih membandingkan dengan nominal `DailyBudget` — salah
+  untuk mode dinamis.
+- Carry antar siklus (`rolloverEnabled` diabaikan di CYCLE), kontribusi goal sebagai komitmen, stream MISSED → keluar dari pot.
+- Notifikasi dampak pembelian besar ("jatah turun dari A ke B").

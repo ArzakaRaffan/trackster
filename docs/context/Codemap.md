@@ -12,7 +12,7 @@ Snapshot 2026-10-05. Kalau nambah module/route/cron, update file ini.
 | sync | `/sync` | trigger manual, backfill rentang tanggal (default tanpa notif Telegram), next-run, logs. |
 | transaction | `/transactions` | list+filter, weekly/monthly/summary/day/insights, create manual, note/category/alias. `createFromParsed()` = jalur sync. `getInsights()` = sumber data semua fitur analitik/AI. |
 | balance | `/balance` | saldo per source, koreksi manual, histori adjustment. `adjustBalance(tx, source, delta)` wajib di dalam `$transaction`. |
-| budget | `/budget` | budget per hari, `today` summary, `runway`. |
+| budget | `/budget` | budget per hari, `today` summary, `runway`, `settings` (mode FIXED/CYCLE/BALANCE). Engine siklus gajian murni di `budget-cycle.ts` (docs/siklus-gajian.md). |
 | income | `/income` | CRUD + `allowance-suggestion` + `allocation`. |
 | merchant-alias | `/merchant-aliases` | CRUD alias. |
 | goal | `/goal` | Kantong: create, contribute, archive, simulate (what-if). |
