@@ -31,7 +31,7 @@ const STATUS_ROW: Record<string, [string, string, string]> = {
 const mapAnyTx = (t: any) => ({
   id: t.id, d: undefined as number | undefined, dl: dayLabelOf(wibISO(new Date(t.occurredAt).getTime())), raw: t.description,
   alias: t.displayDescription && t.displayDescription !== t.description ? t.displayDescription : null, cap: t.aiCaption || null, src: t.source,
-  time: wibHHMM(t.occurredAt), cat: t.category, amt: Number(t.amount) - Number(t.reimbursedAmount || 0), gross: Number(t.amount), note: t.note || '', icon: t.icon || null,
+  time: wibHHMM(t.occurredAt), cat: t.category, amt: Number(t.amount) - Number(t.reimbursedAmount || 0), gross: Number(t.amount), iso: wibISO(new Date(t.occurredAt).getTime()), note: t.note || '', icon: t.icon || null,
 });
 const monthAnchor = (off: number) => { const [y, m] = wibISO().split('-').map(Number); const d = new Date(Date.UTC(y, m - 1 + off, 15)); return d.toISOString().slice(0, 10); };
 
@@ -89,7 +89,7 @@ export function useLive(enabled: boolean, path: string, chatActive: number | nul
       const d = dates.dateIdx[wibISO(new Date(t.occurredAt).getTime())];
       if (d === undefined) continue;
       const alias = t.displayDescription && t.displayDescription !== t.description ? t.displayDescription : null;
-      out.push({ id: t.id, d, raw: t.description, alias, cap: t.aiCaption || null, src: t.source, time: wibHHMM(t.occurredAt), cat: t.category, amt: Number(t.amount) - Number(t.reimbursedAmount || 0), gross: Number(t.amount), note: t.note || '', icon: t.icon || null });
+      out.push({ id: t.id, d, raw: t.description, alias, cap: t.aiCaption || null, src: t.source, time: wibHHMM(t.occurredAt), cat: t.category, amt: Number(t.amount) - Number(t.reimbursedAmount || 0), gross: Number(t.amount), iso: wibISO(new Date(t.occurredAt).getTime()), note: t.note || '', icon: t.icon || null });
     }
     return out.sort((a, b) => a.d - b.d || a.time.localeCompare(b.time));
   }, [txRes.data, dates]);
@@ -197,7 +197,7 @@ export function useLive(enabled: boolean, path: string, chatActive: number | nul
   const split = useMemo(() => {
     const bills = (billsRes.data ?? []).map(mapBill);
     const last = bills.find((b: any) => b.acc);
-    const me = meRes.data;
+    const me = meRes.data?.user ?? meRes.data; // /auth/me = { user: {...} } (dulu dibaca langsung -> nama peserta pertama kosong -> 400)
     return {
       bills,
       meName: me?.displayName || me?.username || '',
@@ -349,7 +349,7 @@ export function useLive(enabled: boolean, path: string, chatActive: number | nul
       archiveGoal: (id: number) => api.patch(`/goal/${id}/archive`, {}),
       simulateGoal: (id: number, cutPercent: number) => api.post<any>(`/goal/${id}/simulate`, { cutPercent }),
       // profil & wizard
-      saveProfile: (b: { displayName?: string; fullName?: string }) => api.patch<any>('/profile', b),
+      saveProfile: (b: { displayName?: string; fullName?: string; forwarding?: boolean }) => api.patch<any>('/profile', b),
       saveAccounts: (accounts: { source?: string; accountNumber: string }[]) => api.put<any>('/profile/accounts', { accounts }),
       addBanks: (sources: string[]) => api.post<any>('/profile/banks', { sources }),
       finishOnboarding: () => api.post<any>('/profile/onboarded'),

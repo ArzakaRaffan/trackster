@@ -44,6 +44,12 @@ export class CreateSplitBillDto {
   @IsISO8601()
   billDate: string;
 
+  // Hanya dipakai endpoint akun (POST /split-bills); endpoint publik mengabaikannya.
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  transactionId?: number;
+
   @IsOptional()
   @IsNumber()
   @Min(0)

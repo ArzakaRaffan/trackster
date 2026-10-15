@@ -10,7 +10,7 @@ import * as assert from 'assert';
 
 
 // ─── Impor fungsi & tipe yang akan diuji ────────────────────────────────────
-import { extractField, parseRupiah, parseEmailDate, htmlToText } from './parser.interface';
+import { extractField, parseRupiah, parseEmailDate, htmlToText, looksTransactional } from './parser.interface';
 import { BcaParser } from './bca.parser';
 import { FlipParser } from './flip.parser';
 import { JagoParser } from './jago.parser';
@@ -99,6 +99,14 @@ check('IDR 36,000.00 → 36000', () => assert.strictEqual(parseRupiah('IDR 36,00
 check('IDR 117,492.00 → 117492', () => assert.strictEqual(parseRupiah('IDR 117,492.00'), 117492));
 check('Rp10.000 → 10000', () => assert.strictEqual(parseRupiah('Rp10.000'), 10000));
 check('IDR 1,000.00 (admin fee) → 1000', () => assert.strictEqual(parseRupiah('IDR 1,000.00'), 1000));
+// bug nyata 2026-10-13: QRIS Rp603 tercatat Rp60.300
+check('IDR 603.00 (< 1000, tanpa koma) → 603', () => assert.strictEqual(parseRupiah('IDR 603.00'), 603));
+check('IDR 1,234,567.00 → 1234567', () => assert.strictEqual(parseRupiah('IDR 1,234,567.00'), 1234567));
+check('Rp 6.392 → 6392', () => assert.strictEqual(parseRupiah('Rp 6.392'), 6392));
+check('Rp 7.900,00 → 7900', () => assert.strictEqual(parseRupiah('Rp 7.900,00'), 7900));
+check('Rp 1.250.000 → 1250000', () => assert.strictEqual(parseRupiah('Rp 1.250.000'), 1250000));
+check('Rp500 → 500', () => assert.strictEqual(parseRupiah('Rp500'), 500));
+
 
 // ─── 3. Unit: parseEmailDate ──────────────────────────────────────────────────
 
@@ -139,6 +147,11 @@ check('buang <script> block', () => {
   assert.ok(!result.includes('alert'), `script masih ada: ${result}`);
   assert.ok(result.includes('Value'));
 });
+
+// looksTransactional: semua fixture email transaksi lolos; promo bank tidak (bug 2026-10-13: promo BCA -> "Perlu dicek")
+for (const f of fs.readdirSync(FIXTURES_DIR)) check(`looksTransactional fixture ${f}`, () => assert.ok(looksTransactional('', loadFixture(f))));
+check('promo BCA bukan transaksi', () => assert.ok(!looksTransactional('Menang Banyak 600 Ribu+ Hadiah Langsung', 'Halo Sobat BCA, ikuti undian berhadiah! Transaksi minimal Rp100.000.')));
+check('promo blu bukan transaksi', () => assert.ok(!looksTransactional('Hobi Happy, Finansial Tetap Healthy!', 'Halo Sobatblu, punya hobi yang ingin dikembangkan?')));
 
 // ─── 5. Integrasi: BcaParser dengan fixture ───────────────────────────────────
 

@@ -46,6 +46,17 @@ export class ReimbursementService {
       if (!r) throw new NotFoundException('Patungan tidak ditemukan');
       if (r.status === 'RECEIVED') throw new BadRequestException('Patungan sudah ditandai diterima');
 
+      if (r.splitParticipantId) {
+        // Tertaut split bill: tandai pesertanya lunas juga; hanya pengeluaran yang berkurang, saldo tidak (lihat SplitBillService.syncLinked).
+        await tx.splitBillParticipant.update({ where: { id: r.splitParticipantId }, data: { isPaid: true, paidAt: new Date() } });
+        await tx.transaction.updateMany({ where: { id: r.transactionId, userId }, data: { reimbursedAmount: { increment: r.amount } } });
+        await tx.reimbursement.updateMany({
+          where: { id, userId },
+          data: { status: 'RECEIVED', receivedAt: new Date(), receivedSource: dto.source ?? r.transaction.source, balanceApplied: false },
+        });
+        return tx.reimbursement.findFirstOrThrow({ where: { id, userId } });
+      }
+
       const source = dto.source ?? r.transaction.source;
       const receivedAt = dto.receivedAt ? new Date(dto.receivedAt) : new Date();
       const lastAdjustmentAt = await this.balanceService.getLastManualAdjustmentAt(tx, userId, source);
@@ -70,6 +81,7 @@ export class ReimbursementService {
     return this.prisma.$transaction(async (tx) => {
       const r = await tx.reimbursement.findFirst({ where: { id, userId } });
       if (!r) throw new NotFoundException('Patungan tidak ditemukan');
+      if (r.splitParticipantId) throw new BadRequestException('Patungan ini dari split bill — ubah lewat split bill-nya');
       if (r.status === 'RECEIVED') {
         await tx.transaction.updateMany({
           where: { id: r.transactionId, userId },

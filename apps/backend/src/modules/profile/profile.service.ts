@@ -16,7 +16,8 @@ export class ProfileService {
       this.prisma.bankBalance.findMany({ where: { userId }, orderBy: { source: 'asc' }, select: { source: true } }),
       this.inbound(userId),
       this.prisma.emailParseLog.findFirst({
-        where: { userId, emailId: { startsWith: 'fwd:' } },
+        // Promo/info bank (EXCLUDED tanpa nominal) bukan hasil uji wizard — lewati supaya langkah uji tetap menunggu email transaksi.
+        where: { userId, emailId: { startsWith: 'fwd:' }, NOT: { status: 'EXCLUDED', amount: null } },
         orderBy: { createdAt: 'desc' },
         select: { status: true, createdAt: true, counterparty: true, amount: true, parser: true },
       }),
@@ -38,6 +39,7 @@ export class ProfileService {
       inbound: {
         address: `u+${inbound.localPart}@${domain}`,
         verified: !!inbound.forwardVerifiedAt,
+        active: inbound.isActive,
         lastEmailAt: inbound.lastEmailAt,
         forwardCode: inbound.lastForwardCode,
         forwardCodeAt: inbound.lastForwardCodeAt,
@@ -74,11 +76,15 @@ export class ProfileService {
     }
   }
 
-  async update(userId: number, dto: { displayName?: string; fullName?: string }) {
+  async update(userId: number, dto: { displayName?: string; fullName?: string; forwarding?: boolean }) {
+    if (dto.forwarding !== undefined) {
+      await this.inbound(userId); // pastikan baris ada
+      await this.prisma.inboundAddress.updateMany({ where: { userId }, data: { isActive: dto.forwarding } });
+    }
     const data: { displayName?: string; fullName?: string | null } = {};
     if (dto.displayName !== undefined) data.displayName = dto.displayName.trim();
     if (dto.fullName !== undefined) data.fullName = dto.fullName.trim().replace(/\s+/g, ' ') || null;
-    await this.prisma.user.update({ where: { id: userId }, data });
+    if (Object.keys(data).length) await this.prisma.user.update({ where: { id: userId }, data });
     return this.get(userId);
   }
 

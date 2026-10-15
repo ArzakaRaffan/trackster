@@ -155,17 +155,16 @@ export function parseEmailDate(raw: string): Date | null {
   return date;
 }
 
-/** Parse nominal Rupiah dari string seperti "IDR 3,330.00", "Rp10.000", "Rp 6.392" */
+/** Parse nominal Rupiah dari string seperti "IDR 3,330.00", "IDR 603.00", "Rp10.000", "Rp 6.392", "Rp 7.900,00".
+ *  Pemisah + tepat 2 digit di akhir = sen (dibuang); pemisah lain = ribuan (grup ribuan selalu 3 digit).
+ *  Dulu "IDR 603.00" (tanpa koma ribuan) terbaca 60300. */
 export function parseRupiah(raw: string): number {
-  // buang semua kecuali digit dan titik/koma
-  let cleaned = raw.replace(/[^0-9.,]/g, '');
-
-  // Format "IDR 3,330.00" -> koma = ribuan, titik = desimal -> buang koma, ambil sebelum titik desimal
-  if (/,\d{3}/.test(cleaned) && /\.\d{2}$/.test(cleaned)) {
-    cleaned = cleaned.replace(/,/g, '').split('.')[0];
-  } else {
-    // Format "Rp10.000" atau "Rp 6.392" -> titik = pemisah ribuan, buang semua titik
-    cleaned = cleaned.replace(/\./g, '').replace(/,/g, '');
-  }
+  const cleaned = raw.replace(/[^0-9.,]/g, '').replace(/[.,]\d{2}$/, '').replace(/[.,]/g, '');
   return parseInt(cleaned, 10) || 0;
 }
+
+/** Ciri email notifikasi transaksi (label rincian yang selalu ada di email transaksi bank; promo/info tidak punya).
+ *  Dipakai hanya saat TIDAK ada parser yang bisa membaca email: kalau ciri ini tak ada, email dianggap promo/info
+ *  (bukan "gagal dibaca") supaya kartu bank tak berstatus "Perlu dicek" gara-gara promo. Semua fixture wajib lolos. */
+const TX_MARKERS = /Transaction Date|Tanggal Transaksi|Reference No|No\.? ?Ref|Referensi|ID Transaksi|Transaction ID|Waktu Transaksi|Total Payment|Total Pembayaran|Nominal|Jumlah|Amount/i;
+export const looksTransactional = (subject: string, body: string): boolean => TX_MARKERS.test(`${subject}\n${body}`);
