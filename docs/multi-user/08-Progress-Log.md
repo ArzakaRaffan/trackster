@@ -243,3 +243,10 @@ deviasi dari rencana (+alasan), env baru yang Arzaka harus tambahkan, langkah be
 - Catatan: wizard melompat ke langkah 5 saat reload bila link sudah ada (perilaku lama `inb.forwardCode ? 4`), bukan regresi. Warning compose `INBOUND_DOMAIN not set` tak berbahaya (default dipakai).
 - **Langkah berikutnya:** (1) Arzaka merge PR `fix/gmail-confirm-link`. (2) Hapus rule sementara `u+pf42…@` → Gmail. (3) Gmail → Forwarding → "Kirim ulang email" → cek wizard/Setting
   memunculkan tombol konfirmasi (uji P7-05 di prod) → klik → konfirmasi. (4) Buat filter Gmail bank → forward (shadow) → tunggu email bank nyata → cek `EmailParseLog` SHADOW (runbook §6).
+
+## 2026-10-15 — P7-07 skrip compare-shadow
+- Sesi oleh: Claude (Opus 5.5)   Branch: `feat/compare-shadow`
+- PR #10 (`fix/gmail-confirm-link`) sudah di-merge. **Arzaka (laporan sendiri):** rule sementara `u+pf42…@` → Gmail dihapus, "Kirim ulang" konfirmasi Gmail → tombol "Konfirmasi di Gmail ↗" → dikonfirmasi (P7-05 di prod), filter Gmail bank → forward ke alamat shadow dipasang. Belum diverifikasi dari sisi DB oleh Claude.
+- **Baru:** `apps/backend/prisma/compare-shadow.js` (di `prisma/`, bukan `scripts/`, karena image prod hanya berisi `prisma/` + `dist/`). Memasangkan log Gmail (emailId bukan `fwd:`) ↔ log `SHADOW` lewat parser + nominal + selisih waktu ≤15 mnt (subjek sama diutamakan) — emailId kedua jalur pasti berbeda. Mulai dari email forward pertama, jadi email Gmail sebelum filter dipasang tidak dihitung selisih.
+- Verifikasi: `--self-test` 10 kasus lulus; dijalankan ke Postgres scratch 5434 (`owner_test`) dengan baris sintetis → COCOK/TIDAK-TERFORWARD sesuai, sisa log shadow dari `inbound-e2e` muncul sebagai HANYA-FORWARD (benar). Baris uji dihapus, Postgres dimatikan.
+- **Langkah berikutnya:** (1) Arzaka merge PR ini (hanya skrip+docs, tanpa migrasi). (2) Harian: `docker compose -f docker-compose.prod.yml exec backend node prisma/compare-shadow.js --username <u>` (Runbook §6). Syarat cutover: 0 selisih tak terjelaskan 7 hari + semua jenis email (Runbook §6.2) muncul ≥1×. (3) Lalu P7-08 ⛔ cutover.
