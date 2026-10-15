@@ -90,7 +90,7 @@ Prasyarat: O1 terjawab. Lakukan di jam sepi. Siapkan **catatan NS lama** (`ns1bc
 
 1. Pasang filter Gmail Arzaka: `from:(<domain-domain bank>)` → forward ke alamat inbound (setelah verifikasi kode di wizard). Gmail OAuth lama **tetap aktif**.
 2. `InboundAddress.shadow=true` (via CLI/skrip admin). Tunggu ≥ 7 hari mencakup: transaksi biasa, transfer Flip, BCA→Flip, Jago terima uang, transfer ke rekening sendiri, email "multiple destinations", email non-transaksi (OTP/promosi).
-3. `compare-shadow.ts` harian → laporan selisih. Syarat cutover: **0 selisih tak terjelaskan** selama 7 hari berturut-turut dan semua jenis email di atas muncul minimal sekali.
+3. `docker compose -f docker-compose.prod.yml exec backend node prisma/compare-shadow.js --username <u> [--days 7] [--verbose]` harian → laporan selisih (COCOK / BEDA-OUTCOME / BEDA-DESKRIPSI / TIDAK-TERFORWARD / HANYA-FORWARD; exit 1 bila ada selisih). Output memuat nominal & deskripsi — jangan tempel ke publik. Syarat cutover: **0 selisih tak terjelaskan** selama 7 hari berturut-turut dan semua jenis email di atas muncul minimal sekali.
 4. ⛔ **Cutover** (satu jendela, dicatat jamnya): `shadow=false` → hentikan cron `gmail-sync` → cabut token Gmail (`/gmail/disconnect` atau cabut di myaccount.google.com/permissions) → verifikasi tak ada transaksi ganda selama 24 jam (cek `EmailParseLog` & transaksi baru).
 5. Setelah 3–7 hari stabil: hapus kode Gmail (P7-09).
 6. **Rollback cutover:** sambungkan ulang Gmail, aktifkan cron lagi, `shadow=true` — dedup per `emailId` berbeda (Gmail ID vs `fwd:`) sehingga **bisa terjadi dobel catat** untuk email yang diproses oleh dua jalur; karena itu cutover dilakukan pada titik waktu yang jelas dan email di sekitarnya diperiksa manual setelah rollback.
