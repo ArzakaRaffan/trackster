@@ -152,9 +152,12 @@ otomatis vs median 90 hari).
      CYCLE; Tidak tentu → BALANCE; tidak dipilih → mode tetap + slider lama. Disimpan sebelum onboarding ditandai selesai.
   5. EN: kamus `CYC_EN` (teks statis); teks berangka dibuat dua bahasa di render.
 
-### Masih terbuka (keputusan produk)
+- [x] Siklus pertama (keputusan Arzaka 2026-10-16) — akun dibuat setelah `cycleStart`:
+  - saldo pernah dikoreksi manual (`BalanceAdjustment` ada) → sisa uang siklus = saldo awal hari ini (saldo + belanja hari ini),
+    tanpa cadangan/carry; `cycle.firstCycle = 'BALANCE'`, UI "siklus pertama: dihitung dari saldo";
+  - saldo belum pernah diisi (user baru = 0) → tetap perkiraan gaji, `firstCycle = 'ESTIMATE'`, UI mengajak isi saldo di Setting → Saldo bank;
+  - `anchorPending` tidak menyala di siklus pertama (gajinya masuk sebelum daftar).
 
-- **User baru di tengah siklus.** Siklus pertama menganggap gaji siklus ini masih utuh (perkiraan anchor) padahal sebagian mungkin
-  sudah terpakai sebelum memakai Trackster, dan menampilkan "gaji belum tercatat" walau gajinya masuk sebelum daftar. Opsi: siklus
-  pertama pakai saldo sekarang sebagai pot, dan `anchorPending` hanya bila akun dibuat sebelum `cycleStart`.
+### Masih terbuka
+
 - Layar Mingguan mewarnai hari "lewat" dari total belanja (termasuk pembelian besar), beda dengan Hari ini/Analisis (belanja rutin).

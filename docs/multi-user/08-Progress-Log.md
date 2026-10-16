@@ -323,3 +323,7 @@ deviasi dari rencana (+alasan), env baru yang Arzaka harus tambahkan, langkah be
   lewat klik, kartu lama muncul lagi), Mingguan (hari lalu nominal, hari ini+ jatah dinamis), wizard user undangan baru (Bulanan tgl 25 →
   stream aktif + CYCLE, Beranda "gajian 9 hari lagi"), `/demo/budget` utuh, EN demo budget. `tsc` FE/BE bersih, check 28/28, tenancy 0.
 - **Terbuka (perlu keputusan Arzaka):** user baru di tengah siklus — lihat `docs/siklus-gajian.md` §Masih terbuka.
+- **Susulan — siklus pertama (keputusan Arzaka):** user yang daftar di tengah siklus memakai saldo (kalau pernah dikoreksi) sebagai sisa
+  uang siklus pertama, kalau belum tetap perkiraan gaji + ajakan isi saldo; "gaji belum tercatat" tidak muncul di siklus pertama.
+  Verifikasi: e2e siklus pertama 5/5 (perkiraan → koreksi saldo → belanja hari ini tidak mengubah jatah → akun lama = perilaku normal),
+  regresi fase 3 9/9 (user uji di-backdate), Beranda "Rp200.000 · siklus pertama: dihitung dari saldo", check 28/28, tenancy 0.
