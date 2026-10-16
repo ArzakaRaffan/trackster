@@ -14,6 +14,7 @@ Snapshot 2026-10-05 (diperbarui 2026-10-17). Kalau nambah module/route/cron, upd
 | balance | `/balance` | saldo per source, koreksi manual, histori adjustment. `adjustBalance(tx, source, delta)` wajib di dalam `$transaction`. |
 | budget | `/budget` | budget per hari, `today` summary, `runway`, `settings` (mode FIXED/CYCLE/BALANCE), `allowances` (snapshot jatah per tanggal). Engine siklus gajian murni di `budget-cycle.ts` (docs/siklus-gajian.md). |
 | income | `/income` | CRUD + `allowance-suggestion` + `allocation`. |
+| income-stream | `/income-streams` | CRUD sumber pemasukan; `GET suggestions` (`stream-detect.ts`, uang masuk rutin tanpa sumber); `POST {linkPast:true}` menautkan riwayat yang cocok keyword. |
 | merchant-alias | `/merchant-aliases` | CRUD alias. |
 | goal | `/goal` | Kantong: create, contribute, archive, simulate (what-if). |
 | subscription | `/subscriptions`, `/calendar` | CRUD + sync event Google Calendar (`googleCalendarEventId`). Jatuh tempo basi digulir otomatis (`subscription-due.ts`, dipakai juga komitmen budget/advisor). `GET suggestions` = deteksi tagihan bulanan berulang (`recurring-detect.ts`). `GET calendar-link` → feed publik `GET /calendar/<userId>-<sig>.ics` (HMAC userId+tokenVersion, `subscription-ics.ts`). |

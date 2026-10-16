@@ -17,6 +17,7 @@ Semua diuji di Postgres scratch lokal (5434) dengan user sintetis, bukan data pr
 | 8 | **Ekspor CSV lengkap** — pemasukan ikut, jam, nama alias, patungan; terbaca benar di Excel (BOM). | Privasi → Ekspor |
 | 9 | Mingguan: di mode dinamis pembelian besar tidak lagi membuat hari "lewat" (sama dengan Hari ini). | Mingguan |
 | 10 | Akun tanpa Google tidak lagi melihat "Calendar belum sync" / banner reconnect palsu. | Langganan |
+| 11 | **Sumber pemasukan terdeteksi** — transfer masuk rutin (gaji tgl 25, uang saku tiap Senin) disarankan jadi sumber; "Jadikan sumber" ikut menautkan riwayatnya, jadi forecast & siklus gajian langsung punya data. | Pemasukan → Sumber |
 
 ## Optimasi
 
@@ -38,9 +39,8 @@ Lalu merge `feat/siklus-gajian` dulu (branch ini berdiri di atasnya), baru branc
 
 ## Ide berikutnya (belum dikerjakan, urut dampak)
 1. **Impor mutasi CSV/PDF** (sudah "SEGERA" di galeri) — isi riwayat lama & bank yang belum didukung.
-2. **Deteksi pemasukan rutin** — kebalikan saran langganan: transfer masuk bulanan dari pengirim sama → usul sumber pemasukan (memperbaiki forecast & mode siklus).
-3. **Peringatan dini 80% jatah** (opt-in) — riset aplikasi "safe-to-spend" menekankan umpan balik sebelum lewat, bukan sesudah.
-4. **Landing tanpa render client** — teks landing belum ada di HTML awal (SEO/LCP).
-5. Tombol "Tambahkan saran" langsung dari ringkasan pagi Telegram.
+2. **Peringatan dini 80% jatah** (opt-in) — riset aplikasi "safe-to-spend" menekankan umpan balik sebelum lewat, bukan sesudah.
+3. **Landing tanpa render client** — teks landing belum ada di HTML awal (SEO/LCP).
+4. Tombol "Tambahkan saran" langsung dari ringkasan pagi Telegram.
 
 Sumber riset: ulasan aplikasi budgeting 2026 (Monarch/Copilot/YNAB — fitur yang paling dihargai: kategorisasi otomatis, recurring/subscription, review cepat, desain) dan artikel aplikasi "safe-to-spend" harian (satu angka harian + pencatatan cepat + umpan balik harian mengubah kebiasaan lebih dari grafik).
