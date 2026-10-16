@@ -15,8 +15,10 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   const res = await fetch(`${API_URL}${path}`, {
     ...options,
     credentials: 'include', // wajib supaya cookie httpOnly ikut terkirim
+    // GET tanpa header khusus = "simple request" lintas origin (trackster.dev → api.trackster.dev) → tanpa preflight
+    // OPTIONS (dulu ±35 ekstra tiap buka app). Request yang mengubah data tetap JSON (lapisan CSRF, lihat audit keamanan).
     headers: {
-      'Content-Type': 'application/json',
+      ...(options.method === 'GET' ? {} : { 'Content-Type': 'application/json' }),
       ...options.headers,
     },
   });
