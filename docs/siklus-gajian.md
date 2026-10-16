@@ -119,17 +119,29 @@ otomatis vs median 90 hari).
 
 ## Progres
 
-- [x] Fase 1 — `apps/backend/src/modules/budget/budget-cycle.ts` + `budget-cycle.check.ts` (15 kasus).
+- [x] Fase 1 — `apps/backend/src/modules/budget/budget-cycle.ts` + `budget-cycle.check.ts` (18 kasus; 23 setelah fase 3).
 - [x] Fase 2 — kolom `mode` (default **FIXED** = perilaku lama, supaya merge tidak mengubah angka tester) + `anchorStreamId`/
   `reservePct`/`horizonDays` (migrasi aditif `20261015100000_budget_cycle_mode`), `GET/PUT /budget/settings`, `getTodaySummary()`
   memanggil engine; respons bertambah `mode`, `bigSpent`, `cycle`. Expected anchor = rata-rata 3 pembayaran terakhir (fallback
   konfigurasi stream).
 
-### Sisa untuk fase 3–4 (ditemukan saat fase 2)
+- [x] Fase 3 — semua perilaku hanya berubah untuk mode CYCLE/BALANCE:
+  1. Tabel `DailyAllowance` (migrasi aditif `20261016100000_daily_allowance`): snapshot jatah per hari, ditulis `getTodaySummary()` +
+     cron `daily-allowance-snapshot` 00:05 WIB. Analytics (kepatuhan, health score, laporan) memakai snapshot; hari tanpa snapshot
+     (= mode FIXED saat itu) tetap pakai nominal `DailyBudget`.
+  2. Carry antar siklus bila `rolloverEnabled` (satu tingkat: pemasukan nyata siklus lalu − cadangan − belanja).
+  3. Anchor dicatat Rp0 (check-in "tidak dapat") = MISSED → `anchorReceived` 0. `cycle.anchorPending` = siklus sudah jalan, gaji belum tercatat.
+  4. Cron alokasi mingguan (Minggu 21:00) dilewati — dulu menimpa `DailyBudget` (= bobot hari) jadi rata.
+  5. `POST /budget/apply` (hemat/seimbang/longgar) mengatur `reservePct` (15/10/5, `RESERVE_PCT`), bukan nominal harian.
+  6. Telegram: alert over-budget memakai belanja rutin; pembelian besar → `sendBigPurchaseNotice` ("jatah N hari ke depan A → B").
+  7. Median ambang "besar" disamakan dengan analytics (90 hari s.d. akhir hari ini) supaya budget & Analisis sepakat.
+- Tidak dikerjakan (sengaja): kontribusi goal sebagai komitmen (tabungan sudah tercakup `reservePct`; Goal tidak punya target per
+  periode); check-in tetap mingguan (sudah hanya menanyakan stream bulanan di minggu payday-nya); forecast mingguan tetap untuk
+  check-in & advisor FIXED.
 
-- **UI** `/app/today` menghitung "lewat budget" sendiri dari `totalSpent` → pembelian besar tetap tampil OVER BUDGET. Pakai
-  `isOverBudget`/`remaining` dari backend.
-- **Analytics** kepatuhan budget (`budgetByDow` di `analytics.service.ts`) masih membandingkan dengan nominal `DailyBudget` — salah
-  untuk mode dinamis.
-- Carry antar siklus (`rolloverEnabled` diabaikan di CYCLE), kontribusi goal sebagai komitmen, stream MISSED → keluar dari pot.
-- Notifikasi dampak pembelian besar ("jatah turun dari A ke B").
+### Sisa untuk fase 4 (UI v3 + wizard)
+
+- `/app/today` menghitung "lewat budget" sendiri dari `totalSpent` → pembelian besar tetap tampil OVER BUDGET. Pakai
+  `isOverBudget`/`remaining`/`bigSpent` dari backend; tampilkan sisa siklus, "gajian N hari lagi", `anchorPending`, `runwayDays`.
+- Layar Budget: pilih mode + anchor, gaya (hemat/seimbang/longgar), bobot hari. Kartu "Alokasi 50/30/20" disembunyikan di mode dinamis.
+- Wizard: "Biasanya kamu terima uang kapan?" → mode + anchor.

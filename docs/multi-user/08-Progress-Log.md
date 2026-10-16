@@ -299,3 +299,14 @@ deviasi dari rencana (+alasan), env baru yang Arzaka harus tambahkan, langkah be
   hapus `tsconfig.tsbuildinfo` sebelum build lokal. CI tidak terdampak (build bersih).
 - **Langkah berikutnya:** fase 3 (forecast/check-in/allocation per siklus, carry, analytics kepatuhan) lalu fase 4 (UI v3 + wizard).
   Merge ke `main` aman kapan saja (default FIXED) — menunggu persetujuan Arzaka.
+
+## 2026-10-16 — Siklus gajian fase 3
+- Sesi oleh: Claude (Opus 5.5)   Branch: `feat/siklus-gajian`. Detail: [`docs/siklus-gajian.md`](../siklus-gajian.md) §Progres.
+- **Temuan:** cron alokasi Minggu 21:00 menimpa `DailyBudget` semua user jadi rata — di mode dinamis itu menghapus bobot hari user. Kini dilewati untuk CYCLE/BALANCE.
+- **Baru:** migrasi aditif `20261016100000_daily_allowance` (`DailyAllowance`, unik `[userId, date]`, ditambahkan ke `tenancy-audit`), cron
+  `daily-allowance-snapshot` 00:05 WIB, carry antar siklus, MISSED via check-in Rp0, `anchorPending`, advisor → `reservePct`,
+  `TelegramService.sendBigPurchaseNotice`, alert over-budget pakai belanja rutin, ambang "besar" budget = analytics.
+- Verifikasi (Postgres scratch 5434, user uji baru): e2e fase 3 9/9; ingest pembelian besar mode dinamis 201 tanpa error server;
+  `npm run check` 28/28; tenancy-audit 0; build BE bersih; `/app/insights` tampil. Notifikasi Telegram tidak diuji kirim (Telegram tak
+  terhubung di lokal; logika `bigPurchaseImpact` diuji di check). Frontend tidak disentuh.
+- **Langkah berikutnya:** fase 4 (UI v3 + wizard). Merge ke `main` tetap aman (default FIXED; FIXED tidak berubah) — menunggu Arzaka.

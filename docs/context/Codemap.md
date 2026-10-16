@@ -36,6 +36,8 @@ Snapshot 2026-10-05. Kalau nambah module/route/cron, update file ini.
 | --- | --- |
 | tiap 5 menit | Gmail sync → parse → kategori AI → simpan + adjust saldo → cek budget → alert |
 | Minggu 20:00 WIB | Weekly insight ke Telegram + simpan Health Score |
+| Minggu 21:00 WIB | Alokasi 50/30/20 → timpa `DailyBudget` (dilewati untuk mode CYCLE/BALANCE) |
+| tiap hari 00:05 WIB | Snapshot `DailyAllowance` untuk user mode CYCLE/BALANCE |
 | tiap hari 20:00 WIB (eksekusi cuma di hari terakhir bulan) | Monthly report card ke Telegram |
 
 ## Frontend — `apps/frontend/src/`
