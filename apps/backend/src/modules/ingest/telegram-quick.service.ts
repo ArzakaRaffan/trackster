@@ -5,7 +5,8 @@ import { PrismaService } from '../../prisma.service';
 import { BudgetService } from '../budget/budget.service';
 import { TransactionService } from '../transaction/transaction.service';
 import { TelegramService, escHtml } from '../telegram/telegram.service';
-import { parseQuickLog, QuickLog } from '../telegram/quick-log';
+import { parseAmount, parseQuickLog, QuickLog } from '../telegram/quick-log';
+import { affordability } from '../budget/affordability';
 import { IngestService } from './ingest.service';
 import { addWibDays, startOfWibDay, wibDateKey } from '../../common/wib';
 import { forEachActiveUser } from '../../common/per-user';
@@ -15,6 +16,7 @@ import { dueDatesBetween } from '../subscription/subscription-due';
 const rupiah = (n: number) => `Rp${Math.round(n).toLocaleString('id-ID')}`;
 const TODAY_CMD = /^\/(hariini|sisa|today)(@\w+)?$/i;
 const BRIEF_CMD = /^\/pagi(@\w+)?$/i;
+const AFFORD_CMD = /^\/bisa(@\w+)?(?:\s+(.*))?$/i;
 const UNDO_PREFIX = 'qx:';
 const UNDO_WINDOW_MS = 24 * 3600_000;
 
@@ -33,15 +35,21 @@ export class TelegramQuickService {
   ) {}
 
   /** Sinkron & murah: dipakai webhook untuk memutuskan jalur sebelum membalas 200 ke Telegram. */
-  match(text: string): { kind: 'today' } | { kind: 'brief' } | { kind: 'log'; q: QuickLog } | null {
+  match(text: string): { kind: 'today' } | { kind: 'brief' } | { kind: 'afford'; amount: number | null } | { kind: 'log'; q: QuickLog } | null {
     if (TODAY_CMD.test(text.trim())) return { kind: 'today' };
     if (BRIEF_CMD.test(text.trim())) return { kind: 'brief' };
+    const af = AFFORD_CMD.exec(text.trim());
+    if (af) {
+      const rest = (af[2] || '').trim();
+      return { kind: 'afford', amount: parseQuickLog(`/catat ${rest}`)?.amount ?? parseAmount(rest.replace(/\s+/g, ''))?.value ?? null };
+    }
     const q = parseQuickLog(text);
     return q ? { kind: 'log', q } : null;
   }
 
   async handle(userId: number, chatId: string, messageId: number, m: NonNullable<ReturnType<TelegramQuickService['match']>>) {
     if (m.kind === 'today') return this.telegramService.sendMessage(userId, await this.todayText(userId));
+    if (m.kind === 'afford') return this.telegramService.sendMessage(userId, await this.affordText(userId, m.amount));
     if (m.kind === 'brief') {
       const on = !(await this.telegramService.isDailyBriefEnabled(userId));
       await this.telegramService.setDailyBrief(userId, on);
@@ -104,6 +112,18 @@ export class TelegramQuickService {
     }
   }
 
+  /** /bisa 350rb — dampak pembelian ke jatah sebelum belanja (tanpa mencatat apa pun). */
+  async affordText(userId: number, amount: number | null): Promise<string> {
+    if (!amount || amount < 100) return 'Contoh: <code>/bisa 350rb</code> atau <code>/bisa sepatu 450rb</code> — aku hitung dampaknya ke jatahmu tanpa mencatat apa pun.';
+    const s = await this.budgetService.getTodaySummary(userId);
+    const a = affordability(s, amount);
+    const head = `Kalau belanja <b>${rupiah(amount)}</b> sekarang:`;
+    if (a.verdict === 'TODAY') return `${head}\n✅ Masih masuk jatah hari ini — sisa jadi ${rupiah(a.leftToday)}.`;
+    if (a.verdict === 'OVER_TODAY') return `${head}\n⚠️ Lewat jatah hari ini ${rupiah(a.overBy)} (jatah ${rupiah(s.budget)}).`;
+    if (a.verdict === 'SHORT') return `${head}\n⛔ Uang ${s.cycle?.mode === 'CYCLE' ? 'sampai gajian' : 'tersedia'} kurang ${rupiah(a.shortBy)}.`;
+    return `${head}\nJatah ${a.days} hari ke depan turun dari ${rupiah(a.perDayBefore)} ke <b>${rupiah(a.perDayAfter)}</b>/hari.`;
+  }
+
   /** 07:00 WIB — ringkasan pagi untuk user yang menyalakan /pagi. */
   @Cron('0 7 * * *', { name: 'telegram-daily-brief', timeZone: 'Asia/Jakarta' })
   async dailyBriefCron() {
@@ -162,7 +182,7 @@ export class TelegramQuickService {
       );
     }
     if (s.totalIncome > 0) lines.push(`Pemasukan hari ini ${rupiah(s.totalIncome)}`);
-    lines.push('', '<i>Catat cepat: "kopi 25rb", "bensin 50rb jago kemarin", pemasukan "+gaji 5jt".</i>');
+    lines.push('', '<i>Catat cepat: "kopi 25rb", "bensin 50rb jago kemarin", pemasukan "+gaji 5jt". Sebelum belanja: /bisa 350rb</i>');
     return lines.join('\n');
   }
 }

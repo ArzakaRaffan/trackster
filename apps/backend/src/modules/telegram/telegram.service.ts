@@ -38,6 +38,7 @@ export class TelegramService implements OnApplicationBootstrap {
       commands: [
         { command: 'hariini', description: 'Sisa jatah hari ini' },
         { command: 'catat', description: 'Catat pengeluaran, mis. /catat kopi 25rb' },
+        { command: 'bisa', description: 'Bisa beli ini? mis. /bisa 350rb' },
         { command: 'pagi', description: 'Ringkasan tiap pagi 07:00 (nyala/mati)' },
       ],
     }).catch((err) => this.logger.warn(`setMyCommands gagal: ${err.message}`));
