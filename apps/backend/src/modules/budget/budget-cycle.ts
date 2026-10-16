@@ -137,3 +137,27 @@ export function computeBalanceAllowance(i: BalanceAllowanceInput): BalanceAllowa
     runwayDays: i.burnRatePerDay > 0 ? Math.max(0, Math.floor(remaining / i.burnRatePerDay)) : null,
   };
 }
+
+export interface BigPurchaseImpact {
+  before: number; // jatah per hari ke depan tanpa transaksi ini
+  after: number;
+  days: number; // hari tersisa setelah hari ini
+}
+
+/** Dampak pembelian besar ke jatah hari-hari berikutnya (notifikasi pengganti alert over-budget).
+ * null = mode FIXED, bukan pembelian besar, atau tidak ada hari tersisa. */
+export function bigPurchaseImpact(
+  summary: { cycle: { remaining: number; daysLeft: number } | null; totalSpent: number; bigThreshold: number | null },
+  amount: number,
+): BigPurchaseImpact | null {
+  const { cycle, bigThreshold } = summary;
+  if (!cycle || bigThreshold == null || amount < bigThreshold) return null;
+  const days = cycle.daysLeft - 1;
+  if (days <= 0) return null;
+  const leftAfter = cycle.remaining - summary.totalSpent;
+  return {
+    before: round500(Math.max(0, leftAfter + amount) / days),
+    after: round500(Math.max(0, leftAfter) / days),
+    days,
+  };
+}

@@ -4,7 +4,7 @@
  */
 import * as assert from 'assert';
 import { wibDateKey } from '../../common/wib';
-import { cycleBounds, computeCycleAllowance, computeBalanceAllowance, normalizeWeights, CycleAllowanceInput } from './budget-cycle';
+import { bigPurchaseImpact, cycleBounds, computeCycleAllowance, computeBalanceAllowance, normalizeWeights, CycleAllowanceInput } from './budget-cycle';
 
 let passed = 0;
 let failed = 0;
@@ -85,6 +85,14 @@ check('komitmen melebihi saldo → defisit', () => {
   const r = computeBalanceAllowance({ ...bal, commitments: 2_000_000 });
   assert.deepStrictEqual([r.allowance, r.deficit, r.runwayDays], [0, true, 0]);
 });
+
+console.log('bigPurchaseImpact');
+const sum = { cycle: { remaining: 1_000_000, daysLeft: 5 }, totalSpent: 600_000, bigThreshold: 300_000 };
+check('jatah 4 hari ke depan turun', () => assert.deepStrictEqual(bigPurchaseImpact(sum, 500_000), { before: 225_000, after: 100_000, days: 4 }));
+check('di bawah ambang → null', () => assert.strictEqual(bigPurchaseImpact(sum, 200_000), null));
+check('mode FIXED → null', () => assert.strictEqual(bigPurchaseImpact({ ...sum, cycle: null, bigThreshold: null }, 500_000), null));
+check('hari terakhir siklus → null', () => assert.strictEqual(bigPurchaseImpact({ ...sum, cycle: { remaining: 1_000_000, daysLeft: 1 } }, 500_000), null));
+check('sudah minus → after 0', () => assert.strictEqual(bigPurchaseImpact({ ...sum, totalSpent: 1_200_000 }, 500_000)!.after, 0));
 
 console.log(`\n${passed} passed, ${failed} failed`);
 if (failed > 0) process.exit(1);

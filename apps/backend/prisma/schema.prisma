@@ -37,6 +37,7 @@ model User {
   reimbursements     Reimbursement[]
   dailyBudgets       DailyBudget[]
   budgetSettings     BudgetSetting[]
+  dailyAllowances    DailyAllowance[]
   emailSyncLogs      EmailSyncLog[]
   emailParseLogs     EmailParseLog[]
   telegramConfigs    TelegramConfig[]
@@ -210,6 +211,19 @@ enum BudgetMode {
   FIXED
   CYCLE
   BALANCE
+}
+
+/// Snapshot jatah harian mode CYCLE/BALANCE (jatahnya dinamis, tidak bisa direkonstruksi dari DailyBudget).
+/// Ditulis getTodaySummary() + cron 00:05 WIB; dibaca analytics (kepatuhan budget). Hari tanpa baris = mode FIXED.
+model DailyAllowance {
+  id     Int      @id @default(autoincrement())
+  date   DateTime @db.Date
+  amount Decimal  @db.Decimal(12, 2)
+
+  userId Int
+  user   User @relation(fields: [userId], references: [id], onDelete: Restrict)
+
+  @@unique([userId, date])
 }
 
 model EmailSyncLog {

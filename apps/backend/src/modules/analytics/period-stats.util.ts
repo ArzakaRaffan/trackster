@@ -24,8 +24,10 @@ export function percentile(numbers: number[], p: number): number {
  * `Transaction.isBig`) menang kalau diisi user lewat tombol "Tandai rutin/besar". */
 export function isBigPurchase(amount: number, medianAmount90d: number, override: boolean | null): boolean {
   if (override != null) return override;
-  return amount >= Math.max(300_000, 5 * medianAmount90d);
+  return amount >= bigPurchaseThreshold(medianAmount90d);
 }
+
+export const bigPurchaseThreshold = (medianAmount90d: number) => Math.max(300_000, 5 * medianAmount90d);
 
 /** Bucket waktu WIB: pagi 05-11, siang 11-15, sore 15-18, malam 18-22, larut 22-05. */
 export function timeBucket(hourWib: number): TimeBucket {

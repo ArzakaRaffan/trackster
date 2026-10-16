@@ -35,6 +35,9 @@ export interface BudgetSuggestion {
   weekStart: string; // 'YYYY-MM-DD'
 }
 
+/** Cadangan tabungan (%) per opsi — juga dipakai sebagai `BudgetSetting.reservePct` di mode CYCLE/BALANCE. */
+export const RESERVE_PCT: Record<BudgetOption, number> = { hemat: 15, seimbang: 10, longgar: 5 };
+
 /** Bulatkan ke kelipatan 500 terdekat. */
 export function round500(n: number): number {
   return Math.round(n / 500) * 500;
@@ -60,7 +63,7 @@ export function computeOption(
   
   // Pemasukan yang dipakai & target tabungan per opsi
   const incomeUsed = option === 'hemat' ? conservativeIncome : expectedIncome;
-  const reservePct = option === 'hemat' ? 0.15 : option === 'seimbang' ? 0.10 : 0.05;
+  const reservePct = RESERVE_PCT[option] / 100;
   const goalContribPct = option === 'longgar' ? 0.5 : 1.0; // longgar: 50% goal contribution
   
   const effectiveCommitments = commitments * goalContribPct;
