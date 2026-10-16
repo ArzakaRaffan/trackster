@@ -11,6 +11,7 @@ import { AiMemoryService } from './ai-memory.service';
 import { RetrievalService } from './retrieval.service';
 import { AnalyticsService } from '../analytics/analytics.service';
 import { BudgetAdvisorService } from '../budget/budget-advisor.service';
+import { affordability } from '../budget/affordability';
 import { Source, Category, MemoryKind } from '@prisma/client';
 import { addWibDays, startOfWibDay, wibDateKey } from '../../common/wib';
 
@@ -52,6 +53,20 @@ export class AiFinanceToolsService {
           required: [],
         },
         handler: async () => this.budgetService.getTodaySummary(userId),
+      },
+      {
+        name: 'checkAffordability',
+        description:
+          'Hitung dampak sebuah pembelian ke jatah harian SEBELUM user membeli (tidak mencatat apa pun). Pakai saat user bertanya "bisa beli X seharga Y?" / "aman nggak kalau belanja Y?". verdict: TODAY = masih masuk jatah hari ini; OVER_TODAY = lewat jatah hari ini sebesar overBy; SPREAD = jatah `days` hari ke depan turun dari perDayBefore ke perDayAfter; SHORT = uang sampai gajian/saldo kurang shortBy.',
+        input_schema: {
+          type: 'object',
+          properties: { amount: { type: 'number', description: 'Harga barang dalam Rupiah, contoh: 350000' } },
+          required: ['amount'],
+        },
+        handler: async (input: { amount: number }) => {
+          const s = await this.budgetService.getTodaySummary(userId);
+          return { amount: input.amount, budgetToday: s.budget, remainingToday: s.remaining, mode: s.mode, ...affordability(s, Number(input.amount)) };
+        },
       },
       {
         name: 'getWeeklySummary',
