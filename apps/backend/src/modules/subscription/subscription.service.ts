@@ -4,7 +4,8 @@ import { PrismaService } from '../../prisma.service';
 import { GmailAuthService } from '../gmail/gmail-auth.service';
 import { CreateSubscriptionDto } from './dto/create-subscription.dto';
 import { UpdateSubscriptionDto } from './dto/update-subscription.dto';
-import { startOfWibDay } from '../../common/wib';
+import { startOfWibDay, wibDateKey } from '../../common/wib';
+import { rollDueDate } from './subscription-due';
 
 type SubRow = {
   id: number;
@@ -38,7 +39,24 @@ export class SubscriptionService {
     };
   }
 
+  /** Langganan berulang: jatuh tempo yang sudah lewat digulir ke kemunculan berikutnya (event Calendar sudah RRULE,
+   *  jadi tidak perlu disinkron ulang). Dipanggil sebelum membaca supaya UI tidak menampilkan "Lewat N hari" selamanya. */
+  private async rollStale(userId: number) {
+    const todayKey = wibDateKey(new Date());
+    const stale = await this.prisma.subscription.findMany({
+      where: { userId, isActive: true, nextDueDate: { lt: new Date(`${todayKey}T00:00:00Z`) } },
+      select: { id: true, cycle: true, nextDueDate: true },
+    });
+    for (const s of stale) {
+      await this.prisma.subscription.updateMany({
+        where: { id: s.id, userId },
+        data: { nextDueDate: rollDueDate(s.nextDueDate, s.cycle, todayKey) },
+      });
+    }
+  }
+
   async findAll(userId: number) {
+    await this.rollStale(userId);
     const rows = await this.prisma.subscription.findMany({
       where: { userId },
       orderBy: [{ isActive: 'desc' }, { nextDueDate: 'asc' }],
@@ -101,6 +119,7 @@ export class SubscriptionService {
 
   /** Dipakai mascot: langganan aktif yang jatuh tempo dalam N hari. */
   async getUpcomingReminders(userId: number, withinDays = 3) {
+    await this.rollStale(userId);
     const rows = await this.prisma.subscription.findMany({
       where: { userId, isActive: true },
       orderBy: { nextDueDate: 'asc' },

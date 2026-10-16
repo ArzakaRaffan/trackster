@@ -3,6 +3,7 @@ import { PrismaService } from '../../prisma.service';
 import { AnalyticsService } from '../analytics/analytics.service';
 import { IncomeForecastService } from '../income-forecast/income-forecast.service';
 import { startOfWibWeek, wibDateKey, addWibDays, startOfWibDay } from '../../common/wib';
+import { commitmentsBetween } from '../subscription/subscription-due';
 import {
   computeBudgetSuggestions,
   computeOption,
@@ -36,11 +37,11 @@ export class BudgetAdvisorService {
     const conservativeIncome = forecast.totals.conservative;
 
     // 2. Commitments: langganan jatuh tempo minggu ini
-    const dueSubs = await this.prisma.subscription.findMany({
-      where: { userId, isActive: true, nextDueDate: { gte: weekStart, lt: weekEnd } },
-      select: { amount: true },
+    const activeSubs = await this.prisma.subscription.findMany({
+      where: { userId, isActive: true },
+      select: { amount: true, cycle: true, nextDueDate: true },
     });
-    const commitments = dueSubs.reduce((s, sub) => s + Number(sub.amount), 0);
+    const commitments = commitmentsBetween(activeSubs, weekKey, wibDateKey(weekEnd));
 
     // 3. Median rutin per hari-dalam-minggu dari 8 minggu terakhir
     const eightWeeksAgo = addWibDays(weekStart, -56);
