@@ -8,7 +8,7 @@ import { V3Tree } from './V3Tree';
 import './v3.css';
 import './pseudo.css';
 import { api } from '@/lib/api';
-import { buildDates, addDaysISO } from './live/dates';
+import { buildDates, addDaysISO, dynamicBudgetOf } from './live/dates';
 import { EMPTY_REPORT } from './live/reports';
 import { IconPicker } from './IconPicker';
 import { iconCss, iconLabel, brandCss, autoIcon } from '@/lib/icons';
@@ -107,7 +107,7 @@ const GOALS0 = [
 let TODAY_MS = new Date(2026, 8, 30).getTime(), TODAY_ISO = '2026-09-30', TODAY_LABEL = 'Rabu, 30 September';
 function v3WeekStart() { const [y, m, d] = TODAY_ISO.split('-').map(Number), dt = new Date(Date.UTC(y, m - 1, d)); dt.setUTCDate(dt.getUTCDate() - ((dt.getUTCDay() + 6) % 7)); return dt.toISOString().slice(0, 10); }
 let WEEK = null;
-function v3SetupDates(manual) { const d = buildDates(manual); WEEK = d.week; DAYS = d.days; DATE_IDX = d.dateIdx; TODAY_MS = d.todayMs; TODAY_ISO = d.todayISO; TODAY_LABEL = d.todayLabel; }
+function v3SetupDates(manual, budgetOf = undefined) { const d = buildDates(manual, Date.now(), budgetOf); WEEK = d.week; DAYS = d.days; DATE_IDX = d.dateIdx; TODAY_MS = d.todayMs; TODAY_ISO = d.todayISO; TODAY_LABEL = d.todayLabel; }
 const daysTo = iso => { const [y, m, d] = iso.split('-').map(Number); return Math.round((new Date(y, m - 1, d).getTime() - TODAY_MS) / 86400000); };
 const TIPS = [{ kind:'reminder', msg:'Spotify Premium jatuh tempo 2 hari lagi (Rp54.990). Saldo Jago cukup, jadi aman.' }];
 const fmtDate = iso => { const [y, m, d] = iso.split('-').map(Number); return new Date(y, m - 1, d).toLocaleDateString('id-ID', { day:'numeric', month:'short' }); };
@@ -119,6 +119,8 @@ const fmtIn = v => { const n = digits(v); return n ? Number(n).toLocaleString('i
 const V3SHAPE = { BCA:'border-radius:2px', Jago:'border-radius:50%', Flip:'transform:rotate(45deg)' };
 // Kamus EN tambahan (wizard: pilihan cara mencatat + mockup Gmail). Terpisah dari kamus utama (satu baris raksasa) supaya tak bentrok saat merge.
 const WIZ_EN = {"Pilih yang paling pas. Dua-duanya bisa diganti nanti.": "Pick what fits best. You can switch later.", "Email otomatis mati: email ke alamat ini diabaikan. Catat transaksi di app, lewat Shortcut, atau Tanya Track.": "Automatic email is off: email to this address is ignored. Record transactions in the app, with a Shortcut, or via Ask Track.", "Email bank yang diteruskan Gmail ke alamat ini tercatat otomatis. Jangan bagikan alamat ini.": "Bank email that Gmail forwards to this address is recorded automatically. Don’t share this address.", "Mau dicatat otomatis atau manual?": "Record automatically or manually?", "Pilih satu. Bisa diganti kapan saja di Setting → Sumber data.": "Pick one. You can change it anytime in Settings → Data sources.", "Otomatis lewat email": "Automatic via email", "DISARANKAN": "RECOMMENDED", "± 5 menit, sekali saja": "± 5 min, one time", "• Email notifikasi dari bankmu diteruskan Gmail ke alamat khusus Trackster.": "• Gmail forwards your bank’s notification emails to your private Trackster address.", "• Transaksi tercatat sendiri 1–2 menit setelah terjadi. Tidak perlu mengetik.": "• Transactions are recorded 1–2 minutes after they happen. No typing.", "• Hanya email bank yang diteruskan (pakai filter Gmail). Email lain tidak sampai ke Trackster.": "• Only bank emails are forwarded (via a Gmail filter). Other email never reaches Trackster.", "• Setup-nya di Gmail web, jadi butuh laptop/komputer sekali.": "• Setup happens in Gmail on the web, so you need a laptop or computer once.", "Catat sendiri": "Record it yourself", "0 menit setup": "0 min setup", "• Tidak ada yang perlu disambungkan.": "• Nothing to connect.", "• Tiap pengeluaran kamu catat di app, lewat Shortcut iPhone, atau bilang ke Tanya Track.": "• Log each expense in the app, with an iPhone Shortcut, or by telling Ask Track.", "• Cocok untuk Gmail kantor/kampus, bank di luar daftar, atau kalau belum mau meneruskan email.": "• Good for work or school Gmail, banks not on the list, or if you’d rather not forward email yet.", "Berikutnya 3 langkah di Gmail: tambah alamat ini, konfirmasi, lalu buat filter. Total ± 5 menit.": "Next, 3 steps in Gmail: add this address, confirm, then create a filter. About 5 minutes total.", "Ganti ke catat sendiri": "Switch to recording it yourself", "BIARKAN INI": "KEEP THIS", "JANGAN": "DON’T", "Tampilan Gmail berbahasa Inggris. Gmail berbahasa Indonesia:": "Gmail shown in English. In Indonesian Gmail:", ". Pilihan": ". Keep", "tetap dibiarkan: filter di langkah 5 yang meneruskan email bank saja.": "selected: the filter in step 5 forwards bank email only.", "Tombol di atas membuka halaman Gmail seperti ini. Klik": "The button above opens a Gmail page like this. Click", "(Konfirmasi), lalu kembali ke sini.": ", then come back here.", "Filter ini yang meneruskan email bank ke Trackster. Email lain tetap di Gmail. ± 2 menit.": "This filter forwards bank email to Trackster. Other email stays in Gmail. About 2 minutes.", "Di Gmail, klik ikon pengaturan pencarian (☰ di ujung kanan kotak cari).": "In Gmail, click the search options icon (☰ at the right end of the search box).", "Tempel teks di bawah ke kolom": "Paste the text below into the", "(Dari), lalu klik": "field, then click", "(Buat filter), bukan Search.": ", not Search.", "Centang": "Tick", "(Teruskan ke), pilih alamat Trackster-mu, lalu": ", pick your Trackster address, then", "(biarkan kosong)": "(leave unchecked)", "Jangan": "Don’t", "pilih “Forward a copy of incoming mail” di tab Forwarding: itu meneruskan": "pick “Forward a copy of incoming mail” in the Forwarding tab: it forwards", "semua": "all", "email. Biarkan “Disable forwarding”; filter ini sudah cukup.": "email. Keep “Disable forwarding”; this filter is enough."};
+// Kamus EN tambahan: cara menghitung budget (siklus gajian / saldo). Teks berangka dibuat dua bahasa langsung di render.
+const CYC_EN = {"Cara menghitung budget": "How your budget is calculated", "Tetap per hari": "Fixed per day", "Kamu atur nominal budget tiap hari.": "You set an amount for each day.", "Ikut gajian": "Follow payday", "Sisa uang sampai gajian berikutnya dibagi ke sisa hari.": "Money left until next payday, split across the remaining days.", "Dari saldo": "From balance", "Untuk pemasukan harian atau tak tentu: saldo dibagi 30 hari.": "For daily or irregular income: your balance split over 30 days.", "Pemasukan utama (penentu tanggal gajian)": "Main income (sets your payday)", "Pilih pemasukan…": "Choose income…", "Belum ada pemasukan rutin (mingguan atau bulanan). Tambahkan dulu di Pemasukan → Sumber.": "No recurring (weekly or monthly) income yet. Add one in Income → Sources first.", "Ke Pemasukan": "Go to Income", "Sisihkan untuk tabungan": "Set aside for savings", "Simpan cara hitung": "Save", "Menyimpan…": "Saving…", "✓ Tersimpan": "✓ Saved", "Jatah hari ini": "Today's allowance", "Atur bobot hari": "Set day weights", "Persentase = bobot tiap hari. Hari berbobot besar dapat jatah lebih besar (mis. weekend).": "Percent = weight of each day. Heavier days get a bigger share (e.g. weekends).", "Nominal per hari diatur di bawah.": "Set each day's amount below.", "Jatah harian berubah tiap hari mengikuti sisa uang sampai gajian.": "Your daily allowance updates every day from the money left until payday.", "Jatah harian = saldo ÷ 30 hari, dikurangi langganan yang akan jatuh tempo.": "Daily allowance = balance ÷ 30 days, minus upcoming subscriptions.", "Biasanya kamu terima uang kapan?": "When do you usually get paid?", "Budget harian dihitung dari sini. Bisa diganti di halaman Budget.": "Your daily budget is based on this. You can change it on the Budget page.", "Bulanan": "Monthly", "Tidak tentu / harian": "Irregular / daily", "Hari terima": "Pay day", "Tanggal terima (1–31)": "Pay date (1–31)", "Biasanya berapa? (Rp)": "Usually how much? (Rp)", "Belum yakin? Lewati saja: budget harian pakai angka tetap di bawah.": "Not sure? Skip it: your daily budget uses the fixed amount below.", "Budget harian = sisa uang sampai gajian berikutnya ÷ sisa hari. Menyesuaikan sendiri tiap hari.": "Daily budget = money left until next payday ÷ days left. It adjusts every day.", "Budget harian = saldo rekening ÷ 30 hari. Cocok untuk pemasukan harian atau tidak tentu.": "Daily budget = account balance ÷ 30 days. Good for daily or irregular income.", "Pemasukan utama": "Main income"};
 export class V3Logic extends React.Component {
   constructor(props) {
     super(props);
@@ -589,7 +591,7 @@ export class V3Logic extends React.Component {
     if (st.kind === 'DEDUCTION') return Math.max(0, n(st.amount) - e.units * n(st.ded));
     return Number(digits(e.amount)) || 0;
   }
-  renderVals() { this.S = this.state; if (this.props.live !== undefined) v3SetupDates(this.S.manual); const v = this.rv0(); for (const k of Object.getOwnPropertyNames(Object.getPrototypeOf(this))) if (k.startsWith('rv_')) Object.assign(v, this[k](this.S, this.props, v)); return v; }
+  renderVals() { this.S = this.state; if (this.props.live !== undefined) v3SetupDates(this.S.manual, this.S.bmode && this.S.bmode !== 'FIXED' ? dynamicBudgetOf(this.S.manual, this.S.allowMap || {}, this.S.todayBudget ?? 0) : undefined); const v = this.rv0(); for (const k of Object.getOwnPropertyNames(Object.getPrototypeOf(this))) if (k.startsWith('rv_')) Object.assign(v, this[k](this.S, this.props, v)); return v; }
   rv_pre(s0, props) { const h = this.v3h(s0); const s = { ...s0, ckS:s0.ckS ?? {}, budget:s0.wzBudget ?? ((props.live !== undefined && s0.manual && Math.max(...s0.manual)) || 150000) };
     const { RP, NUM, seg, isMob, isDesk, isTab } = h;
     const PRE = ['landing', 'auth', 'wizard'];
@@ -612,7 +614,17 @@ export class V3Logic extends React.Component {
     // Gmail kini mengirim link konfirmasi (vf-…), bukan kode angka — backend menyimpannya di forwardCode.
     const isGmailLink = (v) => /^https:\/\/mail\.google\.com\/mail\/vf-/.test(v);
     const copy = (v, ok) => { if (typeof navigator !== 'undefined' && navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(v).then(() => this.toast(ok)).catch(() => this.toast('Gagal menyalin. Salin manual.')); else this.toast('Gagal menyalin. Salin manual.'); };
-    const finishLive = () => { const m = [0, 1, 2, 3, 4, 5, 6].map(() => s.budget); return Promise.all([s.wzBudget ? lv.actions.saveBudget(m) : null, lv.actions.finishOnboarding()]).then(() => lv.refreshProfile()).then(() => { lv.refresh(); this.setState({ pre:null, page:'dash' }); }).catch(e => this.toast((e && e.message) || 'Gagal menyimpan. Coba lagi.')); };
+    // Jadwal pemasukan (langkah 7): mingguan/bulanan → buat stream "Pemasukan utama" + mode CYCLE; tidak tentu → mode BALANCE; kosong → mode tetap (slider).
+    const pay = s.wzPay || '', payDow = s.wzPayDow ?? '5', payDom = s.wzPayDom ?? '25', payAmt = s.wzPayAmt ?? '';
+    const savePay = () => {
+      if (!pay) return null;
+      if (pay === 'NONE') return lv.actions.saveBudgetSettings({ mode:'BALANCE' });
+      const have = (s.streams || []).find(x => x.name === 'Pemasukan utama' && x.cadence === pay);
+      const f = { name:'Pemasukan utama', kind:'FIXED', cadence:pay, active:true, source:pf && pf.banks.includes('JAGO') && !pf.banks.includes('BCA') ? 'JAGO' : 'BCA', payDOW:payDow, payDOM:payDom, amount:digits(payAmt) };
+      return lv.actions.saveStream(have ? have.id : null, f).then(st => lv.actions.saveBudgetSettings({ mode:'CYCLE', anchorStreamId:(st && st.id) || (have && have.id) }));
+    };
+    const payErr = !pay || pay === 'NONE' ? '' : !(Number(digits(payAmt)) > 0) ? 'Isi perkiraan nominal pemasukanmu dulu.' : pay === 'MONTHLY' && !(Number(payDom) >= 1 && Number(payDom) <= 31) ? 'Tanggal terima harus 1–31.' : '';
+    const finishLive = () => { if (payErr) return this.toast(payErr); const m = [0, 1, 2, 3, 4, 5, 6].map(() => s.budget); return Promise.resolve(savePay()).then(() => Promise.all([s.wzBudget && !pay ? lv.actions.saveBudget(m) : null, lv.actions.finishOnboarding()])).then(() => lv.refreshProfile()).then(() => { lv.refresh(); this.setState({ pre:null, page:'dash' }); }).catch(e => this.toast((e && e.message) || 'Gagal menyimpan. Coba lagi.')); };
     const saveStep0 = () => {
       const nums = (s.accNums ?? (pf ? pf.accounts.map(a => a.accountNumber).join(', ') : '')).split(/[,;\n]/).map(x => x.replace(/\D/g, '')).filter(Boolean);
       if (nums.some(x => x.length < 6 || x.length > 20)) return this.setState({ wzErr0:'Nomor rekening harus 6–20 digit.' });
@@ -686,6 +698,12 @@ export class V3Logic extends React.Component {
       simBad:() => this.setState({ testSt:'bad' }),
       simIdle:() => this.setState({ testSt:'idle' }),
       budgetTxt2:RP(s.budget), budgetVal:String(s.budget), onBudget:e => this.setState({ wzBudget:parseInt(e.target.value, 10) }),
+      payOpts:[['WEEKLY', 'Mingguan'], ['MONTHLY', 'Bulanan'], ['NONE', 'Tidak tentu / harian']].map(([k, label]) => ({ label, checked:String(pay === k), bd: pay === k ? 'var(--text)' : 'var(--border)', bg: pay === k ? 'var(--brand-subtle)' : 'transparent', onClick:() => this.setState({ wzPay: pay === k ? '' : k }) })),
+      payWeekly:pay === 'WEEKLY', payMonthly:pay === 'MONTHLY', payHasAmt:pay === 'WEEKLY' || pay === 'MONTHLY', budSliderShow:!pay,
+      payDow, payDowOpts:[1, 2, 3, 4, 5, 6, 0].map(d => ({ value:String(d), label:DAYN[d] })), onPayDow:e => this.setState({ wzPayDow:e.target.value }),
+      payDom, onPayDom:e => this.setState({ wzPayDom:digits(e.target.value).slice(0, 2) }),
+      payAmt:payAmt ? Number(digits(payAmt)).toLocaleString('id-ID') : '', onPayAmt:e => this.setState({ wzPayAmt:digits(e.target.value) }),
+      payNote:!pay ? 'Belum yakin? Lewati saja: budget harian pakai angka tetap di bawah.' : pay === 'NONE' ? 'Budget harian = saldo rekening ÷ 30 hari. Cocok untuk pemasukan harian atau tidak tentu.' : 'Budget harian = sisa uang sampai gajian berikutnya ÷ sisa hari. Menyesuaikan sendiri tiap hari.',
       tgLabel:(isLive ? !!(pf && pf.checklist.telegram) : s.tgOn) ? '✓ Terhubung' : 'Hubungkan', tgBg:(isLive ? !!(pf && pf.checklist.telegram) : s.tgOn) ? 'var(--brand-subtle)' : 'transparent', tgC:'var(--text)', connectTg:() => { if (isLive) return this.linkTelegram(); this.setState(st => ({ tgOn:!st.tgOn })); this.toast(s.tgOn ? 'Telegram diputus.' : 'Telegram terhubung.'); },
       toastPwa:() => this.toast('iOS: Bagikan → Tambah ke Layar Utama. Android: menu ⋮ → Instal aplikasi.'),
       finishWiz:() => { if (isLive) return finishLive(); this.setState({ pre:null, page:'dash' }); this.toast('Selamat datang di Trackster!'); }
@@ -916,7 +934,7 @@ export class V3Logic extends React.Component {
       const m = k.match(/^(Senin|Selasa|Rabu|Kamis|Jumat|Sabtu|Minggu|Sen|Sel|Rab|Kam|Jum|Sab|Min)(, | · )(\d.*)$/); let o = k; if (m) o = DY[m[1]] + m[2] + m[3];
       o = o.replace(/\b(Okt|Agu|Mei|Des)\b(?=\s*(\d|$|·|,))/g, x => MO[x]).replace(/\b(\d+) (Okt|Agu|Mei|Des)\b/g, (a, d, x) => d + ' ' + MO[x]).replace(/\b(Januari|Februari|Maret|Juni|Juli|Agustus|Oktober|Desember)\b/g, x => ({ Januari:'January', Februari:'February', Maret:'March', Juni:'June', Juli:'July', Agustus:'August', Oktober:'October', Desember:'December' })[x]).replace(/^Hari ini, /, 'Today, ').replace(/^Kemarin, /, 'Yesterday, ');
       return o !== k ? o : null; };
-    if (!this.dictWiz) { this.dictWiz = 1; Object.assign(D, WIZ_EN); } // kamus wizard terpisah (lihat WIZ_EN)
+    if (!this.dictWiz) { this.dictWiz = 1; Object.assign(D, WIZ_EN, CYC_EN); } // kamus wizard terpisah (lihat WIZ_EN)
     const w = document.createTreeWalker(root, NodeFilter.SHOW_TEXT); let n;
     while ((n = w.nextNode())) { const o = this.orig.get(n), cur = n.nodeValue;
       if (en) { const base = o && cur === o.t ? o.s : cur, k = base.trim(); const tv = k && tx(k); if (tv) { const out = base.replace(k, tv); this.orig.set(n, { s:base, t:out }); if (cur !== out) n.nodeValue = out; } }
@@ -1052,16 +1070,32 @@ export class V3Logic extends React.Component {
     const pg = PAGES[s.page] || [OTHER[s.page], 'Belum didesain ulang'];
 
     // today
-    const tTx = s.txs.filter(t => t.d === 6), spent = tTx.reduce((a, t) => a + t.amt, 0), budget = s.todayBudget ?? 200000, over = spent > budget, ratio = spent / budget, near = !over && ratio >= .8;
+    // Mode dinamis: pembelian besar (s.todayBig dari backend) sudah mengurangi sisa siklus, jadi tidak dihitung "lewat budget" hari ini.
+    const tTx = s.txs.filter(t => t.d === 6), spentAll = tTx.reduce((a, t) => a + t.amt, 0), big = Math.min(spentAll, s.todayBig || 0), spent = spentAll - big, budget = s.todayBudget ?? 200000, over = spent > budget, ratio = budget > 0 ? spent / budget : (spent > 0 ? 1 : 0), near = !over && ratio >= .8;
     const st = over ? ['Over budget','var(--danger-text)','var(--danger-subtle)',I.octagon,'var(--danger-bold)'] : near ? ['Hampir habis','var(--warning-text)','var(--warning-subtle)',I.triangle,'var(--warning-bold)'] : ['Aman','var(--success-text)','var(--success-subtle)',I.check,'var(--success-bold)'];
     const hero = { label: sisa ? (over ? 'Lewat budget hari ini' : 'Sisa hari ini') : 'Terpakai hari ini', value: sisa ? RP(Math.abs(budget - spent)) : RP(spent), valueColor: over ? 'var(--danger-text)' : 'var(--text)',
       status:st[0], statusColor:st[1], statusBg:st[2], statusIcon:st[3], bar:st[4], pct:Math.min(100, ratio * 100) + '%', pctN:Math.round(Math.min(100, ratio * 100)), over, overBy:RP(spent - budget), tgSent:!!s.st?.tgConfigured,
       peek: sisa ? `Terpakai ${RP(spent)} dari ${RP(budget)}` : `${over ? 'Lewat' : 'Sisa'} ${RP(Math.abs(budget - spent))} dari ${RP(budget)}`,
       stats: [{ label:'Budget', value:RP(budget), color:'var(--text)' }, sisa ? { label:'Terpakai', value:RP(spent), color:'var(--text)' } : { label: over ? 'Lewat' : 'Sisa', value:RP(Math.abs(budget - spent)), color: over ? 'var(--danger-text)' : 'var(--success-text)' }] };
+    const cy = s.cyc, en = (s.lang ?? 'id') === 'en';
+    hero.hasCycle = !!cy; hero.cycleTxt = '';
+    if (cy) {
+      const left = cy.remaining - spentAll, parts = [];
+      if (cy.mode === 'CYCLE') {
+        parts.push(left < 0 ? (en ? `This cycle is ${RP(left)} short` : `Siklus ini minus ${RP(left)}`) : (en ? `${RP(left)} left until payday` : `Sisa ${RP(left)} sampai gajian`));
+        parts.push(en ? `payday in ${cy.daysLeft} day${cy.daysLeft > 1 ? 's' : ''}` : `gajian ${cy.daysLeft} hari lagi`);
+        if (cy.anchorPending) parts.push(en ? 'pay not recorded yet' : 'gaji belum tercatat');
+      } else {
+        parts.push(en ? `Available ${RP(Math.max(0, left))}` : `Saldo tersedia ${RP(Math.max(0, left))}`);
+        if (cy.runwayDays != null) parts.push(en ? `lasts ~${cy.runwayDays} days` : `cukup ±${cy.runwayDays} hari`);
+      }
+      if (big > 0) parts.push(en ? `big purchase ${RP(big)} not counted today` : `pembelian besar ${RP(big)} tidak dihitung hari ini`);
+      hero.cycleTxt = parts.join(' · ');
+    }
     const txMeta = t => [t.src === 'JAGO' ? 'Jago' : t.src, t.time, t.cat !== 'LAINNYA' ? CAT_L[t.cat] : null, t.cap].filter(Boolean).join(' · ');
     const todayRows = tTx.map(t => ({ title:this.title(t), iconCss:iconCss(this.iconOf(t)), initial:this.iconOf(t) ? '' : this.title(t).trim().charAt(0).toUpperCase(), shape:(V3SHAPE[{ BCA:'BCA', JAGO:'Jago', FLIP:'Flip' }[t.src]] || 'border-radius:2px'), srcCss:brandCss(t.src), meta:txMeta(t), amount:'−' + RP(t.amt), hasNote:!!t.note, hasAlias:!!t.alias && t.alias !== t.raw, aria:`${this.title(t)}, ${RP(t.amt)}. Buka detail`, open:() => this.openTx(t) }));
-    const income = s.todayIncome ?? 500000, netV = income - spent;
-    const net = { value:(netV >= 0 ? '+' : '−') + RP(netV), badge: netV >= 0 ? 'Surplus' : 'Defisit', color: netV >= 0 ? 'var(--success-text)' : 'var(--danger-text)', bg: netV >= 0 ? 'var(--success-subtle)' : 'var(--danger-subtle)', inc:RP(income), exp:RP(spent) };
+    const income = s.todayIncome ?? 500000, netV = income - spentAll;
+    const net = { value:(netV >= 0 ? '+' : '−') + RP(netV), badge: netV >= 0 ? 'Surplus' : 'Defisit', color: netV >= 0 ? 'var(--success-text)' : 'var(--danger-text)', bg: netV >= 0 ? 'var(--success-subtle)' : 'var(--danger-subtle)', inc:RP(income), exp:RP(spentAll) };
     const quick = [['Tanya Track','Tanya soal uangmu sebelum memutuskan',I.message,'chat'],['Langganan','Tagihan rutin yang kamu catat',I.repeat,'subs'],['Pemasukan','Catat & kelola pemasukan',I.income,'income'],['Split Bill','Bagi tagihan bareng temen',I.receipt,'split'],['Laporan','Ringkasan bulanan & tren',I.chart,'reports'],['Budget','Atur budget harian',I.wallet,'budget'],['Target Tabungan','Hitung nabung per bulan',I.target,'goals']].map(([label, desc, icon, k]) => ({ label, desc, icon, onClick:() => this.go(k) }));
     const dots = [0, 1].map(i => ({ selected:String(s.car === i), aria:`Ringkasan ${i + 1}`, w: s.car === i ? '20px' : '6px', bg: s.car === i ? 'var(--text)' : 'var(--border-bold)', onClick:() => this.setState({ car:i }) }));
 
@@ -1077,7 +1111,27 @@ export class V3Logic extends React.Component {
 
     // budget
     const DS = ['Min','Sen','Sel','Rab','Kam','Jum','Sab'];
-    const bud = { total:RP(s.manual.reduce((a, v) => a + (v || 0), 0)), strip:s.manual.map((v, i) => ({ day:DS[i], value:Math.round(v / 1000) + 'rb' })),
+    // Cara menghitung budget (BudgetSetting.mode). `dyn` = mode tersimpan; pilihan di layar (bmSel dst.) baru berlaku setelah Simpan.
+    const bsetL = s.bset || { mode:s.bmode || 'FIXED', anchorStreamId:null, reservePct:10 }, dyn = (s.bmode || bsetL.mode) !== 'FIXED';
+    const bmSel = s.bmSel ?? bsetL.mode, anchorSel = s.anchorSel ?? (bsetL.anchorStreamId != null ? String(bsetL.anchorStreamId) : ''), resSel = s.resSel ?? bsetL.reservePct;
+    const pick = on => ({ checked:String(on), bg: on ? 'var(--brand-subtle)' : 'var(--neutral)', hover: on ? 'var(--brand-subtle)' : 'var(--neutral-hover)', ring: on ? 'inset 0 0 0 2px var(--brand)' : 'none', labelColor: on ? 'var(--brand-text)' : 'var(--text)' });
+    const modeOpts = [['FIXED', 'Tetap per hari', 'Kamu atur nominal budget tiap hari.'], ['CYCLE', 'Ikut gajian', 'Sisa uang sampai gajian berikutnya dibagi ke sisa hari.'], ['BALANCE', 'Dari saldo', 'Untuk pemasukan harian atau tak tentu: saldo dibagi 30 hari.']]
+      .map(([k, label, desc]) => ({ label, desc, ...pick(bmSel === k), onClick:() => this.setState({ bmSel:k, modeState:'idle' }) }));
+    const anchorList = (s.streams || []).filter(x => x.active && (x.cadence === 'WEEKLY' || x.cadence === 'MONTHLY'));
+    const anchorOpts = anchorList.map(x => ({ value:String(x.id), label:`${x.name} · ${x.cadence === 'WEEKLY' ? 'tiap ' + DAYN[Number(x.payDOW) || 0] : 'tiap tanggal ' + (x.payDOM || '?')}` }));
+    const reserveOpts = [5, 10, 15].map(pc => ({ label:pc + '%', ...pick(resSel === pc), onClick:() => this.setState({ resSel:pc, modeState:'idle' }) }));
+    const modeNote = { FIXED:'Nominal per hari diatur di bawah.', CYCLE:'Jatah harian berubah tiap hari mengikuti sisa uang sampai gajian.', BALANCE:'Jatah harian = saldo ÷ 30 hari, dikurangi langganan yang akan jatuh tempo.' }[bmSel];
+    const saveMode = () => {
+      if (s.modeState === 'saving') return;
+      if (bmSel === 'CYCLE' && !anchorSel) return this.toast(anchorList.length ? 'Pilih pemasukan utama dulu.' : 'Tambahkan pemasukan rutin dulu di Pemasukan.');
+      if (this.props.live === undefined) { this.setState({ bmode:bmSel, bset:{ mode:bmSel, anchorStreamId:anchorSel ? Number(anchorSel) : null, reservePct:resSel }, modeState:'saved' }); return; }
+      this.setState({ modeState:'saving' });
+      this.props.live.actions.saveBudgetSettings({ mode:bmSel, reservePct:resSel, ...(bmSel === 'CYCLE' ? { anchorStreamId:Number(anchorSel) } : {}) })
+        .then(() => this.props.live.refresh()).then(() => this.setState({ modeState:'saved' }))
+        .catch(e => { this.setState({ modeState:'idle' }); this.toast((e && e.message) || 'Gagal menyimpan cara hitung.'); });
+    };
+    const wSum = s.manual.reduce((a, v) => a + (v || 0), 0);
+    const bud = { total:dyn ? RP(s.todayBudget ?? 0) : RP(wSum), strip:s.manual.map((v, i) => ({ day:DS[i], value:dyn ? (wSum > 0 ? Math.round((v || 0) / wSum * 100) : 14) + '%' : Math.round(v / 1000) + 'rb' })),
       inputs:s.manual.map((v, i) => ({ day:DAYN[i], value: v ? v.toLocaleString('id-ID') : '', onChange:e => { const n = Number(digits(e.target.value)) || 0; this.setState(x => { const m = [...x.manual]; m[i] = n; return { manual:m, saveState:'idle' }; }); } })) };
     const OP = (s.budget && s.budget.opts) || (this.props.live !== undefined ? [] : OPTS); const options = OP.map(o => { const on = o.k === s.opt; return { label:o.label, desc:o.desc, total:RP(o.total), save:RP(o.save), rec:o.k === ((s.budget && s.budget.rec) || 'seimbang'), hasFlag:!!o.flag, flag:o.flag || '', checked:String(on), bg: on ? 'var(--brand-subtle)' : 'var(--neutral)', hover: on ? 'var(--brand-subtle)' : 'var(--neutral-hover)', ring: on ? 'inset 0 0 0 2px var(--brand)' : 'none', labelColor: on ? 'var(--brand-text)' : 'var(--text)', barColor: on ? 'var(--brand)' : 'var(--border-bold)', bars:o.days.map((v, i) => ({ h:Math.max(4, v / 280000 * 26) + 'px', d:DS[i] })), onClick:() => this.setState({ opt:o.k, applyState:'idle' }) }; });
     const optObj = OP.find(o => o.k === s.opt) || OP[0] || { label:'', days:[] };
@@ -1158,6 +1212,9 @@ export class V3Logic extends React.Component {
       runway: s.runwayInfo ? { value:s.runwayInfo.value, badge:s.runwayInfo.short ? 'Defisit' : 'Aman', color:s.runwayInfo.short ? 'var(--danger-text)' : 'var(--success-text)', bg:s.runwayInfo.short ? 'var(--danger-subtle)' : 'var(--success-subtle)' } : { value:'Rp4.049.000', badge:'Aman', color:'var(--success-text)', bg:'var(--success-subtle)' },
       todayRows, todayCount:tTx.length, todayEmpty:tTx.length === 0,
       wk, bars, dayRows,
+      budHeroLabel:dyn ? 'Jatah hari ini' : 'Total budget minggu ini', manualBtnTxt:dyn ? 'Atur bobot hari' : 'Edit manual', budNoteShow:dyn, budNote:'Persentase = bobot tiap hari. Hari berbobot besar dapat jatah lebih besar (mis. weekend).', allocShow:!dyn, sugShow:!dyn,
+      modeOpts, anchorShow:bmSel === 'CYCLE' && anchorList.length > 0, anchorNone:bmSel === 'CYCLE' && anchorList.length === 0, anchorOpts, anchorVal:anchorSel, onAnchor:e => this.setState({ anchorSel:e.target.value, modeState:'idle' }),
+      reserveShow:bmSel !== 'FIXED', reserveOpts, modeNote, saveMode, modeBusy:String(s.modeState === 'saving'), modeSaveLabel:{ idle:'Simpan cara hitung', saving:'Menyimpan…', saved:'✓ Tersimpan' }[s.modeState || 'idle'],
       bud, toggleManual:() => this.setState({ manualOpen:!s.manualOpen }), manualExpanded:String(s.manualOpen), manualRot: s.manualOpen ? '180deg' : '0deg', manualRows: s.manualOpen ? '1fr' : '0fr', manualTab: s.manualOpen ? 0 : -1,
       saveLabel:{ idle:'Simpan budget', saving:'Menyimpan...', saved:'✓ Tersimpan' }[s.saveState],
       saveManual:() => { this.setState({ saveState:'saving' }); if (this.props.live !== undefined) { this.props.live.actions.saveBudget(s.manual).then(() => this.props.live.refresh()).then(() => this.setState({ saveState:'saved' })).catch(e => { this.setState({ saveState:'idle' }); this.toast((e && e.message) || 'Gagal menyimpan budget.'); }); return; } this.t4 = setTimeout(() => this.setState({ saveState:'saved' }), 700); },
