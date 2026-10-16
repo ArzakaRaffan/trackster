@@ -1,4 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
+import { Cron } from '@nestjs/schedule';
 import { Source } from '@prisma/client';
 import { PrismaService } from '../../prisma.service';
 import { BudgetService } from '../budget/budget.service';
@@ -6,10 +7,14 @@ import { TransactionService } from '../transaction/transaction.service';
 import { TelegramService, escHtml } from '../telegram/telegram.service';
 import { parseQuickLog, QuickLog } from '../telegram/quick-log';
 import { IngestService } from './ingest.service';
-import { addWibDays, wibDateKey } from '../../common/wib';
+import { addWibDays, startOfWibDay, wibDateKey } from '../../common/wib';
+import { forEachActiveUser } from '../../common/per-user';
+import { spend } from '../../common/spend';
+import { dueDatesBetween } from '../subscription/subscription-due';
 
 const rupiah = (n: number) => `Rp${Math.round(n).toLocaleString('id-ID')}`;
 const TODAY_CMD = /^\/(hariini|sisa|today)(@\w+)?$/i;
+const BRIEF_CMD = /^\/pagi(@\w+)?$/i;
 const UNDO_PREFIX = 'qx:';
 const UNDO_WINDOW_MS = 24 * 3600_000;
 
@@ -28,14 +33,23 @@ export class TelegramQuickService {
   ) {}
 
   /** Sinkron & murah: dipakai webhook untuk memutuskan jalur sebelum membalas 200 ke Telegram. */
-  match(text: string): { kind: 'today' } | { kind: 'log'; q: QuickLog } | null {
+  match(text: string): { kind: 'today' } | { kind: 'brief' } | { kind: 'log'; q: QuickLog } | null {
     if (TODAY_CMD.test(text.trim())) return { kind: 'today' };
+    if (BRIEF_CMD.test(text.trim())) return { kind: 'brief' };
     const q = parseQuickLog(text);
     return q ? { kind: 'log', q } : null;
   }
 
   async handle(userId: number, chatId: string, messageId: number, m: NonNullable<ReturnType<TelegramQuickService['match']>>) {
     if (m.kind === 'today') return this.telegramService.sendMessage(userId, await this.todayText(userId));
+    if (m.kind === 'brief') {
+      const on = !(await this.telegramService.isDailyBriefEnabled(userId));
+      await this.telegramService.setDailyBrief(userId, on);
+      return this.telegramService.sendMessage(
+        userId,
+        on ? '☀️ Ringkasan pagi <b>nyala</b>: tiap 07:00 aku kirim jatah hari ini, belanja kemarin, dan tagihan yang jatuh tempo. Kirim /pagi lagi untuk mematikan.' : 'Ringkasan pagi <b>mati</b>. Kirim /pagi untuk menyalakan lagi.',
+      );
+    }
 
     const { q } = m;
     const source = q.source ?? (await this.defaultSource(userId));
@@ -88,6 +102,40 @@ export class TelegramQuickService {
         `↩️ Dibatalkan: ${escHtml(tx.description)} ${rupiah(Number(tx.amount))}`,
       );
     }
+  }
+
+  /** 07:00 WIB — ringkasan pagi untuk user yang menyalakan /pagi. */
+  @Cron('0 7 * * *', { name: 'telegram-daily-brief', timeZone: 'Asia/Jakarta' })
+  async dailyBriefCron() {
+    await forEachActiveUser(this.prisma, this.logger, 'telegram-daily-brief', async (userId) => {
+      if (await this.telegramService.isDailyBriefEnabled(userId)) await this.telegramService.sendMessage(userId, await this.briefText(userId));
+    }, { jitterMs: 2000 });
+  }
+
+  async briefText(userId: number): Promise<string> {
+    const now = new Date();
+    const todayStart = startOfWibDay(now);
+    const todayKey = wibDateKey(now);
+    const [s, yTx, subs] = await Promise.all([
+      this.budgetService.getTodaySummary(userId),
+      this.prisma.transaction.findMany({
+        where: { userId, occurredAt: { gte: addWibDays(todayStart, -1), lt: todayStart } },
+        select: { amount: true, reimbursedAmount: true },
+      }),
+      this.prisma.subscription.findMany({ where: { userId, isActive: true }, select: { name: true, amount: true, cycle: true, nextDueDate: true } }),
+    ]);
+    const ySpent = yTx.reduce((a, t) => a + spend(t), 0);
+    const tomorrowKey = wibDateKey(addWibDays(todayStart, 1));
+    const dueToday = subs.filter((x) => dueDatesBetween(x.nextDueDate, x.cycle, todayKey, tomorrowKey).length);
+    const lines = [
+      '☀️ <b>Selamat pagi!</b>',
+      `Jatah hari ini <b>${rupiah(s.budget)}</b>`,
+      yTx.length ? `Kemarin belanja ${rupiah(ySpent)} (${yTx.length} transaksi)` : 'Kemarin tidak ada belanja tercatat 🎉',
+    ];
+    for (const x of dueToday) lines.push(`🔁 ${escHtml(x.name)} ${rupiah(Number(x.amount))} jatuh tempo hari ini`);
+    if (s.cycle?.mode === 'CYCLE') lines.push(`Sisa siklus ${rupiah(s.cycle.remaining)} · ${s.cycle.daysLeft} hari lagi sampai gajian`);
+    lines.push('', '<i>Catat: "kopi 25rb" · cek sisa: /hariini · matikan: /pagi</i>');
+    return lines.join('\n');
   }
 
   private async defaultSource(userId: number): Promise<Source> {

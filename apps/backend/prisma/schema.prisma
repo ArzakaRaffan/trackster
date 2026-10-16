@@ -281,6 +281,7 @@ model TelegramConfig {
   chatId                 String
   isActive               Boolean  @default(true)
   notifyEveryTransaction Boolean  @default(false)
+  dailyBrief             Boolean  @default(false) // ringkasan pagi 07:00 WIB, opt-in lewat /pagi
   updatedAt              DateTime @updatedAt
 
   // multi-user (contract C1): userId wajib; unik global -> komposit (userId, ...).
@@ -903,6 +904,7 @@ model TelegramLink {
   chatId                 String   @unique
   isActive               Boolean  @default(true)
   notifyEveryTransaction Boolean  @default(false)
+  dailyBrief             Boolean  @default(false) // ringkasan pagi 07:00 WIB, opt-in lewat /pagi
   linkedAt               DateTime @default(now())
 }
 
