@@ -139,9 +139,22 @@ otomatis vs median 90 hari).
   periode); check-in tetap mingguan (sudah hanya menanyakan stream bulanan di minggu payday-nya); forecast mingguan tetap untuk
   check-in & advisor FIXED.
 
-### Sisa untuk fase 4 (UI v3 + wizard)
+- [x] Fase 4 — UI v3 (markup di `.dc.html` → `node scripts/dc-to-tsx.mjs`; logika di `logic.tsx`; data di `useLive.ts`):
+  1. **Hari ini & Beranda:** "lewat budget" memakai belanja tanpa pembelian besar (`todayBig` = `bigSpent`); baris info
+     `hero.cycleTxt` ("Sisa Rp X sampai gajian · gajian N hari lagi · gaji belum tercatat" / "Saldo tersedia … · cukup ±N hari").
+     Net hari ini tetap memakai seluruh belanja.
+  2. **Budget:** bagian "Cara menghitung budget" (Tetap per hari / Ikut gajian / Dari saldo, pemasukan utama, sisihkan 5/10/15%,
+     `PUT /budget/settings`). Mode dinamis: hero "Jatah hari ini", strip = bobot %, tombol "Atur bobot hari"; kartu 50/30/20 &
+     "Saran minggu ini" disembunyikan.
+  3. **Mingguan:** budget per tanggal = `dynamicBudgetOf()` (`live/dates.ts`): hari lalu = snapshot `GET /budget/allowances`
+     (tanpa snapshot → nominal), hari ini & ke depan = jatah hari ini.
+  4. **Wizard langkah 7:** "Biasanya kamu terima uang kapan?" Mingguan/Bulanan → stream "Pemasukan utama" (FIXED, aktif) + mode
+     CYCLE; Tidak tentu → BALANCE; tidak dipilih → mode tetap + slider lama. Disimpan sebelum onboarding ditandai selesai.
+  5. EN: kamus `CYC_EN` (teks statis); teks berangka dibuat dua bahasa di render.
 
-- `/app/today` menghitung "lewat budget" sendiri dari `totalSpent` → pembelian besar tetap tampil OVER BUDGET. Pakai
-  `isOverBudget`/`remaining`/`bigSpent` dari backend; tampilkan sisa siklus, "gajian N hari lagi", `anchorPending`, `runwayDays`.
-- Layar Budget: pilih mode + anchor, gaya (hemat/seimbang/longgar), bobot hari. Kartu "Alokasi 50/30/20" disembunyikan di mode dinamis.
-- Wizard: "Biasanya kamu terima uang kapan?" → mode + anchor.
+### Masih terbuka (keputusan produk)
+
+- **User baru di tengah siklus.** Siklus pertama menganggap gaji siklus ini masih utuh (perkiraan anchor) padahal sebagian mungkin
+  sudah terpakai sebelum memakai Trackster, dan menampilkan "gaji belum tercatat" walau gajinya masuk sebelum daftar. Opsi: siklus
+  pertama pakai saldo sekarang sebagai pot, dan `anchorPending` hanya bila akun dibuat sebelum `cycleStart`.
+- Layar Mingguan mewarnai hari "lewat" dari total belanja (termasuk pembelian besar), beda dengan Hari ini/Analisis (belanja rutin).

@@ -310,3 +310,16 @@ deviasi dari rencana (+alasan), env baru yang Arzaka harus tambahkan, langkah be
   `npm run check` 28/28; tenancy-audit 0; build BE bersih; `/app/insights` tampil. Notifikasi Telegram tidak diuji kirim (Telegram tak
   terhubung di lokal; logika `bigPurchaseImpact` diuji di check). Frontend tidak disentuh.
 - **Langkah berikutnya:** fase 4 (UI v3 + wizard). Merge ke `main` tetap aman (default FIXED; FIXED tidak berubah) — menunggu Arzaka.
+
+## 2026-10-16 (lanjutan) — Siklus gajian fase 4 (UI v3 + wizard)
+- Sesi oleh: Claude (Opus 5.5)   Branch: `feat/siklus-gajian`. Detail: [`docs/siklus-gajian.md`](../siklus-gajian.md) §Progres.
+- **Baru:** `GET /budget/allowances?from&to`; markup `.dc.html` (bagian "Cara menghitung budget", info siklus di Hari ini & Beranda,
+  pertanyaan jadwal pemasukan di wizard langkah 7) → view digenerate ulang (kelas hover ikut bernomor ulang di view lain — wajar);
+  `logic.tsx` (`CYC_EN`, `dynamicBudgetOf` di `v3SetupDates`), `useLive.ts` (`bset`, `bmode`, `cyc`, `todayBig`, `allowMap`, `saveBudgetSettings`).
+- **Bug ditemukan saat uji & diperbaiki:** (1) Mingguan tetap memakai nominal karena `logic.tsx` membangun tanggal sendiri — kini lewat
+  helper yang sama. (2) Wizard membuat stream nonaktif (`active` tidak diisi) → `PUT /budget/settings` 400; kini `active:true`, dan
+  jadwal pemasukan disimpan sebelum onboarding ditandai selesai.
+- Verifikasi (Postgres scratch 5434, user uji sintetis): Hari ini (big dikecualikan, baris siklus), Budget (CYCLE → BALANCE → FIXED
+  lewat klik, kartu lama muncul lagi), Mingguan (hari lalu nominal, hari ini+ jatah dinamis), wizard user undangan baru (Bulanan tgl 25 →
+  stream aktif + CYCLE, Beranda "gajian 9 hari lagi"), `/demo/budget` utuh, EN demo budget. `tsc` FE/BE bersih, check 28/28, tenancy 0.
+- **Terbuka (perlu keputusan Arzaka):** user baru di tengah siklus — lihat `docs/siklus-gajian.md` §Masih terbuka.
