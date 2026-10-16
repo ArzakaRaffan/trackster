@@ -168,8 +168,15 @@ export class BudgetService {
       const anchorSum = sumAmount(anchorRows);
 
       // Rollover: sisa siklus sebelumnya (pemasukan nyata − cadangan − belanja), satu tingkat saja.
+      // Siklus pertama (akun dibuat setelah siklus mulai): sebagian uang siklus ini mungkin sudah terpakai sebelum memakai
+      // Trackster. Saldo pernah dikoreksi manual → saldo = sisa uang ('BALANCE'); belum → tetap perkiraan gaji ('ESTIMATE').
+      const user = await this.prisma.user.findUnique({ where: { id: userId }, select: { createdAt: true } });
+      const isFirst = !!user && user.createdAt.getTime() > start.getTime();
+      const balanceKnown = isFirst && !!(await this.prisma.balanceAdjustment.findFirst({ where: { userId }, select: { id: true } }));
+      const firstCycle = !isFirst ? null : balanceKnown ? ('BALANCE' as const) : ('ESTIMATE' as const);
+
       let carry = 0;
-      if (setting.rolloverEnabled) {
+      if (setting.rolloverEnabled && !isFirst) {
         const prevEnd = new Date(start.getTime() - 1);
         const prev = cycleBounds(anchor, prevEnd, anchorIncomes.find((i) => i.receivedAt < start)?.receivedAt);
         const prevIncome = sumAmount(await incomeBetween(prev.start, prevEnd));
@@ -187,21 +194,32 @@ export class BudgetService {
             },
             { historicalAmounts: [], historicalAbsences: [], isScheduledThisWeek: true },
           ).expected;
-      const result = computeCycleAllowance({
+      // Komitmen yang sudah lewat jatuh tempo sudah terbayar → masuk `spentBeforeToday`, jadi hanya hitung yang akan datang.
+      const commitments = await dueBetween(todayStart, end);
+      const balanceStart = balanceKnown
+        ? (await this.prisma.bankBalance.findMany({ where: { userId }, select: { balance: true } })).reduce((s, b) => s + Number(b.balance), 0)
+          + (await spentBetween(todayStart, addWibDays(todayStart, 1))) // belanja hari ini dikembalikan → jatah beku per hari
+        : 0;
+      const result = balanceKnown
+        ? computeCycleAllowance({
+            now, cycleStart: start, cycleEnd: end, weights, commitments,
+            anchorExpected: 0, anchorReceived: balanceStart, otherIncome: 0, carry: 0, reservePct: 0, spentBeforeToday: 0,
+          })
+        : computeCycleAllowance({
         now, cycleStart: start, cycleEnd: end, weights,
         anchorExpected,
         anchorReceived: anchorRows.length ? anchorSum : null,
         otherIncome: sumAmount(inCycle.filter((i) => i.streamId !== stream.id)),
         carry,
-        // Komitmen yang sudah lewat jatuh tempo sudah terbayar → masuk `spentBeforeToday`, jadi hanya hitung yang akan datang.
-        commitments: await dueBetween(todayStart, end),
+        commitments,
         reservePct: setting.reservePct,
         spentBeforeToday: await spentBetween(start, todayStart),
       });
       return {
-        mode: BudgetMode.CYCLE, cycleStart: wibDateKey(start), cycleEnd: wibDateKey(end), runwayDays: null, carry,
+        mode: BudgetMode.CYCLE, cycleStart: wibDateKey(start), cycleEnd: wibDateKey(end), runwayDays: null, carry, firstCycle,
         // Siklus sudah jalan tapi gaji belum tercatat → UI tampilkan "gaji belum masuk" (jatah masih pakai perkiraan).
-        anchorPending: !anchorRows.length && todayStart.getTime() > start.getTime(),
+        // Siklus pertama: gajinya masuk sebelum daftar, jadi tidak dianggap tertunda.
+        anchorPending: !anchorRows.length && todayStart.getTime() > start.getTime() && !isFirst,
         ...result,
       };
     }
@@ -216,7 +234,7 @@ export class BudgetService {
       horizonDays: setting.horizonDays,
       burnRatePerDay: (await spentBetween(addWibDays(todayStart, -7), todayStart)) / 7,
     });
-    return { mode: BudgetMode.BALANCE, cycleStart: null, cycleEnd: null, carry: 0, anchorPending: false, ...result };
+    return { mode: BudgetMode.BALANCE, cycleStart: null, cycleEnd: null, carry: 0, firstCycle: null, anchorPending: false, ...result };
   }
 
   async getAllowances(userId: number, from: string, to: string) {

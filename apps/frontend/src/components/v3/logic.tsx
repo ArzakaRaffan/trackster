@@ -1085,6 +1085,9 @@ export class V3Logic extends React.Component {
         parts.push(left < 0 ? (en ? `This cycle is ${RP(left)} short` : `Siklus ini minus ${RP(left)}`) : (en ? `${RP(left)} left until payday` : `Sisa ${RP(left)} sampai gajian`));
         parts.push(en ? `payday in ${cy.daysLeft} day${cy.daysLeft > 1 ? 's' : ''}` : `gajian ${cy.daysLeft} hari lagi`);
         if (cy.anchorPending) parts.push(en ? 'pay not recorded yet' : 'gaji belum tercatat');
+        // Siklus pertama setelah daftar (backend): dari saldo, atau masih perkiraan gaji kalau saldo belum pernah diisi.
+        if (cy.firstCycle === 'BALANCE') parts.push(en ? 'first cycle: based on your balance' : 'siklus pertama: dihitung dari saldo');
+        if (cy.firstCycle === 'ESTIMATE') parts.push(en ? 'set your balance in Settings → Bank balance for a more accurate number' : 'isi saldo di Setting → Saldo bank supaya lebih akurat');
       } else {
         parts.push(en ? `Available ${RP(Math.max(0, left))}` : `Saldo tersedia ${RP(Math.max(0, left))}`);
         if (cy.runwayDays != null) parts.push(en ? `lasts ~${cy.runwayDays} days` : `cukup ±${cy.runwayDays} hari`);
