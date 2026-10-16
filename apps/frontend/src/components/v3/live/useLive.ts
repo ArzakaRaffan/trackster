@@ -58,6 +58,7 @@ export function useLive(enabled: boolean, path: string, chatActive: number | nul
   const horizonF = useGet(k('/income/forecast/horizon?weeks=4'));
   const draftRes = useGet(k('/income/checkin'));
   const subsRes = useGet(k('/subscriptions'));
+  const streamSugRes = useGet(on('/app/income', '/income-streams/suggestions'));
   const sugSubRes = useGet(on('/app/subscriptions', '/subscriptions/suggestions'));
   const icsRes = useGet(on('/app/subscriptions', '/subscriptions/calendar-link'), { revalidateOnFocus: false });
   const goalsRes = useGet(k('/goal'));
@@ -386,7 +387,7 @@ export function useLive(enabled: boolean, path: string, chatActive: number | nul
     chat,
     split,
     flat: {
-      synced, mem, tip, tidy, srcInfo, srcLog, catIcons, icsUrl: icsRes.data?.path ? API_URL + icsRes.data.path : '', subSug: sugSubRes.data ?? [],
+      synced, mem, tip, tidy, srcInfo, srcLog, catIcons, icsUrl: icsRes.data?.path ? API_URL + icsRes.data.path : '', subSug: sugSubRes.data ?? [], streamSug: streamSugRes.data ?? [],
       txs, manual, incomes, streams, subs, goals, notifs,
       todayBudget: today.data ? Number(today.data.budget) : undefined,
       todayIncome: today.data ? Number(today.data.totalIncome) : undefined,
