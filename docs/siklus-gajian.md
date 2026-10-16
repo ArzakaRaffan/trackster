@@ -160,4 +160,6 @@ otomatis vs median 90 hari).
 
 ### Masih terbuka
 
-- Layar Mingguan mewarnai hari "lewat" dari total belanja (termasuk pembelian besar), beda dengan Hari ini/Analisis (belanja rutin).
+- ~~Layar Mingguan mewarnai hari "lewat" dari total belanja (termasuk pembelian besar)~~ — 2026-10-17: di mode dinamis "lewat"
+  per hari kini memakai belanja rutin (ambang `bigThreshold` dari `/budget/today`, override `isBig` per transaksi), sama dengan Hari ini.
+  Total & "Sisa/Lewat" mingguan tetap total belanja.

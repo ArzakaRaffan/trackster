@@ -103,7 +103,7 @@ export function useLive(enabled: boolean, path: string, chatActive: number | nul
       const d = dates.dateIdx[wibISO(new Date(t.occurredAt).getTime())];
       if (d === undefined) continue;
       const alias = t.displayDescription && t.displayDescription !== t.description ? t.displayDescription : null;
-      out.push({ id: t.id, d, raw: t.description, alias, cap: t.aiCaption || null, src: t.source, time: wibHHMM(t.occurredAt), cat: t.category, amt: Number(t.amount) - Number(t.reimbursedAmount || 0), gross: Number(t.amount), iso: wibISO(new Date(t.occurredAt).getTime()), note: t.note || '', icon: t.icon || null });
+      out.push({ id: t.id, d, raw: t.description, alias, cap: t.aiCaption || null, src: t.source, time: wibHHMM(t.occurredAt), cat: t.category, amt: Number(t.amount) - Number(t.reimbursedAmount || 0), gross: Number(t.amount), iso: wibISO(new Date(t.occurredAt).getTime()), note: t.note || '', icon: t.icon || null, isBig: t.isBig ?? null });
     }
     return out.sort((a, b) => a.d - b.d || a.time.localeCompare(b.time));
   }, [txRes.data, dates]);
@@ -390,7 +390,7 @@ export function useLive(enabled: boolean, path: string, chatActive: number | nul
       txs, manual, incomes, streams, subs, goals, notifs,
       todayBudget: today.data ? Number(today.data.budget) : undefined,
       todayIncome: today.data ? Number(today.data.totalIncome) : undefined,
-      bmode, allowMap, bset: bsetRes.data ?? null, cyc: today.data?.cycle ?? null, todayBig: today.data ? Number(today.data.bigSpent ?? 0) : 0,
+      bmode, allowMap, bset: bsetRes.data ?? null, cyc: today.data?.cycle ?? null, todayBig: today.data ? Number(today.data.bigSpent ?? 0) : 0, bigThr: today.data?.cycle ? today.data.bigThreshold ?? null : null,
       runwayInfo, weekInfo, allocIncome, checkin, budget,
       pendingList, pending: pendingList.length > 0,
     },
