@@ -1,6 +1,6 @@
 # Trackster — Codemap (mau ubah X, buka di mana)
 
-Snapshot 2026-10-05. Kalau nambah module/route/cron, update file ini.
+Snapshot 2026-10-05 (diperbarui 2026-10-17). Kalau nambah module/route/cron, update file ini.
 
 ## Backend — `apps/backend/src/modules/`
 
@@ -16,8 +16,8 @@ Snapshot 2026-10-05. Kalau nambah module/route/cron, update file ini.
 | income | `/income` | CRUD + `allowance-suggestion` + `allocation`. |
 | merchant-alias | `/merchant-aliases` | CRUD alias. |
 | goal | `/goal` | Kantong: create, contribute, archive, simulate (what-if). |
-| subscription | `/subscriptions` | CRUD + sync event Google Calendar (`googleCalendarEventId`). |
-| telegram | `/telegram` | config/test (JWT) + `POST /telegram/webhook/:secret` (public; cek secret + chatId). |
+| subscription | `/subscriptions`, `/calendar` | CRUD + sync event Google Calendar (`googleCalendarEventId`). Jatuh tempo basi digulir otomatis (`subscription-due.ts`, dipakai juga komitmen budget/advisor). `GET suggestions` = deteksi tagihan bulanan berulang (`recurring-detect.ts`). `GET calendar-link` → feed publik `GET /calendar/<userId>-<sig>.ics` (HMAC userId+tokenVersion, `subscription-ics.ts`). |
+| telegram | `/telegram` | config/test (JWT) + `POST /telegram/webhook/:secret` (public; cek secret + chatId). Tanpa AI: catat cepat `kopi 25rb [bank] [kemarin]`, `+gaji 5jt` (pemasukan), `/hariini`, `/pagi` (ringkasan 07:00 opt-in) — parser `telegram/quick-log.ts`, eksekusi `ingest/telegram-quick.service.ts` (lewat IngestService, kunci `tg:<chat>:<msg>`, tombol Batalkan `qx:<id>`). |
 | ai | `/ai` | `chat`, `mascot-tip`, health-score history, trigger manual laporan. |
 | split-bill | `/split-bills` | privat (JWT) + `public`, `manage/:ownerToken`, `public/:slug`. Scan struk: `split-bill-ai.service.ts`. Bill akun bisa ditautkan ke 1 transaksi (`transactionId`): peserta selain yang pertama (= pembuat) jadi `Reimbursement` tertaut (`splitParticipantId`), disinkronkan `syncLinked()` setelah create/assign/tandai lunas; patungan tertaut hanya mengurangi `reimbursedAmount`, tidak menggerakkan saldo. |
 
@@ -38,6 +38,7 @@ Snapshot 2026-10-05. Kalau nambah module/route/cron, update file ini.
 | Minggu 20:00 WIB | Weekly insight ke Telegram + simpan Health Score |
 | Minggu 21:00 WIB | Alokasi 50/30/20 → timpa `DailyBudget` (dilewati untuk mode CYCLE/BALANCE) |
 | tiap hari 00:05 WIB | Snapshot `DailyAllowance` untuk user mode CYCLE/BALANCE |
+| tiap hari 07:00 WIB | Ringkasan pagi Telegram (hanya `dailyBrief` = true, lewat `/pagi`) |
 | tiap hari 20:00 WIB (eksekusi cuma di hari terakhir bulan) | Monthly report card ke Telegram |
 
 ## Frontend — `apps/frontend/src/`
@@ -118,3 +119,11 @@ Dipakai di baris Hari ini, detail transaksi, Setting → Alias merchant (+ logo 
 - Frontend: `useLive` memuat `/profile` (poll 4 dtk di `/setup`); `V3Host` mengarahkan akun baru (belum onboarded & tanpa transaksi) ke `/setup`; wizard live di `logic.tsx#rv_pre` (langkah diturunkan dari data server). `/setup` tidak lagi publik (`middleware.ts`).
 - Setting → Koneksi: baris Email bank + Nama & rekening (semua user); kartu Gmail & Calendar hanya pemilik (`live.isAdmin`).
 - Worker Cloudflare: `infra/cloudflare-worker/` (`wrangler.toml`, secret `INGEST_HMAC_SECRET`). Uji email asli tanpa DNS: `apps/backend/scripts/send-eml.mjs`.
+
+## Perbaikan 2026-10-17 (branch `feat/overnight-improvements`)
+- Kategori otomatis: rule merchant → hint parser → **riwayat merchantKey yang sama** (`MerchantAliasService.findCategoryFromHistory`) → AI.
+- Indeks komposit `(userId, occurredAt)` / `(userId, receivedAt)` di Transaction, Income, EmailParseLog.
+- Frontend: `app/manifest.ts` + `public/pwa-*.png` (PWA bisa dipasang); `lib/api.ts` GET tanpa `Content-Type` (tanpa preflight CORS),
+  backend CORS `maxAge` 2 jam; `useLive` memuat token API / riwayat koreksi saldo / thread & memori chat / saran langganan / tautan .ics
+  hanya di layarnya (`on(prefix, key)`), fokus tab revalidasi maks 1×/menit, tip maskot di-cache 3 jam di backend.
+- Ekspor CSV (`/reports/export.csv`): + pemasukan, jam, nama alias, patungan, BOM.
