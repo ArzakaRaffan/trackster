@@ -1,6 +1,7 @@
-import { Module } from '@nestjs/common';
+import { Module, forwardRef } from '@nestjs/common';
 import { IngestController } from './ingest.controller';
 import { IngestService } from './ingest.service';
+import { TelegramQuickService } from './telegram-quick.service';
 import { ApiTokenModule } from '../api-token/api-token.module';
 import { TransactionModule } from '../transaction/transaction.module';
 import { IncomeModule } from '../income/income.module';
@@ -11,8 +12,9 @@ import { AiModule } from '../ai/ai.module';
 import { PrismaService } from '../../prisma.service';
 
 @Module({
-  imports: [ApiTokenModule, TransactionModule, IncomeModule, MerchantAliasModule, BudgetModule, TelegramModule, AiModule],
+  imports: [ApiTokenModule, TransactionModule, IncomeModule, MerchantAliasModule, BudgetModule, forwardRef(() => TelegramModule), AiModule],
   controllers: [IngestController],
-  providers: [IngestService, PrismaService],
+  providers: [IngestService, TelegramQuickService, PrismaService],
+  exports: [TelegramQuickService],
 })
 export class IngestModule {}
