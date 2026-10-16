@@ -62,4 +62,9 @@ export class CreateIncomeStreamDto {
   @IsOptional()
   @IsBoolean()
   isActive?: boolean;
+
+  // Dari saran "Terdeteksi dari pemasukanmu": tautkan pemasukan 200 hari terakhir yang belum bersumber & cocok matchKeywords.
+  @IsOptional()
+  @IsBoolean()
+  linkPast?: boolean;
 }

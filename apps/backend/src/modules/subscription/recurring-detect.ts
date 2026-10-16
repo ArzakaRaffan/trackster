@@ -27,6 +27,18 @@ const AMOUNT_TOL = 0.1;
 const wibKey = (d: Date) => new Date(d.getTime() + 7 * 3600_000).toISOString().slice(0, 10);
 const keyDate = (k: string) => new Date(`${k}T00:00:00Z`);
 
+/** Panjang rangkaian berturut-turut di ujung terbaru `days` (kunci tanggal terurut) yang jaraknya [gapMin, gapMax] hari.
+ *  Dipakai juga deteksi pemasukan rutin (income-stream/stream-detect.ts). */
+export function recentRun(days: string[], gapMin: number, gapMax: number): number {
+  let run = days.length ? 1 : 0;
+  for (let i = days.length - 1; i > 0; i--) {
+    const gap = (keyDate(days[i]).getTime() - keyDate(days[i - 1]).getTime()) / DAY;
+    if (gap < gapMin || gap > gapMax) break;
+    run++;
+  }
+  return run;
+}
+
 export function detectRecurring(
   txs: RecurringTx[],
   existing: { name: string; amount: unknown }[],
@@ -49,13 +61,7 @@ export function detectRecurring(
     const days = [...byDay.keys()].sort();
     if (days.length < 3) continue;
 
-    // Rangkaian berturut-turut terpanjang di ujung terbaru yang jaraknya bulanan.
-    let run = 1;
-    for (let i = days.length - 1; i > 0; i--) {
-      const gap = (keyDate(days[i]).getTime() - keyDate(days[i - 1]).getTime()) / DAY;
-      if (gap < GAP_MIN || gap > GAP_MAX) break;
-      run++;
-    }
+    const run = recentRun(days, GAP_MIN, GAP_MAX);
     if (run < 3) continue;
     const runDays = days.slice(-run);
     const amounts = runDays.map((d) => byDay.get(d)!);
