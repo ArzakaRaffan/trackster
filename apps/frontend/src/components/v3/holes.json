@@ -393,6 +393,7 @@
     "gcalNote",
     "hasSubBanner",
     "hasSubInactive",
+    "hasSubSug",
     "howIcs2",
     "ic",
     "icsOn",
@@ -408,6 +409,7 @@
     "subInactiveRot",
     "subInactiveRows",
     "subInactiveTab",
+    "subSug",
     "subsEmpty",
     "toggleSubInactive"
   ],
