@@ -219,6 +219,14 @@ export class BudgetService {
     return { mode: BudgetMode.BALANCE, cycleStart: null, cycleEnd: null, carry: 0, anchorPending: false, ...result };
   }
 
+  async getAllowances(userId: number, from: string, to: string) {
+    const rows = await this.prisma.dailyAllowance.findMany({
+      where: { userId, date: { gte: new Date(`${from}T00:00:00Z`), lte: new Date(`${to}T00:00:00Z`) } },
+      orderBy: { date: 'asc' },
+    });
+    return rows.map((r) => ({ date: r.date.toISOString().slice(0, 10), amount: Number(r.amount) }));
+  }
+
   /** 00:05 WIB — pastikan tiap hari punya snapshot DailyAllowance walau user tidak membuka app / tidak ada transaksi. */
   @Cron('5 0 * * *', { name: 'daily-allowance-snapshot', timeZone: 'Asia/Jakarta' })
   async dailyAllowanceSnapshotCron() {

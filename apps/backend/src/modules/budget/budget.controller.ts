@@ -46,6 +46,14 @@ export class BudgetController {
     return this.budgetService.updateSettings(user.id, dto);
   }
 
+  /** Snapshot jatah harian mode dinamis, `from`/`to` = 'YYYY-MM-DD' (inklusif). Hari tanpa baris = mode FIXED saat itu. */
+  @Get('allowances')
+  async getAllowances(@CurrentUser() user: AuthUser, @Query('from') from?: string, @Query('to') to?: string) {
+    const iso = /^\d{4}-\d{2}-\d{2}$/;
+    if (!from || !to || !iso.test(from) || !iso.test(to)) throw new BadRequestException('from & to harus YYYY-MM-DD');
+    return this.budgetService.getAllowances(user.id, from, to);
+  }
+
   @Get('today')
   async getToday(@CurrentUser() user: AuthUser) {
     return this.budgetService.getTodaySummary(user.id);
