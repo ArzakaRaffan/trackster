@@ -255,7 +255,7 @@ export class EmailPipelineService {
   }
 
   /** Pipeline kategorisasi (E00-S3): rule merchant (by merchantKey) → heuristik parser
-   * (`categoryHint`) → AI fast, lalu hasil AI disimpan sebagai rule baru biar merchant yang sama
+   * (`categoryHint`) → riwayat merchant yang sama → AI fast, lalu hasil AI disimpan sebagai rule baru biar merchant yang sama
    * ke depannya konsisten tanpa panggil AI lagi. */
   private async resolveCategory(
     userId: number,
@@ -267,6 +267,9 @@ export class EmailPipelineService {
     if (rule) return rule;
 
     if (categoryHint) return categoryHint;
+
+    const fromHistory = await this.merchantAliasService.findCategoryFromHistory(userId, description);
+    if (fromHistory) return fromHistory;
 
     const aiResult = (await this.aiChatService.categorize(description, amount)) as Category;
     if (aiResult !== Category.LAINNYA) {

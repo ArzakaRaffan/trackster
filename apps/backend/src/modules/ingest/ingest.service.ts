@@ -111,10 +111,12 @@ export class IngestService {
     return { success: true, duplicate: true, id: t.id, category: t.category, message: 'Transaksi ini sudah tercatat sebelumnya' };
   }
 
-  /** Aturan merchant user → AI (dibatasi waktu, hasil dipelajari sbg aturan) → LAINNYA. */
+  /** Aturan merchant user → riwayat merchant yang sama → AI (dibatasi waktu, hasil dipelajari sbg aturan) → LAINNYA. */
   private async resolveCategory(userId: number, description: string, amount: number): Promise<Category> {
-    const rule = await this.merchantAliasService.findCategoryForDescription(userId, description);
-    if (rule) return rule;
+    const known =
+      (await this.merchantAliasService.findCategoryForDescription(userId, description)) ??
+      (await this.merchantAliasService.findCategoryFromHistory(userId, description));
+    if (known) return known;
     try {
       const ai = (await Promise.race([
         this.aiChatService.categorize(description, amount),
