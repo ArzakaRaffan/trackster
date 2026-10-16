@@ -1,4 +1,4 @@
-import { BadRequestException, ForbiddenException, Injectable, Logger } from '@nestjs/common';
+import { BadRequestException, ForbiddenException, Injectable, Logger, OnApplicationBootstrap } from '@nestjs/common';
 import { createHash, randomBytes } from 'crypto';
 import { PrismaService } from '../../prisma.service';
 import { getOwnerUserId } from '../../common/owner';
@@ -25,10 +25,22 @@ async function tgCall<T = any>(token: string, method: string, body: Record<strin
 export const escHtml = (s: unknown) => String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 
 @Injectable()
-export class TelegramService {
+export class TelegramService implements OnApplicationBootstrap {
   private readonly logger = new Logger(TelegramService.name);
 
   constructor(private prisma: PrismaService) {}
+
+  /** Daftar perintah bot bersama (menu "/" di Telegram) supaya catat cepat & /hariini mudah ditemukan. */
+  async onApplicationBootstrap() {
+    const token = process.env.TELEGRAM_BOT_TOKEN;
+    if (!token) return;
+    await tgCall(token, 'setMyCommands', {
+      commands: [
+        { command: 'hariini', description: 'Sisa jatah hari ini' },
+        { command: 'catat', description: 'Catat pengeluaran, mis. /catat kopi 25rb' },
+      ],
+    }).catch((err) => this.logger.warn(`setMyCommands gagal: ${err.message}`));
+  }
 
   /**
    * Tujuan kirim untuk user: chat dari TelegramLink (bot bersama) atau, selama belum ditautkan, TelegramConfig lama.

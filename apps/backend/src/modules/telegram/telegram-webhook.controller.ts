@@ -88,7 +88,7 @@ export class TelegramWebhookController {
       const linked = await this.telegramService.linkChatByCode(incomingChatId, start[1]);
       await this.telegramService.sendToChat(
         incomingChatId,
-        linked ? '✅ Telegram terhubung ke Trackster. Notifikasi & chat AI aktif di sini.' : 'Kode tidak valid atau sudah kedaluwarsa. Buat kode baru di Trackster → Settings.',
+        linked ? '✅ Telegram terhubung ke Trackster. Notifikasi & chat AI aktif di sini.\n\nCatat cepat: kirim "kopi 25rb" (tambahkan "jago"/"bca" untuk pilih rekening). Sisa jatah: /hariini' : 'Kode tidak valid atau sudah kedaluwarsa. Buat kode baru di Trackster → Settings.',
       );
       return { ok: true };
     }
