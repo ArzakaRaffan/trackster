@@ -52,6 +52,9 @@ export class BudgetAllocationService {
 
   async runWeeklyAllocation(userId: number) {
     try {
+      // Mode CYCLE/BALANCE: DailyBudget = bobot hari pilihan user, jatah dihitung dinamis — jangan ditimpa rata.
+      if ((await this.budgetService.getSettings(userId)).mode !== 'FIXED') return;
+
       const preview = await this.computePreview(userId);
 
       await this.budgetService.updateAll(userId, {
