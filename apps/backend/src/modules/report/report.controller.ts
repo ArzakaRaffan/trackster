@@ -2,7 +2,7 @@ import { BadRequestException, Controller, Get, Query, UseGuards, Res, Header } f
 import { ReportService } from './report.service';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { AuthUser, CurrentUser } from '../../common/decorators/current-user.decorator';
-import { startOfWibDay, addWibDays, wibDateKey } from '../../common/wib';
+import { startOfWibDay, addWibDays, wibDateKey, WIB_OFFSET_MS } from '../../common/wib';
 import { Response } from 'express';
 
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
@@ -52,18 +52,24 @@ export class ReportController {
     res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
     res.setHeader('Content-Type', 'text/csv; charset=utf-8');
     
-    const header = 'tanggal,deskripsi,jumlah,kategori,rekening,catatan';
-    const lines = rows.map(r =>
+    // 6 kolom pertama sama dengan format lama (spreadsheet lama tetap cocok); kolom baru ditambahkan di belakang.
+    const header = 'tanggal,deskripsi,jumlah,kategori,rekening,catatan,jenis,jam,nama,patungan_diterima';
+    const lines = rows.map((r) =>
       [
-        wibDateKey(r.occurredAt),
+        wibDateKey(r.at),
         csvText(r.description),
-        Number(r.amount),
+        r.amount,
         r.category,
         r.source,
-        csvText(r.note ?? ''),
-      ].join(',')
+        csvText(r.note),
+        r.kind,
+        new Date(r.at.getTime() + WIB_OFFSET_MS).toISOString().slice(11, 16),
+        csvText(r.name),
+        r.reimbursed,
+      ].join(','),
     );
-    
-    res.end([header, ...lines].join('\n'));
+
+    // BOM: Excel di Windows membaca CSV tanpa BOM sebagai ANSI (huruf non-ASCII di nama merchant rusak).
+    res.end('\uFEFF' + [header, ...lines].join('\n'));
   }
 }
