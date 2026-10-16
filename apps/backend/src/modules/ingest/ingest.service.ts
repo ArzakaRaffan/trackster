@@ -5,6 +5,7 @@ import { TransactionService } from '../transaction/transaction.service';
 import { IncomeService } from '../income/income.service';
 import { MerchantAliasService } from '../merchant-alias/merchant-alias.service';
 import { BudgetService } from '../budget/budget.service';
+import { bigPurchaseImpact } from '../budget/budget-cycle';
 import { TelegramService } from '../telegram/telegram.service';
 import { AiChatService } from '../ai/ai-chat.service';
 import { AiCaptionService } from '../ai/ai-caption.service';
@@ -128,13 +129,15 @@ export class IngestService {
 
   private async alertIfOverBudget(
     userId: number,
-    summary: { date: string; isOverBudget: boolean; totalSpent: number; budget: number },
+    summary: Awaited<ReturnType<BudgetService['getTodaySummary']>>,
     lastTransaction: { source: string; description: string; amount: number },
   ) {
+    const impact = bigPurchaseImpact(summary, lastTransaction.amount);
+    if (impact) await this.telegramService.sendBigPurchaseNotice(userId, { ...impact, lastTransaction });
     if (!summary.isOverBudget) return;
     const date = new Date(summary.date);
     if (await this.prisma.alertLog.findFirst({ where: { userId, date } })) return;
-    const sent = await this.telegramService.sendBudgetAlert(userId, { totalSpent: summary.totalSpent, budget: summary.budget, lastTransaction });
+    const sent = await this.telegramService.sendBudgetAlert(userId, { totalSpent: summary.totalSpent - summary.bigSpent, budget: summary.budget, lastTransaction });
     if (sent) await this.prisma.alertLog.create({ data: { userId, date } });
   }
 }

@@ -281,3 +281,49 @@ deviasi dari rencana (+alasan), env baru yang Arzaka harus tambahkan, langkah be
 - **Baru:** `apps/backend/prisma/compare-shadow.js` (di `prisma/`, bukan `scripts/`, karena image prod hanya berisi `prisma/` + `dist/`). Memasangkan log Gmail (emailId bukan `fwd:`) ↔ log `SHADOW` lewat parser + nominal + selisih waktu ≤15 mnt (subjek sama diutamakan) — emailId kedua jalur pasti berbeda. Mulai dari email forward pertama, jadi email Gmail sebelum filter dipasang tidak dihitung selisih.
 - Verifikasi: `--self-test` 10 kasus lulus; dijalankan ke Postgres scratch 5434 (`owner_test`) dengan baris sintetis → COCOK/TIDAK-TERFORWARD sesuai, sisa log shadow dari `inbound-e2e` muncul sebagai HANYA-FORWARD (benar). Baris uji dihapus, Postgres dimatikan.
 - **Langkah berikutnya:** (1) Arzaka merge PR ini (hanya skrip+docs, tanpa migrasi). (2) Harian: `docker compose -f docker-compose.prod.yml exec backend node prisma/compare-shadow.js --username <u>` (Runbook §6). Syarat cutover: 0 selisih tak terjelaskan 7 hari + semua jenis email (Runbook §6.2) muncul ≥1×. (3) Lalu P7-08 ⛔ cutover.
+
+## 2026-10-15 — Siklus gajian fase 1–2 (revamp pemasukan/budget)
+- Sesi oleh: Claude (Opus 5.5)   Branch: `feat/siklus-gajian` (dari `main`). Desain: [`docs/siklus-gajian.md`](../siklus-gajian.md).
+- Keputusan Arzaka: perencanaan per **siklus gajian** (anchor = income utama), budget harian **dinamis**, user tak tentu = **mode saldo**,
+  pembelian besar tidak memicu alert harian. Invarian §7 #8 (minggu Senin–Minggu) tetap berlaku untuk laporan/statistik mingguan; siklus
+  gajian hanya untuk jatah harian.
+- **Baru:** engine murni `budget-cycle.ts` (+ check 15 kasus); migrasi aditif `20261015100000_budget_cycle_mode` (`BudgetMode` enum,
+  `BudgetSetting.mode` default **FIXED**, `anchorStreamId` FK SET NULL, `reservePct`, `horizonDays`); `GET/PUT /budget/settings`
+  (anchor divalidasi milik user + cadence WEEKLY/MONTHLY); `getTodaySummary()` memakai engine bila mode ≠ FIXED.
+- **Bug ditemukan & diperbaiki:** filter `@db.Date` (`Subscription.nextDueDate`) dengan instant 00:00 WIB terpotong ke tanggal UTC →
+  langganan di hari terakhir rentang terbuang. Dicatat di CLAUDE.md.
+- Verifikasi (Postgres scratch 5434, user uji baru via undangan): e2e 12/12 (FIXED identik perilaku lama; CYCLE/BALANCE sesuai hitungan
+  manual; validasi 400; anchor dihapus → null), `npm run check` 28/28, tenancy-audit 0, build BE bersih, `/app/today` tampil tanpa error.
+  Frontend tidak disentuh (tsc FE tidak dijalankan).
+- **Catatan lokal:** `nest build` kedua kali menghasilkan `dist/` tak lengkap (`deleteOutDir` + `tsconfig.tsbuildinfo` di luar `dist`) —
+  hapus `tsconfig.tsbuildinfo` sebelum build lokal. CI tidak terdampak (build bersih).
+- **Langkah berikutnya:** fase 3 (forecast/check-in/allocation per siklus, carry, analytics kepatuhan) lalu fase 4 (UI v3 + wizard).
+  Merge ke `main` aman kapan saja (default FIXED) — menunggu persetujuan Arzaka.
+
+## 2026-10-16 — Siklus gajian fase 3
+- Sesi oleh: Claude (Opus 5.5)   Branch: `feat/siklus-gajian`. Detail: [`docs/siklus-gajian.md`](../siklus-gajian.md) §Progres.
+- **Temuan:** cron alokasi Minggu 21:00 menimpa `DailyBudget` semua user jadi rata — di mode dinamis itu menghapus bobot hari user. Kini dilewati untuk CYCLE/BALANCE.
+- **Baru:** migrasi aditif `20261016100000_daily_allowance` (`DailyAllowance`, unik `[userId, date]`, ditambahkan ke `tenancy-audit`), cron
+  `daily-allowance-snapshot` 00:05 WIB, carry antar siklus, MISSED via check-in Rp0, `anchorPending`, advisor → `reservePct`,
+  `TelegramService.sendBigPurchaseNotice`, alert over-budget pakai belanja rutin, ambang "besar" budget = analytics.
+- Verifikasi (Postgres scratch 5434, user uji baru): e2e fase 3 9/9; ingest pembelian besar mode dinamis 201 tanpa error server;
+  `npm run check` 28/28; tenancy-audit 0; build BE bersih; `/app/insights` tampil. Notifikasi Telegram tidak diuji kirim (Telegram tak
+  terhubung di lokal; logika `bigPurchaseImpact` diuji di check). Frontend tidak disentuh.
+- **Langkah berikutnya:** fase 4 (UI v3 + wizard). Merge ke `main` tetap aman (default FIXED; FIXED tidak berubah) — menunggu Arzaka.
+
+## 2026-10-16 (lanjutan) — Siklus gajian fase 4 (UI v3 + wizard)
+- Sesi oleh: Claude (Opus 5.5)   Branch: `feat/siklus-gajian`. Detail: [`docs/siklus-gajian.md`](../siklus-gajian.md) §Progres.
+- **Baru:** `GET /budget/allowances?from&to`; markup `.dc.html` (bagian "Cara menghitung budget", info siklus di Hari ini & Beranda,
+  pertanyaan jadwal pemasukan di wizard langkah 7) → view digenerate ulang (kelas hover ikut bernomor ulang di view lain — wajar);
+  `logic.tsx` (`CYC_EN`, `dynamicBudgetOf` di `v3SetupDates`), `useLive.ts` (`bset`, `bmode`, `cyc`, `todayBig`, `allowMap`, `saveBudgetSettings`).
+- **Bug ditemukan saat uji & diperbaiki:** (1) Mingguan tetap memakai nominal karena `logic.tsx` membangun tanggal sendiri — kini lewat
+  helper yang sama. (2) Wizard membuat stream nonaktif (`active` tidak diisi) → `PUT /budget/settings` 400; kini `active:true`, dan
+  jadwal pemasukan disimpan sebelum onboarding ditandai selesai.
+- Verifikasi (Postgres scratch 5434, user uji sintetis): Hari ini (big dikecualikan, baris siklus), Budget (CYCLE → BALANCE → FIXED
+  lewat klik, kartu lama muncul lagi), Mingguan (hari lalu nominal, hari ini+ jatah dinamis), wizard user undangan baru (Bulanan tgl 25 →
+  stream aktif + CYCLE, Beranda "gajian 9 hari lagi"), `/demo/budget` utuh, EN demo budget. `tsc` FE/BE bersih, check 28/28, tenancy 0.
+- **Terbuka (perlu keputusan Arzaka):** user baru di tengah siklus — lihat `docs/siklus-gajian.md` §Masih terbuka.
+- **Susulan — siklus pertama (keputusan Arzaka):** user yang daftar di tengah siklus memakai saldo (kalau pernah dikoreksi) sebagai sisa
+  uang siklus pertama, kalau belum tetap perkiraan gaji + ajakan isi saldo; "gaji belum tercatat" tidak muncul di siklus pertama.
+  Verifikasi: e2e siklus pertama 5/5 (perkiraan → koreksi saldo → belanja hari ini tidak mengubah jatah → akun lama = perilaku normal),
+  regresi fase 3 9/9 (user uji di-backdate), Beranda "Rp200.000 · siklus pertama: dihitung dari saldo", check 28/28, tenancy 0.

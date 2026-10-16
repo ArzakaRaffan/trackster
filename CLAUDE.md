@@ -42,6 +42,14 @@ Konteks tambahan (`Product.md`, `Decisions.md`, `Gotchas.md` hanya ada lokal —
 - BCA TIDAK PERNAH mengirim email notifikasi dana masuk/setor tunai (sudah diverifikasi langsung, bukan asumsi) — makanya Income untuk BCA murni manual entry, tidak ada parser buat itu.
 - Deduplikasi transaksi pakai `emailId` (Gmail message ID) sebagai unique constraint.
 
+## Domain Logic — Budget Harian
+
+- `BudgetSetting.mode`: **FIXED** (default, perilaku lama: nominal `DailyBudget` per hari + rollover mingguan), **CYCLE** (jatah = sisa uang siklus gajian ÷ sisa hari, siklus ikut `anchorStreamId`), **BALANCE** (jatah = saldo ÷ `horizonDays`). Di mode dinamis, nominal `DailyBudget` dipakai sebagai **bobot** hari.
+- Semua pemakai budget (alert Telegram, AI, mascot, ingest) lewat `BudgetService.getTodaySummary()` — ubah rumus di sana saja. Engine murni: `budget/budget-cycle.ts`. Desain & fase: [`docs/siklus-gajian.md`](docs/siklus-gajian.md).
+- Mode dinamis: pembelian besar (`isBigPurchase`) tetap mengurangi sisa siklus tapi **tidak** dihitung di `isOverBudget` hari ini (Telegram kirim notifikasi dampak, bukan alert).
+- Jatah dinamis tidak bisa direkonstruksi → disimpan per hari di `DailyAllowance`; analytics membaca snapshot itu (fallback nominal `DailyBudget`). Kode yang menimpa `DailyBudget` massal (mis. cron alokasi) harus melewati mode dinamis — di sana nominalnya = bobot pilihan user.
+- Kolom `@db.Date` (mis. `Subscription.nextDueDate`): Prisma memotong parameter filter ke tanggal UTC — kirim batas sebagai tanggal kalender WIB (`new Date(wibDateKey(x) + 'T00:00:00Z')`), bukan instant 00:00 WIB.
+
 ## Domain Logic — Saldo Bank (BankBalance)
 
 - Saldo itu **live incremental**, BUKAN dihitung ulang dari agregat total transaksi/income. Baseline di-set manual, lalu bergerak tiap ada event:

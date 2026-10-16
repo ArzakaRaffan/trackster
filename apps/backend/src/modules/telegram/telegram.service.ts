@@ -278,6 +278,24 @@ export class TelegramService {
     return this.sendMessage(userId, text);
   }
 
+  /** Mode CYCLE/BALANCE: pembelian besar tidak memicu alert over-budget, tapi user diberi tahu dampaknya ke jatah ke depan. */
+  async sendBigPurchaseNotice(userId: number, params: {
+    before: number;
+    after: number;
+    days: number;
+    lastTransaction: { source: string; description: string; amount: number };
+  }) {
+    const formatRp = (n: number) => `Rp ${n.toLocaleString('id-ID')}`;
+    const { before, after, days, lastTransaction } = params;
+    const text = [
+      '🧾 <b>Pembelian besar tercatat</b>',
+      '',
+      `${escHtml(lastTransaction.description)} — ${formatRp(lastTransaction.amount)}`,
+      `Jatah harian ${days} hari ke depan: ${formatRp(before)} → <b>${formatRp(after)}</b>`,
+    ].join('\n');
+    return this.sendMessage(userId, text);
+  }
+
   /** Cek toggle notifyEveryTransaction tanpa expose config penuh. */
   async isNotifyEveryTransactionEnabled(userId: number): Promise<boolean> {
     const config = await this.activeConfig(userId);

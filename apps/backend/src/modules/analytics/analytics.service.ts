@@ -84,9 +84,11 @@ export class AnalyticsService {
 
   /** `end` eksklusif. Semua kunci hari pakai `wibDateKey`, batas hari/minggu dari `wib.ts`. */
   async getPeriodStats(userId: number, start: Date, end: Date, compare = true): Promise<PeriodStats> {
-    const [dataStartsAtRow, budgetRows, transactionsRaw, window90dRaw, historyBeforeStart] = await Promise.all([
+    const asDate = (x: Date) => new Date(`${wibDateKey(x)}T00:00:00Z`); // kolom @db.Date: kirim tanggal kalender WIB
+    const [dataStartsAtRow, budgetRows, allowanceRows, transactionsRaw, window90dRaw, historyBeforeStart] = await Promise.all([
       this.prisma.transaction.aggregate({ where: { userId }, _min: { occurredAt: true } }),
       this.prisma.dailyBudget.findMany({ where: { userId } }),
+      this.prisma.dailyAllowance.findMany({ where: { userId, date: { gte: asDate(start), lt: asDate(end) } } }),
       this.prisma.transaction.findMany({ where: { userId, occurredAt: { gte: start, lt: end } }, orderBy: { occurredAt: 'asc' } }),
       this.prisma.transaction.findMany({
         where: { userId, occurredAt: { gte: addWibDays(end, -90), lt: end } },
@@ -104,6 +106,8 @@ export class AnalyticsService {
 
     const dataStartsAt = dataStartsAtRow._min.occurredAt;
     const budgetByDow = new Map(budgetRows.map((b) => [b.dayOfWeek, Number(b.amount)]));
+    // Hari mode CYCLE/BALANCE punya snapshot jatah; hari tanpa snapshot = mode FIXED → nominal per hari-dalam-minggu.
+    const allowanceByDate = new Map(allowanceRows.map((a) => [a.date.toISOString().slice(0, 10), Number(a.amount)]));
     const days = Math.max(1, Math.round((end.getTime() - start.getTime()) / 86_400_000));
 
     const medianAmount90d = median(window90d.map((t) => Number(t.amount)));
@@ -157,7 +161,7 @@ export class AnalyticsService {
 
     const byCategory = this.buildByCategory(transactions, prevByCategory);
     const byMerchant = await this.buildByMerchant(userId, transactions, prevByMerchant, days);
-    const byDay = this.buildByDay(transactions, incomeRows, start, end, budgetByDow, medianAmount90d);
+    const byDay = this.buildByDay(transactions, incomeRows, start, end, budgetByDow, allowanceByDate, medianAmount90d);
     const byWeekday = this.buildByWeekday(byDay);
     const timeHeatmap = this.buildTimeHeatmap(transactions);
     const bigPurchases = transactions
@@ -258,6 +262,7 @@ export class AnalyticsService {
     start: Date,
     end: Date,
     budgetByDow: Map<number, number>,
+    allowanceByDate: Map<string, number>,
     medianAmount90d: number,
   ) {
     const byDate = new Map<string, { spend: number; spendRoutine: number }>();
@@ -285,7 +290,7 @@ export class AnalyticsService {
         date: key,
         spend: entry.spend,
         spendRoutine: entry.spendRoutine,
-        budget: budgetByDow.get(wibDayOfWeek(date)) ?? 0,
+        budget: allowanceByDate.get(key) ?? budgetByDow.get(wibDayOfWeek(date)) ?? 0,
         income: incomeByDate.get(key) ?? 0,
       });
     }

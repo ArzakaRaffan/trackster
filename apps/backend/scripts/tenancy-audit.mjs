@@ -14,7 +14,7 @@ const args = new Set(process.argv.slice(2));
 
 // Nama delegate Prisma (camelCase) untuk model tenant. Split Bill/Trip dikecualikan sengaja (publik, lihat 04 §A).
 const TENANT = [
-  'transaction', 'reimbursement', 'dailyBudget', 'budgetSetting', 'emailSyncLog', 'emailParseLog',
+  'transaction', 'reimbursement', 'dailyBudget', 'dailyAllowance', 'budgetSetting', 'emailSyncLog', 'emailParseLog',
   'telegramConfig', 'telegramLink', 'telegramLinkCode', 'gmailToken', 'alertLog', 'income', 'incomeStream',
   'bankBalance', 'balanceAdjustment', 'merchantAlias', 'categoryIcon', 'healthScoreLog', 'budgetAdvice',
   'aiInsightCard', 'periodReport', 'goal', 'goalContribution', 'subscription', 'chatThread', 'chatMessage',

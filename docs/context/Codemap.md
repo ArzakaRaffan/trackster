@@ -12,7 +12,7 @@ Snapshot 2026-10-05. Kalau nambah module/route/cron, update file ini.
 | sync | `/sync` | trigger manual, backfill rentang tanggal (default tanpa notif Telegram), next-run, logs. |
 | transaction | `/transactions` | list+filter, weekly/monthly/summary/day/insights, create manual, note/category/alias. `createFromParsed()` = jalur sync. `getInsights()` = sumber data semua fitur analitik/AI. |
 | balance | `/balance` | saldo per source, koreksi manual, histori adjustment. `adjustBalance(tx, source, delta)` wajib di dalam `$transaction`. |
-| budget | `/budget` | budget per hari, `today` summary, `runway`. |
+| budget | `/budget` | budget per hari, `today` summary, `runway`, `settings` (mode FIXED/CYCLE/BALANCE), `allowances` (snapshot jatah per tanggal). Engine siklus gajian murni di `budget-cycle.ts` (docs/siklus-gajian.md). |
 | income | `/income` | CRUD + `allowance-suggestion` + `allocation`. |
 | merchant-alias | `/merchant-aliases` | CRUD alias. |
 | goal | `/goal` | Kantong: create, contribute, archive, simulate (what-if). |
@@ -36,6 +36,8 @@ Snapshot 2026-10-05. Kalau nambah module/route/cron, update file ini.
 | --- | --- |
 | tiap 5 menit | Gmail sync → parse → kategori AI → simpan + adjust saldo → cek budget → alert |
 | Minggu 20:00 WIB | Weekly insight ke Telegram + simpan Health Score |
+| Minggu 21:00 WIB | Alokasi 50/30/20 → timpa `DailyBudget` (dilewati untuk mode CYCLE/BALANCE) |
+| tiap hari 00:05 WIB | Snapshot `DailyAllowance` untuk user mode CYCLE/BALANCE |
 | tiap hari 20:00 WIB (eksekusi cuma di hari terakhir bulan) | Monthly report card ke Telegram |
 
 ## Frontend — `apps/frontend/src/`

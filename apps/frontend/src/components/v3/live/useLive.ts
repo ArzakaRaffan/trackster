@@ -3,7 +3,7 @@
 import { useMemo } from 'react';
 import useSWR, { useSWRConfig } from 'swr';
 import { API_URL, api } from '@/lib/api';
-import { addDaysISO, buildDates, wibHHMM, wibISO, wibLogDate } from './dates';
+import { addDaysISO, buildDates, dynamicBudgetOf, wibHHMM, wibISO, wibLogDate } from './dates';
 import { buildAggregateReport, buildPeriodReport, dayLabelOf } from './reports';
 import { RPf, mapBill, mapGoal, mapIncome, mapMem, mapMsg, mapStream, mapSub, streamPayload } from './map';
 
@@ -44,6 +44,9 @@ export function useLive(enabled: boolean, path: string, chatActive: number | nul
   const budgets = useGet(k('/budget'));
   const today = useGet(k('/budget/today'), { refreshInterval: 60_000 });
   const runway = useGet(k('/budget/runway'), { refreshInterval: 60_000 });
+  const bsetRes = useGet(k('/budget/settings'));
+  // Mode dinamis: jatah per tanggal (snapshot). `from` = 6 hari lalu juga mencakup Senin minggu berjalan.
+  const allowRes = useGet(k(`/budget/allowances?from=${from}&to=${todayISO}`));
   const txRes = useGet(k(`/transactions?startDate=${from}&endDate=${todayISO}&limit=500`));
   const incRes = useGet(k('/income'));
   const streamsRes = useGet(k('/income-streams'));
@@ -81,6 +84,12 @@ export function useLive(enabled: boolean, path: string, chatActive: number | nul
     return m;
   }, [budgets.data]);
 
+  const bmode: string = today.data?.mode ?? bsetRes.data?.mode ?? 'FIXED';
+  const allowMap = useMemo(() => {
+    const snap: Record<string, number> = {};
+    for (const a of allowRes.data ?? []) snap[a.date] = Number(a.amount);
+    return snap;
+  }, [allowRes.data]);
   const dates = useMemo(() => buildDates(manual), [manual, todayISO]);
 
   const txs = useMemo(() => {
@@ -269,6 +278,7 @@ export function useLive(enabled: boolean, path: string, chatActive: number | nul
           occurredAt: x.dateISO === wibISO() ? new Date().toISOString() : new Date(`${x.dateISO}T12:00:00+07:00`).toISOString(),
         }),
       saveBudget: (m: number[]) => api.put('/budget', { budgets: m.map((amount, dayOfWeek) => ({ dayOfWeek, amount })) }),
+      saveBudgetSettings: (body: { mode?: string; anchorStreamId?: number | null; reservePct?: number }) => api.put('/budget/settings', body),
       applyBudget: (option: string, week: string) => api.post('/budget/apply', { option, week }),
       sync: () => api.post<any>('/sync/trigger'),
       reportData: async (tab: number, off: number) => {
@@ -375,6 +385,7 @@ export function useLive(enabled: boolean, path: string, chatActive: number | nul
       txs, manual, incomes, streams, subs, goals, notifs,
       todayBudget: today.data ? Number(today.data.budget) : undefined,
       todayIncome: today.data ? Number(today.data.totalIncome) : undefined,
+      bmode, allowMap, bset: bsetRes.data ?? null, cyc: today.data?.cycle ?? null, todayBig: today.data ? Number(today.data.bigSpent ?? 0) : 0,
       runwayInfo, weekInfo, allocIncome, checkin, budget,
       pendingList, pending: pendingList.length > 0,
     },

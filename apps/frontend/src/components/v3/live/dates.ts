@@ -27,15 +27,24 @@ export interface V3Dates {
   todayMs: number; // tengah malam hari ini sebagai Date lokal (dipakai daysTo)
 }
 
-export function buildDates(manual: number[], now: number = Date.now()): V3Dates {
+/** Mode budget dinamis (CYCLE/BALANCE): budget per tanggal. Hari lalu = snapshot jatah (tanpa snapshot = masih mode
+ * FIXED saat itu → nominal per hari-dalam-minggu); hari ini & ke depan = jatah hari ini (perkiraan). */
+export function dynamicBudgetOf(manual: number[], snap: Record<string, number>, todayAmt: number) {
+  const todayISO = wibISO();
+  return (iso: string, dow: number) => (iso >= todayISO ? todayAmt : snap[iso] ?? manual[dow] ?? 0);
+}
+
+/** `budgetOf` (mode budget dinamis): budget per tanggal; default = nominal per hari-dalam-minggu. */
+export function buildDates(manual: number[], now: number = Date.now(), budgetOf?: (iso: string, dow: number) => number): V3Dates {
   const todayISO = wibISO(now);
+  const bud = (iso: string, dow: number) => (budgetOf ? budgetOf(iso, dow) : manual[dow] || 0);
   const days: V3Dates['days'] = [];
   const dateIdx: Record<string, number> = {};
   for (let i = 0; i < 7; i++) {
     const iso = addDaysISO(todayISO, i - 6);
     const dow = dowOf(iso);
     const [, m, d] = iso.split('-').map(Number);
-    days.push([DAY_SHORT[dow], `${DAYN[dow]}, ${d} ${MON_SHORT[m - 1]}`, manual[dow] || 0]);
+    days.push([DAY_SHORT[dow], `${DAYN[dow]}, ${d} ${MON_SHORT[m - 1]}`, bud(iso, dow)]);
     dateIdx[iso] = i;
   }
   const monISO = addDaysISO(todayISO, -((dowOf(todayISO) + 6) % 7));
@@ -44,7 +53,7 @@ export function buildDates(manual: number[], now: number = Date.now()): V3Dates 
     const iso = addDaysISO(monISO, i);
     const dow = dowOf(iso);
     const [, wm, wd] = iso.split('-').map(Number);
-    week.push([DAY_SHORT[dow], `${DAYN[dow]}, ${wd} ${MON_SHORT[wm - 1]}`, manual[dow] || 0, dateIdx[iso], iso]);
+    week.push([DAY_SHORT[dow], `${DAYN[dow]}, ${wd} ${MON_SHORT[wm - 1]}`, bud(iso, dow), dateIdx[iso], iso]);
   }
   const [y, m, d] = todayISO.split('-').map(Number);
   return { todayISO, week, todayLabel: `${DAYN[dowOf(todayISO)]}, ${d} ${MON_LONG[m - 1]}`, days, dateIdx, todayMs: new Date(y, m - 1, d).getTime() };

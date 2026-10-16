@@ -4,6 +4,7 @@ import { ParserRegistryService } from './parsers/parser-registry.service';
 import { RawEmail, ParseResult, looksTransactional } from './parsers/parser.interface';
 import { TransactionService } from '../transaction/transaction.service';
 import { BudgetService } from '../budget/budget.service';
+import { bigPurchaseImpact } from '../budget/budget-cycle';
 import { TelegramService } from '../telegram/telegram.service';
 import { PrismaService } from '../../prisma.service';
 import { getOwnerContext } from '../../common/owner';
@@ -280,6 +281,9 @@ export class EmailPipelineService {
     amount: number;
   }) {
     const summary = await this.budgetService.getTodaySummary(userId);
+    // ponytail: hanya transaksi terbaru satu batch yang dicek; pembelian besar lain di batch yang sama tidak dapat notifikasi.
+    const impact = bigPurchaseImpact(summary, lastTransaction.amount);
+    if (impact) await this.telegramService.sendBigPurchaseNotice(userId, { ...impact, lastTransaction });
     if (!summary.isOverBudget) return;
 
     const todayDateOnly = new Date(summary.date);
@@ -287,7 +291,7 @@ export class EmailPipelineService {
     if (alreadyAlerted) return;
 
     const sent = await this.telegramService.sendBudgetAlert(userId, {
-      totalSpent: summary.totalSpent,
+      totalSpent: summary.totalSpent - summary.bigSpent,
       budget: summary.budget,
       lastTransaction,
     });

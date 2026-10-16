@@ -13,14 +13,15 @@
 .scpb:hover{background:var(--card-hover) !important}
 .scpc:hover{transform:scale(1.06) !important}
 .scpd:hover{background:var(--neutral-hover) !important}
-.scpe:focus-within{box-shadow:inset 0 0 0 2px var(--brand) !important}
-.scpf:hover{background:var(--scv0) !important}
-.scpg:hover{background:var(--neutral) !important;color:var(--text) !important}
-.scph:hover{background:var(--danger-subtle) !important}
-.scpi:hover{color:var(--text) !important}
-.scpj:hover{background:var(--danger-subtle) !important;color:var(--danger-text) !important}
-.scpk:hover{background:var(--scv1) !important}
-.scpl:hover{background:var(--neutral) !important}
-.scpm:focus{box-shadow:inset 0 0 0 2px var(--brand) !important}
-.scpn:hover{opacity:.8 !important}
-.scpo:active{transform:scale(.92) !important}
+.scpe:hover{background:var(--scv0) !important}
+.scpf:focus-within{box-shadow:inset 0 0 0 2px var(--brand) !important}
+.scpg:hover{background:var(--scv1) !important}
+.scph:hover{background:var(--neutral) !important;color:var(--text) !important}
+.scpi:hover{background:var(--danger-subtle) !important}
+.scpj:hover{color:var(--text) !important}
+.scpk:hover{background:var(--danger-subtle) !important;color:var(--danger-text) !important}
+.scpl:hover{background:var(--scv2) !important}
+.scpm:hover{background:var(--neutral) !important}
+.scpn:focus{box-shadow:inset 0 0 0 2px var(--brand) !important}
+.scpo:hover{opacity:.8 !important}
+.scpp:active{transform:scale(.92) !important}
