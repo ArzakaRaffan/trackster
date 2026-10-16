@@ -1,4 +1,4 @@
-import type { Metadata } from 'next';
+import type { Metadata, Viewport } from 'next';
 import Script from 'next/script';
 import { V3Host } from '@/components/v3/V3Host';
 
@@ -17,7 +17,11 @@ export const metadata: Metadata = {
     url: '/',
     siteName: 'Trackster',
   },
+  // Dipasang di layar utama iOS: buka tanpa bilah Safari.
+  appleWebApp: { capable: true, title: 'Trackster', statusBarStyle: 'black' },
 };
+
+export const viewport: Viewport = { themeColor: '#121212' };
 
 // Tidak mengimpor globals.css (Tailwind preflight): desain v3 bergantung pada default browser, bukan reset Tailwind.
 export default function V3Layout({ children }: { children: React.ReactNode }) {
