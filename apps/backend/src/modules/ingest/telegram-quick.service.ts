@@ -6,6 +6,7 @@ import { TransactionService } from '../transaction/transaction.service';
 import { TelegramService, escHtml } from '../telegram/telegram.service';
 import { parseQuickLog, QuickLog } from '../telegram/quick-log';
 import { IngestService } from './ingest.service';
+import { addWibDays, wibDateKey } from '../../common/wib';
 
 const rupiah = (n: number) => `Rp${Math.round(n).toLocaleString('id-ID')}`;
 const TODAY_CMD = /^\/(hariini|sisa|today)(@\w+)?$/i;
@@ -36,17 +37,29 @@ export class TelegramQuickService {
   async handle(userId: number, chatId: string, messageId: number, m: NonNullable<ReturnType<TelegramQuickService['match']>>) {
     if (m.kind === 'today') return this.telegramService.sendMessage(userId, await this.todayText(userId));
 
-    const source = m.q.source ?? (await this.defaultSource(userId));
+    const { q } = m;
+    const source = q.source ?? (await this.defaultSource(userId));
     // Kunci idempotensi = pesan Telegram → webhook yang dikirim ulang tidak mencatat dua kali.
-    const res = await this.ingestService.ingestTransaction(userId, `tg:${chatId}:${messageId}`, {
-      amount: m.q.amount,
-      description: m.q.description,
+    const key = `tg:${chatId}:${messageId}`;
+    // "kemarin" → pukul 12:00 WIB kemarin.
+    const when = q.daysAgo ? `${wibDateKey(addWibDays(new Date(), -1))}T12:00:00+07:00` : undefined;
+    if (q.kind === 'income') {
+      const inc = await this.ingestService.ingestIncome(userId, key, {
+        amount: q.amount, description: q.description, streamName: q.description, source, receivedAt: when,
+      });
+      if (!inc.duplicate) await this.telegramService.sendMessage(userId, `💰 ${escHtml(inc.message)}\n<i>${source}${q.daysAgo ? ' · kemarin' : ''}</i>`);
+      return;
+    }
+    const res = await this.ingestService.ingestTransaction(userId, key, {
+      amount: q.amount,
+      description: q.description,
       source,
+      occurredAt: when,
     });
     if (res.duplicate) return;
     await this.telegramService.sendMessageWithKeyboard(
       userId,
-      `✅ ${escHtml(res.message)}\n<i>${source} · ${res.category}</i>`,
+      `✅ ${escHtml(res.message)}\n<i>${source} · ${res.category}${q.daysAgo ? ' · kemarin' : ''}</i>`,
       [[{ text: '↩️ Batalkan', callback_data: `${UNDO_PREFIX}${res.id}` }]],
     );
   }
@@ -101,7 +114,7 @@ export class TelegramQuickService {
       );
     }
     if (s.totalIncome > 0) lines.push(`Pemasukan hari ini ${rupiah(s.totalIncome)}`);
-    lines.push('', '<i>Catat cepat: kirim "kopi 25rb" (tambahkan "jago"/"bca" untuk pilih rekening).</i>');
+    lines.push('', '<i>Catat cepat: "kopi 25rb", "bensin 50rb jago kemarin", pemasukan "+gaji 5jt".</i>');
     return lines.join('\n');
   }
 }

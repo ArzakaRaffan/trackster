@@ -1,9 +1,10 @@
 import { Source } from '@prisma/client';
 
-// Catat cepat lewat Telegram tanpa AI: "kopi 25rb", "parkir 5000 jago", "/catat makan siang 35k".
+// Catat cepat lewat Telegram tanpa AI: "kopi 25rb", "parkir 5000 jago", "/catat makan siang 35k", "kopi 25rb kemarin",
+// pemasukan diawali "+": "+gaji 5jt jago".
 // Pesan yang tidak jelas formatnya tetap diteruskan ke chat AI — parser ini sengaja konservatif.
 
-export type QuickLog = { description: string; amount: number; source: Source | null };
+export type QuickLog = { kind: 'expense' | 'income'; description: string; amount: number; source: Source | null; daysAgo: 0 | 1 };
 
 const UNIT: Record<string, number> = { rb: 1e3, ribu: 1e3, k: 1e3, jt: 1e6, juta: 1e6 };
 // Kalimat tanya / perintah laporan → bukan catatan belanja, biarkan AI yang menjawab.
@@ -35,8 +36,17 @@ export function parseQuickLog(text: string): QuickLog | null {
   if (forced) t = t.replace(/^\/catat(@\w+)?\s*/i, '');
   if (!t || t.startsWith('/') || t.length > 80) return null;
   if (!forced && QUESTION.test(t)) return null;
+  const kind = t.startsWith('+') ? 'income' : 'expense';
+  if (kind === 'income') t = t.slice(1).trim();
 
   let words = t.split(' ');
+  // "kemarin" di awal/akhir → dicatat untuk kemarin.
+  let daysAgo: 0 | 1 = 0;
+  const yIdx = [words.length - 1, 0].find((i) => words[i]?.toLowerCase() === 'kemarin');
+  if (yIdx !== undefined && words.length > 2) {
+    daysAgo = 1;
+    words = words.filter((_, i) => i !== yIdx);
+  }
   // Bank opsional di awal/akhir: "kopi 25rb jago", "bca bensin 50rb".
   let source: Source | null = null;
   const srcIdx = [words.length - 1, 0].find((i) => SOURCES.includes(words[i]?.toUpperCase()));
@@ -63,5 +73,5 @@ export function parseQuickLog(text: string): QuickLog | null {
   // Tanpa satuan & tanpa pemisah ribuan: hanya terima ≥ 1.000 dan bukan bentuk tahun ("laptop 2025").
   if (!forced && !a.explicit && (a.value < 1000 || /^(19|20)\d\d$/.test(String(a.value)))) return null;
   if (a.value < 100 || a.value > 100_000_000) return null;
-  return { description: desc.charAt(0).toUpperCase() + desc.slice(1), amount: a.value, source };
+  return { kind, description: desc.charAt(0).toUpperCase() + desc.slice(1), amount: a.value, source, daysAgo };
 }

@@ -5,8 +5,8 @@
 import * as assert from 'assert';
 import { parseQuickLog } from './quick-log';
 
-const ok = (text: string, description: string, amount: number, source: string | null = null) =>
-  assert.deepStrictEqual(parseQuickLog(text), { description, amount, source }, text);
+const ok = (text: string, description: string, amount: number, source: string | null = null, kind = 'expense', daysAgo = 0) =>
+  assert.deepStrictEqual(parseQuickLog(text), { kind, description, amount, source, daysAgo }, text);
 const no = (text: string) => assert.strictEqual(parseQuickLog(text), null, text);
 
 ok('kopi 25rb', 'Kopi', 25000);
@@ -22,6 +22,14 @@ ok('BCA token listrik 100.000', 'Token listrik', 100000, 'BCA');
 ok('/catat parkir 2000', 'Parkir', 2000);
 ok('/catat@TracksterBot es teh 500', 'Es teh', 500, null);
 ok('  kopi   25rb  ', 'Kopi', 25000);
+
+// Kemarin & pemasukan.
+ok('kopi 25rb kemarin', 'Kopi', 25000, null, 'expense', 1);
+ok('kemarin bensin 50rb jago', 'Bensin', 50000, 'JAGO', 'expense', 1);
+ok('+gaji 5jt', 'Gaji', 5000000, null, 'income');
+ok('+ freelance desain 1,2jt bca kemarin', 'Freelance desain', 1200000, 'BCA', 'income', 1);
+no('+');
+no('+berapa gajiku?');
 
 // Pertanyaan / perintah → AI.
 no('berapa pengeluaran bulan 10');
