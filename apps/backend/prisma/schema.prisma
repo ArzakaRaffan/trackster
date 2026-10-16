@@ -106,7 +106,7 @@ model Transaction {
   @@unique([userId, emailId])
   @@index([occurredAt])
   @@index([merchantKey])
-  @@index([userId])
+  @@index([userId, occurredAt]) // semua query per user memfilter rentang waktu; unik (userId, emailId) sudah menutup lookup userId saja
 }
 
 enum ReimbursementStatus {
@@ -272,7 +272,7 @@ model EmailParseLog {
   @@unique([userId, emailId])
   @@index([status])
   @@index([receivedAt])
-  @@index([userId])
+  @@index([userId, receivedAt])
 }
 
 model TelegramConfig {
@@ -340,7 +340,7 @@ model Income {
   @@unique([userId, externalId])
   @@index([receivedAt])
   @@index([streamId, periodStart])
-  @@index([userId])
+  @@index([userId, receivedAt])
 }
 
 enum IncomeKind {
