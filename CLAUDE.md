@@ -92,6 +92,11 @@ Konteks tambahan (`Product.md`, `Decisions.md`, `Gotchas.md` hanya ada lokal —
 - **`useSearchParams()` di Next.js App Router** harus dibungkus `<Suspense>` kalau mau lolos `next build` (production), meskipun jalan normal di `next dev`.
 - **Dockerfile naming**: file HARUS persis bernama `Dockerfile`, bukan `backend.Dockerfile` dst — kalau salah nama pas manual save dari luar, `docker compose build` gagal cari file.
 - **`package-lock.json` nyimpen flag `dev` per-package terpisah dari `package.json`** — mindahin package dari devDependencies ke dependencies di `package.json` doang nggak cukup, `npm install --omit=dev` masih baca dari lockfile lama kalau nggak di-regenerate.
+- **`PrismaService` JANGAN didaftarkan di `providers` module mana pun** — sudah global lewat `src/prisma.module.ts`. Mendaftarkannya ulang = PrismaClient + connection pool baru per module (dulu ±25 pool, audit 2026-10-18).
+- **Body parser dipasang manual di `main.ts`** (`bodyParser: false`): JSON 200kb, rute scan struk 6mb, form-urlencoded hanya `/ingest`. Rute baru yang butuh body besar → tambah `app.use('<rute>', express.json({ limit }))` di sana.
+- **Request pengubah data ber-cookie wajib `Origin` = `FRONTEND_URL`** (`common/csrf.ts`). Klien browser dari origin lain (mis. subdomain baru) akan 403.
+- **CSP frontend** (`next.config.js`): host eksternal baru (font, gambar, API pihak ketiga) harus ditambahkan ke direktif yang sesuai, kalau tidak diblok browser.
+- **Config Nginx** baru aktif lewat CD: diuji `nginx -t` di kontainer sekali-pakai sebelum restart, lalu `nginx -s reload`. Directive level-http (gzip, limit_req_zone, ssl_*) ada di `nginx/conf.d/trackster.conf`.
 - **`tsconfig.tsbuildinfo` jangan sampai ke-commit** — sempat jadi biang keladi dev-server rusak berkali-kali karena cache stale ikut ke-track git. Sudah di-gitignore.
 
 ## Deployment

@@ -344,3 +344,12 @@ deviasi dari rencana (+alasan), env baru yang Arzaka harus tambahkan, langkah be
 - **Scan struk publik:** tanpa login, 5/hari per IP (`aiQuotaOk` in-memory, berlaku juga untuk user login). Tombol scan tampil di langkah 1 & 2 `/split-bills/new`.
 - **Chat:** kuota 50 pesan/hari per user (web + stream + Telegram, di `sendMessage`); penyaring topik model cepat jalan paralel dgn pengambilan konteks, gagal → diloloskan. Eval model asli 20/20; e2e lokal (AI tiruan) 9/9; check 34/34; build BE & tsc FE bersih.
 - **Belum:** kuota masih in-memory (reset saat restart; `AiUsage` belum dipakai). `ai-trackster-worker.service` (system, bukan Trackster) gagal start tiap 10 dtk — Arzaka perlu `sudo systemctl disable --now ai-trackster-worker`.
+
+## 2026-10-18 — Audit keamanan & performa (atas permintaan Arzaka: perbaiki & push ke main)
+- Sesi oleh: Claude (Opus 5.5). Branch `feat/overnight-improvements` (= `main` saat mulai) → push `main`. Detail: [`11-Audit-2026-10-18.md`](11-Audit-2026-10-18.md).
+- **Keamanan:** validasi argumen tool AI, cek Origin (CSRF subdomain), OAuth Gmail terikat sesi, CSP ketat, bcrypt 12, rate limit ganti password & Nginx, kontainer non-root, Actions dipin SHA, rotasi log.
+- **Performa:** satu PrismaClient (dulu ±25 pool), N+1 mingguan, getPeriodStats tanpa tarik seluruh riwayat, HTTP/2 + gzip, foto struk dikecilkan (scan foto HP asli dulu selalu 413), satu logout saat sesi habis.
+- Verifikasi: check 36/36, tenancy 0, security-e2e 16/16, auth 9/9, ingest 18/18, isolasi 173/173, golden 16 endpoint identik, image Docker BE/FE di-build & dijalankan, Nginx diuji nyata, browser build produksi tanpa pelanggaran CSP.
+- **Catatan deploy:** kontainer backend/frontend/nginx dibuat ulang (logging/heap); config Nginx diuji sebelum restart (deploy.yml). Postgres tidak disentuh.
+- **Sisa (butuh Arzaka):** pastikan `JWT_SECRET` prod ≥ 32 char; rotasi `TELEGRAM_WEBHOOK_SECRET` (R1 audit lama); Postgres keluar dari `shared-web-net`.
+
