@@ -95,6 +95,8 @@ export class AiService {
         Authorization: `Bearer ${this.apiKey}`,
       },
       body: JSON.stringify(body),
+      // Provider macet tak boleh menggantung request (& kuota koneksi) sampai 5 menit default undici.
+      signal: AbortSignal.timeout(90_000),
     });
 
     if (!res.ok) {

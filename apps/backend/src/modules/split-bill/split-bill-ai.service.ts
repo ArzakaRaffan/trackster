@@ -59,6 +59,7 @@ export class SplitBillAiService {
           },
         ],
       }),
+      signal: AbortSignal.timeout(60_000), // model vision macet → gagal jelas, bukan menggantung
     });
 
     if (!res.ok) {
