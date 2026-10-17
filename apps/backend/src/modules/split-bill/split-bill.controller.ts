@@ -1,14 +1,16 @@
-import { Body, Controller, Get, Param, ParseIntPipe, Patch, Post, Req, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, HttpException, HttpStatus, Param, ParseIntPipe, Patch, Post, Req, UseGuards } from '@nestjs/common';
 import { Request } from 'express';
 import { ThrottlerGuard } from '@nestjs/throttler';
 import { SplitBillService } from './split-bill.service';
 import { SplitBillAiService } from './split-bill-ai.service';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
-import { AiRateLimitGuard } from '../../common/guards/ai-rate-limit.guard';
+import { aiQuotaOk } from '../../common/guards/ai-rate-limit.guard';
 import { CreateSplitBillDto } from './dto/create-split-bill.dto';
 import { AssignSharesDto } from './dto/assign-shares.dto';
 import { ScanReceiptDto } from './dto/scan-receipt.dto';
 import { SetAvatarDto } from './dto/set-avatar.dto';
+
+const SCAN_PER_IP_PER_DAY = 5;
 
 @Controller('split-bills')
 export class SplitBillController {
@@ -50,12 +52,16 @@ export class SplitBillController {
     return this.splitBillService.assignShares(id, itemId, userId, dto);
   }
 
-  // Scan struk TETAP login-only meskipun create bill sekarang publik — ini manggil AI API
-  // berbayar (mwapi.dev), buka ke traffic anonim tanpa proteksi bisa habisin quota. Pembuat
-  // bill anonim tetap bisa pakai fitur ini, cuma harus input item manual.
-  @UseGuards(JwtAuthGuard, AiRateLimitGuard)
+  // Publik (pembuat bill anonim juga bisa scan), tapi tiap scan memanggil AI → dibatasi per IP per hari,
+  // berlaku juga untuk user login. ponytail: hitungan in-memory (aiQuotaOk), reset saat backend restart.
   @Post('scan-receipt')
-  async scanReceipt(@Body() dto: ScanReceiptDto) {
+  async scanReceipt(@Req() req: Request, @Body() dto: ScanReceiptDto) {
+    if (!aiQuotaOk(`ip:${req.ip}|scan-receipt`, Date.now(), SCAN_PER_IP_PER_DAY)) {
+      throw new HttpException(
+        `Batas scan struk hari ini sudah habis (${SCAN_PER_IP_PER_DAY}x). Isi item manual, atau coba lagi besok.`,
+        HttpStatus.TOO_MANY_REQUESTS,
+      );
+    }
     const items = await this.splitBillAiService.scanReceipt(dto.imageBase64);
     return { items };
   }

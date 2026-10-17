@@ -8,7 +8,7 @@ const PER_DAY = Number(process.env.AI_RATE_PER_DAY) || 300;
 const hits = new Map<string, { m: number; mSince: number; d: number; dSince: number }>();
 
 /** true = boleh lanjut; false = kena batas. Dipakai guard di bawah dan webhook Telegram (chat AI lewat bot). */
-export function aiQuotaOk(key: string, now = Date.now()): boolean {
+export function aiQuotaOk(key: string, now = Date.now(), perDay = PER_DAY): boolean {
   let h = hits.get(key);
   if (!h) {
     if (hits.size > 20_000) hits.clear();
@@ -17,7 +17,7 @@ export function aiQuotaOk(key: string, now = Date.now()): boolean {
   }
   if (now - h.mSince >= 60_000) (h.m = 0), (h.mSince = now);
   if (now - h.dSince >= 86_400_000) (h.d = 0), (h.dSince = now);
-  if (h.m >= PER_MIN || h.d >= PER_DAY) return false;
+  if (h.m >= PER_MIN || h.d >= perDay) return false;
   h.m++;
   h.d++;
   return true;

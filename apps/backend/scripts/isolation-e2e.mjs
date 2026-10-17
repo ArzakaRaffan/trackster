@@ -62,7 +62,7 @@ const PRIVATE = [
   ['GET', '/transactions/uncategorized-merchants'], ['GET', '/transactions/1/same-merchant-count'],
   ['POST', '/transactions'], ['DELETE', '/transactions/1'], ['PATCH', '/transactions/1/note'], ['PATCH', '/transactions/1/category'],
   ['PATCH', '/transactions/1/alias'], ['PATCH', '/transactions/1/big'],
-  ['POST', '/split-bills'], ['POST', '/split-bills/scan-receipt'], ['GET', '/split-bills'], ['GET', '/split-bills/1'], ['PATCH', '/split-bills/1/items/1/assign'],
+  ['POST', '/split-bills'], ['GET', '/split-bills'], ['GET', '/split-bills/1'], ['PATCH', '/split-bills/1/items/1/assign'],
   ['POST', '/trips'],
 ];
 

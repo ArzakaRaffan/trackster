@@ -132,6 +132,28 @@ export default function NewSplitBillPage() {
     }
   };
 
+  const scannedCount = items.filter((r) => r.description.trim()).length;
+  // Satu tombol, dipakai di langkah 1 (biar langsung kelihatan) dan langkah 2 (tambah dari struk lain).
+  const scanButton = (
+    <>
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept="image/*"
+        capture="environment"
+        hidden
+        onChange={(e) => {
+          const file = e.target.files?.[0];
+          if (file) handleScanReceipt(file);
+          e.target.value = '';
+        }}
+      />
+      <button type="button" className="pb-btn" style={{ width: '100%', marginBottom: 14 }} onClick={() => fileInputRef.current?.click()} disabled={scanning}>
+        {scanning ? 'Memindai struk…' : 'Scan struk'}
+      </button>
+    </>
+  );
+
   const validParticipants = participants.filter((p) => p.name.trim().length > 0);
   const validItems = items.filter((r) => r.description.trim() && parseFloat(r.amount) > 0);
 
@@ -264,6 +286,10 @@ export default function NewSplitBillPage() {
 
         {step === 0 && (
           <>
+            {scanButton}
+            <p className="pb-hint">
+              {scannedCount > 0 ? `${scannedCount} item terbaca dari struk. Cek di langkah berikutnya.` : 'Opsional: foto struk, item terisi otomatis. Maksimal 5 scan per hari.'}
+            </p>
             {field('Nama resto', restaurantName, setRestaurantName)}
             {field('Tanggal', billDate, setBillDate, { type: 'date' })}
 
@@ -313,29 +339,7 @@ export default function NewSplitBillPage() {
           <>
             <p className="pb-hint">Pilih siapa aja yang pesen tiap menu. Ketuk nama buat assign, boleh lebih dari satu.</p>
 
-            {isOwner === true ? (
-              <>
-                <input
-                  ref={fileInputRef}
-                  type="file"
-                  accept="image/*"
-                  capture="environment"
-                  hidden
-                  onChange={(e) => {
-                    const file = e.target.files?.[0];
-                    if (file) handleScanReceipt(file);
-                    e.target.value = '';
-                  }}
-                />
-                <button type="button" className="pb-btn" style={{ width: '100%', marginBottom: 14 }} onClick={() => fileInputRef.current?.click()} disabled={scanning}>
-                  {scanning ? 'Memindai struk…' : 'Scan struk'}
-                </button>
-              </>
-            ) : isOwner === false ? (
-              <p className="pb-hint" style={{ padding: '10px 14px', borderRadius: 10, background: 'var(--neutral)' }}>
-                Scan struk otomatis cuma buat yang login ke Trackster.
-              </p>
-            ) : null}
+            {scanButton}
 
             {items.map((row) => (
               <div key={row.id} className="pb-itemrow">
