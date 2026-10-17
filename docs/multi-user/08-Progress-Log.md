@@ -336,3 +336,11 @@ deviasi dari rencana (+alasan), env baru yang Arzaka harus tambahkan, langkah be
 - **Migrasi (aditif/indeks saja):** `20261017100000_user_time_indexes` (CREATE/DROP INDEX), `20261017110000_telegram_daily_brief` (2 kolom boolean default false).
 - Verifikasi (Postgres scratch 5434, user uji sintetis `overnight`): check 32/32 (4 check baru), tenancy-audit 0, tsc FE/BE, build BE; browser: Langganan (saran → Tambahkan → form terisi → tersimpan & saran hilang, abaikan, .ics), Mingguan (pembelian besar mode dinamis), Setting, Tanya Track, ponsel 375px tanpa overflow; webhook Telegram disimulasikan (catat, dedup retry, batalkan, pemasukan, kemarin, /pagi). Pesan Telegram tidak terkirim sungguhan (token palsu di lokal).
 - **Belum:** merge ke `main` (menunggu Arzaka). `setMyCommands` bot bersama jalan otomatis saat backend start di prod.
+
+## 2026-10-17 (malam) — AI prod, scan struk publik, kuota & penyaring topik chat (sebagian P9-02)
+- Sesi oleh: Claude (Opus 5.5)   Branch: `feat/overnight-improvements` (belum di-commit saat log ditulis).
+- **Prod (izin Arzaka):** `AI_MODEL_FAST` `ag/gemini-3.7-flash-low` → `ag/gemini-3.8-flash-low` (lama: upstream 404 sejak 2026-10-16 15:50 → kategori `LAINNYA`, caption gagal). Backup `~/trackster/.env.bak-20261017-aifast`, backend di-recreate, uji dari container 200. AI prod = 9router di VPS (`9router.service`, user systemd, :20128), bukan `cc/`.
+- **Landing mobile:** `lpmSink` (kartu hero turun 90px) hanya ≥1024px — di layout tumpuk menimpa judul FITUR.
+- **Scan struk publik:** tanpa login, 5/hari per IP (`aiQuotaOk` in-memory, berlaku juga untuk user login). Tombol scan tampil di langkah 1 & 2 `/split-bills/new`.
+- **Chat:** kuota 50 pesan/hari per user (web + stream + Telegram, di `sendMessage`); penyaring topik model cepat jalan paralel dgn pengambilan konteks, gagal → diloloskan. Eval model asli 20/20; e2e lokal (AI tiruan) 9/9; check 34/34; build BE & tsc FE bersih.
+- **Belum:** kuota masih in-memory (reset saat restart; `AiUsage` belum dipakai). `ai-trackster-worker.service` (system, bukan Trackster) gagal start tiap 10 dtk — Arzaka perlu `sudo systemctl disable --now ai-trackster-worker`.
