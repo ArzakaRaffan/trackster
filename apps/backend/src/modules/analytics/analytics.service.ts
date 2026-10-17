@@ -72,8 +72,9 @@ export class AnalyticsService {
     const end = addWibDays(startOfWibDay(now), 1);
 
     if (range === 'all') {
-      const first = await this.getPeriodStats(userId, new Date(0), end, false);
-      const start = first.range.dataStartsAt ? startOfWibDay(new Date(first.range.dataStartsAt)) : startOfWibDay(now);
+      // Cukup tanggal transaksi pertama (dulu: menghitung statistik penuh seluruh riwayat hanya untuk angka ini).
+      const first = await this.prisma.transaction.aggregate({ where: { userId }, _min: { occurredAt: true } });
+      const start = first._min.occurredAt ? startOfWibDay(first._min.occurredAt) : startOfWibDay(now);
       return { start, end };
     }
 
@@ -85,7 +86,7 @@ export class AnalyticsService {
   /** `end` eksklusif. Semua kunci hari pakai `wibDateKey`, batas hari/minggu dari `wib.ts`. */
   async getPeriodStats(userId: number, start: Date, end: Date, compare = true): Promise<PeriodStats> {
     const asDate = (x: Date) => new Date(`${wibDateKey(x)}T00:00:00Z`); // kolom @db.Date: kirim tanggal kalender WIB
-    const [dataStartsAtRow, budgetRows, allowanceRows, transactionsRaw, window90dRaw, historyBeforeStart] = await Promise.all([
+    const [dataStartsAtRow, budgetRows, allowanceRows, transactionsRaw, window90dRaw, merchantsBeforeStart, legacyBeforeStart, incomeRows] = await Promise.all([
       this.prisma.transaction.aggregate({ where: { userId }, _min: { occurredAt: true } }),
       this.prisma.dailyBudget.findMany({ where: { userId } }),
       this.prisma.dailyAllowance.findMany({ where: { userId, date: { gte: asDate(start), lt: asDate(end) } } }),
@@ -94,9 +95,12 @@ export class AnalyticsService {
         where: { userId, occurredAt: { gte: addWibDays(end, -90), lt: end } },
         select: { amount: true, reimbursedAmount: true, category: true, merchantKey: true, description: true },
       }),
-      this.prisma.transaction.findMany({
-        where: { userId, occurredAt: { lt: start } },
-        select: { merchantKey: true, description: true },
+      // Merchant yang sudah pernah muncul sebelum periode: GROUP BY di DB (dulu: seluruh riwayat diambil per request).
+      this.prisma.transaction.groupBy({ by: ['merchantKey'], where: { userId, occurredAt: { lt: start }, merchantKey: { gt: '' } } }),
+      this.prisma.transaction.findMany({ where: { userId, occurredAt: { lt: start }, OR: [{ merchantKey: null }, { merchantKey: '' }] }, select: { description: true } }),
+      this.prisma.income.findMany({
+        where: { userId, receivedAt: { gte: start, lt: end }, status: IncomeStatus.CONFIRMED },
+        select: { amount: true, receivedAt: true },
       }),
     ]);
 
@@ -116,14 +120,10 @@ export class AnalyticsService {
     for (const cat of Object.values(Category)) {
       categoryMedians.set(cat, median(window90d.filter((t) => t.category === cat).map((t) => Number(t.amount))));
     }
-    const knownMerchantsBeforeStart = new Set(
-      historyBeforeStart.map((t) => t.merchantKey || computeMerchantKey(t.description)),
-    );
-
-    const incomeRows = await this.prisma.income.findMany({
-      where: { userId, receivedAt: { gte: start, lt: end }, status: IncomeStatus.CONFIRMED },
-      select: { amount: true, receivedAt: true },
-    });
+    const knownMerchantsBeforeStart = new Set<string>([
+      ...merchantsBeforeStart.map((g) => g.merchantKey as string),
+      ...legacyBeforeStart.map((t) => computeMerchantKey(t.description)),
+    ]);
     const totalIncome = incomeRows.reduce((sum, i) => sum + Number(i.amount), 0);
 
     const totals = this.computeTotals(transactions, medianAmount90d, totalIncome, days);
@@ -160,7 +160,12 @@ export class AnalyticsService {
     }
 
     const byCategory = this.buildByCategory(transactions, prevByCategory);
-    const byMerchant = await this.buildByMerchant(userId, transactions, prevByMerchant, days);
+    // Tiga bagian yang butuh DB (alias & hitungan) jalan paralel.
+    const [byMerchant, habits, dataQuality] = await Promise.all([
+      this.buildByMerchant(userId, transactions, prevByMerchant, days),
+      this.buildHabits(userId, transactions, medianAmount90d, days),
+      this.buildDataQuality(userId, transactions),
+    ]);
     const byDay = this.buildByDay(transactions, incomeRows, start, end, budgetByDow, allowanceByDate, medianAmount90d);
     const byWeekday = this.buildByWeekday(byDay);
     const timeHeatmap = this.buildTimeHeatmap(transactions);
@@ -168,9 +173,7 @@ export class AnalyticsService {
       .filter((t) => isBigPurchase(Number(t.amount), medianAmount90d, t.isBig))
       .sort((a, b) => Number(b.amount) - Number(a.amount));
     const anomalies = this.buildAnomalies(transactions, medianAmount90d, categoryMedians, p90Amount90d, knownMerchantsBeforeStart);
-    const habits = await this.buildHabits(userId, transactions, medianAmount90d, days);
     const budget = { ...computeBudgetAdherence(byDay.map((d) => ({ spend: d.spendRoutine, budget: d.budget }))), worstWeekday: this.worstWeekday(byDay) };
-    const dataQuality = await this.buildDataQuality(userId, transactions);
 
     return {
       range: { start: start.toISOString(), end: end.toISOString(), days, dataStartsAt: dataStartsAt?.toISOString() ?? null },

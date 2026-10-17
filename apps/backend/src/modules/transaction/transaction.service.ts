@@ -105,23 +105,32 @@ export class TransactionService {
     const now = new Date();
     const startOfWeek = startOfWibWeek(now); // Senin 00:00 WIB
 
+    // 2 query untuk seluruh minggu (dulu 14 query berurutan: budget + transaksi per hari), lalu dibagi per hari WIB.
+    const [budgetRows, weekTx] = await Promise.all([
+      this.prisma.dailyBudget.findMany({ where: { userId } }),
+      this.prisma.transaction.findMany({
+        where: { userId, occurredAt: { gte: startOfWeek, lt: addWibDays(startOfWeek, 7) } },
+        orderBy: { occurredAt: 'asc' },
+      }),
+    ]);
+    const budgetByDow = new Map(budgetRows.map((b) => [b.dayOfWeek, Number(b.amount)]));
+    const txByDate = new Map<string, typeof weekTx>();
+    for (const t of weekTx) {
+      const key = wibDateKey(t.occurredAt);
+      txByDate.set(key, [...(txByDate.get(key) ?? []), t]);
+    }
+
     const days: any[] = [];
     for (let i = 0; i < 7; i++) {
       const date = addWibDays(startOfWeek, i);
-      const nextDate = addWibDays(date, 1);
-
       const dayOfWeek = wibDayOfWeek(date); // Senin..Minggu = 1..6,0
-      const budgetRow = await this.prisma.dailyBudget.findFirst({ where: { userId, dayOfWeek } });
-      const transactions = await this.prisma.transaction.findMany({
-        where: { userId, occurredAt: { gte: date, lt: nextDate } },
-        orderBy: { occurredAt: 'asc' },
-      });
+      const transactions = txByDate.get(wibDateKey(date)) ?? [];
       const totalSpent = transactions.reduce((sum, t) => sum + spend(t), 0);
 
       days.push({
         date: wibDateKey(date),
         dayOfWeek,
-        budget: budgetRow ? Number(budgetRow.amount) : 0,
+        budget: budgetByDow.get(dayOfWeek) ?? 0,
         totalSpent,
         transactions,
       });
@@ -312,7 +321,8 @@ export class TransactionService {
   /** Total sepanjang waktu, breakdown per kategori, dan bulan tertinggi/terendah. */
   async getAllTimeSummary(userId: number) {
     const [transactions, byCategoryRaw] = await Promise.all([
-      this.prisma.transaction.findMany({ where: { userId }, orderBy: { occurredAt: 'asc' } }),
+      // Hanya kolom yang dihitung (dulu seluruh baris seluruh riwayat).
+      this.prisma.transaction.findMany({ where: { userId }, select: { amount: true, reimbursedAmount: true, occurredAt: true }, orderBy: { occurredAt: 'asc' } }),
       this.prisma.transaction.groupBy({ by: ['category'], where: { userId }, _sum: { amount: true, reimbursedAmount: true } }),
     ]);
 

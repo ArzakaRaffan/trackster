@@ -28,18 +28,17 @@ export class BudgetService {
   }
 
   async updateAll(userId: number, dto: UpdateBudgetDto) {
-    const results: Awaited<ReturnType<typeof this.prisma.dailyBudget.create>>[] = [];
-    for (const item of dto.budgets) {
-      // findFirst + updateMany/create (bukan upsert by `dayOfWeek`): unik masih global sampai C1 -> (userId, dayOfWeek).
-      const row = await this.prisma.dailyBudget.findFirst({ where: { userId, dayOfWeek: item.dayOfWeek }, select: { id: true } });
-      if (row) {
-        await this.prisma.dailyBudget.updateMany({ where: { id: row.id, userId }, data: { amount: item.amount } });
-        results.push(await this.prisma.dailyBudget.findFirstOrThrow({ where: { id: row.id, userId } }));
-      } else {
-        results.push(await this.prisma.dailyBudget.create({ data: { userId, dayOfWeek: item.dayOfWeek, amount: item.amount } }));
-      }
-    }
-    return results;
+    // Unik sudah komposit (userId, dayOfWeek) → upsert; satu transaksi = 7 hari tersimpan semua atau tidak sama sekali
+    // (dulu ±21 query lepas berurutan, gagal di tengah = budget setengah tersimpan).
+    return this.prisma.$transaction(
+      dto.budgets.map((item) =>
+        this.prisma.dailyBudget.upsert({
+          where: { userId_dayOfWeek: { userId, dayOfWeek: item.dayOfWeek } },
+          create: { userId, dayOfWeek: item.dayOfWeek, amount: item.amount },
+          update: { amount: item.amount },
+        }),
+      ),
+    );
   }
 
   /** Ambil budget untuk hari tertentu (0=Minggu...6=Sabtu) */
