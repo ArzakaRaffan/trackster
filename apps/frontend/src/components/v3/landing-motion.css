@@ -80,7 +80,8 @@
   :root[data-lpm] [data-lp-head]::after{content:'';position:absolute;left:0;right:0;bottom:-1.5px;height:2px;background:var(--brand);transform-origin:left;animation:lpmProg linear both;animation-timeline:scroll()}
   /* Parallax hero: teks naik lebih cepat & memudar, kartu turun pelan */
   :root[data-lpm] [data-sec=hero] > div:first-child{animation:lpmAway linear both;animation-timeline:scroll();animation-range:0 600px}
-  :root[data-lpm] [data-sec=hero] > div:nth-child(2){animation:lpmRise 1000ms var(--lpm-e) 220ms both,lpmSink linear both;animation-timeline:auto,scroll();animation-range:normal,0 700px}
+  /* Kartu turun hanya saat hero 2 kolom (≥1024, lihat heroCols); di layout tumpuk kartu menimpa judul FITUR */
+  @media (min-width:1024px){:root[data-lpm] [data-sec=hero] > div:nth-child(2){animation:lpmRise 1000ms var(--lpm-e) 220ms both,lpmSink linear both;animation-timeline:auto,scroll();animation-range:normal,0 700px}}
   :root[data-lpm] [data-sec=hero]::after{animation:lpmCue 1.8s ease-in-out 1.4s infinite both,lpmGone linear both;animation-timeline:auto,scroll();animation-range:normal,0 160px}
 }
 }
