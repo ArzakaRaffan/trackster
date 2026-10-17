@@ -113,6 +113,59 @@ await test('split bill publik: input raksasa 400, shares jahat tidak bikin crash
   expect(bill.items[0].shares.length === 1, `share tak valid ikut tersimpan: ${JSON.stringify(bill.items[0].shares)}`);
 });
 
+// ── Audit 2026-10-18 ──
+const FE = process.env.FRONTEND_URL || 'http://localhost:3000';
+const txBody = { amount: 1000, description: 'csrf', source: 'BCA', category: 'LAINNYA', occurredAt: new Date().toISOString() };
+
+await test('CSRF: request ber-cookie dari origin lain 403, dari frontend lolos, tanpa cookie tak terdampak', async () => {
+  expect((await req('POST', '/transactions', txBody, cookieB, { origin: 'https://evil.trackster.dev' })).status === 403, 'subdomain lain lolos');
+  expect((await req('DELETE', '/transactions/1', undefined, cookieB, { origin: 'null' })).status === 403, 'origin null lolos');
+  expect((await req('POST', '/transactions', txBody, cookieB, { origin: FE })).status === 201, 'frontend sendiri ditolak');
+  expect((await req('POST', '/auth/login', { username: 'x', password: 'y' }, undefined, { origin: 'https://evil.com' })).status === 401, 'tanpa cookie ikut diblok');
+  expect((await req('GET', '/auth/me', undefined, cookieB, { origin: 'https://evil.com' })).status === 200, 'GET ikut diblok');
+});
+
+await test('form-urlencoded tidak di-parse di rute cookie; body >200kb 413; rute scan menerima foto besar', async () => {
+  const form = await fetch(BASE + '/transactions', { method: 'POST', headers: { cookie: cookieB, 'content-type': 'application/x-www-form-urlencoded' }, body: 'amount=1&description=x&source=BCA&category=LAINNYA&occurredAt=2026-01-01' });
+  expect(form.status === 400, `form -> ${form.status}`);
+  expect((await req('POST', '/transactions', { ...txBody, note: 'x'.repeat(300_000) }, cookieB)).status === 413, 'body raksasa lolos');
+  const scan = await req('POST', '/split-bills/scan-receipt', { imageBase64: 'data:image/jpeg;base64,' + 'A'.repeat(1_000_000) });
+  expect(scan.status !== 413, 'foto 1MB ditolak 413');
+});
+
+await test('header API: CSP default-src none, CORP same-site', async () => {
+  const r = await req('GET', '/auth/me');
+  expect((r.headers.get('content-security-policy') ?? '').includes("default-src 'none'"), 'CSP');
+  expect(r.headers.get('cross-origin-resource-policy') === 'same-site', 'CORP');
+});
+
+await test('OAuth Gmail: state sah tanpa sesi browser yang sama ditolak', async () => {
+  const state = signJwt({ sub: adminId, purpose: 'gmail-oauth' });
+  const noSession = await fetch(`${BASE}/gmail/callback?code=x&state=${state}`, { redirect: 'manual' });
+  expect(decodeURIComponent(noSession.headers.get('location') ?? '').includes('Sesi login tidak cocok'), `tanpa sesi: ${noSession.headers.get('location')}`);
+  const otherUser = await fetch(`${BASE}/gmail/callback?code=x&state=${state}`, { redirect: 'manual', headers: { cookie: cookieB } });
+  expect(decodeURIComponent(otherUser.headers.get('location') ?? '').includes('Sesi login tidak cocok'), 'sesi user lain diterima');
+  const same = await fetch(`${BASE}/gmail/callback?code=x&state=${state}`, { redirect: 'manual', headers: { cookie: admin } });
+  expect(!decodeURIComponent(same.headers.get('location') ?? '').includes('Sesi login tidak cocok'), 'sesi pemilik ditolak');
+});
+
+await test('trip publik: shares/tanggal/mata uang ngawur 400 (bukan 500)', async () => {
+  const base = { name: 'Trip', members: [{ name: 'A' }, { name: 'B' }] };
+  const evil = await req('POST', '/trips/public', { ...base, expenses: [{ description: 'x', amount: 1, shares: [{ memberIndex: '__proto__', weight: 'x' }] }] });
+  expect(evil.status === 400, `shares jahat -> ${evil.status}`);
+  expect((await req('POST', '/trips/public', { ...base, currency: '<b>', expenses: [] })).status === 400, 'currency bebas lolos');
+  const ok = await req('POST', '/trips/public', { ...base, expenses: [] });
+  const trip = await ok.json();
+  expect(ok.status === 201, `trip sah -> ${ok.status}`);
+  const bad = await req('PATCH', `/trips/manage/${trip.ownerToken}/expenses`, { description: 'x', amount: 1, paidByMemberIndex: 0, date: 'kemarin' });
+  expect(bad.status === 400, `tanggal ngawur -> ${bad.status}`);
+});
+
+await test('split bill milik user lain -> 404 (bukan 403)', async () => {
+  const mine = await (await req('POST', '/split-bills', { restaurantName: 'R', billDate: '2026-10-10', participants: [{ name: 'A' }], items: [] }, admin, { origin: FE })).json();
+  expect((await req('GET', `/split-bills/${mine.id}`, undefined, cookieB)).status === 404, 'bukan 404');
+});
+
 await test('kunci login per username 15 mnt: password benar pun ditolak setelah 10 gagal', async () => {
   for (let i = 0; i < 10; i++) await req('POST', '/auth/login', { username: B, password: 'salah-salah-salah' });
   expect((await req('POST', '/auth/login', { username: B, password: PW })).status === 429, 'tidak terkunci');
