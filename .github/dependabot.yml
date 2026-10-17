@@ -1,0 +1,31 @@
+# Update dependensi otomatis (PR, tidak auto-merge). Bulanan + dikelompokkan supaya tidak banjir PR.
+# Merge PR = deploy ke prod (CD di main) — tetap review & uji dulu (CLAUDE.md: build BE, tsc FE, cek di browser).
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: /apps/backend
+    schedule: { interval: monthly }
+    open-pull-requests-limit: 3
+    groups:
+      minor-patch:
+        update-types: [minor, patch]
+  - package-ecosystem: npm
+    directory: /apps/frontend
+    schedule: { interval: monthly }
+    open-pull-requests-limit: 3
+    groups:
+      minor-patch:
+        update-types: [minor, patch]
+  # Actions dipin per SHA (deploy.yml): Dependabot memperbarui SHA + komentar versinya.
+  - package-ecosystem: github-actions
+    directory: /
+    schedule: { interval: monthly }
+    groups:
+      actions:
+        patterns: ['*']
+  - package-ecosystem: docker
+    directory: /apps/backend
+    schedule: { interval: monthly }
+  - package-ecosystem: docker
+    directory: /apps/frontend
+    schedule: { interval: monthly }

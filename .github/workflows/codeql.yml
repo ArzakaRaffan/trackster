@@ -1,0 +1,26 @@
+# Analisis statis keamanan (injeksi, XSS, SSRF, path traversal, dll) untuk backend & frontend TypeScript.
+# Hasil di tab Security → Code scanning. Tidak memblok deploy (workflow terpisah dari deploy.yml).
+name: CodeQL
+
+on:
+  pull_request:
+    branches: [main]
+  schedule:
+    - cron: '17 3 * * 1' # Senin 10:17 WIB
+
+permissions:
+  contents: read
+
+jobs:
+  analyze:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: github/codeql-action/init@6f2ac81f5cd81fe351a197ba0b00d91d03cd2aee # v4
+        with:
+          languages: javascript-typescript
+          queries: security-extended
+      - uses: github/codeql-action/analyze@6f2ac81f5cd81fe351a197ba0b00d91d03cd2aee # v4
