@@ -2,6 +2,7 @@ import { IsString, MaxLength, MinLength } from 'class-validator';
 
 export class ChangePasswordDto {
   @IsString()
+  @MaxLength(200)
   currentPassword: string;
 
   @IsString()

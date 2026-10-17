@@ -52,7 +52,7 @@ export class AuthController {
     return { success: true };
   }
 
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, AuthRateLimitGuard) // cookie curian tak boleh dipakai menebak password lama tanpa batas
   @Post('change-password')
   async changePassword(@CurrentUser() user: AuthUser, @Body() dto: ChangePasswordDto, @Res({ passthrough: true }) res: Response) {
     const { token } = await this.authService.changePassword(user.id, dto.currentPassword, dto.newPassword);

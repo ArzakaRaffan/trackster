@@ -13,7 +13,10 @@ const { provisionUser } = require('../../../prisma/provision-user');
 export const sha256 = (s: string) => createHash('sha256').update(s).digest('hex');
 // 10 gagal per username per 15 menit (≈960 tebakan/hari maks walau IP berganti-ganti); selain throttler per-IP.
 const FAIL_WINDOW_MS = 15 * 60_000;
-const DUMMY_HASH = bcrypt.hashSync('dummy-password', 10);
+// Biaya bcrypt hash baru. Hash lama (10) di-upgrade otomatis saat login berhasil. Hash palsu memakai biaya sama agar waktu respons
+// user-tak-ada ≈ user-ada.
+const BCRYPT_COST = 12;
+const DUMMY_HASH = bcrypt.hashSync('dummy-password', BCRYPT_COST);
 const FAIL_LIMIT = 10;
 
 @Injectable()
@@ -61,7 +64,8 @@ export class AuthService {
       throw new UnauthorizedException('Username atau password salah');
     }
     this.fails.delete(key);
-    await this.prisma.user.update({ where: { id: user.id }, data: { lastLoginAt: new Date() } });
+    const rehash = bcrypt.getRounds(user.password) < BCRYPT_COST ? { password: await bcrypt.hash(password, BCRYPT_COST) } : {};
+    await this.prisma.user.update({ where: { id: user.id }, data: { lastLoginAt: new Date(), ...rehash } });
     return { token: await this.sign(user), user: { id: user.id, username: user.username } };
   }
 
@@ -77,7 +81,7 @@ export class AuthService {
         throw new ConflictException('Username sudah dipakai');
       }
       const created = await tx.user.create({
-        data: { username: dto.username, password: await bcrypt.hash(dto.password, 10), displayName: dto.displayName?.trim() || dto.username, role: 'MEMBER' },
+        data: { username: dto.username, password: await bcrypt.hash(dto.password, BCRYPT_COST), displayName: dto.displayName?.trim() || dto.username, role: 'MEMBER' },
       });
       // updateMany + usedAt:null = klaim atomik: dua pendaftar dengan kode yang sama → hanya satu yang lolos.
       const claimed = await tx.invite.updateMany({ where: { id: invite.id, usedAt: null }, data: { usedAt: new Date(), usedByUserId: created.id } });
@@ -94,7 +98,7 @@ export class AuthService {
     if (!user || !(await bcrypt.compare(currentPassword, user.password))) throw new UnauthorizedException('Password saat ini salah');
     const updated = await this.prisma.user.update({
       where: { id: userId },
-      data: { password: await bcrypt.hash(newPassword, 10), tokenVersion: { increment: 1 } },
+      data: { password: await bcrypt.hash(newPassword, BCRYPT_COST), tokenVersion: { increment: 1 } },
     });
     invalidateAuthCache(userId);
     return { token: await this.sign(updated) };
@@ -108,7 +112,7 @@ export class AuthService {
       if (!row || row.kind !== 'RESET_PASSWORD' || row.usedAt || row.expiresAt < new Date()) throw new BadRequestException('Tautan reset tidak valid atau sudah kedaluwarsa');
       const claimed = await tx.oneTimeToken.updateMany({ where: { id: row.id, usedAt: null }, data: { usedAt: new Date() } });
       if (claimed.count !== 1) throw new BadRequestException('Tautan reset tidak valid atau sudah kedaluwarsa');
-      await tx.user.update({ where: { id: row.userId }, data: { password: await bcrypt.hash(newPassword, 10), tokenVersion: { increment: 1 } } });
+      await tx.user.update({ where: { id: row.userId }, data: { password: await bcrypt.hash(newPassword, BCRYPT_COST), tokenVersion: { increment: 1 } } });
       return row.userId;
     });
     invalidateAuthCache(userId);
