@@ -5,6 +5,10 @@ updates:
   - package-ecosystem: npm
     directory: /apps/backend
     schedule: { interval: monthly }
+    ignore:
+      # Major dikerjakan manual (breaking change; mis. Tailwind 4, Node non-LTS). Patch keamanan tetap lewat minor/patch.
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major"]
     open-pull-requests-limit: 3
     groups:
       minor-patch:
@@ -12,6 +16,10 @@ updates:
   - package-ecosystem: npm
     directory: /apps/frontend
     schedule: { interval: monthly }
+    ignore:
+      # Major dikerjakan manual (breaking change; mis. Tailwind 4, Node non-LTS). Patch keamanan tetap lewat minor/patch.
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major"]
     open-pull-requests-limit: 3
     groups:
       minor-patch:
@@ -26,6 +34,14 @@ updates:
   - package-ecosystem: docker
     directory: /apps/backend
     schedule: { interval: monthly }
+    ignore:
+      # Major dikerjakan manual (breaking change; mis. Tailwind 4, Node non-LTS). Patch keamanan tetap lewat minor/patch.
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major"]
   - package-ecosystem: docker
     directory: /apps/frontend
     schedule: { interval: monthly }
+    ignore:
+      # Major dikerjakan manual (breaking change; mis. Tailwind 4, Node non-LTS). Patch keamanan tetap lewat minor/patch.
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major"]
