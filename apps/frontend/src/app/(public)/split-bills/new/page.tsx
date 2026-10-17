@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { api, ApiError } from '@/lib/api';
+import { shrinkDataUrl } from '@/lib/image';
 import { formatRupiah } from '@/lib/format';
 import { avatarCss } from '@/lib/avatars';
 import { calculate, SplitInput } from '@/lib/split-calc';
@@ -116,7 +117,7 @@ export default function NewSplitBillPage() {
         reader.onerror = reject;
         reader.readAsDataURL(file);
       });
-      const { items: scanned } = await api.post<{ items: { description: string; amount: number; quantity: number }[] }>('/split-bills/scan-receipt', { imageBase64 });
+      const { items: scanned } = await api.post<{ items: { description: string; amount: number; quantity: number }[] }>('/split-bills/scan-receipt', { imageBase64: await shrinkDataUrl(imageBase64) });
       if (scanned.length === 0) {
         setErrorMsg('Struk tidak terbaca, coba foto ulang atau tambah item manual.');
         return;
