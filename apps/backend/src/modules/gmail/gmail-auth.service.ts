@@ -40,7 +40,7 @@ export class GmailAuthService {
 
   private userIdFromState(state: string | undefined): number {
     try {
-      const payload = this.jwtService.verify(state ?? '', { secret: process.env.JWT_SECRET });
+      const payload = this.jwtService.verify(state ?? '', { secret: process.env.JWT_SECRET, algorithms: ['HS256'] });
       if (payload?.purpose === 'gmail-oauth' && Number.isInteger(payload.sub)) return payload.sub;
     } catch {
       // jatuh ke throw di bawah
@@ -48,8 +48,17 @@ export class GmailAuthService {
     throw new UnauthorizedException('State OAuth tidak valid atau kedaluwarsa — mulai ulang dari Setting.');
   }
 
-  async handleCallback(code: string, state: string | undefined) {
+  /** `sessionToken` = cookie sesi browser yang menyelesaikan OAuth. Wajib milik user yang sama dengan `state`: tanpa ini
+   * penyerang bisa mengirim tautan OAuth miliknya ke korban, lalu refresh token Gmail korban tersimpan di akun penyerang. */
+  async handleCallback(code: string, state: string | undefined, sessionToken: string | undefined) {
     const userId = this.userIdFromState(state);
+    let sessionSub: unknown;
+    try {
+      sessionSub = (await this.jwtService.verifyAsync(sessionToken ?? '', { secret: process.env.JWT_SECRET, algorithms: ['HS256'] }))?.sub;
+    } catch {
+      sessionSub = undefined;
+    }
+    if (sessionSub !== userId) throw new UnauthorizedException('Sesi login tidak cocok — buka Setting lalu hubungkan ulang dari browser yang sama.');
     const client = this.getOAuth2Client();
     const { tokens } = await client.getToken(code);
 

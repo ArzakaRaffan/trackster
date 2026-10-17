@@ -1,5 +1,5 @@
-import { Controller, Get, Post, Query, Res, UseGuards } from '@nestjs/common';
-import { Response } from 'express';
+import { Controller, Get, Post, Query, Req, Res, UseGuards } from '@nestjs/common';
+import { Request, Response } from 'express';
 import { GmailAuthService } from './gmail-auth.service';
 import { GmailSyncService } from './gmail-sync.service';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
@@ -25,10 +25,10 @@ export class GmailController {
   // TIDAK pakai JwtAuthGuard - ini dipanggil langsung oleh Google redirect, bukan dari frontend fetch.
   // Identitas = `state` bertanda tangan yang dibuat getAuthUrl(userId).
   @Get('callback')
-  async callback(@Query('code') code: string, @Query('state') state: string, @Res() res: Response) {
+  async callback(@Query('code') code: string, @Query('state') state: string, @Req() req: Request, @Res() res: Response) {
     const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
     try {
-      await this.gmailAuthService.handleCallback(code, state);
+      await this.gmailAuthService.handleCallback(code, state, req.cookies?.['trackster_jwt']);
       return res.redirect(`${frontendUrl}/app/settings?gmail=connected`);
     } catch (err) {
       return res.redirect(`${frontendUrl}/app/settings?gmail=error&message=${encodeURIComponent(err.message)}`);
