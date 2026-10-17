@@ -25,7 +25,7 @@ export class JwtAuthGuard implements CanActivate {
 
     let payload: any;
     try {
-      payload = await this.jwtService.verifyAsync(token, { secret: process.env.JWT_SECRET });
+      payload = await this.jwtService.verifyAsync(token, { secret: process.env.JWT_SECRET, algorithms: ['HS256'] });
     } catch {
       throw new UnauthorizedException('Invalid or expired token');
     }
