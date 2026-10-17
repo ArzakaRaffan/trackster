@@ -25,7 +25,6 @@ import { BalanceModule } from '../balance/balance.module';
 import { IncomeForecastModule } from '../income-forecast/income-forecast.module';
 import { AnalyticsModule } from '../analytics/analytics.module';
 import { ReportModule } from '../report/report.module';
-import { PrismaService } from '../../prisma.service';
 
 @Module({
   imports: [
@@ -56,7 +55,6 @@ import { PrismaService } from '../../prisma.service';
     AiInsightCardService,
     AiBudgetService,
     AiBudgetReminderService,
-    PrismaService,
   ],
   controllers: [AiController],
   exports: [

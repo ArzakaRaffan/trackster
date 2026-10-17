@@ -9,12 +9,11 @@ import { MerchantAliasModule } from '../merchant-alias/merchant-alias.module';
 import { BudgetModule } from '../budget/budget.module';
 import { TelegramModule } from '../telegram/telegram.module';
 import { AiModule } from '../ai/ai.module';
-import { PrismaService } from '../../prisma.service';
 
 @Module({
   imports: [ApiTokenModule, TransactionModule, IncomeModule, MerchantAliasModule, BudgetModule, forwardRef(() => TelegramModule), AiModule],
   controllers: [IngestController],
-  providers: [IngestService, TelegramQuickService, PrismaService],
+  providers: [IngestService, TelegramQuickService],
   exports: [TelegramQuickService],
 })
 export class IngestModule {}
