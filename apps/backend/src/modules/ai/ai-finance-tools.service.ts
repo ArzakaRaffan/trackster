@@ -14,6 +14,18 @@ import { BudgetAdvisorService } from '../budget/budget-advisor.service';
 import { affordability } from '../budget/affordability';
 import { Source, Category, MemoryKind } from '@prisma/client';
 import { addWibDays, startOfWibDay, wibDateKey } from '../../common/wib';
+import { plainToInstance } from 'class-transformer';
+import { validateSync } from 'class-validator';
+import { CreateTransactionDto } from '../transaction/dto/create-transaction.dto';
+import { CreateIncomeDto } from '../income/dto/create-income.dto';
+
+/** Argumen tool diisi model (bisa kena prompt injection dari deskripsi email/pesan) → divalidasi DTO yang sama dengan endpoint HTTP. */
+function checked<T extends object>(cls: new () => T, input: object): T {
+  const dto = plainToInstance(cls, input);
+  const errors = validateSync(dto, { whitelist: true });
+  if (errors.length) throw new Error('Argumen tidak valid: ' + errors.map((e) => e.property).join(', '));
+  return dto;
+}
 
 /** Kartu yang ikut disimpan di ChatMessage.attachments pesan assistant terakhir (lihat
  * AiChatService.sendMessage) — cuma metadata rendering, bukan sumber angka baru buat model. */
@@ -162,13 +174,16 @@ export class AiFinanceToolsService {
           category: string;
           source: string;
         }) => {
-          const created = await this.transactionService.create(userId, {
-            amount: input.amount,
-            description: input.description,
-            category: input.category as Category,
-            source: (input.source || 'BCA') as Source,
-            occurredAt: new Date().toISOString(),
-          });
+          const created = await this.transactionService.create(
+            userId,
+            checked(CreateTransactionDto, {
+              amount: input.amount,
+              description: typeof input.description === 'string' ? input.description.trim() : input.description,
+              category: input.category,
+              source: input.source || 'BCA',
+              occurredAt: new Date().toISOString(),
+            }),
+          );
           this.aiCaptionService
             .generate(userId, {
               id: created.id,
@@ -409,12 +424,15 @@ export class AiFinanceToolsService {
           required: ['amount', 'description', 'source'],
         },
         handler: async (input: { amount: number; description: string; source: string }) =>
-          this.incomeService.create(userId, {
-            amount: input.amount,
-            description: input.description,
-            source: input.source as Source,
-            receivedAt: new Date().toISOString(),
-          }),
+          this.incomeService.create(
+            userId,
+            checked(CreateIncomeDto, {
+              amount: input.amount,
+              description: typeof input.description === 'string' ? input.description.trim() : input.description,
+              source: input.source,
+              receivedAt: new Date().toISOString(),
+            }),
+          ),
       },
       {
         name: 'remember',
@@ -431,8 +449,11 @@ export class AiFinanceToolsService {
           },
           required: ['content', 'kind'],
         },
-        handler: async (input: { content: string; kind: string }) =>
-          this.aiMemoryService.create(userId, { content: input.content, kind: input.kind as MemoryKind }),
+        handler: async (input: { content: string; kind: string }) => {
+          if (typeof input.content !== 'string' || !input.content.trim() || input.content.length > 1000) throw new Error('content 1–1000 karakter');
+          if (!Object.values(MemoryKind).includes(input.kind as MemoryKind)) throw new Error('kind tidak valid');
+          return this.aiMemoryService.create(userId, { content: input.content.trim(), kind: input.kind as MemoryKind });
+        },
       },
       {
         name: 'forget',
