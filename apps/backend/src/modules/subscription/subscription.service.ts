@@ -4,7 +4,12 @@ import { PrismaService } from '../../prisma.service';
 import { GmailAuthService } from '../gmail/gmail-auth.service';
 import { CreateSubscriptionDto } from './dto/create-subscription.dto';
 import { UpdateSubscriptionDto } from './dto/update-subscription.dto';
-import { startOfWibDay } from '../../common/wib';
+import { addWibDays, startOfWibDay, wibDateKey } from '../../common/wib';
+import { spend } from '../../common/spend';
+import { MerchantAliasService } from '../merchant-alias/merchant-alias.service';
+import { detectRecurring } from './recurring-detect';
+import { rollDueDate } from './subscription-due';
+import { buildSubscriptionsIcs, calendarFile, parseCalendarFile, verifyCalendarSig } from './subscription-ics';
 
 type SubRow = {
   id: number;
@@ -28,6 +33,7 @@ export class SubscriptionService {
   constructor(
     private prisma: PrismaService,
     private gmailAuth: GmailAuthService,
+    private merchantAliasService: MerchantAliasService,
   ) {}
 
   private serialize(row: SubRow) {
@@ -38,7 +44,24 @@ export class SubscriptionService {
     };
   }
 
+  /** Langganan berulang: jatuh tempo yang sudah lewat digulir ke kemunculan berikutnya (event Calendar sudah RRULE,
+   *  jadi tidak perlu disinkron ulang). Dipanggil sebelum membaca supaya UI tidak menampilkan "Lewat N hari" selamanya. */
+  private async rollStale(userId: number) {
+    const todayKey = wibDateKey(new Date());
+    const stale = await this.prisma.subscription.findMany({
+      where: { userId, isActive: true, nextDueDate: { lt: new Date(`${todayKey}T00:00:00Z`) } },
+      select: { id: true, cycle: true, nextDueDate: true },
+    });
+    for (const s of stale) {
+      await this.prisma.subscription.updateMany({
+        where: { id: s.id, userId },
+        data: { nextDueDate: rollDueDate(s.nextDueDate, s.cycle, todayKey) },
+      });
+    }
+  }
+
   async findAll(userId: number) {
+    await this.rollStale(userId);
     const rows = await this.prisma.subscription.findMany({
       where: { userId },
       orderBy: [{ isActive: 'desc' }, { nextDueDate: 'asc' }],
@@ -99,8 +122,45 @@ export class SubscriptionService {
     return { success: true };
   }
 
+  /** Saran langganan dari tagihan bulanan berulang 200 hari terakhir. Langganan yang sudah ada (termasuk nonaktif)
+   *  tidak disarankan lagi; "abaikan" disimpan di perangkat (frontend). */
+  async suggestions(userId: number) {
+    const now = new Date();
+    const [rows, existing] = await Promise.all([
+      this.prisma.transaction.findMany({
+        where: { userId, occurredAt: { gte: addWibDays(startOfWibDay(now), -200) } },
+        select: { description: true, merchantKey: true, amount: true, reimbursedAmount: true, occurredAt: true, source: true },
+      }),
+      this.prisma.subscription.findMany({ where: { userId }, select: { name: true, amount: true } }),
+    ]);
+    const named = await this.merchantAliasService.attachDisplayNames(userId, rows);
+    return detectRecurring(
+      named.map((t) => ({ description: t.description, displayName: t.displayDescription, merchantKey: t.merchantKey, amount: spend(t), occurredAt: t.occurredAt, source: t.source })),
+      existing,
+      wibDateKey(now),
+    );
+  }
+
+  /** Path feed .ics pribadi (frontend menambahkan URL API di depannya). */
+  async calendarLink(userId: number) {
+    const user = await this.prisma.user.findUniqueOrThrow({ where: { id: userId }, select: { tokenVersion: true } });
+    return { path: `/calendar/${calendarFile(userId, user.tokenVersion)}` };
+  }
+
+  /** Isi feed .ics untuk `<userId>-<sig>.ics`; null = tautan tidak valid / user nonaktif (controller → 404 tanpa detail). */
+  async calendarFeed(file: string): Promise<string | null> {
+    const parsed = parseCalendarFile(file);
+    if (!parsed) return null;
+    const user = await this.prisma.user.findUnique({ where: { id: parsed.userId }, select: { status: true, tokenVersion: true } });
+    if (!user || user.status !== 'ACTIVE' || !verifyCalendarSig(parsed.userId, user.tokenVersion, parsed.sig)) return null;
+    await this.rollStale(parsed.userId);
+    const subs = await this.prisma.subscription.findMany({ where: { userId: parsed.userId, isActive: true }, orderBy: { nextDueDate: 'asc' } });
+    return buildSubscriptionsIcs(subs);
+  }
+
   /** Dipakai mascot: langganan aktif yang jatuh tempo dalam N hari. */
   async getUpcomingReminders(userId: number, withinDays = 3) {
+    await this.rollStale(userId);
     const rows = await this.prisma.subscription.findMany({
       where: { userId, isActive: true },
       orderBy: { nextDueDate: 'asc' },

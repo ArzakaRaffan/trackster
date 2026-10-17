@@ -32,6 +32,7 @@ export function streamPayload(f: any) {
     typicalUnits: ['SESSION', 'DEDUCTION'].includes(f.kind) ? numOrUndef(f.typical) : undefined,
     matchKeywords: String(f.keywords || '').split(',').map((x) => x.trim()).filter(Boolean),
     isActive: !!f.active,
+    linkPast: f.linkPast ? true : undefined, // hanya saat dibuat dari saran (POST)
   };
 }
 

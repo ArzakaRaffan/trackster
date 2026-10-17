@@ -49,6 +49,7 @@ Konteks tambahan (`Product.md`, `Decisions.md`, `Gotchas.md` hanya ada lokal —
 - Mode dinamis: pembelian besar (`isBigPurchase`) tetap mengurangi sisa siklus tapi **tidak** dihitung di `isOverBudget` hari ini (Telegram kirim notifikasi dampak, bukan alert).
 - Jatah dinamis tidak bisa direkonstruksi → disimpan per hari di `DailyAllowance`; analytics membaca snapshot itu (fallback nominal `DailyBudget`). Kode yang menimpa `DailyBudget` massal (mis. cron alokasi) harus melewati mode dinamis — di sana nominalnya = bobot pilihan user.
 - Kolom `@db.Date` (mis. `Subscription.nextDueDate`): Prisma memotong parameter filter ke tanggal UTC — kirim batas sebagai tanggal kalender WIB (`new Date(wibDateKey(x) + 'T00:00:00Z')`), bukan instant 00:00 WIB.
+- `Subscription.nextDueDate` tersimpan bisa **basi** (lewat): jangan filter `nextDueDate` langsung untuk "jatuh tempo di rentang X". Pakai `subscription/subscription-due.ts` (`commitmentsBetween`/`dueDatesBetween`, menggulir per siklus di memori). `SubscriptionService.findAll()` juga menggulir & menyimpan tanggal basi.
 
 ## Domain Logic — Saldo Bank (BankBalance)
 
@@ -75,6 +76,10 @@ Konteks tambahan (`Product.md`, `Decisions.md`, `Gotchas.md` hanya ada lokal —
   `ParseResult.balanceOnly=true` (di `bca.parser.ts`/`flip.parser.ts`/`jago.parser.ts`) → `GmailSyncService`
   tetap mendebit saldo tanpa bikin `Transaction`, dedup lewat `EmailParseLog.status=EXCLUDED` (skip kalau
   sudah pernah diterapkan, cron scan berulang tidak boleh dobel-debit). Aturan baseline di atas tetap berlaku.
+
+## Domain Logic — Telegram tanpa AI
+
+- Pesan "deskripsi nominal [bank] [kemarin]" / "+pemasukan nominal" / `/hariini` / `/pagi` dijawab **tanpa AI** (`telegram/quick-log.ts` + `ingest/telegram-quick.service.ts`), lewat `IngestService` (kategori, alert, saldo sama dengan Shortcut). Parser sengaja konservatif: kalimat tanya / format ambigu tetap ke chat AI. Ubah aturan parser = tambah kasus di `quick-log.check.ts`.
 
 ## Gotcha Infrastruktur (jangan diulang!)
 

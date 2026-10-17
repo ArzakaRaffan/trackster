@@ -8,7 +8,8 @@ import { buildAggregateReport, buildPeriodReport, dayLabelOf } from './reports';
 import { RPf, mapBill, mapGoal, mapIncome, mapMem, mapMsg, mapStream, mapSub, streamPayload } from './map';
 
 const fetcher = (u: string) => api.get<any>(u);
-const useGet = (key: string | null, opts: Record<string, unknown> = {}) => useSWR<any>(key, fetcher, opts);
+// ±35 endpoint dimuat bersamaan: fokus tab ulang paling sering sekali per menit (default SWR 5 dtk = badai request di HP).
+const useGet = (key: string | null, opts: Record<string, unknown> = {}) => useSWR<any>(key, fetcher, { focusThrottleInterval: 60_000, ...opts });
 
 const OPT_META: Record<string, { label: string; desc: string }> = {
   hemat: { label: 'Hemat', desc: 'Kejar goal, dana cadangan 15%' },
@@ -40,6 +41,8 @@ export function useLive(enabled: boolean, path: string, chatActive: number | nul
   const todayISO = wibISO();
   const from = addDaysISO(todayISO, -6);
   const k = (key: string) => (enabled ? key : null);
+  // Data yang hanya dipakai satu layar dimuat saat layar itu dibuka.
+  const on = (prefix: string, key: string) => (enabled && path.startsWith(prefix) ? key : null);
 
   const budgets = useGet(k('/budget'));
   const today = useGet(k('/budget/today'), { refreshInterval: 60_000 });
@@ -55,22 +58,25 @@ export function useLive(enabled: boolean, path: string, chatActive: number | nul
   const horizonF = useGet(k('/income/forecast/horizon?weeks=4'));
   const draftRes = useGet(k('/income/checkin'));
   const subsRes = useGet(k('/subscriptions'));
+  const streamSugRes = useGet(on('/app/income', '/income-streams/suggestions'));
+  const sugSubRes = useGet(on('/app/subscriptions', '/subscriptions/suggestions'));
+  const icsRes = useGet(on('/app/subscriptions', '/subscriptions/calendar-link'), { revalidateOnFocus: false });
   const goalsRes = useGet(k('/goal'));
   const gmailRes = useGet(k('/gmail/status'));
   const tgRes = useGet(k('/telegram/status'));
-  const tokRes = useGet(k('/api-tokens'));
+  const tokRes = useGet(on('/app/settings', '/api-tokens'));
   const nextRunRes = useGet(k('/sync/next-run'), { refreshInterval: 30_000 });
   const balRes = useGet(k('/balance'));
-  const adjBca = useGet(k('/balance/BCA/adjustments'));
-  const adjJago = useGet(k('/balance/JAGO/adjustments'));
+  const adjBca = useGet(on('/app/settings', '/balance/BCA/adjustments'));
+  const adjJago = useGet(on('/app/settings', '/balance/JAGO/adjustments'));
   const aliasRes = useGet(k('/merchant-aliases'));
   const catIconRes = useGet(k('/merchant-aliases/category-icons'));
   const parseLogRes = useGet(k('/sync/parse-log?limit=200'));
   const syncLogRes = useGet(k('/sync/logs'));
-  const threadsRes = useGet(k('/ai/threads'));
+  const threadsRes = useGet(on('/app/chat', '/ai/threads'));
   const msgsRes = useGet(enabled && chatActive ? `/ai/threads/${chatActive}/messages` : null);
-  const memRes = useGet(k('/ai/memory'));
-  const tipRes = useGet(k('/ai/mascot-tip'));
+  const memRes = useGet(on('/app/chat', '/ai/memory'));
+  const tipRes = useGet(k('/ai/mascot-tip'), { revalidateOnFocus: false }); // tiap revalidasi = panggilan LLM
   const tidyRes = useGet(k('/transactions/uncategorized-merchants'));
   const billsRes = useGet(k('/split-bills'));
   const meRes = useGet(k('/auth/me'));
@@ -98,7 +104,7 @@ export function useLive(enabled: boolean, path: string, chatActive: number | nul
       const d = dates.dateIdx[wibISO(new Date(t.occurredAt).getTime())];
       if (d === undefined) continue;
       const alias = t.displayDescription && t.displayDescription !== t.description ? t.displayDescription : null;
-      out.push({ id: t.id, d, raw: t.description, alias, cap: t.aiCaption || null, src: t.source, time: wibHHMM(t.occurredAt), cat: t.category, amt: Number(t.amount) - Number(t.reimbursedAmount || 0), gross: Number(t.amount), iso: wibISO(new Date(t.occurredAt).getTime()), note: t.note || '', icon: t.icon || null });
+      out.push({ id: t.id, d, raw: t.description, alias, cap: t.aiCaption || null, src: t.source, time: wibHHMM(t.occurredAt), cat: t.category, amt: Number(t.amount) - Number(t.reimbursedAmount || 0), gross: Number(t.amount), iso: wibISO(new Date(t.occurredAt).getTime()), note: t.note || '', icon: t.icon || null, isBig: t.isBig ?? null });
     }
     return out.sort((a, b) => a.d - b.d || a.time.localeCompare(b.time));
   }, [txRes.data, dates]);
@@ -381,11 +387,11 @@ export function useLive(enabled: boolean, path: string, chatActive: number | nul
     chat,
     split,
     flat: {
-      synced, mem, tip, tidy, srcInfo, srcLog, catIcons,
+      synced, mem, tip, tidy, srcInfo, srcLog, catIcons, icsUrl: icsRes.data?.path ? API_URL + icsRes.data.path : '', subSug: sugSubRes.data ?? [], streamSug: streamSugRes.data ?? [],
       txs, manual, incomes, streams, subs, goals, notifs,
       todayBudget: today.data ? Number(today.data.budget) : undefined,
       todayIncome: today.data ? Number(today.data.totalIncome) : undefined,
-      bmode, allowMap, bset: bsetRes.data ?? null, cyc: today.data?.cycle ?? null, todayBig: today.data ? Number(today.data.bigSpent ?? 0) : 0,
+      bmode, allowMap, bset: bsetRes.data ?? null, cyc: today.data?.cycle ?? null, todayBig: today.data ? Number(today.data.bigSpent ?? 0) : 0, bigThr: today.data?.cycle ? today.data.bigThreshold ?? null : null,
       runwayInfo, weekInfo, allocIncome, checkin, budget,
       pendingList, pending: pendingList.length > 0,
     },

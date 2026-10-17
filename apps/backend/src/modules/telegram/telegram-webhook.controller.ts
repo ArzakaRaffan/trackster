@@ -6,6 +6,8 @@ import {
   HttpCode,
   Logger,
   ForbiddenException,
+  Inject,
+  forwardRef,
 } from '@nestjs/common';
 import { createHash, timingSafeEqual } from 'crypto';
 import { TelegramService, escHtml } from './telegram.service';
@@ -13,6 +15,7 @@ import { aiQuotaOk } from '../../common/guards/ai-rate-limit.guard';
 import { AiChatService } from '../ai/ai-chat.service';
 import { IncomeCheckinReminderService } from '../income-checkin/income-checkin-reminder.service';
 import { AiBudgetReminderService } from '../ai/ai-budget-reminder.service';
+import { TelegramQuickService } from '../ingest/telegram-quick.service';
 
 const digest = (s: string) => createHash('sha256').update(s).digest();
 const safeEqual = (a: string, b: string) => timingSafeEqual(digest(a), digest(b)); // panjang sama -> tak bocor lewat waktu
@@ -26,6 +29,7 @@ export class TelegramWebhookController {
     private aiChatService: AiChatService,
     private incomeCheckinReminderService: IncomeCheckinReminderService,
     private aiBudgetReminderService: AiBudgetReminderService,
+    @Inject(forwardRef(() => TelegramQuickService)) private telegramQuick: TelegramQuickService,
   ) {}
 
   /** Public endpoint — TANPA JWT guard.
@@ -55,7 +59,9 @@ export class TelegramWebhookController {
       // userId ditentukan SERVER dari chatId yang terdaftar — tidak pernah dari isi pesan.
       const userId = config.userId;
       try {
-        if (typeof callbackQuery.data === 'string' && callbackQuery.data.startsWith('ba:')) {
+        if (this.telegramQuick.isUndo(callbackQuery.data)) {
+          await this.telegramQuick.undo(userId, callbackQuery);
+        } else if (typeof callbackQuery.data === 'string' && callbackQuery.data.startsWith('ba:')) {
           await this.aiBudgetReminderService.handleCallback(userId, callbackQuery);
         } else {
           await this.incomeCheckinReminderService.handleCallback(userId, callbackQuery);
@@ -82,7 +88,7 @@ export class TelegramWebhookController {
       const linked = await this.telegramService.linkChatByCode(incomingChatId, start[1]);
       await this.telegramService.sendToChat(
         incomingChatId,
-        linked ? '✅ Telegram terhubung ke Trackster. Notifikasi & chat AI aktif di sini.' : 'Kode tidak valid atau sudah kedaluwarsa. Buat kode baru di Trackster → Settings.',
+        linked ? '✅ Telegram terhubung ke Trackster. Notifikasi & chat AI aktif di sini.\n\nCatat cepat: kirim "kopi 25rb" (tambahkan "jago"/"bca" untuk pilih rekening). Sisa jatah: /hariini' : 'Kode tidak valid atau sudah kedaluwarsa. Buat kode baru di Trackster → Settings.',
       );
       return { ok: true };
     }
@@ -104,6 +110,18 @@ export class TelegramWebhookController {
     // Proses async — langsung return 200 ke Telegram, jawaban dikirim terpisah
     // (Telegram timeout 5 detik kalau webhook tidak segera respond)
     const userId = config.userId;
+    // Catat cepat ("kopi 25rb") & /hariini: tanpa AI, tidak memakai kuota.
+    const quick = this.telegramQuick.match(text);
+    if (quick) {
+      const messageId = Number(message.message_id);
+      setImmediate(() =>
+        this.telegramQuick.handle(userId, incomingChatId!, messageId, quick).catch(async (err: any) => {
+          this.logger.error(`Catat cepat Telegram gagal: ${err?.message}`);
+          await this.telegramService.sendMessage(userId, 'Gagal mencatat. Coba lagi atau catat lewat app.');
+        }),
+      );
+      return { ok: true };
+    }
     if (!aiQuotaOk(`${userId}|telegram-chat`)) {
       await this.telegramService.sendMessage(userId, 'Batas chat AI tercapai. Coba lagi nanti ya.');
       return { ok: true };

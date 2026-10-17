@@ -1,4 +1,4 @@
-import { BadRequestException, ForbiddenException, Injectable, Logger } from '@nestjs/common';
+import { BadRequestException, ForbiddenException, Injectable, Logger, OnApplicationBootstrap } from '@nestjs/common';
 import { createHash, randomBytes } from 'crypto';
 import { PrismaService } from '../../prisma.service';
 import { getOwnerUserId } from '../../common/owner';
@@ -25,10 +25,24 @@ async function tgCall<T = any>(token: string, method: string, body: Record<strin
 export const escHtml = (s: unknown) => String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 
 @Injectable()
-export class TelegramService {
+export class TelegramService implements OnApplicationBootstrap {
   private readonly logger = new Logger(TelegramService.name);
 
   constructor(private prisma: PrismaService) {}
+
+  /** Daftar perintah bot bersama (menu "/" di Telegram) supaya catat cepat & /hariini mudah ditemukan. */
+  async onApplicationBootstrap() {
+    const token = process.env.TELEGRAM_BOT_TOKEN;
+    if (!token) return;
+    await tgCall(token, 'setMyCommands', {
+      commands: [
+        { command: 'hariini', description: 'Sisa jatah hari ini' },
+        { command: 'catat', description: 'Catat pengeluaran, mis. /catat kopi 25rb' },
+        { command: 'bisa', description: 'Bisa beli ini? mis. /bisa 350rb' },
+        { command: 'pagi', description: 'Ringkasan tiap pagi 07:00 (nyala/mati)' },
+      ],
+    }).catch((err) => this.logger.warn(`setMyCommands gagal: ${err.message}`));
+  }
 
   /**
    * Tujuan kirim untuk user: chat dari TelegramLink (bot bersama) atau, selama belum ditautkan, TelegramConfig lama.
@@ -43,7 +57,22 @@ export class TelegramService {
     const chatId = link?.chatId ?? legacy?.chatId;
     const botToken = process.env.TELEGRAM_BOT_TOKEN || legacy?.botToken;
     if (!chatId || !botToken) return null;
-    return { botToken, chatId, notifyEveryTransaction: link ? link.notifyEveryTransaction : !!legacy?.notifyEveryTransaction };
+    return {
+      botToken,
+      chatId,
+      notifyEveryTransaction: link ? link.notifyEveryTransaction : !!legacy?.notifyEveryTransaction,
+      dailyBrief: link ? link.dailyBrief : !!legacy?.dailyBrief,
+    };
+  }
+
+  async isDailyBriefEnabled(userId: number): Promise<boolean> {
+    return !!(await this.activeConfig(userId))?.dailyBrief;
+  }
+
+  /** Ringkasan pagi on/off (perintah /pagi). Disimpan di tautan bot bersama & config lama, sama seperti notifyEveryTransaction. */
+  async setDailyBrief(userId: number, on: boolean) {
+    await this.prisma.telegramLink.updateMany({ where: { userId }, data: { dailyBrief: on } });
+    await this.prisma.telegramConfig.updateMany({ where: { userId }, data: { dailyBrief: on } });
   }
 
   /** Buat kode tautan sekali pakai (15 menit): user kirim `/start <kode>` ke bot bersama. Hanya hash yang disimpan. */

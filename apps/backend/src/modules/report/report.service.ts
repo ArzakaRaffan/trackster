@@ -277,11 +277,30 @@ export class ReportService {
     };
   }
 
+  /** Baris ekspor CSV: pengeluaran + pemasukan dalam rentang, terbaru dulu. `jumlah` pengeluaran = bruto (uang keluar bank),
+   *  patungan yang sudah diterima di kolom sendiri; nama = alias merchant bila ada. */
   async getDataExportRows(userId: number, from: Date, to: Date) {
-    return this.prisma.transaction.findMany({
-      where: { userId, occurredAt: { gte: from, lt: to } },
-      orderBy: { occurredAt: 'desc' },
-      select: { id: true, occurredAt: true, description: true, amount: true, category: true, source: true, note: true },
-    });
+    const [txs, incomes, aliases] = await Promise.all([
+      this.prisma.transaction.findMany({
+        where: { userId, occurredAt: { gte: from, lt: to } },
+        select: { occurredAt: true, description: true, amount: true, reimbursedAmount: true, category: true, source: true, note: true },
+      }),
+      this.prisma.income.findMany({
+        where: { userId, receivedAt: { gte: from, lt: to } },
+        select: { receivedAt: true, description: true, amount: true, source: true, status: true, stream: { select: { name: true } } },
+      }),
+      this.prisma.merchantAlias.findMany({ where: { userId, displayName: { not: null } }, select: { rawDescription: true, displayName: true } }),
+    ]);
+    const alias = new Map(aliases.map((a) => [a.rawDescription, a.displayName ?? '']));
+    return [
+      ...txs.map((t) => ({
+        at: t.occurredAt, kind: 'PENGELUARAN', description: t.description, name: alias.get(t.description) ?? '',
+        amount: Number(t.amount), reimbursed: Number(t.reimbursedAmount), category: t.category as string, source: t.source as string, note: t.note ?? '',
+      })),
+      ...incomes.map((i) => ({
+        at: i.receivedAt, kind: 'PEMASUKAN', description: i.description, name: i.stream?.name ?? '',
+        amount: Number(i.amount), reimbursed: 0, category: i.status === 'CONFIRMED' ? 'PEMASUKAN' : `PEMASUKAN_${i.status}`, source: i.source as string, note: '',
+      })),
+    ].sort((a, b) => b.at.getTime() - a.at.getTime());
   }
 }

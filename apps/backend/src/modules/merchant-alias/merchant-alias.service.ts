@@ -31,6 +31,19 @@ export class MerchantAliasService {
     return match?.category ?? null;
   }
 
+  /** Kategori transaksi terakhir user di merchant yang sama (selain LAINNYA) — dipakai sebelum AI supaya merchant yang
+   *  pernah dicatat manual (app/Telegram, tanpa rule) tidak perlu panggilan AI lagi. Indeks `merchantKey`. */
+  async findCategoryFromHistory(userId: number, description: string): Promise<Category | null> {
+    const key = merchantKey(description);
+    if (!key) return null;
+    const prev = await this.prisma.transaction.findFirst({
+      where: { userId, merchantKey: key, category: { not: Category.LAINNYA } },
+      orderBy: { occurredAt: 'desc' },
+      select: { category: true },
+    });
+    return prev?.category ?? null;
+  }
+
   /** Simpan/perbarui rule kategori untuk merchant ini (dipakai AI-learn & koreksi manual user).
    * Tidak menyentuh displayName yang mungkin sudah ada. */
   async upsertCategory(userId: number, rawDescription: string, category: Category) {

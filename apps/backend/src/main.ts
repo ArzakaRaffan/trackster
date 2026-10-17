@@ -29,6 +29,7 @@ async function bootstrap() {
   app.enableCors({
     origin: process.env.FRONTEND_URL || 'http://localhost:3000',
     credentials: true,
+    maxAge: 7200, // preflight (POST/PUT JSON) di-cache browser 2 jam (batas Chrome), bukan diulang tiap request
   });
 
   const port = process.env.BACKEND_PORT || 4000;

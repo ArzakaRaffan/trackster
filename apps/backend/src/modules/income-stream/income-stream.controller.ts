@@ -15,6 +15,11 @@ export class IncomeStreamController {
     return this.incomeStreamService.findAll(user.id, { activeOnly: activeOnly === 'true' });
   }
 
+  @Get('suggestions')
+  async suggestions(@CurrentUser() user: AuthUser) {
+    return this.incomeStreamService.suggestions(user.id);
+  }
+
   @Post()
   async create(@CurrentUser() user: AuthUser, @Body() dto: CreateIncomeStreamDto) {
     return this.incomeStreamService.create(user.id, dto);

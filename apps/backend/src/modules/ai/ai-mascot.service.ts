@@ -12,6 +12,11 @@ Boleh bandingkan angka pengeluaran/tabungan user dengan hal receh sehari-hari bi
 ATURAN: JANGAN mengarang angka yang tidak ada di data. JANGAN pakai emoji lebih dari 1.
 Jawab HANYA kalimatnya, tanpa tanda kutip, tanpa embel-embel lain.`;
 
+// Fun fact di-cache per user: tanpa ini tiap buka app / fokus tab = satu panggilan LLM (+ getInsights 30 hari).
+// ponytail: in-memory satu proses (hilang saat restart, cukup — fun fact tidak perlu persisten).
+const FACT_TTL_MS = 3 * 3600_000;
+const factCache = new Map<number, { at: number; message: string }>();
+
 export interface MascotTip {
   kind: 'reminder' | 'fact';
   message: string;
@@ -35,7 +40,11 @@ export class AiMascotService {
     const reminder = await this.getUpcomingSubscriptionReminder(userId);
     if (reminder) return { kind: 'reminder', message: reminder };
 
-    return { kind: 'fact', message: await this.generateFunFact(userId) };
+    const hit = factCache.get(userId);
+    if (hit && Date.now() - hit.at < FACT_TTL_MS) return { kind: 'fact', message: hit.message };
+    const message = await this.generateFunFact(userId);
+    if (message !== this.fallbackFact()) factCache.set(userId, { at: Date.now(), message });
+    return { kind: 'fact', message };
   }
 
   private async getUpcomingSubscriptionReminder(userId: number): Promise<string | null> {

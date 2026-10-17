@@ -12,6 +12,7 @@ import { MerchantAliasService } from '../merchant-alias/merchant-alias.service';
 import { addWibDays, startOfWibDay, startOfWibWeek, wibDateKey, wibDayOfWeek, wibRange } from '../../common/wib';
 import { calcRollover } from './budget-rollover';
 import { spend, sumSpend } from '../../common/spend';
+import { commitmentsBetween } from '../subscription/subscription-due';
 
 @Injectable()
 export class BudgetService {
@@ -127,16 +128,13 @@ export class BudgetService {
     const amounts: number[] = [];
     for (const r of rows) amounts[r.dayOfWeek] = Number(r.amount);
     const weights = normalizeWeights(amounts);
-    // `nextDueDate` itu @db.Date: Prisma memotong parameter ke tanggal UTC, jadi batas 00:00 WIB (= 17:00 UTC kemarin)
-    // harus dikirim sebagai tanggal kalender WIB-nya, kalau tidak langganan di hari terakhir rentang ikut terbuang.
-    const asDate = (x: Date) => new Date(`${wibDateKey(x)}T00:00:00Z`);
-    const dueBetween = async (from: Date, to: Date) => {
-      const subs = await this.prisma.subscription.findMany({
-        where: { userId, isActive: true, nextDueDate: { gte: asDate(from), lt: asDate(to) } },
-        select: { amount: true },
-      });
-      return subs.reduce((s, x) => s + Number(x.amount), 0);
-    };
+    // Jatuh tempo digulir di memori (langganan yang tanggalnya sudah lewat tetap dihitung di kemunculan berikutnya);
+    // perbandingan pakai tanggal kalender WIB karena `nextDueDate` itu @db.Date.
+    const activeSubs = await this.prisma.subscription.findMany({
+      where: { userId, isActive: true },
+      select: { amount: true, cycle: true, nextDueDate: true },
+    });
+    const dueBetween = (from: Date, to: Date) => commitmentsBetween(activeSubs, wibDateKey(from), wibDateKey(to));
     const spentBetween = async (from: Date, to: Date) =>
       sumSpend((await this.prisma.transaction.aggregate({
         _sum: { amount: true, reimbursedAmount: true },
@@ -195,7 +193,7 @@ export class BudgetService {
             { historicalAmounts: [], historicalAbsences: [], isScheduledThisWeek: true },
           ).expected;
       // Komitmen yang sudah lewat jatuh tempo sudah terbayar → masuk `spentBeforeToday`, jadi hanya hitung yang akan datang.
-      const commitments = await dueBetween(todayStart, end);
+      const commitments = dueBetween(todayStart, end);
       const balanceStart = balanceKnown
         ? (await this.prisma.bankBalance.findMany({ where: { userId }, select: { balance: true } })).reduce((s, b) => s + Number(b.balance), 0)
           + (await spentBetween(todayStart, addWibDays(todayStart, 1))) // belanja hari ini dikembalikan → jatah beku per hari
@@ -230,7 +228,7 @@ export class BudgetService {
       now, weights,
       balance: balances.reduce((s, b) => s + Number(b.balance), 0),
       spentToday: await spentBetween(todayStart, addWibDays(todayStart, 1)),
-      commitments: await dueBetween(todayStart, horizonEnd),
+      commitments: dueBetween(todayStart, horizonEnd),
       horizonDays: setting.horizonDays,
       burnRatePerDay: (await spentBetween(addWibDays(todayStart, -7), todayStart)) / 7,
     });

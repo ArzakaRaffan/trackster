@@ -327,3 +327,12 @@ deviasi dari rencana (+alasan), env baru yang Arzaka harus tambahkan, langkah be
   uang siklus pertama, kalau belum tetap perkiraan gaji + ajakan isi saldo; "gaji belum tercatat" tidak muncul di siklus pertama.
   Verifikasi: e2e siklus pertama 5/5 (perkiraan → koreksi saldo → belanja hari ini tidak mengubah jatah → akun lama = perilaku normal),
   regresi fase 3 9/9 (user uji di-backdate), Beranda "Rp200.000 · siklus pertama: dihitung dari saldo", check 28/28, tenancy 0.
+
+## 2026-10-17 — Perbaikan malam (fitur + optimasi)
+- Sesi oleh: Claude (Opus 5.5), otonom atas permintaan Arzaka. Branch: `feat/overnight-improvements` (dari `feat/siklus-gajian`). Ringkasan: [`docs/improvements-2026-10-17.md`](../improvements-2026-10-17.md).
+- **Bug:** `Subscription.nextDueDate` tidak pernah maju → "Lewat N hari" selamanya, pengingat berhenti, komitmen jatah dinamis/advisor hilang. Kini digulir (`subscription-due.ts`).
+- **Baru:** feed `.ics` langganan (publik, HMAC userId+tokenVersion), saran langganan dari tagihan berulang, Telegram catat cepat/`/hariini`/`/pagi` tanpa AI, PWA manifest, ekspor CSV + pemasukan.
+- **Optimasi:** GET tanpa preflight CORS (+ `maxAge`), cache fun fact maskot 3 jam, SWR per layar, kategori dari riwayat merchant sebelum AI, indeks komposit `(userId, waktu)`.
+- **Migrasi (aditif/indeks saja):** `20261017100000_user_time_indexes` (CREATE/DROP INDEX), `20261017110000_telegram_daily_brief` (2 kolom boolean default false).
+- Verifikasi (Postgres scratch 5434, user uji sintetis `overnight`): check 32/32 (4 check baru), tenancy-audit 0, tsc FE/BE, build BE; browser: Langganan (saran → Tambahkan → form terisi → tersimpan & saran hilang, abaikan, .ics), Mingguan (pembelian besar mode dinamis), Setting, Tanya Track, ponsel 375px tanpa overflow; webhook Telegram disimulasikan (catat, dedup retry, batalkan, pemasukan, kemarin, /pagi). Pesan Telegram tidak terkirim sungguhan (token palsu di lokal).
+- **Belum:** merge ke `main` (menunggu Arzaka). `setMyCommands` bot bersama jalan otomatis saat backend start di prod.

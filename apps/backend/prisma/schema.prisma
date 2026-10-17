@@ -106,7 +106,7 @@ model Transaction {
   @@unique([userId, emailId])
   @@index([occurredAt])
   @@index([merchantKey])
-  @@index([userId])
+  @@index([userId, occurredAt]) // semua query per user memfilter rentang waktu; unik (userId, emailId) sudah menutup lookup userId saja
 }
 
 enum ReimbursementStatus {
@@ -272,7 +272,7 @@ model EmailParseLog {
   @@unique([userId, emailId])
   @@index([status])
   @@index([receivedAt])
-  @@index([userId])
+  @@index([userId, receivedAt])
 }
 
 model TelegramConfig {
@@ -281,6 +281,7 @@ model TelegramConfig {
   chatId                 String
   isActive               Boolean  @default(true)
   notifyEveryTransaction Boolean  @default(false)
+  dailyBrief             Boolean  @default(false) // ringkasan pagi 07:00 WIB, opt-in lewat /pagi
   updatedAt              DateTime @updatedAt
 
   // multi-user (contract C1): userId wajib; unik global -> komposit (userId, ...).
@@ -340,7 +341,7 @@ model Income {
   @@unique([userId, externalId])
   @@index([receivedAt])
   @@index([streamId, periodStart])
-  @@index([userId])
+  @@index([userId, receivedAt])
 }
 
 enum IncomeKind {
@@ -903,6 +904,7 @@ model TelegramLink {
   chatId                 String   @unique
   isActive               Boolean  @default(true)
   notifyEveryTransaction Boolean  @default(false)
+  dailyBrief             Boolean  @default(false) // ringkasan pagi 07:00 WIB, opt-in lewat /pagi
   linkedAt               DateTime @default(now())
 }
 
