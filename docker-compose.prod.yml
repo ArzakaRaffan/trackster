@@ -1,3 +1,10 @@
+# Log kontainer dirotasi (default json-file tanpa batas → disk VPS bisa penuh oleh log).
+x-logging: &default-logging
+  driver: json-file
+  options:
+    max-size: '10m'
+    max-file: '3'
+
 services:
   postgres:
     image: postgres:16-alpine
@@ -21,6 +28,7 @@ services:
 
   backend:
     image: ghcr.io/arzakaraffan/trackster-backend:${IMAGE_TAG:-latest}
+    logging: *default-logging
     build:
       context: ./apps/backend
     restart: unless-stopped
@@ -43,6 +51,7 @@ services:
       COOKIE_DOMAIN: ${COOKIE_DOMAIN}
       BACKEND_PORT: 4000
       NODE_ENV: production
+      NODE_OPTIONS: --max-old-space-size=512 # heap normal ±150–250MB; batas ini mencegah satu proses menghabiskan RAM VPS
       AI_BASE_URL: ${AI_BASE_URL}
       AI_API_KEY: ${AI_API_KEY}
       AI_MODEL: ${AI_MODEL}
@@ -59,12 +68,15 @@ services:
 
   frontend:
     image: ghcr.io/arzakaraffan/trackster-frontend:${IMAGE_TAG:-latest}
+    logging: *default-logging
     build:
       context: ./apps/frontend
       args:
         NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL}
         NEXT_PUBLIC_SITE_URL: ${NEXT_PUBLIC_SITE_URL:-https://trackster.dev}
     restart: unless-stopped
+    environment:
+      NODE_OPTIONS: --max-old-space-size=384
     depends_on:
       - backend
     expose:
@@ -72,6 +84,7 @@ services:
 
   nginx:
     image: nginx:alpine
+    logging: *default-logging
     restart: unless-stopped
     depends_on:
       - backend
