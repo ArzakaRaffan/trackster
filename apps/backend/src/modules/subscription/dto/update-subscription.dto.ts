@@ -1,4 +1,4 @@
-import { IsBoolean, IsEnum, IsInt, IsISO8601, IsNumber, IsOptional, IsString, Max, Min, MinLength } from 'class-validator';
+import { IsBoolean, IsEnum, IsInt, IsISO8601, IsNumber, IsOptional, IsString, Max, Min, MinLength, MaxLength } from 'class-validator';
 
 enum BillingCycleDto {
   MONTHLY = 'MONTHLY',
@@ -15,6 +15,7 @@ export class UpdateSubscriptionDto {
   @IsOptional()
   @IsString()
   @MinLength(1)
+  @MaxLength(100)
   name?: string;
 
   @IsOptional()
@@ -36,6 +37,7 @@ export class UpdateSubscriptionDto {
 
   @IsOptional()
   @IsString()
+  @MaxLength(1000)
   notes?: string | null;
 
   @IsOptional()

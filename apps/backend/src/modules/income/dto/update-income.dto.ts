@@ -1,4 +1,4 @@
-import { IsEnum, IsISO8601, IsNumber, IsOptional, IsString, Min, MinLength } from 'class-validator';
+import { IsEnum, IsISO8601, IsNumber, IsOptional, IsString, Min, MinLength, MaxLength } from 'class-validator';
 import { Source } from '@prisma/client';
 
 export class UpdateIncomeDto {
@@ -10,6 +10,7 @@ export class UpdateIncomeDto {
   @IsOptional()
   @IsString()
   @MinLength(1)
+  @MaxLength(200)
   description?: string;
 
   @IsOptional()

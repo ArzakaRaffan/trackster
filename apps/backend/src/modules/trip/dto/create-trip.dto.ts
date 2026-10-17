@@ -1,6 +1,7 @@
 import { Type } from 'class-transformer';
 import { ArrayMaxSize, ArrayMinSize, IsArray, IsInt, IsNumber, IsOptional, IsString, Matches, Max, MaxLength, Min, MinLength, ValidateNested } from 'class-validator';
 import { AVATAR_SPEC_RE } from '../../split-bill/dto/set-avatar.dto';
+import { ShareInputDto } from './add-expense.dto';
 
 export class TripMemberInputDto {
   @IsString()
@@ -33,7 +34,9 @@ export class TripExpenseInputDto {
   @IsOptional()
   @IsArray()
   @ArrayMaxSize(200)
-  shares?: { memberIndex: number; weight: number }[];
+  @ValidateNested({ each: true }) // dulu bentuk bebas: memberIndex "length"/"__proto__" & weight teks -> 500
+  @Type(() => ShareInputDto)
+  shares?: ShareInputDto[];
 }
 
 export class CreateTripDto {
@@ -43,8 +46,7 @@ export class CreateTripDto {
   name: string;
 
   @IsOptional()
-  @IsString()
-  @MaxLength(200)
+  @Matches(/^[A-Z]{3}$/)
   currency?: string;
 
   @IsArray()

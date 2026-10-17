@@ -1,4 +1,4 @@
-import { IsNumber, IsOptional, IsString, Min } from 'class-validator';
+import { IsNumber, IsOptional, IsString, Min, MaxLength } from 'class-validator';
 
 export class ContributeGoalDto {
   @IsNumber()
@@ -7,5 +7,6 @@ export class ContributeGoalDto {
 
   @IsOptional()
   @IsString()
+  @MaxLength(500)
   note?: string;
 }

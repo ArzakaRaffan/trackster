@@ -106,7 +106,7 @@ export class TelegramWebhookController {
 
     // 4. Dispatch ke AI chat dan kirim balasan ke Telegram
     const text: string = message.text;
-    this.logger.log(`Pesan masuk dari Telegram (chatId ${incomingChatId}): ${text.slice(0, 100)}`);
+    this.logger.log(`Pesan masuk dari Telegram (user ${config.userId}, ${text.length} karakter)`); // isi pesan = data keuangan, tidak ditulis ke log
 
     // Proses async — langsung return 200 ke Telegram, jawaban dikirim terpisah
     // (Telegram timeout 5 detik kalau webhook tidak segera respond)

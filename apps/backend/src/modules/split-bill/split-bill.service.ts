@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable, ForbiddenException, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { randomBytes } from 'crypto';
 import { Prisma, SplitBillItem, SplitBillParticipant, SplitBillItemShare, SplitBill } from '@prisma/client';
 import { PrismaService } from '../../prisma.service';
@@ -198,8 +198,8 @@ export class SplitBillService {
       where: { id },
       include: { participants: true, items: { include: { shares: true } } },
     });
-    if (!bill) throw new NotFoundException('Split bill tidak ditemukan');
-    if (bill.createdByUserId !== userId) throw new ForbiddenException('Bukan split bill kamu');
+    // 404 (bukan 403) untuk bill orang lain: jangan bocorkan id mana yang ada.
+    if (!bill || bill.createdByUserId !== userId) throw new NotFoundException('Split bill tidak ditemukan');
     return bill;
   }
 

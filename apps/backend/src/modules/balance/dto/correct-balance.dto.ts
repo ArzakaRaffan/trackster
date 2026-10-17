@@ -1,4 +1,4 @@
-import { IsNumber, IsOptional, IsString } from 'class-validator';
+import { IsNumber, IsOptional, IsString, MaxLength } from 'class-validator';
 
 export class CorrectBalanceDto {
   @IsNumber()
@@ -6,5 +6,6 @@ export class CorrectBalanceDto {
 
   @IsOptional()
   @IsString()
+  @MaxLength(500)
   note?: string;
 }

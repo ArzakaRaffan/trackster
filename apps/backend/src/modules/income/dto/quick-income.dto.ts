@@ -1,4 +1,4 @@
-import { IsEnum, IsNumber, IsOptional, IsString, Min } from 'class-validator';
+import { IsEnum, IsNumber, IsOptional, IsString, Min, MaxLength } from 'class-validator';
 import { Transform } from 'class-transformer';
 import { Source } from '@prisma/client';
 
@@ -18,18 +18,22 @@ export class QuickIncomeDto {
 
   @IsOptional()
   @IsString()
+  @MaxLength(50)
   category?: string;
 
   @IsOptional()
   @IsString()
+  @MaxLength(100)
   streamName?: string;
 
   @IsOptional()
   @IsString()
+  @MaxLength(200)
   description?: string;
 
   @IsOptional()
   @IsString()
+  @MaxLength(500)
   note?: string;
 
   @IsOptional()

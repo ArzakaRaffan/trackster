@@ -1,9 +1,10 @@
-import { IsBoolean, IsEnum, IsInt, IsNumber, IsOptional, IsString, Min, MinLength } from 'class-validator';
+import { IsBoolean, IsEnum, IsInt, IsNumber, IsOptional, IsString, Min, MinLength, MaxLength } from 'class-validator';
 import { IncomeCadence, IncomeKind, Source } from '@prisma/client';
 
 export class CreateIncomeStreamDto {
   @IsString()
   @MinLength(1)
+  @MaxLength(100)
   name: string;
 
   @IsEnum(IncomeKind)

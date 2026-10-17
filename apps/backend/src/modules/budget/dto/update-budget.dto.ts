@@ -1,5 +1,5 @@
 import { Type } from 'class-transformer';
-import { IsArray, IsInt, IsNumber, Max, Min, ValidateNested } from 'class-validator';
+import { ArrayMaxSize, IsArray, IsInt, IsNumber, Max, Min, ValidateNested } from 'class-validator';
 
 export class DailyBudgetItem {
   @IsInt()
@@ -9,11 +9,13 @@ export class DailyBudgetItem {
 
   @IsNumber()
   @Min(0)
+  @Max(9_999_999_999)
   amount: number;
 }
 
 export class UpdateBudgetDto {
   @IsArray()
+  @ArrayMaxSize(7)
   @ValidateNested({ each: true })
   @Type(() => DailyBudgetItem)
   budgets: DailyBudgetItem[];
