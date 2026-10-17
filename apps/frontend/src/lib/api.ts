@@ -11,6 +11,17 @@ class ApiError extends Error {
 // Endpoint auth sendiri dikecualikan supaya gagal login/logout tidak memicu redirect loop.
 const isAuthPath = (path: string) => path.startsWith('/auth/');
 
+// Sesi kedaluwarsa: ±30 request paralel layar app semuanya 401 → cukup SATU logout + redirect (dulu tiap 401 memanggil
+// logout sendiri = puluhan request sia-sia + redirect berulang).
+let sessionEnding = false;
+function endSession() {
+  if (sessionEnding) return;
+  sessionEnding = true;
+  fetch(`${API_URL}/auth/logout`, { method: 'POST', credentials: 'include' }).finally(() => {
+    window.location.href = '/login';
+  });
+}
+
 async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   const res = await fetch(`${API_URL}${path}`, {
     ...options,
@@ -26,9 +37,7 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   if (res.status === 401 && typeof window !== 'undefined' && !isAuthPath(path)) {
     // Sesi kadaluarsa/tidak valid: bersihkan cookie di server lalu balik ke login
     // otomatis, biar tidak nyangkut di halaman yang gagal fetch selamanya.
-    fetch(`${API_URL}/auth/logout`, { method: 'POST', credentials: 'include' }).finally(() => {
-      window.location.href = '/login';
-    });
+    endSession();
     throw new ApiError('Sesi berakhir, mengarahkan ke login...', 401);
   }
 
@@ -49,9 +58,7 @@ async function postStream(path: string, body: unknown, onEvent: (event: any) => 
     body: JSON.stringify(body),
   });
   if (res.status === 401 && typeof window !== 'undefined') {
-    fetch(`${API_URL}/auth/logout`, { method: 'POST', credentials: 'include' }).finally(() => {
-      window.location.href = '/login';
-    });
+    endSession();
     throw new ApiError('Sesi berakhir, mengarahkan ke login...', 401);
   }
   if (!res.ok || !res.body) throw new ApiError(`Request gagal (${res.status})`, res.status);
