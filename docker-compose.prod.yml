@@ -29,6 +29,11 @@ services:
   backend:
     image: ghcr.io/arzakaraffan/trackster-backend:${IMAGE_TAG:-latest}
     logging: *default-logging
+    # Proses Node tak butuh capability Linux apa pun (port >1024, user node) & tak boleh naik hak akses.
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
     build:
       context: ./apps/backend
     restart: unless-stopped
@@ -69,6 +74,11 @@ services:
   frontend:
     image: ghcr.io/arzakaraffan/trackster-frontend:${IMAGE_TAG:-latest}
     logging: *default-logging
+    # Proses Node tak butuh capability Linux apa pun (port >1024, user node) & tak boleh naik hak akses.
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
     build:
       context: ./apps/frontend
       args:
