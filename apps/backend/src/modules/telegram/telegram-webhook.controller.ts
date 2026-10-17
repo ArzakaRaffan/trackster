@@ -6,6 +6,7 @@ import {
   HttpCode,
   Logger,
   ForbiddenException,
+  HttpException,
   Inject,
   forwardRef,
 } from '@nestjs/common';
@@ -132,7 +133,7 @@ export class TelegramWebhookController {
         await this.telegramService.sendMessage(userId, escHtml(reply));
       } catch (err: any) {
         this.logger.error(`Error handle telegram message: ${err?.message}`);
-        await this.telegramService.sendMessage(userId, 'Maaf, ada gangguan teknis. Coba lagi ya!');
+        await this.telegramService.sendMessage(userId, err instanceof HttpException ? escHtml(err.message) : 'Maaf, ada gangguan teknis. Coba lagi ya!');
       }
     });
 
