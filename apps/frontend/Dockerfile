@@ -1,4 +1,4 @@
-FROM node:20-alpine AS builder
+FROM node:24-alpine AS builder
 WORKDIR /app
 COPY package*.json ./
 # npm ci = persis sesuai lockfile (tak diam-diam naik versi).
@@ -13,7 +13,7 @@ ENV NODE_OPTIONS=--max-old-space-size=$NODE_HEAP_MB
 ENV NEXT_TELEMETRY_DISABLED=1
 RUN npm run build
 
-FROM node:20-alpine AS runner
+FROM node:24-alpine AS runner
 RUN apk add --no-cache tini
 WORKDIR /app
 ENV NODE_ENV=production

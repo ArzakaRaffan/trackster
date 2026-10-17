@@ -83,7 +83,7 @@ Konteks tambahan (`Product.md`, `Decisions.md`, `Gotchas.md` hanya ada lokal —
 
 ## Gotcha Infrastruktur (jangan diulang!)
 
-- **Prisma + Alpine**: image `node:20-alpine` butuh `RUN apk add --no-cache openssl` eksplisit di builder DAN runner stage, kalau nggak Prisma engine crash-loop dengan error samar ("Could not parse schema engine response").
+- **Prisma + Alpine**: image `node:*-alpine` (kini `node:24-alpine`, Node 20 EOL) butuh `RUN apk add --no-cache openssl` eksplisit di builder DAN runner stage, kalau nggak Prisma engine crash-loop dengan error samar ("Could not parse schema engine response").
 - **NODE_ENV urutan penting**: `ENV NODE_ENV=production` di Dockerfile HARUS di-set SETELAH `npm install`, bukan sebelum — npm otomatis skip devDependencies kalau NODE_ENV=production sudah aktif saat install, meskipun tidak ada flag `--omit=dev` eksplisit.
 - **VPS cuma 2GB RAM**: image **tidak lagi di-build di VPS** (sejak 2026-10-04, build di GitHub Actions → GHCR). Build manual di VPS (`docker compose build`) hanya fallback darurat: sequential, `NODE_HEAP_MB` default 1280 (build-arg di Dockerfile; CI pakai 4096 — `nest build` butuh >1280MB heap). Berlaku juga buat `npm run build`/`npm run start:dev` lokal di sesi Claude Code — **pernah bikin prod down** (2026-09-28) gara-gara build tanpa cap + dev Postgres nyala bareng container prod. Detail & checklist: [`CAUTION.md`](CAUTION.md).
 - **tsconfig rootDir**: `apps/backend/tsconfig.json` harus punya `"rootDir": "./src"` dan `"include": ["src/**/*.ts"]` — kalau nggak, TypeScript ikut compile `prisma/seed.ts` dan bikin output `dist/src/main.js` bukan `dist/main.js`, sementara CMD di Dockerfile expect `node dist/main`.

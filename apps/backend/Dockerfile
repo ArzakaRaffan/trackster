@@ -1,4 +1,4 @@
-FROM node:20-alpine AS builder
+FROM node:24-alpine AS builder
 RUN apk add --no-cache openssl
 WORKDIR /app
 COPY package*.json ./
@@ -11,7 +11,7 @@ ARG NODE_HEAP_MB=1280
 ENV NODE_OPTIONS=--max-old-space-size=$NODE_HEAP_MB
 RUN npm run build
 
-FROM node:20-alpine AS runner
+FROM node:24-alpine AS runner
 RUN apk add --no-cache openssl tini
 WORKDIR /app
 COPY package*.json ./
