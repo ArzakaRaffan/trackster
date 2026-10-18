@@ -9,7 +9,7 @@ import { buildAggregateReport, buildPeriodReport, dayLabelOf } from './reports';
 import { RPf, mapBill, mapGoal, mapIncome, mapMem, mapMsg, mapStream, mapSub, streamPayload } from './map';
 
 const fetcher = (u: string) => api.get<any>(u);
-// ±35 endpoint dimuat bersamaan: fokus tab ulang paling sering sekali per menit (default SWR 5 dtk = badai request di HP).
+// ±20 endpoint dimuat bersamaan: fokus tab ulang paling sering sekali per menit (default SWR 5 dtk = badai request di HP).
 const useGet = (key: string | null, opts: Record<string, unknown> = {}) => useSWR<any>(key, fetcher, { focusThrottleInterval: 60_000, ...opts });
 
 const OPT_META: Record<string, { label: string; desc: string }> = {
@@ -52,17 +52,17 @@ export function useLive(enabled: boolean, path: string, chatActive: number | nul
   // Mode dinamis: jatah per tanggal (snapshot). `from` = 6 hari lalu juga mencakup Senin minggu berjalan.
   const allowRes = useGet(k(`/budget/allowances?from=${from}&to=${todayISO}`));
   const txRes = useGet(k(`/transactions?startDate=${from}&endDate=${todayISO}&limit=500`));
-  const incRes = useGet(k('/income'));
+  const incRes = useGet(on('/app/income', '/income')); // riwayat penuh, hanya daftar di layar Pemasukan
   const streamsRes = useGet(k('/income-streams'));
   const pendRes = useGet(k('/income?status=PENDING'));
-  const weekF = useGet(k('/income/forecast/week'));
-  const horizonF = useGet(k('/income/forecast/horizon?weeks=4'));
-  const draftRes = useGet(k('/income/checkin'));
+  const weekF = useGet(on('/app/income', '/income/forecast/week'));
+  const horizonF = useGet(on('/app/income', '/income/forecast/horizon?weeks=4'));
+  const draftRes = useGet(on('/app/income', '/income/checkin')); // juga /app/income/checkin
   const subsRes = useGet(k('/subscriptions'));
   const streamSugRes = useGet(on('/app/income', '/income-streams/suggestions'));
   const sugSubRes = useGet(on('/app/subscriptions', '/subscriptions/suggestions'));
   const icsRes = useGet(on('/app/subscriptions', '/subscriptions/calendar-link'), { revalidateOnFocus: false });
-  const goalsRes = useGet(k('/goal'));
+  const goalsRes = useGet(on('/app/goals', '/goal'));
   const gmailRes = useGet(k('/gmail/status'));
   const tgRes = useGet(k('/telegram/status'));
   const tokRes = useGet(on('/app/settings', '/api-tokens'));
@@ -78,7 +78,7 @@ export function useLive(enabled: boolean, path: string, chatActive: number | nul
   const msgsRes = useGet(enabled && chatActive ? `/ai/threads/${chatActive}/messages` : null);
   const memRes = useGet(on('/app/chat', '/ai/memory'));
   const tipRes = useGet(k('/ai/mascot-tip'), { revalidateOnFocus: false }); // tiap revalidasi = panggilan LLM
-  const tidyRes = useGet(k('/transactions/uncategorized-merchants'));
+  const tidyRes = useGet(on('/app/categorize', '/transactions/uncategorized-merchants'));
   const billsRes = useGet(k('/split-bills'));
   const meRes = useGet(k('/auth/me'));
   // Profil & onboarding (wizard /setup): di wizard di-poll supaya kode Gmail & email pertama muncul sendiri.
@@ -261,7 +261,7 @@ export function useLive(enabled: boolean, path: string, chatActive: number | nul
   }, [pendingList, subs, todayISO]);
 
   const settled = (r: { data?: unknown; error?: unknown }) => r.data !== undefined || r.error !== undefined; // error ≠ blank screen selamanya
-  const ready = !enabled || [budgets, today, txRes, incRes, streamsRes].every(settled);
+  const ready = !enabled || [budgets, today, txRes, streamsRes].every(settled);
   // Data inti gagal dimuat (server mati/offline): jangan gambar layar dengan angka bawaan prototipe.
   const failed = enabled && [budgets, today, txRes].some((r) => r.error !== undefined && r.data === undefined);
   const refresh = () => mutate(() => true);
