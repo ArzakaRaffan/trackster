@@ -417,7 +417,6 @@ export class TransactionService {
    * manual = snapshot saldo asli bank yang sudah mencakup transaksi itu (backfill tidak boleh
    * double-count). */
   async createFromParsed(userId: number, parsed: ParsedTransaction) {
-    // Dedup per user; unik DB masih global (emailId) sampai C1 -> (userId, emailId).
     const existing = await this.prisma.transaction.findFirst({ where: { userId, emailId: parsed.emailId } });
     if (existing) return null;
 

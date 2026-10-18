@@ -360,3 +360,4 @@ deviasi dari rencana (+alasan), env baru yang Arzaka harus tambahkan, langkah be
 - **Migrasi:** `20261018100000_balance_applied` (2 kolom boolean default true + UPDATE backfill dari BalanceAdjustment) — aman untuk auto-migrate.
 - Verifikasi: check 37/37, tsc BE/FE, nest build, migrasi di DB scratch, browser (hapus paralel, Beranda).
 - **Belum:** push ke `main` (menunggu Arzaka).
+- **Susulan (sesi yang sama):** kuota AI harian → tabel `AiUsage`; debit `balanceOnly` + log satu transaksi; `useLive` 27 → 21 request di Beranda; docs basi dirapikan (status multi-user live, versi stack, route `(public)`/`(legal)`). Check 39/39.

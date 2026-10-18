@@ -325,7 +325,6 @@ export class EmailPipelineService {
       kind: entry.kind,
       parser: entry.parser ?? undefined,
     };
-    // findFirst + update/create (bukan upsert): unik masih global (emailId) sampai C1 -> (userId, emailId).
     if (existing) {
       await db.emailParseLog.updateMany({ where: { id: existing.id, userId }, data });
     } else {

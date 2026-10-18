@@ -2,8 +2,8 @@
 
 > Revamp v2 sudah selesai (2026-09-24 → 2026-10-04) — ringkasannya di `docs/Revamp History.md`.
 
-**Apa ini:** Personal finance expense tracker single-user (Arzaka). Otomatis mencatat pengeluaran dari notifikasi email bank BCA & Jago (parser Gmail API), tracking budget harian, alert Telegram kalau over-budget, plus laporan/insight. Termasuk fitur publik terpisah: Split Bill (bagi tagihan) & Kalkulator Target Tabungan.
-**Stack:** TypeScript. Backend NestJS 10 + Prisma 5 + PostgreSQL 16 (`apps/backend`). Frontend Next.js 14 App Router + Tailwind + SWR (`apps/frontend`). Deploy Docker Compose di VPS + Nginx + Let's Encrypt, GitHub Actions CD tiap push `main`.
+**Apa ini:** Personal finance expense tracker multi-user invite-only (pemilik: Arzaka; live sejak 2026-10-13). Otomatis mencatat pengeluaran dari notifikasi email bank BCA & Jago (parser Gmail API), tracking budget harian, alert Telegram kalau over-budget, plus laporan/insight. Termasuk fitur publik terpisah: Split Bill (bagi tagihan) & Kalkulator Target Tabungan.
+**Stack:** TypeScript. Backend NestJS 11 + Prisma 5 + PostgreSQL 16 (`apps/backend`). Frontend Next.js 15 App Router + React 19 + Tailwind 3 + SWR (`apps/frontend`). Image Docker Node 24 (build di GitHub Actions → GHCR), Docker Compose di VPS + Nginx + Let's Encrypt, CD tiap push `main`.
 
 **Cara jalan (dev):**
 ```bash

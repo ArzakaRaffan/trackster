@@ -28,12 +28,12 @@
 
 ## Integrasi eksternal
 - Gmail API (`googleapis`) — `gmail-auth.service.ts` / `gmail-sync.service.ts`, env `GMAIL_CLIENT_ID/SECRET/REDIRECT_URI`, refresh token di tabel `GmailToken`.
-- Telegram Bot API (`node-telegram-bot-api`) — `telegram.service.ts`, kredensial di tabel `TelegramConfig` (via Settings UI).
-- Claude vision via mwapi.dev — `split-bill-ai.service.ts`, env `SPLITBILL_AI_*`, hanya untuk scan struk Split Bill.
+- Telegram Bot API (fetch langsung lewat `tgCall()`, tanpa library) — `telegram.service.ts`; bot bersama (env `TELEGRAM_BOT_TOKEN` + webhook) dengan tautan per user `/start <kode>`, bot pribadi pemilik di `TelegramConfig`.
+- Provider AI (API kompatibel OpenAI, env `AI_*` untuk chat/kategori, `SPLITBILL_AI_*` untuk scan struk). Kuota harian per user di tabel `AiUsage`.
 
 ## Batas sistem (jangan dilewati)
-- Single-user: tak ada signup, tak ada multi-tenant. `User` cuma di-seed dari `ADMIN_USERNAME/PASSWORD`.
-- Split Bill SENGAJA tidak menyentuh `Transaction`/`BankBalance` — jaga saldo tetap "live incremental" murni.
-- Saldo TIDAK PERNAH dihitung ulang dari agregat; hanya bergerak lewat `adjustBalance` dalam Prisma transaction bareng operasi utamanya.
+- Multi-user invite-only: tiap query tenant WAJIB ber-`userId` (`npm run tenancy-audit`, `scripts/isolation-e2e.mjs`). User baru lewat undangan (`Invite`), pemilik di-seed dari `ADMIN_USERNAME/PASSWORD`.
+- Split Bill SENGAJA tidak menggerakkan `BankBalance` — split bill yang ditautkan ke transaksi hanya mengurangi pengeluaran lewat `Reimbursement` (`balanceApplied=false`).
+- Saldo TIDAK PERNAH dihitung ulang dari agregat; hanya bergerak lewat `adjustBalance`/`adjustAfterBaseline` dalam Prisma transaction bareng operasi utamanya. Baris yang menggerakkan saldo ditandai `balanceApplied` (lihat CLAUDE.md §Saldo).
 - GoPay tidak diparse sama sekali (enum ada, parser tidak didaftarkan di `parser-registry.service`).
 - Auth flow (middleware, cookie httpOnly, `COOKIE_DOMAIN` cross-subdomain) sudah settled — jangan diubah tanpa alasan kuat.

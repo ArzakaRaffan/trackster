@@ -300,7 +300,6 @@ export class AiReportsService {
       // weekStart = Senin minggu ini (WIB)
       const weekStart = startOfWibWeek(now);
 
-      // findFirst + update/create (bukan upsert): unik masih global (weekStart) sampai C1 -> (userId, weekStart).
       const existingLog = await this.prisma.healthScoreLog.findFirst({ where: { userId, weekStart }, select: { id: true } });
       if (existingLog) {
         await this.prisma.healthScoreLog.updateMany({

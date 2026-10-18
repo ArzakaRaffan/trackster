@@ -43,7 +43,6 @@ export class AiInsightCardService {
 
     const points = await this.generatePoints(userId, rangeKey);
 
-    // findFirst + update/create (bukan upsert): unik masih global (rangeKey, dayKey) sampai C1 -> (userId, rangeKey, dayKey).
     const existing = await this.prisma.aiInsightCard.findFirst({ where: { userId, rangeKey, dayKey }, select: { id: true } });
     if (existing) {
       await this.prisma.aiInsightCard.updateMany({ where: { id: existing.id, userId }, data: { points } });

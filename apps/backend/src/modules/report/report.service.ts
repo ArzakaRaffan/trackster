@@ -123,7 +123,6 @@ export class ReportService {
       this.logger.error(`closePeriod narrative gagal (${period} ${start.toISOString()}): ${err?.message}`);
     }
 
-    // findFirst + update/create (bukan upsert): unik masih global (period, periodStart) sampai C1 -> (userId, period, periodStart).
     const existing = await this.prisma.periodReport.findFirst({ where: { userId, period, periodStart: start }, select: { id: true } });
     if (existing) {
       await this.prisma.periodReport.updateMany({ where: { id: existing.id, userId }, data: { stats: stats as any, narrative } });

@@ -49,16 +49,17 @@ semua layar; route cuma menentukan layar mana yang aktif.
 
 | Route | Isi |
 | --- | --- |
-| `/`, `/login`, `/setup` | Landing, masuk/daftar (daftar & wizard = tampilan saja), wizard setup — layar `pre` prototipe |
+| `/`, `/login`, `/setup` | Landing, masuk, wizard setup (nyata) — layar `pre` prototipe |
 | `/app`, `/app/today`, `/app/weekly` | Beranda, Hari ini, Mingguan (7 hari terakhir) |
 | `/app/budget`, `/app/income`, `/app/income/checkin`, `/app/goals`, `/app/subscriptions` | Rencana |
 | `/app/reports`, `/app/insights`, `/app/chat`, `/app/chat/memory`, `/app/categorize` | Insight (insights = Analisis) |
 | `/app/more`, `/app/split`, `/app/calc`, `/app/sources`, `/app/privacy`, `/app/settings` | Menu |
 | `/demo/*` | Prototipe dengan data contoh (tombol "Coba pakai data contoh" di landing) |
-| `(legacy)`: `/split-bills/*`, `/s/[slug]`, `/t/[slug]`, `/trip/*`, `/tools`, `/savings-calculator`, `/installment-calculator` | Tools publik (desain lama, Tailwind) |
+| `(public)`: `/split-bills/new`, `/split-bills/manage/[token]`, `/s/[slug]`, `/t/[slug]`, `/trip/*`, `/tools`, `/savings-calculator`, `/installment-calculator`, `/invite/[code]`, `/reset/[token]` | Tools publik & alur akun (Tailwind). `/split-bills`, `/split-bills/:id` → redirect `/app/split` (`next.config.js`) |
+| `(legal)`: `/privacy`, `/terms` | Halaman legal |
 
-Dua root layout: `app/(v3)/layout.tsx` (tanpa `globals.css`/Tailwind preflight — desain v3 bergantung pada default browser) dan
-`app/(legacy)/layout.tsx` (Tailwind + Figtree, untuk tools publik).
+Tiga root layout: `app/(v3)/layout.tsx` (tanpa `globals.css`/Tailwind preflight — desain v3 bergantung pada default browser),
+`app/(public)/layout.tsx` (Tailwind, tools publik) dan `app/(legal)/layout.tsx`.
 
 **Cara kerja v3 (`components/v3/`)**
 - `views/*View.tsx`, `V3Tree.tsx`, `pseudo.css` — **digenerate** oleh `scripts/dc-to-tsx.mjs` dari template `.dc.html`. Jangan edit tangan;
@@ -89,42 +90,46 @@ Dipakai di baris Hari ini, detail transaksi, Setting → Alias merchant (+ logo 
 - `design_system/` — token, guideline, `handoff/README.md`.
 
 ## Drift yang ketemu (belum dibenerin)
-- `CLAUDE.md` nyebut folder `design-system/`, aslinya `design_system/`.
-- ~~`.env.example` domain lama / env belum lengkap~~ — dirapikan 2026-10-06 (multi-user F0). `TELEGRAM_BOT_TOKEN` di compose prod tidak dibaca kode.
+- ~~`.env.example` domain lama / env belum lengkap~~ — dirapikan 2026-10-06 (multi-user F0).
 - `Source.GOPAY` masih di enum & tipe frontend walau nggak ada sumber aktif.
 
 ## Keamanan (audit 2026-10-10, `docs/multi-user/09-Security-Audit.md`)
-- `common/guards/ai-rate-limit.guard.ts` — kuota AI per user per rute (`AiRateLimitGuard`, `aiQuotaOk()` juga dipakai webhook Telegram). Endpoint baru yang memanggil AI WAJIB memasang guard ini.
+- `common/guards/ai-rate-limit.guard.ts` — kuota AI: `AiRateLimitGuard` (per user per rute) & `aiUserQuotaOk()` (chat 50/hari) menghitung harian di tabel `AiUsage` (bertahan deploy) + burst per menit in-memory; `aiQuotaOk()` in-memory hanya untuk kunci tanpa user (scan struk per IP, webhook Telegram). Endpoint baru yang memanggil AI WAJIB memasang guard ini.
 - `telegram.service.ts`: `escHtml()` wajib untuk teks dinamis di pesan Telegram (parse_mode HTML); Bot API lewat `tgCall()` (fetch, tanpa library). Chat ID manual hanya pemilik; member via `POST /telegram/link-code` + `/start <kode>`.
 - `main.ts`: query parser `simple`, header keamanan API. `next.config.js`: header keamanan frontend. Tes serangan: `scripts/security-e2e.mjs`.
 
-## Multi-user — F6 (di branch)
+## Multi-user — F6 (live di prod)
 - `modules/api-token` (`/api-tokens`, JWT): buat/daftar/cabut token API per user (`trk_`+40 base62, hash SHA-256, maks 5 aktif). `common/guards/api-token.guard.ts` = Bearer → `req.apiAuth{userId,tokenId}` (user harus ACTIVE, rate limit 60/mnt/token, env tes `INGEST_RATE_LIMIT`).
 - `modules/ingest` (`POST /ingest/transaction|income`): pintu Shortcut; `Idempotency-Key` → `emailId`/`externalId = ing:<key>` (dedup per user). Income memakai `IncomeService.createQuick(userId, dto, {externalId, receivedAt, streamId})`.
 - Frontend: tab **Shortcut** di `/app/settings` (sumber di `.dc.html` + `logic.tsx` batch3 `setTok…` + `useLive` `tokens`/`tokCreate`/`tokRevoke`). `/income/quick` lama sudah dihapus (P6-06).
 - Tes: `scripts/ingest-e2e.mjs` (backend jalan dgn `INGEST_RATE_LIMIT=30`), `api-token.util.check.ts`, `ingest.util.check.ts`.
 
-## Multi-user (transisi, F0–F1 selesai di branch `feat/multi-user`, belum di prod)
-- Skema: `User` + role/status/displayName/fullName/tokenVersion; semua tabel tenant punya `userId Int?` (nullable, FK Restrict) — kode runtime BELUM memakainya (F2). Tabel baru (belum dipakai): `Invite, OneTimeToken, ApiToken, InboundAddress, OwnAccount, TelegramLink(+Code), AiUsage`.
+## Multi-user (live di prod sejak 2026-10-13)
+- Skema: `User` + role/status/displayName/fullName/tokenVersion; semua tabel tenant punya `userId` wajib (FK Restrict) dan unik komposit `(userId, …)` (C1 selesai). Tabel: `Invite, OneTimeToken, ApiToken, InboundAddress, OwnAccount, TelegramLink(+Code), AiUsage`.
 - Alat (di `apps/backend`): `npm run check` (semua `*.check.ts`), `npm run tenancy-audit` (daftar kerja scoping), `npm run golden`/`isolation-e2e` (`scripts/`), `prisma/data-fixes/{verify-backfill,2026-10-multiuser-backfill-owner}.js`, `prisma/provision-user.js`. Detail & status: `docs/multi-user/08-Progress-Log.md`.
-- **F2 (scoping backend, di branch):** semua service tenant menerima `userId` sebagai parameter pertama; controller memakai `@CurrentUser()` (`common/decorators/current-user.decorator.ts`). Cron per user lewat `common/per-user.ts#forEachActiveUser`; jalur legacy tanpa konteks user (`/income/quick`, Gmail/`/sync/*`) memakai/mengunci ke pemilik (`common/owner.ts`). Upsert-by-unique-global diganti `findFirst`+`update/create` sampai C1. **Jangan buat user kedua sebelum C1** (unik global masih ada) — lihat Progress Log 2026-10-06 (lanjutan).
+- **F2 (scoping backend, di branch):** semua service tenant menerima `userId` sebagai parameter pertama; controller memakai `@CurrentUser()` (`common/decorators/current-user.decorator.ts`). Cron per user lewat `common/per-user.ts#forEachActiveUser`; jalur legacy tanpa konteks user (`/income/quick`, Gmail/`/sync/*`) memakai/mengunci ke pemilik (`common/owner.ts`). Sisa `findFirst`+`update/create` dari masa sebelum C1 masih benar (unik sudah komposit), boleh diganti upsert bila disentuh.
 
 
-## Inbound email (F7, branch feat/multi-user)
+## Inbound email (F7, live — pemilik masih `shadow`)
 - `modules/gmail/email-pipeline.service.ts` — pipeline email->parse->saldo/kategori/Telegram, dipakai Gmail sync DAN inbound (opsi `shadow` = log `ParseStatus.SHADOW`, tanpa tulis data). Email bank yang tak terbaca parser dan tidak `looksTransactional()` (promo/info) → `EXCLUDED`, bukan `UNPARSED` (PR #16).
 - `modules/inbound/` — `POST /ingest/email` (HMAC `X-Trackster-Signature` = HMAC(secret, `ts.to.sha256(body)`) — `to` = header `X-Trackster-To`, ts ms ±5 mnt, body MIME mentah via `express.raw` di `main.ts`, maks 3MB). Alamat `u+<24 char base32>@in.trackster.dev` -> `InboundAddress`. Bukan pengirim bank (`ParserRegistryService.canHandle`) = dibuang. Email konfirmasi Gmail -> `lastForwardCode`.
 - CLI: `node prisma/user-admin.js inbound --username u [--shadow on|off] [--rotate]`. Tes: `inbound.util.check.ts`, `scripts/inbound-e2e.mjs`.
 
-## Profil & onboarding (P8, branch feat/multi-user-launch)
+## Profil & onboarding (P8, live)
 - `modules/profile/` — `GET /profile` (nama, nama di rekening, `OwnAccount`, bank = baris `BankBalance`, alamat inbound dibuat malas — shadow bila user punya `GmailToken`, hasil email forward terakhir, checklist aktivasi), `PATCH /profile` (termasuk `forwarding: boolean` = `InboundAddress.isActive`; dipakai wizard "Catat sendiri" & tombol Jeda di Sumber data, PR #15), `PUT /profile/accounts` (ganti semua), `POST /profile/banks` (tambah saja), `POST /profile/onboarded`.
 - Frontend: `useLive` memuat `/profile` (poll 4 dtk di `/setup`); `V3Host` mengarahkan akun baru (belum onboarded & tanpa transaksi) ke `/setup`; wizard live di `logic.tsx#rv_pre` (langkah diturunkan dari data server). `/setup` tidak lagi publik (`middleware.ts`).
 - Setting → Koneksi: baris Email bank + Nama & rekening (semua user); kartu Gmail & Calendar hanya pemilik (`live.isAdmin`).
 - Worker Cloudflare: `infra/cloudflare-worker/` (`wrangler.toml`, secret `INGEST_HMAC_SECRET`). Uji email asli tanpa DNS: `apps/backend/scripts/send-eml.mjs`.
 
-## Perbaikan 2026-10-17 (branch `feat/overnight-improvements`)
+## Perbaikan 2026-10-17 (sudah di `main`)
 - Kategori otomatis: rule merchant → hint parser → **riwayat merchantKey yang sama** (`MerchantAliasService.findCategoryFromHistory`) → AI.
 - Indeks komposit `(userId, occurredAt)` / `(userId, receivedAt)` di Transaction, Income, EmailParseLog.
 - Frontend: `app/manifest.ts` + `public/pwa-*.png` (PWA bisa dipasang); `lib/api.ts` GET tanpa `Content-Type` (tanpa preflight CORS),
   backend CORS `maxAge` 2 jam; `useLive` memuat token API / riwayat koreksi saldo / thread & memori chat / saran langganan / tautan .ics
   hanya di layarnya (`on(prefix, key)`), fokus tab revalidasi maks 1×/menit, tip maskot di-cache 3 jam di backend.
 - Ekspor CSV (`/reports/export.csv`): + pemasukan, jam, nama alias, patungan, BOM.
+
+## Audit 2026-10-18 (`docs/multi-user/11-Audit-2026-10-18.md`)
+- Saldo: `Transaction/Income.balanceApplied` — hapus/edit membalik saldo hanya kalau true; `BalanceService.correctBalance` menyerap semua baris source itu; `adjustAfterBaseline()` = aturan baseline + gerakkan saldo.
+- `GmailSyncService.syncEmails` dikunci per user; email RECORDED tak diunduh ulang; `EmailSyncLog` > 30 hari dibuang.
+- `useLive`: riwayat/forecast/check-in pemasukan, target, rapikan kategori dimuat hanya di layarnya (Beranda 27 → 21 request).

@@ -24,7 +24,6 @@ export class BalanceService {
    * dari baseline manual, dikoreksi manual via correctBalance() kalau meleset.
    */
   async adjustBalance(tx: Prisma.TransactionClient, userId: number, source: Source, delta: number) {
-    // findFirst+updateMany/create (bukan upsert by `source`): unik masih global sampai C1, lalu jadi (userId, source).
     const row = await tx.bankBalance.findFirst({ where: { userId, source }, select: { id: true } });
     if (row) {
       await tx.bankBalance.updateMany({ where: { id: row.id, userId }, data: { balance: { increment: delta } } });

@@ -56,7 +56,6 @@ export class MerchantAliasService {
     return this.upsertAlias(userId, rawDescription, { displayName });
   }
 
-  /** findFirst + update/create (bukan upsert by `rawDescription`): unik masih global sampai C1, lalu jadi (userId, rawDescription). */
   private async upsertAlias(
     userId: number,
     rawDescription: string,
@@ -87,7 +86,6 @@ export class MerchantAliasService {
 
   async setCategoryIcon(userId: number, category: Category, icon: string | null) {
     if (!icon) return this.prisma.categoryIcon.deleteMany({ where: { userId, category } });
-    // PK `category` masih global sampai C1 (jadi (userId, category)); findFirst+updateMany/create tetap benar sesudahnya.
     const existing = await this.prisma.categoryIcon.findFirst({ where: { userId, category } });
     if (existing) return this.prisma.categoryIcon.updateMany({ where: { userId, category }, data: { icon } });
     return this.prisma.categoryIcon.create({ data: { userId, category, icon } });

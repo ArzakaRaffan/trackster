@@ -2,9 +2,10 @@
 
 Personal finance expense tracker untuk Arzaka. Otomatis mencatat pengeluaran dari notifikasi email bank (BCA, Jago), tracking budget harian, alert Telegram, laporan & insight.
 
-**Single-user app (saat ini) — sedang direncanakan migrasi ke multi-user invite-only.** Kode hari ini masih single-user: nggak ada multi-tenant, nggak ada signup flow.
+**Multi-user invite-only — live di prod sejak 2026-10-13.** Semua tabel tenant ber-`userId`, signup lewat undangan, wizard `/setup` nyata.
+Email bank: Gmail sync (pemilik, sementara) + forwarding Cloudflare (user baru); pemilik masih mode `shadow` — cutover ke forwarding menunggu Arzaka.
 
-> 🚧 **MIGRASI MULTI-USER (rencana, belum diimplementasi):** sebelum menyentuh auth, schema Prisma, parser email, Telegram, cron, ingest, DNS, atau wizard,
+> 🚧 **MULTI-USER (fase lanjutan masih berjalan):** sebelum menyentuh auth, schema Prisma, parser email, Telegram, cron, ingest, DNS, atau wizard,
 > **baca [`docs/multi-user/README.md`](docs/multi-user/README.md)** (protokol sesi wajib: baca CAUTION → docs → Progress Log → fase aktif; update docs & log di akhir sesi).
 > Jangan merge/push ke `main` untuk pekerjaan ini tanpa persetujuan eksplisit Arzaka (push `main` = auto-deploy + auto-migrate prod).
 
@@ -16,8 +17,8 @@ Konteks tambahan (`Product.md`, `Decisions.md`, `Gotchas.md` hanya ada lokal —
 
 ## Tech Stack
 
-- Backend: NestJS + Prisma + PostgreSQL, di `apps/backend`
-- Frontend: Next.js 14 App Router + Tailwind CSS + SWR, di `apps/frontend`
+- Backend: NestJS 11 + Prisma 5 + PostgreSQL 16, di `apps/backend` (Node 24 di image)
+- Frontend: Next.js 15 App Router + React 19 + Tailwind 3 + SWR, di `apps/frontend`
 - Auth: JWT via httpOnly cookie (bukan localStorage)
 - Deploy: Docker Compose di VPS Tencent Cloud (Jakarta), Nginx + Let's Encrypt, GitHub Actions CD auto-deploy tiap push ke `main`
 - Domain: `trackster.dev` (frontend), `api.trackster.dev` (backend) — dua subdomain terpisah, bukan satu domain. (Domain lama `track.trackster.my.id` hanya redirect di Nginx.)
@@ -113,8 +114,9 @@ Konteks tambahan (`Product.md`, `Decisions.md`, `Gotchas.md` hanya ada lokal —
   (`apps/frontend/scripts/dc-to-tsx.mjs` → `src/components/v3/views`), logika prototipe ada di `src/components/v3/logic.tsx`, data nyata di
   `src/components/v3/live/`. Detail: `docs/context/Codemap.md` (bagian Frontend) dan `docs/Rework Design Trackster/PLAN.md`.
 - Token (warna/jarak/tipografi) hidup di `logic.tsx` (`DARK`, `LIGHT`, `DENSITY`) dan CSS variable di wrapper root — jangan pakai magic number Tailwind di layar v3.
-- Layar v3 tidak memakai Tailwind preflight (`app/(v3)/layout.tsx` tidak mengimpor `globals.css`). Tools publik lama ada di `app/(legacy)`.
-- Layar pra-app (Daftar, Masuk Google, Lupa password, Wizard setup, Harga/Plus) = **tampilan saja** (produk tetap single-user, tanpa backend baru).
+- Layar v3 tidak memakai Tailwind preflight (`app/(v3)/layout.tsx` tidak mengimpor `globals.css`). Tools publik (Tailwind) ada di `app/(public)`, halaman legal di `app/(legal)`.
+- Daftar (lewat undangan `/invite/[code]`), Lupa password (`/reset/[token]`) dan Wizard `/setup` = nyata. Masuk Google & Harga/Plus = **tampilan saja** (disembunyikan di live, tampil di `/demo`).
+- Data layar dimuat di `useLive.ts`: data yang dipakai satu layar saja digate dengan `on('/app/<layar>', key)` (pemetaan URL ↔ layar: `lib/v3-routes.ts`) — jangan pakai `k()` (global) kecuali datanya tampil di Beranda/sidebar/modal.
 - Mengubah layar: ubah desain → regenerate view; perubahan data/aksi → `useLive.ts` + cabang `live` di `logic.tsx`. Verifikasi dengan membandingkan ke prototipe standalone.
 - Folder lama `design_system/` (Claude Design v2) tinggal arsip.
 

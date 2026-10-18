@@ -60,7 +60,6 @@ export class AiBudgetService {
 
     const advice = await this.generate(userId, weekKey);
 
-    // findFirst + update/create (bukan upsert): unik masih global (weekStart) sampai C1 -> (userId, weekStart).
     const existing = await this.prisma.budgetAdvice.findFirst({ where: { userId, weekStart }, select: { id: true } });
     if (existing) {
       await this.prisma.budgetAdvice.updateMany({ where: { id: existing.id, userId }, data: advice });

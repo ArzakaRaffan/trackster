@@ -1,6 +1,7 @@
 # Migrasi Multi-User Trackster — Panduan Utama (BACA INI DULU)
 
-> **Status:** F0–F5 selesai di branch `feat/multi-user`, F6 kode selesai (belum ada yang di prod/`main`) — lihat [`08-Progress-Log.md`](08-Progress-Log.md) untuk status terkini).
+> **Status:** F0–F6 + P8 (wizard/profil) live di prod sejak 2026-10-13 (PR #10); forwarding email (F7) live tapi pemilik masih `shadow` —
+> cutover menunggu Arzaka. Status terkini: [`08-Progress-Log.md`](08-Progress-Log.md).
 > **Pemilik keputusan:** Arzaka (satu-satunya yang boleh menyetujui keputusan di [`00-Decisions.md`](00-Decisions.md)).
 > **Tujuan tertinggi:** migrasi ini harus **tanpa kesalahan** — tidak ada data bocor antar user, tidak ada data Arzaka yang
 > hilang/berubah, tidak ada prod down. Kalau ragu, **berhenti dan tanya**, jangan menebak.
