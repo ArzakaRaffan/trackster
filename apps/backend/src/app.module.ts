@@ -23,6 +23,7 @@ import { GoalModule } from './modules/goal/goal.module';
 import { SubscriptionModule } from './modules/subscription/subscription.module';
 import { AnalyticsModule } from './modules/analytics/analytics.module';
 import { ReportModule } from './modules/report/report.module';
+import { BackupModule } from './modules/backup/backup.module';
 import { ApiTokenModule } from './modules/api-token/api-token.module';
 import { IngestModule } from './modules/ingest/ingest.module';
 import { InboundModule } from './modules/inbound/inbound.module';
@@ -54,6 +55,7 @@ import { ProfileModule } from './modules/profile/profile.module';
     SubscriptionModule,
     AnalyticsModule,
     ReportModule,
+    BackupModule,
     ApiTokenModule,
     IngestModule,
     InboundModule,

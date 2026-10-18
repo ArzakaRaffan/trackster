@@ -68,8 +68,26 @@ services:
       TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN}
       INGEST_HMAC_SECRET: ${INGEST_HMAC_SECRET}
       INBOUND_DOMAIN: ${INBOUND_DOMAIN}
+    volumes:
+      - trackster_backups:/backups:ro # BackupMonitorService: Telegram ke pemilik bila backup harian basi
     expose:
       - '4000'
+
+  # Backup harian ±03:00 WIB + sebelum tiap deploy (deploy.yml). Image sama dengan postgres (tak ada unduhan baru); skrip dari repo.
+  db-backup:
+    image: postgres:16-alpine
+    logging: *default-logging
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      PGPASSWORD: ${POSTGRES_PASSWORD}
+    entrypoint: ['sh', '/scripts/backup.sh']
+    command: ['loop'] # deploy.yml: `run db-backup once predeploy` mengganti command ini
+    volumes:
+      - ./infra/db-backup:/scripts:ro
+      - trackster_backups:/backups
 
   frontend:
     image: ghcr.io/arzakaraffan/trackster-frontend:${IMAGE_TAG:-latest}
@@ -121,6 +139,7 @@ services:
 
 volumes:
   trackster_pg_data:
+  trackster_backups:
 networks:
   shared-web-net:
     external: true

@@ -14,7 +14,13 @@ sha256sum ~/backup-*.sql | tail -1     # catat nama+checksum di Progress Log (bu
 ```
 - Backup wajib sebelum: setiap deploy yang membawa migrasi, backfill (F1), C1 (F4), cutover (F7), hapus akun (F9).
 - Simpan ≥ 3 backup terakhir; salin 1 salinan ke luar VPS (mis. `scp` ke laptop). Enkripsi bila disimpan di cloud.
-- (F9) Jadwalkan backup harian otomatis (cron VPS) + retensi 7 hari.
+- **Otomatis (sejak 2026-10-18):** kontainer `db-backup` (`infra/db-backup/backup.sh`) — harian ±03:00 WIB (simpan 14) + sebelum
+  tiap deploy di `deploy.yml` (simpan 10; gagal → deploy berhenti sebelum migrasi). Volume `trackster_backups`. Backend
+  (`BackupMonitorService`, 09:00 WIB) mengirim Telegram ke pemilik bila backup harian > 26 jam / tidak ada.
+  - Lihat: `docker compose -f docker-compose.prod.yml exec db-backup ls -lh /backups`
+  - Backup manual: `docker compose -f docker-compose.prod.yml run --rm --no-deps -T db-backup once manual`
+  - Restore (ke DB uji dulu!): `docker compose -f docker-compose.prod.yml exec db-backup pg_restore -d <db> --no-owner /backups/<file>.dump`
+  - Salinan ke luar VPS: `docker cp trackster-db-backup-1:/backups/<file>.dump ~/` lalu `scp` ke laptop. **Belum otomatis** (perlu keputusan tujuan + enkripsi).
 
 ## 2. Restore-drill ke DB dev (membuktikan backup berguna & tempat uji migrasi)
 
