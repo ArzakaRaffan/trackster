@@ -1,5 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { Category, ParseStatus } from '@prisma/client';
+import { Category, ParseStatus, Prisma } from '@prisma/client';
 import { ParserRegistryService } from './parsers/parser-registry.service';
 import { RawEmail, ParseResult, looksTransactional } from './parsers/parser.interface';
 import { TransactionService } from '../transaction/transaction.service';
@@ -13,7 +13,7 @@ import { AiCaptionService } from '../ai/ai-caption.service';
 import { AiAnomalyService } from '../ai/ai-anomaly.service';
 import { MerchantAliasService } from '../merchant-alias/merchant-alias.service';
 import { IncomeService } from '../income/income.service';
-import { BalanceService, shouldAdjustBalance } from '../balance/balance.service';
+import { BalanceService } from '../balance/balance.service';
 import { shouldSkipLogUpsert } from './parsers/email-parse-log.util';
 
 export type PipelineCallbacks = {
@@ -124,14 +124,12 @@ export class EmailPipelineService {
     if (parsed.excluded) {
       this.logger.debug(`Skip (excluded): ${parsed.excludeReason}`);
       callbacks.onExcluded();
-      if (parsed.balanceOnly) {
-        await this.applyBalanceOnlyDebit(userId, emailId, parsed);
-      }
-      await this.logParseResult(userId, emailId, meta, {
-        status: ParseStatus.EXCLUDED,
-        reason: parsed.excludeReason,
-        amount: parsed.amount,
-        parser,
+      const log = { status: ParseStatus.EXCLUDED, reason: parsed.excludeReason, amount: parsed.amount, parser };
+      if (!parsed.balanceOnly) return this.logParseResult(userId, emailId, meta, log);
+      // Debit + log EXCLUDED (penanda "sudah didebit") satu transaksi: crash di antaranya dulu → debit diulang sync berikutnya.
+      await this.prisma.$transaction(async (tx) => {
+        await this.applyBalanceOnlyDebit(tx, userId, emailId, parsed);
+        await this.logParseResult(userId, emailId, meta, log, tx);
       });
       return;
     }
@@ -242,16 +240,10 @@ export class EmailPipelineService {
    * beneran keluar dari `source` sekarang. Debit saldo sekali per email (dedup: kalau EmailParseLog
    * emailId ini sudah berstatus EXCLUDED dari sync sebelumnya, jangan diterapkan lagi — repeated
    * cron scan tidak boleh dobel-debit). Aturan baseline (koreksi manual) tetap berlaku. */
-  private async applyBalanceOnlyDebit(userId: number, emailId: string, parsed: ParseResult) {
-    const existing = await this.prisma.emailParseLog.findFirst({ where: { userId, emailId } });
+  private async applyBalanceOnlyDebit(tx: Prisma.TransactionClient, userId: number, emailId: string, parsed: ParseResult) {
+    const existing = await tx.emailParseLog.findFirst({ where: { userId, emailId } });
     if (existing?.status === ParseStatus.EXCLUDED) return;
-
-    await this.prisma.$transaction(async (tx) => {
-      const lastAdjustmentAt = await this.balanceService.getLastManualAdjustmentAt(tx, userId, parsed.source);
-      if (shouldAdjustBalance(parsed.occurredAt, lastAdjustmentAt)) {
-        await this.balanceService.adjustBalance(tx, userId, parsed.source, -parsed.amount);
-      }
-    });
+    await this.balanceService.adjustAfterBaseline(tx, userId, parsed.source, parsed.occurredAt, -parsed.amount);
   }
 
   /** Pipeline kategorisasi (E00-S3): rule merchant (by merchantKey) → heuristik parser
@@ -317,8 +309,9 @@ export class EmailPipelineService {
       kind?: string;
       parser?: string | null;
     },
+    db: Prisma.TransactionClient = this.prisma,
   ) {
-    const existing = await this.prisma.emailParseLog.findFirst({ where: { userId, emailId } });
+    const existing = await db.emailParseLog.findFirst({ where: { userId, emailId } });
     if (shouldSkipLogUpsert(existing?.status ?? null)) return;
 
     const data = {
@@ -334,9 +327,9 @@ export class EmailPipelineService {
     };
     // findFirst + update/create (bukan upsert): unik masih global (emailId) sampai C1 -> (userId, emailId).
     if (existing) {
-      await this.prisma.emailParseLog.updateMany({ where: { id: existing.id, userId }, data });
+      await db.emailParseLog.updateMany({ where: { id: existing.id, userId }, data });
     } else {
-      await this.prisma.emailParseLog.create({ data: { userId, emailId, ...data } });
+      await db.emailParseLog.create({ data: { userId, emailId, ...data } });
     }
   }
 }
