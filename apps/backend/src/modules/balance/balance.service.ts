@@ -60,9 +60,8 @@ export class BalanceService {
       await tx.balanceAdjustment.create({ data: { userId, source, delta, note } });
       // Angka koreksi = saldo asli bank, sudah mencakup semua yang tercatat sebelumnya → hapus/edit baris lama tak boleh
       // menggerakkan saldo lagi (dulu: hapus pemasukan sesudah koreksi selalu mengurangi saldo → saldo meleset).
-      const absorbed = { userId, source, balanceApplied: true };
-      await tx.transaction.updateMany({ where: absorbed, data: { balanceApplied: false } });
-      await tx.income.updateMany({ where: absorbed, data: { balanceApplied: false } });
+      await tx.transaction.updateMany({ where: { userId, source, balanceApplied: true }, data: { balanceApplied: false } });
+      await tx.income.updateMany({ where: { userId, source, balanceApplied: true }, data: { balanceApplied: false } });
       await tx.reimbursement.updateMany({
         where: { userId, receivedSource: source, balanceApplied: true },
         data: { balanceApplied: false },

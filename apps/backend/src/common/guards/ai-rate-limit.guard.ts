@@ -29,9 +29,13 @@ export function aiQuotaOk(key: string, now = Date.now(), perDay = PER_DAY): bool
 /** Burst per menit (in-memory) + kuota harian per user per `kind` (AiUsage, hari WIB). Menghitung satu pemakaian. */
 export async function aiUserQuotaOk(prisma: Pick<PrismaClient, 'aiUsage'>, userId: number, kind: string, perDay = PER_DAY): Promise<boolean> {
   if (!aiQuotaOk(`${userId}|${kind}`, Date.now(), Infinity)) return false;
-  const key = { userId, dayKey: wibDateKey(new Date()), kind };
+  const dayKey = wibDateKey(new Date());
   const take = () =>
-    prisma.aiUsage.upsert({ where: { userId_dayKey_kind: key }, create: { ...key, count: 1 }, update: { count: { increment: 1 } } });
+    prisma.aiUsage.upsert({
+      where: { userId_dayKey_kind: { userId, dayKey, kind } },
+      create: { userId, dayKey, kind, count: 1 },
+      update: { count: { increment: 1 } },
+    });
   // Dua request pertama hari itu bersamaan: yang kalah balapan create kena unik → ulangi sebagai update.
   const row = await take().catch((e) => (e?.code === 'P2002' ? take() : Promise.reject(e)));
   return row.count <= perDay;
