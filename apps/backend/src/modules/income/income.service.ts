@@ -1,7 +1,7 @@
 import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { IncomeOrigin, IncomeStatus, ParseStatus, Source } from '@prisma/client';
 import { PrismaService } from '../../prisma.service';
-import { BalanceService, shouldAdjustBalance } from '../balance/balance.service';
+import { BalanceService } from '../balance/balance.service';
 import { IncomeForecastService } from '../income-forecast/income-forecast.service';
 import { TelegramService, escHtml } from '../telegram/telegram.service';
 import { CreateIncomeDto } from './dto/create-income.dto';
@@ -120,7 +120,8 @@ export class IncomeService {
     let income;
     try {
       income = await this.prisma.$transaction(async (tx) => {
-        const created = await tx.income.create({
+        const balanceApplied = await this.balanceService.adjustAfterBaseline(tx, userId, source, receivedAt, amount);
+        return tx.income.create({
           data: {
             userId,
             amount,
@@ -129,18 +130,12 @@ export class IncomeService {
             receivedAt,
             status: IncomeStatus.CONFIRMED,
             origin: IncomeOrigin.MANUAL,
+            balanceApplied,
             ...(opts.externalId ? { externalId: opts.externalId } : {}),
             ...(streamId ? { streamId, periodStart } : {}),
           },
           include: { stream: true },
         });
-
-        const lastAdjustmentAt = await this.balanceService.getLastManualAdjustmentAt(tx, userId, created.source);
-        if (shouldAdjustBalance(created.receivedAt, lastAdjustmentAt)) {
-          await this.balanceService.adjustBalance(tx, userId, created.source, Number(created.amount));
-        }
-
-        return created;
       });
     } catch (err: any) {
       // Dua request dgn kunci sama bersamaan: yang kalah kena unik (userId, externalId) -> perlakukan sbg duplikat.
@@ -177,12 +172,13 @@ export class IncomeService {
 
 
   /** Reverse efek balance dari data lama dulu, baru apply data baru — lebih simpel & aman
-   * daripada ngitung selisih per-field, dan tetap benar walau amount dan source dua-duanya berubah. */
+   * daripada ngitung selisih per-field, dan tetap benar walau amount dan source dua-duanya berubah.
+   * Hanya kalau nominalnya masih ikut di saldo (`balanceApplied`): baris yang sudah diserap koreksi manual cukup diedit datanya. */
   async update(userId: number, id: number, dto: UpdateIncomeDto) {
     return this.prisma.$transaction(async (tx) => {
       const existing = await tx.income.findFirst({ where: { id, userId } });
       if (!existing) throw new NotFoundException('Pemasukan tidak ditemukan');
-      await this.balanceService.adjustBalance(tx, userId, existing.source, -Number(existing.amount));
+      if (existing.balanceApplied) await this.balanceService.adjustBalance(tx, userId, existing.source, -Number(existing.amount));
 
       await tx.income.updateMany({
         where: { id, userId },
@@ -194,7 +190,7 @@ export class IncomeService {
         },
       });
       const updated = await tx.income.findFirstOrThrow({ where: { id, userId } });
-      await this.balanceService.adjustBalance(tx, userId, updated.source, Number(updated.amount));
+      if (existing.balanceApplied) await this.balanceService.adjustBalance(tx, userId, updated.source, Number(updated.amount));
       return updated;
     });
   }
@@ -210,7 +206,8 @@ export class IncomeService {
     const periodStart = streamId ? startOfWibWeek(parsed.occurredAt) : undefined;
 
     return this.prisma.$transaction(async (tx) => {
-      const income = await tx.income.create({
+      const balanceApplied = await this.balanceService.adjustAfterBaseline(tx, userId, parsed.source, parsed.occurredAt, parsed.amount);
+      return tx.income.create({
         data: {
           userId,
           amount: parsed.amount,
@@ -220,16 +217,10 @@ export class IncomeService {
           status,
           origin: IncomeOrigin.EMAIL,
           externalId: parsed.emailId,
+          balanceApplied,
           ...(streamId ? { streamId, periodStart } : {}),
         },
       });
-
-      const lastAdjustmentAt = await this.balanceService.getLastManualAdjustmentAt(tx, userId, income.source);
-      if (shouldAdjustBalance(income.receivedAt, lastAdjustmentAt)) {
-        await this.balanceService.adjustBalance(tx, userId, income.source, Number(income.amount));
-      }
-
-      return income;
     });
   }
 
@@ -297,8 +288,10 @@ export class IncomeService {
     return this.prisma.$transaction(async (tx) => {
       const deleted = await tx.income.findFirst({ where: { id, userId } });
       if (!deleted) throw new NotFoundException('Pemasukan tidak ditemukan');
-      await tx.income.deleteMany({ where: { id, userId } });
-      await this.balanceService.adjustBalance(tx, userId, deleted.source, -Number(deleted.amount));
+      // Hapus bersamaan: yang kalah menghapus 0 baris → batal (saldo tak dobel). Lihat TransactionService.remove.
+      const { count } = await tx.income.deleteMany({ where: { id, userId } });
+      if (count === 0) throw new NotFoundException('Pemasukan tidak ditemukan');
+      if (deleted.balanceApplied) await this.balanceService.adjustBalance(tx, userId, deleted.source, -Number(deleted.amount));
       return deleted;
     });
   }

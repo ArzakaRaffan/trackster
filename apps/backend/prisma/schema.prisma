@@ -82,6 +82,9 @@ model Transaction {
   note             String?
   category         Category        @default(LAINNYA)
   isManual         Boolean         @default(false)
+  // Nominal ini sedang ikut di saldo BankBalance & belum diserap koreksi manual. false = dilewati aturan baseline saat
+  // dibuat, atau sudah tercakup koreksi manual sesudahnya. Hapus transaksi hanya membalikkan saldo kalau true.
+  balanceApplied   Boolean         @default(true)
   // Kunci normalisasi merchant (lowercase, tanpa digit/tanda baca/"qr", ≤3 kata pertama) —
   // dipakai groupBy merchant di analisis & lookup rule kategori. Lihat merchantKey() di
   // merchant-key.util.ts. Nullable karena transaksi lama di-backfill terpisah (bukan migration).
@@ -333,6 +336,7 @@ model Income {
   status      IncomeStatus  @default(CONFIRMED)
   origin      IncomeOrigin  @default(MANUAL)
   externalId  String? // Gmail message ID / hash notifikasi -> dedup auto-capture (E02)
+  balanceApplied Boolean @default(true) // sama dengan Transaction.balanceApplied
 
   // multi-user (contract C1): userId wajib; unik global -> komposit (userId, ...).
   userId Int

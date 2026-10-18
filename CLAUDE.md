@@ -60,7 +60,7 @@ Konteks tambahan (`Product.md`, `Decisions.md`, `Gotchas.md` hanya ada lokal —
   - Income diedit/dihapus → saldo disesuaikan selisihnya
   - Koreksi manual → catat delta ke `BalanceAdjustment` (dengan note opsional)
 - Semua operasi ubah saldo harus dalam Prisma transaction bareng operasi utamanya (hindari race condition saldo nggak sinkron).
-- **Aturan baseline vs backfill:** transaksi/income yang `occurredAt`-nya lebih lama dari koreksi manual (`BalanceAdjustment`) terakhir untuk source yang sama TIDAK menggerakkan saldo — koreksi manual = snapshot saldo asli bank yang sudah mencakup transaksi itu. Dicek via `BalanceService.getLastManualAdjustmentAt()` + `shouldAdjustBalance()`, dipakai di `TransactionService.createFromParsed()`. Berlaku juga nanti buat income otomatis (E02).
+- **Aturan baseline vs backfill:** transaksi/income yang `occurredAt`-nya lebih lama dari koreksi manual (`BalanceAdjustment`) terakhir untuk source yang sama TIDAK menggerakkan saldo — koreksi manual = snapshot saldo asli bank yang sudah mencakup transaksi itu. Dicek via `BalanceService.adjustAfterBaseline()` di semua jalur otomatis (email, ingest, check-in). Hasilnya disimpan di `Transaction/Income.balanceApplied`; hapus/edit hanya membalik saldo kalau `true`, dan `correctBalance()` mengeset semua baris source itu jadi `false` (angka koreksi sudah mencakupnya). Hapus wajib cek `count` dari `deleteMany` (double-tap = saldo dobel).
 - `BalanceAdjustment` log HANYA untuk koreksi manual, bukan buat tiap transaksi otomatis (itu sudah keliatan di halaman transaksi biasa).
 - **Prinsip (E02-S1):** uang yang *benar-benar* keluar/masuk rekening selalu menggerakkan saldo; klasifikasi
   (expense / pemasukan / internal) itu urusan terpisah. Siapa gerakin apa:

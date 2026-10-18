@@ -82,6 +82,9 @@ export class ReimbursementService {
       const r = await tx.reimbursement.findFirst({ where: { id, userId } });
       if (!r) throw new NotFoundException('Patungan tidak ditemukan');
       if (r.splitParticipantId) throw new BadRequestException('Patungan ini dari split bill — ubah lewat split bill-nya');
+      // Hapus bersamaan: yang kalah menghapus 0 baris → batal (pengeluaran & saldo tak dibalik dua kali).
+      const { count } = await tx.reimbursement.deleteMany({ where: { id, userId } });
+      if (count === 0) throw new NotFoundException('Patungan tidak ditemukan');
       if (r.status === 'RECEIVED') {
         await tx.transaction.updateMany({
           where: { id: r.transactionId, userId },
@@ -91,7 +94,6 @@ export class ReimbursementService {
           await this.balanceService.adjustBalance(tx, userId, r.receivedSource, -Number(r.amount));
         }
       }
-      await tx.reimbursement.deleteMany({ where: { id, userId } });
       return r;
     });
   }

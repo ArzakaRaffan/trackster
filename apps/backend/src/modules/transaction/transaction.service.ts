@@ -1,8 +1,8 @@
 import { randomUUID } from 'crypto';
-import { Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../../prisma.service';
 import { Category, Prisma, Source } from '@prisma/client';
-import { BalanceService, shouldAdjustBalance } from '../balance/balance.service';
+import { BalanceService } from '../balance/balance.service';
 import { spend, sumSpend } from '../../common/spend';
 import { MerchantAliasService } from '../merchant-alias/merchant-alias.service';
 import { AnalyticsService } from '../analytics/analytics.service';
@@ -21,8 +21,6 @@ export interface ParsedTransaction {
 
 @Injectable()
 export class TransactionService {
-  private readonly logger = new Logger(TransactionService.name);
-
   constructor(
     private prisma: PrismaService,
     private balanceService: BalanceService,
@@ -149,10 +147,8 @@ export class TransactionService {
     return { days };
   }
 
-  /** Hapus transaksi expense dan balikin efeknya ke saldo bank dalam satu db transaction —
-   * kecuali transaksi ini lebih lama dari koreksi manual terakhir untuk source yang sama, karena
-   * saldo koreksi manual itu sudah "menyerap" pengeluaran ini (sama aturannya dengan
-   * createFromParsed). */
+  /** Hapus transaksi expense dan balikin efeknya ke saldo bank dalam satu db transaction — hanya kalau nominalnya
+   * masih ikut di saldo (`balanceApplied`; false = dilewati aturan baseline atau sudah diserap koreksi manual). */
   async remove(userId: number, id: number) {
     return this.prisma.$transaction(async (tx) => {
       const deleted = await tx.transaction.findFirst({ where: { id, userId } });
@@ -161,18 +157,13 @@ export class TransactionService {
       const received = await tx.reimbursement.findMany({
         where: { userId, transactionId: id, status: 'RECEIVED', balanceApplied: true },
       });
+      // Dua hapus bersamaan (double-tap "Batalkan") sama-sama lolos findFirst; yang kalah menghapus 0 baris → batal, saldo tak dobel.
+      const { count } = await tx.transaction.deleteMany({ where: { id, userId } });
+      if (count === 0) throw new NotFoundException('Transaksi tidak ditemukan');
       for (const r of received) {
         if (r.receivedSource) await this.balanceService.adjustBalance(tx, userId, r.receivedSource, -Number(r.amount));
       }
-      await tx.transaction.deleteMany({ where: { id, userId } });
-      const lastAdjustmentAt = await this.balanceService.getLastManualAdjustmentAt(tx, userId, deleted.source);
-      if (shouldAdjustBalance(deleted.occurredAt, lastAdjustmentAt)) {
-        await this.balanceService.adjustBalance(tx, userId, deleted.source, Number(deleted.amount));
-      } else {
-        this.logger.debug(
-          `Skip adjustBalance saat hapus transaksi ${deleted.id} (occurredAt ${deleted.occurredAt.toISOString()} < koreksi manual terakhir ${lastAdjustmentAt?.toISOString()})`,
-        );
-      }
+      if (deleted.balanceApplied) await this.balanceService.adjustBalance(tx, userId, deleted.source, Number(deleted.amount));
       return deleted;
     });
   }
@@ -431,7 +422,8 @@ export class TransactionService {
     if (existing) return null;
 
     return this.prisma.$transaction(async (tx) => {
-      const created = await tx.transaction.create({
+      const balanceApplied = await this.balanceService.adjustAfterBaseline(tx, userId, parsed.source, parsed.occurredAt, -parsed.amount);
+      return tx.transaction.create({
         data: {
           userId,
           amount: parsed.amount,
@@ -440,18 +432,10 @@ export class TransactionService {
           emailId: parsed.emailId,
           occurredAt: parsed.occurredAt,
           merchantKey: merchantKey(parsed.description),
+          balanceApplied,
           ...(parsed.category ? { category: parsed.category } : {}),
         },
       });
-      const lastAdjustmentAt = await this.balanceService.getLastManualAdjustmentAt(tx, userId, created.source);
-      if (shouldAdjustBalance(created.occurredAt, lastAdjustmentAt)) {
-        await this.balanceService.adjustBalance(tx, userId, created.source, -Number(created.amount));
-      } else {
-        this.logger.debug(
-          `Skip adjustBalance utk transaksi ${created.id} (occurredAt ${created.occurredAt.toISOString()} < koreksi manual terakhir ${lastAdjustmentAt?.toISOString()})`,
-        );
-      }
-      return created;
     });
   }
 

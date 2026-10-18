@@ -1,7 +1,7 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
 import { IncomeKind, IncomeStream } from '@prisma/client';
 import { PrismaService } from '../../prisma.service';
-import { BalanceService, shouldAdjustBalance } from '../balance/balance.service';
+import { BalanceService } from '../balance/balance.service';
 import { IncomeForecastService, isScheduledInWeek } from '../income-forecast/income-forecast.service';
 import { addWibDays, startOfWibWeek, wibDateKey, wibRange } from '../../common/wib';
 import { CheckinEntryDto, SubmitCheckinDto } from './dto/submit-checkin.dto';
@@ -185,7 +185,8 @@ export class IncomeCheckinService {
           entry,
         );
 
-        const income = await tx.income.create({
+        const balanceApplied = amount > 0 && (await this.balanceService.adjustAfterBaseline(tx, userId, stream.source, receivedAt, amount));
+        await tx.income.create({
           data: {
             userId,
             amount,
@@ -197,15 +198,9 @@ export class IncomeCheckinService {
             units: units != null ? units : undefined,
             extraUnits: extraUnits != null ? extraUnits : undefined,
             origin: 'CHECKIN',
+            balanceApplied,
           },
         });
-
-        if (amount > 0) {
-          const lastAdjustmentAt = await this.balanceService.getLastManualAdjustmentAt(tx, userId, income.source);
-          if (shouldAdjustBalance(receivedAt, lastAdjustmentAt)) {
-            await this.balanceService.adjustBalance(tx, userId, income.source, amount);
-          }
-        }
 
         created.push({ streamId: stream.id, amount });
       }

@@ -33,6 +33,13 @@ export class BalanceService {
     }
   }
 
+  /** Aturan baseline + gerakkan saldo dalam satu langkah. Return true kalau saldo bergerak (simpan ke `balanceApplied`). */
+  async adjustAfterBaseline(tx: Prisma.TransactionClient, userId: number, source: Source, at: Date, delta: number): Promise<boolean> {
+    if (!shouldAdjustBalance(at, await this.getLastManualAdjustmentAt(tx, userId, source))) return false;
+    await this.adjustBalance(tx, userId, source, delta);
+    return true;
+  }
+
   async getAll(userId: number) {
     return this.prisma.bankBalance.findMany({ where: { userId }, orderBy: { source: 'asc' } });
   }
@@ -52,6 +59,15 @@ export class BalanceService {
       const updated = await tx.bankBalance.findFirstOrThrow({ where: { userId, source } });
 
       await tx.balanceAdjustment.create({ data: { userId, source, delta, note } });
+      // Angka koreksi = saldo asli bank, sudah mencakup semua yang tercatat sebelumnya → hapus/edit baris lama tak boleh
+      // menggerakkan saldo lagi (dulu: hapus pemasukan sesudah koreksi selalu mengurangi saldo → saldo meleset).
+      const absorbed = { userId, source, balanceApplied: true };
+      await tx.transaction.updateMany({ where: absorbed, data: { balanceApplied: false } });
+      await tx.income.updateMany({ where: absorbed, data: { balanceApplied: false } });
+      await tx.reimbursement.updateMany({
+        where: { userId, receivedSource: source, balanceApplied: true },
+        data: { balanceApplied: false },
+      });
 
       return updated;
     });
