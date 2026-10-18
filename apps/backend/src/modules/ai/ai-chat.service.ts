@@ -1,5 +1,5 @@
 import { HttpException, HttpStatus, Injectable, Logger, NotFoundException } from '@nestjs/common';
-import { aiQuotaOk } from '../../common/guards/ai-rate-limit.guard';
+import { aiUserQuotaOk } from '../../common/guards/ai-rate-limit.guard';
 import { ChatChannel } from '@prisma/client';
 import { PrismaService } from '../../prisma.service';
 import { AiService, ChatMessage as AiMessage } from './ai.service';
@@ -186,7 +186,7 @@ export class AiChatService {
     lang: 'id' | 'en' = 'id',
   ): Promise<string> {
     const thread = await this.assertThreadExists(userId, threadId);
-    if (!aiQuotaOk(`${userId}|chat`, Date.now(), CHAT_PER_DAY)) {
+    if (!(await aiUserQuotaOk(this.prisma, userId, 'CHAT', CHAT_PER_DAY))) {
       throw new HttpException(`Batas chat tercapai (maks ${CHAT_PER_DAY} pesan per hari). Coba lagi nanti ya.`, HttpStatus.TOO_MANY_REQUESTS);
     }
     this.logger.log(`sendMessage user=${userId} thread=${threadId}: ${text.slice(0, 100)}`);
