@@ -353,3 +353,10 @@ deviasi dari rencana (+alasan), env baru yang Arzaka harus tambahkan, langkah be
 - **Catatan deploy:** kontainer backend/frontend/nginx dibuat ulang (logging/heap); config Nginx diuji sebelum restart (deploy.yml). Postgres tidak disentuh.
 - **Sisa (butuh Arzaka):** pastikan `JWT_SECRET` prod ≥ 32 char; rotasi `TELEGRAM_WEBHOOK_SECRET` (R1 audit lama); Postgres keluar dari `shared-web-net`.
 
+
+## 2026-10-18 (sore) — Audit lanjutan: kebenaran saldo & sync
+- Sesi oleh: Claude (Opus 5.5)   Branch: `feat/overnight-improvements` (= `origin/main` saat mulai). Detail: [`11-Audit-2026-10-18.md`](11-Audit-2026-10-18.md) §6.
+- **Bug uang:** hapus/edit pemasukan & hapus transaksi manual mundur menggeser saldo permanen → `balanceApplied` + koreksi manual menyerap; hapus bersamaan menggandakan saldo → cek `count`; sync Gmail bertumpuk → kunci per user.
+- **Migrasi:** `20261018100000_balance_applied` (2 kolom boolean default true + UPDATE backfill dari BalanceAdjustment) — aman untuk auto-migrate.
+- Verifikasi: check 37/37, tsc BE/FE, nest build, migrasi di DB scratch, browser (hapus paralel, Beranda).
+- **Belum:** push ke `main` (menunggu Arzaka).
