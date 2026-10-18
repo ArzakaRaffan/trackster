@@ -24,6 +24,9 @@ export type SyncOptions = {
 @Injectable()
 export class GmailSyncService {
   private readonly logger = new Logger(GmailSyncService.name);
+  // Sync per user tak boleh tumpang tindih (cron 5 menit vs tombol sync/backfill, atau run lama yang lewat 5 menit):
+  // dua proses email yang sama bisa sama-sama mendebit saldo transfer-ke-rekening-sendiri. ponytail: in-memory, 1 instance backend.
+  private readonly running = new Set<number>();
 
   constructor(
     private gmailAuthService: GmailAuthService,
@@ -63,6 +66,16 @@ export class GmailSyncService {
   }
 
   async syncEmails(userId: number, options?: SyncOptions) {
+    if (this.running.has(userId)) return { synced: 0, scanned: 0, query: 'Sync sebelumnya masih berjalan' };
+    this.running.add(userId);
+    try {
+      return await this.syncEmailsUnlocked(userId, options);
+    } finally {
+      this.running.delete(userId);
+    }
+  }
+
+  private async syncEmailsUnlocked(userId: number, options?: SyncOptions) {
     const gmail = await this.gmailAuthService.getGmailClient(userId);
     if (!gmail) {
       this.logger.debug('Gmail belum terhubung, skip sync.');
@@ -99,7 +112,21 @@ export class GmailSyncService {
       const notifyEveryTransaction =
         !quiet && (await this.telegramService.isNotifyEveryTransactionEnabled(userId));
 
+      // Email yang sudah RECORDED langsung dilewati pipeline — jangan unduh isinya lagi tiap 5 menit (dulu: semua email 7 hari).
+      const recorded = new Set(
+        (
+          await this.prisma.emailParseLog.findMany({
+            where: { userId, emailId: { in: messageIds }, status: ParseStatus.RECORDED },
+            select: { emailId: true },
+          })
+        ).map((l) => l.emailId),
+      );
+
       for (const id of messageIds) {
+        if (recorded.has(id)) {
+          skippedDuplicate++;
+          continue;
+        }
         const full = await gmail.users.messages.get({ userId: 'me', id, format: 'full' });
         const { from, subject, receivedAt } = this.extractHeaders(full.data);
 
@@ -127,6 +154,8 @@ export class GmailSyncService {
       await this.prisma.emailSyncLog.create({
         data: { userId, lastSyncAt: new Date(), status: 'SUCCESS', message: summary },
       });
+      // Satu baris tiap 5 menit (±100rb/tahun/user) padahal UI hanya membaca 20 terakhir.
+      await this.prisma.emailSyncLog.deleteMany({ where: { userId, createdAt: { lt: new Date(Date.now() - 30 * 86_400_000) } } });
 
       if (!quiet && syncedCount > 0 && newestTransaction) {
         await this.pipeline.checkAndAlertIfOverBudget(userId, newestTransaction);
