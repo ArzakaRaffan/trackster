@@ -106,7 +106,10 @@ export class IncomeService {
   }
 
   private summaryOrNull(userId: number): Promise<TodaySummary | null> {
-    return this.budgetService.getTodaySummary(userId).catch(() => null);
+    // Notifikasi dampak itu best-effort: gagal hitung budget tidak boleh menggagalkan pencatatan pemasukan.
+    return Promise.resolve()
+      .then(() => this.budgetService.getTodaySummary(userId))
+      .catch(() => null);
   }
 
   /** "Jatah harianmu naik Rp A → Rp B sampai Senin" — null kalau budget tidak ikut pemasukan / tidak berubah. */
