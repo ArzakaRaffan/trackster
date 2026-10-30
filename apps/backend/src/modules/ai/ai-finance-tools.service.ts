@@ -3,14 +3,13 @@ import { BudgetService } from '../budget/budget.service';
 import { TransactionService } from '../transaction/transaction.service';
 import { IncomeService } from '../income/income.service';
 import { GoalService } from '../goal/goal.service';
-import { IncomeForecastService } from '../income-forecast/income-forecast.service';
+import { HabitService } from '../habit/habit.service';
 import { PlanSimulatorService } from './plan-simulator.service';
 import { AiTool } from './ai.service';
 import { AiCaptionService } from './ai-caption.service';
 import { AiMemoryService } from './ai-memory.service';
 import { RetrievalService } from './retrieval.service';
 import { AnalyticsService } from '../analytics/analytics.service';
-import { BudgetAdvisorService } from '../budget/budget-advisor.service';
 import { affordability } from '../budget/affordability';
 import { Source, Category, MemoryKind } from '@prisma/client';
 import { addWibDays, startOfWibDay, wibDateKey } from '../../common/wib';
@@ -40,13 +39,12 @@ export class AiFinanceToolsService {
     private transactionService: TransactionService,
     private incomeService: IncomeService,
     private goalService: GoalService,
-    private incomeForecastService: IncomeForecastService,
+    private habitService: HabitService,
     private planSimulatorService: PlanSimulatorService,
     private aiCaptionService: AiCaptionService,
     private aiMemoryService: AiMemoryService,
     private retrievalService: RetrievalService,
     private analyticsService: AnalyticsService,
-    private budgetAdvisorService: BudgetAdvisorService,
   ) {}
 
   /** `ctx.userId` = pemilik percakapan, DIIKAT SERVER saat tool dibuat — tidak pernah datang dari argumen
@@ -130,16 +128,6 @@ export class AiFinanceToolsService {
           required: [],
         },
         handler: async () => this.transactionService.getAllTimeSummary(userId),
-      },
-      {
-        name: 'getIncomeAllocation',
-        description: 'Ambil rekomendasi alokasi mingguan: berapa yang sebaiknya ditabung, diinvestasikan, dan boleh dihabiskan bebas, dihitung dari rata-rata pemasukan mingguan dikurangi target budget mingguan.',
-        input_schema: {
-          type: 'object',
-          properties: {},
-          required: [],
-        },
-        handler: async () => this.incomeService.getAllocationRecommendation(userId),
       },
       {
         name: 'logExpense',
@@ -251,16 +239,17 @@ export class AiFinanceToolsService {
         },
       },
       {
-        name: 'getIncomeForecast',
-        description: 'Forecast pemasukan mingguan (konservatif/ekspektasi/maks) untuk beberapa minggu ke depan, per stream pemasukan.',
+        name: 'getHabits',
+        description: 'Kebiasaan user di satu minggu (Senin–Minggu) dibanding minggu-minggu biasanya: belanja rutin biasanya vs minggu ini, merchant yang lebih sering/jarang dari biasanya, kebiasaan baru, hari & jam paling boros, pemasukan biasanya per periode (pasti/tambahan) dan hari biasa masuk, plus insight siap pakai. Pakai untuk pertanyaan "aku boros di mana?", "biasanya aku dapat berapa?", "minggu ini gimana dibanding biasanya?".',
         input_schema: {
           type: 'object',
           properties: {
-            weeks: { type: 'number', description: 'Jumlah minggu ke depan, default 4, maks 26' },
+            week: { type: 'string', description: 'Tanggal mana pun di minggu itu, format YYYY-MM-DD. Default minggu ini.' },
           },
           required: [],
         },
-        handler: async (input: { weeks?: number }) => this.incomeForecastService.getHorizon(userId, Math.min(26, input.weeks ?? 4)),
+        handler: async (input: { week?: string }) =>
+          this.habitService.getWeekly(userId, typeof input.week === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(input.week) ? input.week : undefined),
       },
       {
         name: 'getGoals',
@@ -384,36 +373,32 @@ export class AiFinanceToolsService {
       },
       {
         name: 'proposeBudget',
-        description: 'Usulkan budget harian minggu ini ke user berdasarkan konteks yang tidak ada di data (mis. "ada acara ultah Sabtu, geser jatah ke Sabtu"). TIDAK langsung mengubah budget — cuma menampilkan kartu dengan tombol "Terapkan" yang harus dikonfirmasi user sendiri. Angkanya dihitung ulang oleh engine (bukan kamu yang mengarang), total mingguan opsi tetap sama.',
+        description: 'Usulkan gaya budget (hemat/seimbang/longgar) ke user. Ikut pemasukan: hemat menyisihkan 15%, seimbang 10%, longgar 5% dari pemasukan periode. Target sendiri: 85/100/110% dari belanja rutin biasanya. TIDAK langsung mengubah budget — cuma menampilkan kartu dengan tombol "Terapkan" yang harus ditekan user sendiri. Angka jatahnya dihitung engine, bukan kamu.',
         input_schema: {
           type: 'object',
           properties: {
-            option: { type: 'string', enum: ['hemat', 'seimbang', 'longgar'], description: 'Default: opsi yang direkomendasikan sistem minggu ini' },
-            dayOverrides: {
-              type: 'array',
-              description: 'Hari yang jatahnya mau digeser, sisa hari lain otomatis menyesuaikan',
-              items: {
-                type: 'object',
-                properties: {
-                  dayOfWeek: { type: 'number', description: '0=Minggu..6=Sabtu' },
-                  amount: { type: 'number' },
-                },
-                required: ['dayOfWeek', 'amount'],
-              },
-            },
-            note: { type: 'string', description: 'Alasan singkat penyesuaian, ditampilkan di kartu' },
+            option: { type: 'string', enum: ['hemat', 'seimbang', 'longgar'], description: 'Gaya yang diusulkan' },
+            note: { type: 'string', description: 'Alasan singkat, ditampilkan di kartu' },
           },
-          required: [],
+          required: ['option'],
         },
-        handler: async (input: { option?: string; dayOverrides?: { dayOfWeek: number; amount: number }[]; note?: string }): Promise<ToolCard> => {
-          const option = (input.option as any) ?? 'seimbang';
-          const result = await this.budgetAdvisorService.proposeAdjusted(userId, undefined, option, input.dayOverrides ?? []);
-          return { card: { type: 'budget-proposal', ...result, note: input.note ?? null } };
+        handler: async (input: { option?: string; note?: string }): Promise<ToolCard | { error: string }> => {
+          const option = ['hemat', 'seimbang', 'longgar'].includes(input.option as string) ? (input.option as string) : 'seimbang';
+          const s = await this.budgetService.getTodaySummary(userId);
+          const preview = s.cycle.styles.find((x) => x.option === option);
+          if (!preview) return { error: 'Belum cukup riwayat belanja untuk gaya ini (target sendiri butuh ≥3 minggu riwayat).' };
+          return {
+            card: {
+              type: 'budget-proposal', option, basis: s.cycle.basis, period: s.cycle.period,
+              allowance: preview.allowance, periodBudget: preview.periodBudget, reservePct: preview.reservePct, target: preview.target,
+              currentAllowance: s.budget, note: typeof input.note === 'string' ? input.note : null,
+            },
+          };
         },
       },
       {
         name: 'logIncome',
-        description: 'Catat pemasukan manual yang disebutkan user di chat (mis. "barusan dapat honor 200rb"). Untuk pemasukan rutin terjadwal (les/magang/mingguan), arahkan user ke halaman check-in mingguan, bukan tool ini.',
+        description: 'Catat pemasukan manual yang disebutkan user di chat (mis. "barusan dapat honor 200rb"). Pemasukan yang nominalnya mirip pemasukan pasti otomatis dianggap pemasukan pasti itu; selebihnya jadi pemasukan tambahan yang langsung menaikkan budget periode ini (kalau budget ikut pemasukan).',
         input_schema: {
           type: 'object',
           properties: {

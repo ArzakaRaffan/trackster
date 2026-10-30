@@ -5,7 +5,7 @@ import { TransactionService } from '../transaction/transaction.service';
 import { IncomeService } from '../income/income.service';
 import { MerchantAliasService } from '../merchant-alias/merchant-alias.service';
 import { BudgetService } from '../budget/budget.service';
-import { bigPurchaseImpact } from '../budget/budget-cycle';
+import { bigPurchaseImpact } from '../budget/budget-period';
 import { TelegramService } from '../telegram/telegram.service';
 import { AiChatService } from '../ai/ai-chat.service';
 import { AiCaptionService } from '../ai/ai-caption.service';

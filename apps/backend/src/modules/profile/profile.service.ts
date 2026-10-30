@@ -22,7 +22,8 @@ export class ProfileService {
         select: { status: true, createdAt: true, counterparty: true, amount: true, parser: true },
       }),
       this.prisma.balanceAdjustment.count({ where: { userId } }),
-      this.prisma.incomeStream.count({ where: { userId, isActive: true } }),
+      // Budget sudah diatur = punya pemasukan pasti, atau setelan periode tersimpan (mis. target sendiri tanpa pemasukan pasti).
+      this.prisma.incomeStream.count({ where: { userId, isActive: true } }).then(async (n) => n + (await this.prisma.budgetSetting.count({ where: { userId, period: { not: null } } }))),
       this.prisma.apiToken.count({ where: { userId, lastUsedAt: { not: null } } }),
       this.prisma.telegramLink.count({ where: { userId, isActive: true } }),
       this.prisma.transaction.count({ where: { userId } }),

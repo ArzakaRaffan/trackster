@@ -13,15 +13,15 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
 const SOURCES = ['BCA', 'JAGO', 'GOPAY', 'BNI', 'MANDIRI', 'RAYA', 'BRI'];
-// Hanya GET read-only. Sengaja TIDAK ada: ai/mascot-tip, ai/snapshot, ai/insight-card, ai/budget-suggestions,
-// budget/suggestions (memanggil AI/menulis cache), gmail/auth-url, gmail/callback.
+// Hanya GET read-only. Sengaja TIDAK ada: ai/mascot-tip, ai/snapshot, ai/insight-card (memanggil AI/menulis cache),
+// gmail/auth-url, gmail/callback.
 const ENDPOINTS = [
   '/auth/me',
   '/transactions', '/transactions/subscriptions', '/transactions/weekly', '/transactions/monthly',
   '/transactions/summary', '/transactions/insights', '/transactions/uncategorized-merchants',
   '/balance', ...SOURCES.map((s) => `/balance/${s}/adjustments`),
-  '/budget', '/budget/rollover', '/budget/today', '/budget/runway', '/budget-allocation/preview',
-  '/income', '/income/allocation', '/income-streams', '/income/forecast/week', '/income/forecast/horizon', '/income/checkin',
+  '/budget', '/budget/settings', '/budget/today', '/budget/runway', '/habits',
+  '/income', '/income-streams',
   '/analytics/stats', '/reports?period=week', '/reports?period=month', '/reports/aggregate', '/reports/records',
   '/goal', '/subscriptions', '/merchant-aliases', '/merchant-aliases/category-icons', '/reimbursements',
   '/ai/health-score/history', '/ai/memory', '/ai/threads',

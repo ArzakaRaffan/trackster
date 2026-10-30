@@ -1,3 +1,4 @@
+import { HabitService } from '../habit/habit.service';
 import { Injectable, Logger } from '@nestjs/common';
 import { Cron } from '@nestjs/schedule';
 import { ReportPeriod } from '@prisma/client';
@@ -46,6 +47,7 @@ export class AiReportsService {
     private subscriptionService: SubscriptionService,
     private analyticsService: AnalyticsService,
     private reportService: ReportService,
+    private habitService: HabitService,
   ) {}
 
   /** Daily: setiap hari jam 22:00 WIB. Skip kalau nggak ada aktivitas hari ini — jangan spam
@@ -215,12 +217,16 @@ export class AiReportsService {
     try {
       const anchor = this.reportService.lastClosedWeekAnchor(new Date());
       const report = await this.reportService.getReport(userId, 'week', anchor);
-      if (report.narrative) {
+      // Kebiasaan minggu lalu (deterministik, tanpa AI) — selalu dikirim, walau narasi AI gagal.
+      const habits = await this.habitService.getWeekly(userId, wibDateKey(new Date(report.start))).catch(() => null);
+      const habitLines = habits ? HabitService.bullets(habits, 3) : [];
+      if (report.narrative || habitLines.length) {
         const link = `${this.frontendUrl()}/app/reports?period=week&date=${wibDateKey(new Date(report.start))}`;
-        await this.telegramService.sendMessage(
-          userId,
-          `📊 <b>Laporan Minggu Ini</b>\n\n${escHtml(report.narrative)}\n\n<a href="${link}">Lihat detail</a>`,
-        );
+        const parts = ['📊 <b>Laporan Minggu Lalu</b>'];
+        if (habitLines.length) parts.push(`<b>Kebiasaanmu</b>\n${habitLines.map(escHtml).join('\n')}`);
+        if (report.narrative) parts.push(escHtml(report.narrative));
+        parts.push(`<a href="${link}">Lihat detail</a>`);
+        await this.telegramService.sendMessage(userId, parts.join('\n\n'));
       }
 
       // Hitung & simpan Health Score sekalian

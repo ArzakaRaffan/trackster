@@ -1,105 +1,39 @@
-import { Injectable, Logger } from '@nestjs/common';
-import { Cron } from '@nestjs/schedule';
-import { InlineKeyboardButton, TelegramService, escHtml } from '../telegram/telegram.service';
+import { Injectable } from '@nestjs/common';
+import { TelegramService } from '../telegram/telegram.service';
 import { BudgetService } from '../budget/budget.service';
-import { BudgetAdvisorService } from '../budget/budget-advisor.service';
-import { AiBudgetService } from './ai-budget.service';
-import { WEEK_ORDER, addWibDays, startOfWibWeek, wibDateKey } from '../../common/wib';
-import { PrismaService } from '../../prisma.service';
-import { forEachActiveUser } from '../../common/per-user';
+import { BudgetOption, periodWords } from '../budget/budget-period';
 
-const OPTION_LABEL: Record<string, string> = { hemat: 'Hemat', seimbang: 'Seimbang', longgar: 'Longgar' };
+const OPTION_LABEL: Record<BudgetOption, string> = { hemat: 'Hemat', seimbang: 'Seimbang', longgar: 'Longgar' };
+const rp = (n: number) => `Rp${Math.round(n).toLocaleString('id-ID')}`;
 
-function parseApplyCallback(data: string): { weekStart: string; option: string } | null {
-  const match = /^ba:(\d{4}-\d{2}-\d{2}):(hemat|seimbang|longgar)$/.exec(data);
-  if (!match) return null;
-  return { weekStart: match[1], option: match[2] };
-}
+type CallbackQuery = { id: string; data?: string; message?: { chat: { id: number }; message_id: number } };
 
-/** E05-S2: setelah check-in pemasukan mingguan (19:00) & alokasi 50/30/20 otomatis (E03-S4, 21:00),
- * kirim saran budget minggu depan dari 3-opsi advisor (E05-S1) + alasan AI. Sengaja dijadwalkan
- * SETELAH cron alokasi 50/30/20 (yang overwrite DailyBudget otomatis tiap Minggu) supaya kalau
- * Arzaka tap "Terapkan" di sini, pilihannya tidak langsung ketiban tertimpa cron itu. */
+/** Tombol Telegram lama. Cron "saran budget minggu depan" & check-in mingguan sudah dihapus (docs/budget-kebiasaan.md);
+ * pesan lama yang masih punya tombol tetap dijawab dengan benar:
+ * - `ba:{minggu}:{gaya}` → terapkan gaya lewat setelan (dulu menimpa nominal per hari = bobot hari user)
+ * - `ci:...` (check-in) → arahkan ke catat pemasukan langsung */
 @Injectable()
 export class AiBudgetReminderService {
-  private readonly logger = new Logger(AiBudgetReminderService.name);
-
   constructor(
-    private prisma: PrismaService,
     private telegramService: TelegramService,
     private budgetService: BudgetService,
-    private budgetAdvisorService: BudgetAdvisorService,
-    private aiBudgetService: AiBudgetService,
   ) {}
 
-  @Cron('10 21 * * 0', { name: 'budget-suggestion-followup', timeZone: 'Asia/Jakarta' })
-  async followupCron() {
-    await forEachActiveUser(this.prisma, this.logger, 'budget-suggestion-followup', (userId) => this.sendFollowup(userId));
-  }
-
-  async sendFollowup(userId: number) {
-    try {
-      const nextWeekStart = wibDateKey(addWibDays(startOfWibWeek(new Date()), 7));
-      const { text, keyboard } = await this.buildMessage(userId, nextWeekStart);
-      await this.telegramService.sendMessageWithKeyboard(userId, text, keyboard);
-      this.logger.log(`Saran budget (user ${userId}) minggu ${nextWeekStart} terkirim.`);
-    } catch (err: any) {
-      this.logger.error(`sendFollowup error: ${err?.message}`);
+  async handleCallback(userId: number, cq: CallbackQuery) {
+    const data = cq.data ?? '';
+    const apply = /^ba:\d{4}-\d{2}-\d{2}:(hemat|seimbang|longgar)$/.exec(data);
+    if (apply) {
+      const option = apply[1] as BudgetOption;
+      const s = await this.budgetService.applyStyle(userId, option);
+      await this.telegramService.answerCallbackQuery(userId, cq.id, 'Diterapkan ✅');
+      if (cq.message) {
+        const text = `✅ <b>Gaya ${OPTION_LABEL[option]} diterapkan</b>\nJatah hari ini ${rp(s.budget)} · budget ${periodWords(s.cycle).label} ${rp(s.cycle.periodBudget)}`;
+        await this.telegramService.editMessage(userId, String(cq.message.chat.id), cq.message.message_id, text);
+      }
+      return;
     }
-  }
-
-  private async buildMessage(userId: number, weekStart: string): Promise<{ text: string; keyboard: InlineKeyboardButton[][] }> {
-    const suggestion = await this.budgetAdvisorService.getSuggestions(userId, weekStart);
-    const advice = await this.aiBudgetService.explain(userId, weekStart);
-    const chosen = suggestion.options.find(o => o.option === advice.recommended) ?? suggestion.options[1];
-
-    const fmt = (n: number) => `Rp${Math.round(n).toLocaleString('id-ID')}`;
-    const weekdayLo = Math.min(...chosen.dailyAmounts.slice(1, 6));
-    const weekdayHi = Math.max(...chosen.dailyAmounts.slice(1, 6));
-    const weekendAvg = Math.round((chosen.dailyAmounts[0] + chosen.dailyAmounts[6]) / 2);
-
-    const lines = [
-      `📅 <b>Saran budget minggu depan</b>`,
-      ``,
-      `<b>${OPTION_LABEL[chosen.option]}</b>: ${weekdayLo === weekdayHi ? fmt(weekdayLo) : `${fmt(weekdayLo)}–${fmt(weekdayHi)}`}/hari Sen–Jum, ${fmt(weekendAvg)}/hari Sab–Min`,
-    ];
-    if (advice.reason) lines.push(``, escHtml(advice.reason));
-    if (advice.tip) lines.push(``, `💡 ${escHtml(advice.tip)}`);
-    if (chosen.realismFlag) lines.push(``, `⚠️ ${escHtml(chosen.realismFlag)}`);
-
-    const keyboard: InlineKeyboardButton[][] = [
-      [{ text: `✅ Terapkan ${OPTION_LABEL[chosen.option]}`, callback_data: `ba:${weekStart}:${chosen.option}` }],
-      [{ text: '📊 Lihat opsi lain', url: `${process.env.FRONTEND_URL || 'http://localhost:3000'}/app/budget?week=${weekStart}` }],
-    ];
-
-    return { text: lines.join('\n'), keyboard };
-  }
-
-  /** Dipanggil dari TelegramWebhookController saat tombol "Terapkan" di-tap. */
-  async handleCallback(userId: number, callbackQuery: { id: string; data?: string; message?: { chat: { id: number }; message_id: number } }) {
-    const data = callbackQuery.data;
-    if (!data) return;
-    const parsed = parseApplyCallback(data);
-    if (!parsed) return;
-
-    const suggestion = await this.budgetAdvisorService.getSuggestions(userId, parsed.weekStart);
-    const chosen = suggestion.options.find(o => o.option === parsed.option);
-    if (!chosen) return;
-
-    await this.budgetService.updateAll(userId, {
-      budgets: chosen.dailyAmounts.map((amount, dayOfWeek) => ({ dayOfWeek, amount })),
-    });
-    await this.telegramService.answerCallbackQuery(userId, callbackQuery.id, 'Diterapkan ✅');
-
-    if (callbackQuery.message) {
-      const fmt = (n: number) => `Rp${Math.round(n).toLocaleString('id-ID')}`;
-      const dayNames = ['Min', 'Sen', 'Sel', 'Rab', 'Kam', 'Jum', 'Sab'];
-      const text = [
-        `✅ <b>Budget ${OPTION_LABEL[chosen.option]} diterapkan</b> (minggu ${parsed.weekStart})`,
-        ``,
-        ...WEEK_ORDER.map((i) => `${dayNames[i]}: ${fmt(chosen.dailyAmounts[i])}`),
-      ].join('\n');
-      await this.telegramService.editMessage(userId, String(callbackQuery.message.chat.id), callbackQuery.message.message_id, text);
+    if (data.startsWith('ci:')) {
+      await this.telegramService.answerCallbackQuery(userId, cq.id, 'Check-in sudah tidak dipakai — catat pemasukan langsung, mis. "+gaji 500rb"');
     }
   }
 }

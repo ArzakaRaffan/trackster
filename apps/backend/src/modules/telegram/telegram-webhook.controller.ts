@@ -14,7 +14,6 @@ import { createHash, timingSafeEqual } from 'crypto';
 import { TelegramService, escHtml } from './telegram.service';
 import { aiQuotaOk } from '../../common/guards/ai-rate-limit.guard';
 import { AiChatService } from '../ai/ai-chat.service';
-import { IncomeCheckinReminderService } from '../income-checkin/income-checkin-reminder.service';
 import { AiBudgetReminderService } from '../ai/ai-budget-reminder.service';
 import { TelegramQuickService } from '../ingest/telegram-quick.service';
 
@@ -28,7 +27,6 @@ export class TelegramWebhookController {
   constructor(
     private telegramService: TelegramService,
     private aiChatService: AiChatService,
-    private incomeCheckinReminderService: IncomeCheckinReminderService,
     private aiBudgetReminderService: AiBudgetReminderService,
     @Inject(forwardRef(() => TelegramQuickService)) private telegramQuick: TelegramQuickService,
   ) {}
@@ -48,7 +46,7 @@ export class TelegramWebhookController {
       throw new ForbiddenException('Invalid secret');
     }
 
-    // 2. Callback query (tombol inline keyboard check-in pemasukan E03-S3) — jalur terpisah dari text message
+    // 2. Callback query (tombol inline keyboard: batal catat, tombol lama ba:/ci:) — jalur terpisah dari text message
     const callbackQuery = body?.callback_query;
     if (callbackQuery) {
       const incomingChatId = callbackQuery.message?.chat?.id?.toString();
@@ -62,13 +60,11 @@ export class TelegramWebhookController {
       try {
         if (this.telegramQuick.isUndo(callbackQuery.data)) {
           await this.telegramQuick.undo(userId, callbackQuery);
-        } else if (typeof callbackQuery.data === 'string' && callbackQuery.data.startsWith('ba:')) {
-          await this.aiBudgetReminderService.handleCallback(userId, callbackQuery);
         } else {
-          await this.incomeCheckinReminderService.handleCallback(userId, callbackQuery);
+          await this.aiBudgetReminderService.handleCallback(userId, callbackQuery);
         }
       } catch (err: any) {
-        this.logger.error(`Error handle callback_query check-in: ${err?.message}`);
+        this.logger.error(`Error handle callback_query: ${err?.message}`);
       }
       return { ok: true };
     }

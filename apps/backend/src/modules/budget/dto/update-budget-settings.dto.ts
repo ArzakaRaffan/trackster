@@ -1,15 +1,29 @@
-import { BudgetMode } from '@prisma/client';
-import { IsEnum, IsInt, IsOptional, Max, Min } from 'class-validator';
+import { BudgetBasis, BudgetPeriod } from '@prisma/client';
+import { IsBoolean, IsEnum, IsInt, IsNumber, IsOptional, Max, Min } from 'class-validator';
 
+/** Setelan budget periode (docs/budget-kebiasaan.md). Menyimpan → `period` terisi → banner "cek cara budget" hilang. */
 export class UpdateBudgetSettingsDto {
   @IsOptional()
-  @IsEnum(BudgetMode)
-  mode?: BudgetMode;
+  @IsEnum(BudgetPeriod)
+  period?: BudgetPeriod;
 
-  /** null = lepas anchor. Wajib terisi (stream WEEKLY/MONTHLY milik user) kalau mode CYCLE. */
+  /** WEEKLY: 0=Min..6=Sab. MONTHLY: 1..31. */
   @IsOptional()
   @IsInt()
-  anchorStreamId?: number | null;
+  @Min(0)
+  @Max(31)
+  periodDay?: number;
+
+  @IsOptional()
+  @IsEnum(BudgetBasis)
+  basis?: BudgetBasis;
+
+  /** Basis TARGET: mau belanja berapa per periode. */
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
+  @Max(1_000_000_000)
+  targetAmount?: number | null;
 
   @IsOptional()
   @IsInt()
@@ -18,8 +32,16 @@ export class UpdateBudgetSettingsDto {
   reservePct?: number;
 
   @IsOptional()
+  @IsBoolean()
+  autoWeights?: boolean;
+
+  /** Sisa periode lalu ikut ke periode ini. */
+  @IsOptional()
+  @IsBoolean()
+  rolloverEnabled?: boolean;
+
+  /** Pemasukan pasti utama (penentu hari mulai & gaji lebih awal). null = lepas. */
+  @IsOptional()
   @IsInt()
-  @Min(7)
-  @Max(90)
-  horizonDays?: number;
+  anchorStreamId?: number | null;
 }

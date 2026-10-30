@@ -2,7 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { AiService } from './ai.service';
 import { BudgetService } from '../budget/budget.service';
 import { TransactionService } from '../transaction/transaction.service';
-import { IncomeService } from '../income/income.service';
+import { HabitService } from '../habit/habit.service';
 import { SubscriptionService } from '../subscription/subscription.service';
 
 const MASCOT_SYSTEM_PROMPT = `Kamu adalah maskot kecil imut aplikasi finance tracker Trackster, muncul di pojok layar buat nemenin user.
@@ -30,7 +30,7 @@ export class AiMascotService {
     private aiService: AiService,
     private budgetService: BudgetService,
     private transactionService: TransactionService,
-    private incomeService: IncomeService,
+    private habitService: HabitService,
     private subscriptionService: SubscriptionService,
   ) {}
 
@@ -59,16 +59,16 @@ export class AiMascotService {
   }
 
   private async generateFunFact(userId: number): Promise<string> {
-    const [today, insights, allocation] = await Promise.all([
+    const [today, insights, habits] = await Promise.all([
       this.budgetService.getTodaySummary(userId),
       this.transactionService.getInsights(userId, '30d'),
-      this.incomeService.getAllocationRecommendation(userId),
+      this.habitService.getWeekly(userId),
     ]);
 
     try {
       const message = await this.aiService.chat({
         system: MASCOT_SYSTEM_PROMPT,
-        messages: [{ role: 'user', content: JSON.stringify({ today, insights, allocation }) }],
+        messages: [{ role: 'user', content: JSON.stringify({ today, insights, kebiasaan: habits.insights.map((x) => x.textId) }) }],
         maxTokens: 150,
       });
       return message?.content?.trim() || this.fallbackFact();

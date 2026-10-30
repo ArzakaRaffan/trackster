@@ -4,9 +4,10 @@ import { ReportService } from './report.service';
 import { AuthModule } from '../auth/auth.module';
 import { AnalyticsModule } from '../analytics/analytics.module';
 import { AiModule } from '../ai/ai.module';
+import { HabitModule } from '../habit/habit.module';
 
 @Module({
-  imports: [AuthModule, AnalyticsModule, forwardRef(() => AiModule)],
+  imports: [AuthModule, AnalyticsModule, HabitModule, forwardRef(() => AiModule)],
   controllers: [ReportController],
   providers: [ReportService],
   exports: [ReportService],

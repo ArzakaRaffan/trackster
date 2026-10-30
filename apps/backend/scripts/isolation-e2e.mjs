@@ -34,22 +34,19 @@ const call = (method, path, cookie, body) =>
 // ── Daftar rute privat (04 §C). Sumber kebenaran = controller; rute baru WAJIB ditambahkan di sini. ──
 const PRIVATE = [
   ['GET', '/ai/mascot-tip'], ['GET', '/ai/snapshot'], ['GET', '/ai/memory'], ['GET', '/ai/threads'], ['GET', '/ai/threads/1/messages'],
-  ['GET', '/ai/insight-card'], ['GET', '/ai/health-score/history'], ['GET', '/ai/budget-suggestions'],
+  ['GET', '/ai/insight-card'], ['GET', '/ai/health-score/history'],
   ['POST', '/ai/memory'], ['POST', '/ai/chat'], ['POST', '/ai/threads'], ['POST', '/ai/threads/1/messages'], ['POST', '/ai/threads/1/messages/stream'],
   ['POST', '/ai/suggest-category'], ['POST', '/ai/reports/trigger-weekly'], ['POST', '/ai/reports/trigger-health-score'],
   ['GET', '/api-tokens'], ['POST', '/api-tokens'], ['DELETE', '/api-tokens/1'], ['POST', '/ingest/transaction'], ['POST', '/ingest/income'],
   ['PATCH', '/ai/memory/1'], ['PATCH', '/ai/threads/1'], ['DELETE', '/ai/memory/1'], ['DELETE', '/ai/threads/1'],
   ['GET', '/analytics/stats'], ['GET', '/auth/me'], ['POST', '/auth/change-password'], ['POST', '/auth/logout-all'],
   ['GET', '/balance'], ['PUT', '/balance/BCA'], ['GET', '/balance/BCA/adjustments'],
-  ['GET', '/budget-allocation/preview'], ['POST', '/budget-allocation/trigger-weekly'],
-  ['GET', '/budget'], ['GET', '/budget/rollover'], ['GET', '/budget/today'], ['GET', '/budget/runway'], ['GET', '/budget/suggestions'],
-  ['PUT', '/budget'], ['PUT', '/budget/rollover'], ['POST', '/budget/apply'],
+  ['GET', '/budget'], ['GET', '/budget/settings'], ['GET', '/budget/allowances'], ['GET', '/budget/today'], ['GET', '/budget/runway'],
+  ['PUT', '/budget'], ['PUT', '/budget/settings'], ['POST', '/budget/apply'], ['GET', '/habits'],
   ['GET', '/gmail/auth-url'], ['GET', '/gmail/status'], ['POST', '/gmail/disconnect'],
   ['GET', '/goal'], ['POST', '/goal'], ['POST', '/goal/1/contribute'], ['POST', '/goal/1/simulate'], ['PATCH', '/goal/1/archive'],
-  ['GET', '/income/checkin'], ['POST', '/income/checkin'], ['POST', '/income/checkin/trigger-prompt'], ['POST', '/income/checkin/trigger-reminder'],
-  ['GET', '/income/forecast/week'], ['GET', '/income/forecast/horizon'],
   ['GET', '/income-streams'], ['POST', '/income-streams'], ['PUT', '/income-streams/1'], ['DELETE', '/income-streams/1'],
-  ['GET', '/income'], ['GET', '/income/allocation'], ['POST', '/income'], ['PUT', '/income/1'], ['DELETE', '/income/1'], ['PATCH', '/income/1/resolve'],
+  ['GET', '/income'], ['POST', '/income'], ['PUT', '/income/1'], ['DELETE', '/income/1'], ['PATCH', '/income/1/resolve'],
   ['GET', '/merchant-aliases'], ['GET', '/merchant-aliases/category-icons'], ['POST', '/merchant-aliases'], ['PUT', '/merchant-aliases/1'],
   ['PUT', '/merchant-aliases/category-icons'], ['DELETE', '/merchant-aliases/1'],
   ['GET', '/reimbursements'], ['POST', '/reimbursements'], ['POST', '/reimbursements/1/received'], ['DELETE', '/reimbursements/1'],
@@ -110,8 +107,8 @@ else {
 
   // (1) list: B tidak melihat penanda A di endpoint manapun yang bisa memuatnya
   const LISTS = ['/transactions', '/transactions/weekly', '/transactions/monthly', '/transactions/summary', '/transactions/insights', '/transactions/subscriptions',
-    '/transactions/uncategorized-merchants', '/income', '/income/allocation', '/income-streams', '/income/forecast/week', '/income/forecast/horizon', '/income/checkin',
-    '/goal', '/subscriptions', '/merchant-aliases', '/reimbursements', '/reimbursements?status=RECEIVED', '/ai/memory', '/ai/threads', '/budget/today', '/budget', '/balance',
+    '/transactions/uncategorized-merchants', '/income', '/income-streams', '/habits',
+    '/goal', '/subscriptions', '/merchant-aliases', '/reimbursements', '/reimbursements?status=RECEIVED', '/ai/memory', '/ai/threads', '/budget/today', '/budget/settings', '/budget', '/balance',
     '/analytics/stats', '/reports?period=week', ...(PRE_C1 ? [] : ['/reports/aggregate']), '/reports/records', '/reports/export.csv', '/ai/health-score/history', '/sync/logs', '/sync/parse-log'];
   for (const p of LISTS) {
     await test(`B tidak melihat data A  GET ${p}`, async () => {

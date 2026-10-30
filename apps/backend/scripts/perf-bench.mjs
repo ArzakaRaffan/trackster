@@ -46,7 +46,7 @@ async function seed() {
 const ENDPOINTS = (from, to) => [
   '/budget', '/budget/today', '/budget/runway', '/budget/settings', `/budget/allowances?from=${from}&to=${to}`,
   `/transactions?startDate=${from}&endDate=${to}&limit=500`, '/income', '/income-streams', '/income?status=PENDING',
-  '/income/forecast/week', '/income/forecast/horizon?weeks=4', '/income/checkin', '/subscriptions', '/goal', '/gmail/status',
+  '/habits', '/subscriptions', '/goal', '/gmail/status',
   '/telegram/status', '/sync/next-run', '/balance', '/merchant-aliases', '/merchant-aliases/category-icons',
   '/sync/parse-log?limit=200', '/sync/logs', '/transactions/uncategorized-merchants', '/split-bills', '/auth/me', '/profile',
   '/analytics/stats?range=30d', '/reports?period=month', '/transactions/weekly', '/transactions/monthly', '/transactions/insights',

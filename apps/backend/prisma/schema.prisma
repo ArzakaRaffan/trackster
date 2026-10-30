@@ -201,6 +201,16 @@ model BudgetSetting {
   reservePct      Int           @default(10)
   /// Mode BALANCE: saldo dibagi ke sekian hari.
   horizonDays     Int           @default(30)
+  /// Budget periode (docs/budget-kebiasaan.md). null = setelan lama belum ditinjau → diturunkan on-the-fly dari `mode`.
+  /// Kolom `mode`/`horizonDays` tidak dipakai lagi begitu ini terisi.
+  period          BudgetPeriod?
+  /// WEEKLY: hari mulai 0=Min..6=Sab. MONTHLY: tanggal mulai 1..31.
+  periodDay       Int?
+  basis           BudgetBasis   @default(INCOME)
+  /// Basis TARGET: mau belanja berapa per periode.
+  targetAmount    Decimal?      @db.Decimal(12, 2)
+  /// true = bobot hari dipelajari dari kebiasaan belanja; false = pakai nominal DailyBudget.
+  autoWeights     Boolean       @default(true)
 
   // multi-user (contract C1): userId wajib; unik global -> komposit (userId, ...).
   userId Int
@@ -214,6 +224,17 @@ enum BudgetMode {
   FIXED
   CYCLE
   BALANCE
+}
+
+enum BudgetPeriod {
+  WEEKLY
+  MONTHLY
+}
+
+/// INCOME = ikut pemasukan (pasti + tambahan − disisihkan). TARGET = angka yang ditentukan user.
+enum BudgetBasis {
+  INCOME
+  TARGET
 }
 
 /// Snapshot jatah harian mode CYCLE/BALANCE (jatahnya dinamis, tidak bisa direkonstruksi dari DailyBudget).

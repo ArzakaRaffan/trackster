@@ -1,4 +1,4 @@
-import { IsEnum, IsISO8601, IsNumber, IsString, Max, MaxLength, Min, MinLength } from 'class-validator';
+import { IsEnum, IsISO8601, IsInt, IsNumber, IsOptional, IsString, Max, MaxLength, Min, MinLength } from 'class-validator';
 import { Source } from '@prisma/client';
 
 export class CreateIncomeDto {
@@ -17,4 +17,9 @@ export class CreateIncomeDto {
 
   @IsISO8601()
   receivedAt: string;
+
+  /** Pemasukan pasti yang mana. Tidak diisi = dicocokkan otomatis ke pemasukan pasti yang nominalnya mirip; null = tambahan. */
+  @IsOptional()
+  @IsInt()
+  streamId?: number | null;
 }

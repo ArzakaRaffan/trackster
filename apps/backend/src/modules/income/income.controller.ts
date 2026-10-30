@@ -36,12 +36,6 @@ export class IncomeController {
 
 
   @UseGuards(JwtAuthGuard)
-  @Get('allocation')
-  async getAllocation(@CurrentUser() user: AuthUser) {
-    return this.incomeService.getAllocationRecommendation(user.id);
-  }
-
-  @UseGuards(JwtAuthGuard)
   @Post()
   async create(@CurrentUser() user: AuthUser, @Body() dto: CreateIncomeDto) {
     return this.incomeService.create(user.id, dto);

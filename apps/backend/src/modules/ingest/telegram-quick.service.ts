@@ -3,10 +3,12 @@ import { Cron } from '@nestjs/schedule';
 import { Source } from '@prisma/client';
 import { PrismaService } from '../../prisma.service';
 import { BudgetService } from '../budget/budget.service';
+import { HabitService } from '../habit/habit.service';
 import { TransactionService } from '../transaction/transaction.service';
 import { TelegramService, escHtml } from '../telegram/telegram.service';
 import { parseAmount, parseQuickLog, QuickLog } from '../telegram/quick-log';
 import { affordability } from '../budget/affordability';
+import { periodSummaryText, periodWords } from '../budget/budget-period';
 import { IngestService } from './ingest.service';
 import { addWibDays, startOfWibDay, wibDateKey } from '../../common/wib';
 import { forEachActiveUser } from '../../common/per-user';
@@ -32,6 +34,7 @@ export class TelegramQuickService {
     private budgetService: BudgetService,
     private transactionService: TransactionService,
     private telegramService: TelegramService,
+    private habitService: HabitService,
   ) {}
 
   /** Sinkron & murah: dipakai webhook untuk memutuskan jalur sebelum membalas 200 ke Telegram. */
@@ -120,7 +123,7 @@ export class TelegramQuickService {
     const head = `Kalau belanja <b>${rupiah(amount)}</b> sekarang:`;
     if (a.verdict === 'TODAY') return `${head}\n✅ Masih masuk jatah hari ini — sisa jadi ${rupiah(a.leftToday)}.`;
     if (a.verdict === 'OVER_TODAY') return `${head}\n⚠️ Lewat jatah hari ini ${rupiah(a.overBy)} (jatah ${rupiah(s.budget)}).`;
-    if (a.verdict === 'SHORT') return `${head}\n⛔ Uang ${s.cycle?.mode === 'CYCLE' ? 'sampai gajian' : 'tersedia'} kurang ${rupiah(a.shortBy)}.`;
+    if (a.verdict === 'SHORT') return `${head}\n⛔ Budget ${periodWords(s.cycle).label} kurang ${rupiah(a.shortBy)}.`;
     return `${head}\nJatah ${a.days} hari ke depan turun dari ${rupiah(a.perDayBefore)} ke <b>${rupiah(a.perDayAfter)}</b>/hari.`;
   }
 
@@ -136,13 +139,14 @@ export class TelegramQuickService {
     const now = new Date();
     const todayStart = startOfWibDay(now);
     const todayKey = wibDateKey(now);
-    const [s, yTx, subs] = await Promise.all([
+    const [s, yTx, subs, habits] = await Promise.all([
       this.budgetService.getTodaySummary(userId),
       this.prisma.transaction.findMany({
         where: { userId, occurredAt: { gte: addWibDays(todayStart, -1), lt: todayStart } },
         select: { amount: true, reimbursedAmount: true },
       }),
       this.prisma.subscription.findMany({ where: { userId, isActive: true }, select: { name: true, amount: true, cycle: true, nextDueDate: true } }),
+      this.habitService.getWeekly(userId).catch(() => null),
     ]);
     const ySpent = yTx.reduce((a, t) => a + spend(t), 0);
     const tomorrowKey = wibDateKey(addWibDays(todayStart, 1));
@@ -153,7 +157,11 @@ export class TelegramQuickService {
       yTx.length ? `Kemarin belanja ${rupiah(ySpent)} (${yTx.length} transaksi)` : 'Kemarin tidak ada belanja tercatat 🎉',
     ];
     for (const x of dueToday) lines.push(`🔁 ${escHtml(x.name)} ${rupiah(Number(x.amount))} jatuh tempo hari ini`);
-    if (s.cycle?.mode === 'CYCLE') lines.push(`Sisa siklus ${rupiah(s.cycle.remaining)} · ${s.cycle.daysLeft} hari lagi sampai gajian`);
+    lines.push(periodSummaryText(s.cycle, s.totalSpent));
+    // Satu kebiasaan yang relevan pagi ini: hari paling boros (kalau hari ini), pemasukan pasti telat, atau peringatan teratas.
+    const habit = habits?.insights.find((x) => x.id === 'peak-dow' && x.textId.startsWith('Hari ini'))
+      ?? habits?.insights.find((x) => x.tone === 'warn');
+    if (habit) lines.push(`🧠 ${escHtml(habit.textId)}`);
     lines.push('', '<i>Catat: "kopi 25rb" · cek sisa: /hariini · matikan: /pagi</i>');
     return lines.join('\n');
   }
@@ -174,13 +182,7 @@ export class TelegramQuickService {
       s.remaining >= 0 ? `Sisa <b>${rupiah(s.remaining)}</b> ✅` : `Lewat <b>${rupiah(-s.remaining)}</b> ⚠️`,
     ];
     if (s.bigSpent > 0) lines.push(`Pembelian besar ${rupiah(s.bigSpent)} (tidak dihitung di jatah harian)`);
-    if (s.cycle) {
-      lines.push(
-        s.cycle.mode === 'CYCLE'
-          ? `Sisa siklus ${rupiah(s.cycle.remaining)} · ${s.cycle.daysLeft} hari lagi sampai gajian`
-          : `Saldo tersedia ${rupiah(s.cycle.remaining)}${s.cycle.runwayDays != null ? ` · cukup ±${s.cycle.runwayDays} hari` : ''}`,
-      );
-    }
+    lines.push(periodSummaryText(s.cycle, s.totalSpent));
     if (s.totalIncome > 0) lines.push(`Pemasukan hari ini ${rupiah(s.totalIncome)}`);
     lines.push('', '<i>Catat cepat: "kopi 25rb", "bensin 50rb jago kemarin", pemasukan "+gaji 5jt". Sebelum belanja: /bisa 350rb</i>');
     return lines.join('\n');

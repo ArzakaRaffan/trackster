@@ -9,9 +9,10 @@ import { MerchantAliasModule } from '../merchant-alias/merchant-alias.module';
 import { BudgetModule } from '../budget/budget.module';
 import { TelegramModule } from '../telegram/telegram.module';
 import { AiModule } from '../ai/ai.module';
+import { HabitModule } from '../habit/habit.module';
 
 @Module({
-  imports: [ApiTokenModule, TransactionModule, IncomeModule, MerchantAliasModule, BudgetModule, forwardRef(() => TelegramModule), AiModule],
+  imports: [ApiTokenModule, TransactionModule, IncomeModule, MerchantAliasModule, BudgetModule, HabitModule, forwardRef(() => TelegramModule), AiModule],
   controllers: [IngestController],
   providers: [IngestService, TelegramQuickService],
   exports: [TelegramQuickService],

@@ -11,7 +11,6 @@ import { AiMemoryService } from './ai-memory.service';
 import { RetrievalService } from './retrieval.service';
 import { PlanSimulatorService } from './plan-simulator.service';
 import { AiInsightCardService } from './ai-insight-card.service';
-import { AiBudgetService } from './ai-budget.service';
 import { AiBudgetReminderService } from './ai-budget-reminder.service';
 import { AiController } from './ai.controller';
 import { BudgetModule } from '../budget/budget.module';
@@ -22,7 +21,7 @@ import { TelegramModule } from '../telegram/telegram.module';
 import { SubscriptionModule } from '../subscription/subscription.module';
 import { GoalModule } from '../goal/goal.module';
 import { BalanceModule } from '../balance/balance.module';
-import { IncomeForecastModule } from '../income-forecast/income-forecast.module';
+import { HabitModule } from '../habit/habit.module';
 import { AnalyticsModule } from '../analytics/analytics.module';
 import { ReportModule } from '../report/report.module';
 
@@ -34,7 +33,7 @@ import { ReportModule } from '../report/report.module';
     AuthModule,
     GoalModule,
     BalanceModule,
-    IncomeForecastModule,
+    HabitModule,
     AnalyticsModule,
     forwardRef(() => SubscriptionModule),
     forwardRef(() => TelegramModule),
@@ -53,7 +52,6 @@ import { ReportModule } from '../report/report.module';
     RetrievalService,
     PlanSimulatorService,
     AiInsightCardService,
-    AiBudgetService,
     AiBudgetReminderService,
   ],
   controllers: [AiController],
@@ -69,7 +67,6 @@ import { ReportModule } from '../report/report.module';
     AiMemoryService,
     RetrievalService,
     PlanSimulatorService,
-    AiBudgetService,
     AiBudgetReminderService,
   ],
 })

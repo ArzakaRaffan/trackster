@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../../prisma.service';
 import { BalanceService } from '../balance/balance.service';
-import { IncomeForecastService } from '../income-forecast/income-forecast.service';
+import { HabitService } from '../habit/habit.service';
 import { addWibDays, startOfWibWeek } from '../../common/wib';
 import {
   PlanBaseline,
@@ -34,7 +34,7 @@ export class PlanSimulatorService {
   constructor(
     private prisma: PrismaService,
     private balanceService: BalanceService,
-    private incomeForecastService: IncomeForecastService,
+    private habitService: HabitService,
   ) {}
 
   async simulatePlan(userId: number, input: SimulatePlanInput) {
@@ -48,16 +48,16 @@ export class PlanSimulatorService {
   }
 
   private async buildBaseline(userId: number): Promise<PlanBaseline> {
-    const [horizon, balances, weeklySpendByCategory] = await Promise.all([
-      this.incomeForecastService.getHorizon(userId, 1),
+    const [income, balances, weeklySpendByCategory] = await Promise.all([
+      this.habitService.getUsualWeeklyIncome(userId),
       this.balanceService.getAll(userId),
       this.getRoutineWeeklyBaseline(userId),
     ]);
-    const totals = horizon[0]?.totals ?? { conservative: 0, expected: 0, max: 0, received: 0 };
     const startingBalance = balances.reduce((sum, b) => sum + Number(b.balance), 0);
 
     return {
-      weeklyIncome: { conservative: totals.conservative, expected: totals.expected, max: totals.max },
+      // Konservatif = pemasukan pasti saja; ekspektasi = kebiasaan total (pasti + tambahan).
+      weeklyIncome: { conservative: income.pasti, expected: income.total, max: income.total },
       weeklySpendByCategory,
       startingBalance,
     };

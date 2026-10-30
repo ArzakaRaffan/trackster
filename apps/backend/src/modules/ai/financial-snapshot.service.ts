@@ -4,7 +4,8 @@ import { BalanceService } from '../balance/balance.service';
 import { BudgetService } from '../budget/budget.service';
 import { GoalService } from '../goal/goal.service';
 import { SubscriptionService } from '../subscription/subscription.service';
-import { IncomeForecastService } from '../income-forecast/income-forecast.service';
+import { HabitService } from '../habit/habit.service';
+import { periodWords } from '../budget/budget-period';
 import { wibDateKey, wibRange } from '../../common/wib';
 import { sumSpend } from '../../common/spend';
 
@@ -53,7 +54,7 @@ export class FinancialSnapshotService {
     private budgetService: BudgetService,
     private goalService: GoalService,
     private subscriptionService: SubscriptionService,
-    private incomeForecastService: IncomeForecastService,
+    private habitService: HabitService,
   ) {}
 
   async getSnapshot(userId: number, force = false): Promise<string> {
@@ -72,21 +73,14 @@ export class FinancialSnapshotService {
     const [
       balances,
       todaySummary,
-      dailyBudgets,
-      weekSpentAgg,
       bigPurchases,
       goals,
       upcomingSubs,
-      weekForecast,
+      habits,
       pendingIncomeCount,
     ] = await Promise.all([
       this.balanceService.getAll(userId),
       this.budgetService.getTodaySummary(userId),
-      this.prisma.dailyBudget.findMany({ where: { userId } }),
-      this.prisma.transaction.aggregate({
-        _sum: { amount: true, reimbursedAmount: true },
-        where: { userId, occurredAt: { gte: weekStart, lt: weekEnd } },
-      }),
       this.prisma.transaction.findMany({
         where: { userId, occurredAt: { gte: new Date(now.getTime() - 30 * 86_400_000) }, amount: { gte: BIG_PURCHASE_THRESHOLD } },
         orderBy: { amount: 'desc' },
@@ -94,7 +88,7 @@ export class FinancialSnapshotService {
       }),
       this.goalService.findAll(userId),
       this.subscriptionService.getUpcomingReminders(userId, 14),
-      this.incomeForecastService.getWeekForecast(userId),
+      this.habitService.getWeekly(userId),
       this.prisma.income.count({ where: { userId, status: 'PENDING' } }),
     ]);
 
@@ -111,12 +105,16 @@ export class FinancialSnapshotService {
     );
     lines.push(`Saldo: ${balanceParts.join(' · ')}.`);
 
-    const weekBudgetTarget = dailyBudgets.reduce((sum, b) => sum + Number(b.amount), 0);
-    const weekSpent = sumSpend(weekSpentAgg._sum);
-    const weekPct = weekBudgetTarget > 0 ? Math.round((weekSpent / weekBudgetTarget) * 100) : 0;
+    const c = todaySummary.cycle;
+    const w = periodWords(c);
+    const basisTxt = c.basis === 'INCOME'
+      ? `ikut pemasukan (pemasukan dihitung ${fmtRp(c.income)}, disisihkan ${c.reservePct}% = ${fmtRp(c.reserve)})`
+      : `target sendiri ${fmtRp(c.target ?? 0)}${c.targetIsUsual ? ' (= belanja rutin biasanya)' : ''}`;
     lines.push(
-      `Minggu ini: keluar ${fmtRp(weekSpent)} dari budget ${fmtRp(weekBudgetTarget)} (${weekPct}%). ` +
-        `Hari ini ${fmtRp(todaySummary.totalSpent)} / ${fmtRp(todaySummary.budget)}.`,
+      `Budget ${w.label} (${c.start}–${c.end}, ${c.period === 'WEEKLY' ? 'mingguan' : 'bulanan'}): ${fmtRp(c.periodBudget)}, ${basisTxt}` +
+        `${c.carry ? `, sisa periode lalu +${fmtRp(c.carry)}` : ''}${c.commitments ? `, langganan mendatang −${fmtRp(c.commitments)}` : ''}. ` +
+        `Sisa ${fmtRp(c.remaining - todaySummary.totalSpent)} untuk ${c.daysLeft} hari (${w.until})${c.deficit ? ' — DEFISIT' : ''}. ` +
+        `Hari ini ${fmtRp(todaySummary.totalSpent)} / jatah ${fmtRp(todaySummary.budget)}.`,
     );
 
     if (bigPurchases.length > 0) {
@@ -124,14 +122,21 @@ export class FinancialSnapshotService {
       lines.push(`Pembelian besar 30 hari: ${parts.join(', ')}.`);
     }
 
-    const scheduledUnfilled = weekForecast.streams.filter(
-      (s) => s.kind !== 'IRREGULAR' && s.expected > 0 && (s.status === 'PENDING' || s.status === 'MISSED'),
-    );
+    const pastiTxt = c.pasti.map((p) =>
+      `${p.name} biasanya ${fmtRp(p.usual)}${p.learned ? ' (dari kebiasaan)' : ' (angka yang diisi)'}${p.receivedCount ? `, sudah masuk ${fmtRp(p.received)}` : p.paydays ? ', belum masuk' : ''}`);
     lines.push(
-      `Pemasukan minggu ini: tercatat ${fmtRp(weekForecast.totals.received)} dari perkiraan ${fmtRp(weekForecast.totals.expected)} ` +
-        `(konservatif ${fmtRp(weekForecast.totals.conservative)}).` +
-        (scheduledUnfilled.length > 0 ? ` Belum check-in: ${scheduledUnfilled.map((s) => s.name).join(', ')}.` : ''),
+      `Pemasukan ${w.label}: ${pastiTxt.length ? `pasti — ${pastiTxt.join('; ')}` : 'tidak ada pemasukan pasti'}; tambahan ${fmtRp(c.tambahan)}.` +
+        (c.pastiPending.length ? ` Lewat jadwal & belum tercatat: ${c.pastiPending.map((p) => p.name).join(', ')}.` : '') +
+        (habits.income?.usualTotal != null ? ` Biasanya total ${fmtRp(habits.income.usualTotal)} per periode.` : ''),
     );
+    if (habits.learning) {
+      lines.push(`Kebiasaan: masih kenalan (${habits.learning.weeksObserved} dari ${habits.learning.needed} minggu riwayat).`);
+    } else {
+      lines.push(
+        `Kebiasaan: belanja rutin biasanya ${fmtRp(habits.spending.usualWeekly ?? 0)}/minggu, minggu ini ${fmtRp(habits.spending.thisWeek)}.` +
+          (habits.insights.length ? ` ${habits.insights.map((x) => x.textId).join(' ')}` : ''),
+      );
+    }
 
     if (goals.length > 0) {
       const parts = goals.map(

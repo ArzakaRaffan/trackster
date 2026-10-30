@@ -3,6 +3,7 @@ import { ReportPeriod } from '@prisma/client';
 import { PrismaService } from '../../prisma.service';
 import { AnalyticsService, PeriodStats } from '../analytics/analytics.service';
 import { AiService } from '../ai/ai.service';
+import { HabitService } from '../habit/habit.service';
 import { startOfWibDay, wibRange, wibDateKey, wibParts, startOfWibMonth } from '../../common/wib';
 import { spend, sumSpend } from '../../common/spend';
 import { forUser, getUserName } from '../../common/persona';
@@ -13,6 +14,8 @@ Pakai HANYA angka dari data JSON yang diberikan (jangan mengarang angka). Sebut:
 1. Satu hal yang bagus di periode ini
 2. Satu hal yang perlu diperbaiki
 3. Satu saran konkret buat periode berikutnya
+Kalau ada \`habits.insights\` (kebiasaan minggu ini dibanding biasanya), pakai satu yang paling bermakna — sebut perbandingannya
+dengan "biasanya" supaya terasa Trackster kenal kebiasaannya. Kalau \`habits.learning\` terisi, jangan bilang "biasanya".
 Tidak perlu salam pembuka/penutup formal.`;
 
 export interface ReportResult {
@@ -74,6 +77,7 @@ export class ReportService {
     private prisma: PrismaService,
     private analyticsService: AnalyticsService,
     private aiService: AiService,
+    private habitService: HabitService,
   ) {}
 
   /** `period`: 'week'|'month', `anchorDate` jatuh di dalam periode yang diminta.
@@ -109,7 +113,10 @@ export class ReportService {
   /** Hitung PeriodStats + narasi AI, simpan snapshot. Dipanggil cron tutup periode ATAU
    * lazy on-demand kalau ada yang buka laporan lama yang belum pernah di-tutup (backfill implisit). */
   async closePeriod(userId: number, period: ReportPeriod, start: Date, end: Date) {
-    const stats = await this.analyticsService.getPeriodStats(userId, start, end);
+    const base = await this.analyticsService.getPeriodStats(userId, start, end);
+    // Laporan mingguan ikut membekukan kebiasaan minggu itu (tanpa tabel baru — bagian dari snapshot stats).
+    const habits = period === ReportPeriod.WEEK ? await this.habitService.getWeekly(userId, wibDateKey(start)).catch(() => null) : null;
+    const stats = habits ? { ...base, habits } : base;
 
     let narrative: string | null = null;
     try {

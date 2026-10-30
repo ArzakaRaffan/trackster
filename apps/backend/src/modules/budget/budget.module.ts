@@ -1,16 +1,13 @@
 import { Module } from '@nestjs/common';
 import { BudgetController } from './budget.controller';
 import { BudgetService } from './budget.service';
-import { BudgetAdvisorService } from './budget-advisor.service';
 import { AuthModule } from '../auth/auth.module';
 import { MerchantAliasModule } from '../merchant-alias/merchant-alias.module';
-import { AnalyticsModule } from '../analytics/analytics.module';
-import { IncomeForecastModule } from '../income-forecast/income-forecast.module';
 
 @Module({
-  imports: [AuthModule, MerchantAliasModule, AnalyticsModule, IncomeForecastModule],
+  imports: [AuthModule, MerchantAliasModule],
   controllers: [BudgetController],
-  providers: [BudgetService, BudgetAdvisorService],
-  exports: [BudgetService, BudgetAdvisorService],
+  providers: [BudgetService],
+  exports: [BudgetService],
 })
 export class BudgetModule {}

@@ -4,7 +4,7 @@ import { ParserRegistryService } from './parsers/parser-registry.service';
 import { RawEmail, ParseResult, looksTransactional } from './parsers/parser.interface';
 import { TransactionService } from '../transaction/transaction.service';
 import { BudgetService } from '../budget/budget.service';
-import { bigPurchaseImpact } from '../budget/budget-cycle';
+import { bigPurchaseImpact } from '../budget/budget-period';
 import { TelegramService } from '../telegram/telegram.service';
 import { PrismaService } from '../../prisma.service';
 import { getOwnerContext } from '../../common/owner';

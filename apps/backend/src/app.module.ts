@@ -12,9 +12,7 @@ import { BalanceModule } from './modules/balance/balance.module';
 import { IncomeModule } from './modules/income/income.module';
 import { ReimbursementModule } from './modules/reimbursement/reimbursement.module';
 import { IncomeStreamModule } from './modules/income-stream/income-stream.module';
-import { IncomeForecastModule } from './modules/income-forecast/income-forecast.module';
-import { IncomeCheckinModule } from './modules/income-checkin/income-checkin.module';
-import { BudgetAllocationModule } from './modules/budget-allocation/budget-allocation.module';
+import { HabitModule } from './modules/habit/habit.module';
 import { MerchantAliasModule } from './modules/merchant-alias/merchant-alias.module';
 import { SplitBillModule } from './modules/split-bill/split-bill.module';
 import { TripModule } from './modules/trip/trip.module';
@@ -44,9 +42,7 @@ import { ProfileModule } from './modules/profile/profile.module';
     IncomeModule,
     ReimbursementModule,
     IncomeStreamModule,
-    IncomeForecastModule,
-    IncomeCheckinModule,
-    BudgetAllocationModule,
+    HabitModule,
     MerchantAliasModule,
     SplitBillModule,
     TripModule,

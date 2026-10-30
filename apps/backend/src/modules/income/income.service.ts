@@ -1,8 +1,9 @@
 import { Injectable, Logger, NotFoundException } from '@nestjs/common';
-import { IncomeOrigin, IncomeStatus, ParseStatus, Source } from '@prisma/client';
+import { IncomeCadence, IncomeOrigin, IncomeStatus, ParseStatus, Source } from '@prisma/client';
 import { PrismaService } from '../../prisma.service';
 import { BalanceService } from '../balance/balance.service';
-import { IncomeForecastService } from '../income-forecast/income-forecast.service';
+import { BudgetService, declaredAmount, isPastiStream } from '../budget/budget.service';
+import { incomeImpact, periodWords, usualAmount } from '../budget/budget-period';
 import { TelegramService, escHtml } from '../telegram/telegram.service';
 import { CreateIncomeDto } from './dto/create-income.dto';
 import { UpdateIncomeDto } from './dto/update-income.dto';
@@ -24,6 +25,13 @@ export interface ParsedIncome {
  * beberapa menit, bukan jam, tapi kasih jarak buat proses/antrian bank. */
 const FLIPTECH_CORRELATION_WINDOW_MS = 3 * 60 * 60 * 1000;
 
+/** Pemasukan tanpa sumber yang nominalnya ±20% dari "biasanya" sebuah pemasukan pasti, dan pasti itu belum masuk
+ * sekian hari terakhir, dianggap pemasukan pasti tersebut — supaya tidak terhitung dua kali (perkiraan + tambahan). */
+const PASTI_MATCH_TOLERANCE = 0.2;
+const PASTI_MIN_GAP_DAYS = { WEEKLY: 5, MONTHLY: 20 } as const;
+const rp = (n: number) => `Rp ${Math.round(n).toLocaleString('id-ID')}`;
+type TodaySummary = Awaited<ReturnType<BudgetService['getTodaySummary']>>;
+
 @Injectable()
 export class IncomeService {
   private readonly logger = new Logger(IncomeService.name);
@@ -31,7 +39,7 @@ export class IncomeService {
   constructor(
     private prisma: PrismaService,
     private balanceService: BalanceService,
-    private incomeForecastService: IncomeForecastService,
+    private budgetService: BudgetService,
     private telegramService: TelegramService,
   ) {}
 
@@ -49,19 +57,76 @@ export class IncomeService {
   }
 
   async create(userId: number, dto: CreateIncomeDto) {
-    return this.prisma.$transaction(async (tx) => {
+    const receivedAt = new Date(dto.receivedAt);
+    let streamId: number | null = null;
+    if (dto.streamId != null) {
+      // streamId dari klien: wajib milik user yang sama.
+      const stream = await this.prisma.incomeStream.findFirst({ where: { id: dto.streamId, userId }, select: { id: true } });
+      if (!stream) throw new NotFoundException('Sumber pemasukan tidak ditemukan');
+      streamId = stream.id;
+    } else if (dto.streamId === undefined) {
+      streamId = await this.matchPasti(userId, dto.amount, receivedAt);
+    }
+    const before = await this.summaryOrNull(userId);
+    const created = await this.prisma.$transaction(async (tx) => {
       const income = await tx.income.create({
         data: {
           userId,
           amount: dto.amount,
           description: dto.description,
           source: dto.source,
-          receivedAt: new Date(dto.receivedAt),
+          receivedAt,
+          ...(streamId ? { streamId, periodStart: startOfWibWeek(receivedAt) } : {}),
         },
       });
       await this.balanceService.adjustBalance(tx, userId, income.source, Number(income.amount));
       return income;
     });
+    await this.notifyImpact(userId, before, dto.amount, dto.description);
+    return created;
+  }
+
+  /** Pemasukan pasti yang cocok untuk pemasukan tanpa sumber (lihat PASTI_MATCH_TOLERANCE), atau null. */
+  private async matchPasti(userId: number, amount: number, at: Date): Promise<number | null> {
+    const streams = (await this.prisma.incomeStream.findMany({ where: { userId, isActive: true } })).filter(isPastiStream);
+    for (const s of streams) {
+      const recent = await this.prisma.income.findMany({
+        where: { userId, streamId: s.id, status: IncomeStatus.CONFIRMED, receivedAt: { lte: at } },
+        orderBy: { receivedAt: 'desc' },
+        take: 6,
+        select: { amount: true, receivedAt: true },
+      });
+      const usual = usualAmount(recent.map((r) => Number(r.amount)), declaredAmount(s)).amount;
+      if (!usual || Math.abs(amount - usual) > usual * PASTI_MATCH_TOLERANCE) continue;
+      const gap = PASTI_MIN_GAP_DAYS[s.cadence === IncomeCadence.MONTHLY ? 'MONTHLY' : 'WEEKLY'];
+      if (recent[0] && at.getTime() - recent[0].receivedAt.getTime() < gap * 86_400_000) continue;
+      return s.id;
+    }
+    return null;
+  }
+
+  private summaryOrNull(userId: number): Promise<TodaySummary | null> {
+    return this.budgetService.getTodaySummary(userId).catch(() => null);
+  }
+
+  /** "Jatah harianmu naik Rp A → Rp B sampai Senin" — null kalau budget tidak ikut pemasukan / tidak berubah. */
+  private async impactLine(userId: number, before: TodaySummary | null): Promise<string | null> {
+    if (!before) return null;
+    const after = await this.summaryOrNull(userId);
+    if (!after) return null;
+    const left = (s: TodaySummary) => s.cycle.remaining - s.totalSpent;
+    const impact = incomeImpact(left(before), left(after), after.cycle.daysLeft);
+    if (!impact) return null;
+    return `Jatah harianmu ${impact.after > impact.before ? 'naik' : 'turun'} ${rp(impact.before)} → <b>${rp(impact.after)}</b> ${periodWords(after.cycle).until}`;
+  }
+
+  private async notifyImpact(userId: number, before: TodaySummary | null, amount: number, description: string) {
+    try {
+      const line = await this.impactLine(userId, before);
+      if (line) await this.telegramService.sendMessage(userId, `💰 <b>Pemasukan ${rp(amount)} tercatat</b> — ${escHtml(description)}\n${line}`);
+    } catch (err: any) {
+      this.logger.warn(`Gagal kirim notif dampak pemasukan: ${err?.message}`);
+    }
   }
 
   /** Quick logging endpoint untuk iOS Shortcut / integrasi webhook tanpa JWT.
@@ -113,8 +178,10 @@ export class IncomeService {
       matchedStream = streams.find((s) => s.name.toLowerCase().includes('project'));
     }
 
-    const streamId = matchedStream?.id ?? null;
+    const streamId = matchedStream?.id ?? (await this.matchPasti(userId, amount, receivedAt));
+    matchedStream ??= streams.find((s) => s.id === streamId);
     const periodStart = streamId ? startOfWibWeek(receivedAt) : null;
+    const before = await this.summaryOrNull(userId);
     const description = noteHint || (matchedStream ? matchedStream.name : streamHint || 'Pemasukan Shortcut');
 
     let income;
@@ -148,15 +215,16 @@ export class IncomeService {
 
     // Kirim notifikasi konfirmasi ke Telegram
     try {
-      const streamName = income.stream?.name ?? 'Tanpa Kategori';
-      const formattedAmount = `Rp ${Math.round(amount).toLocaleString('id-ID')}`;
+      const streamName = income.stream?.name ?? 'Tambahan';
+      const line = await this.impactLine(userId, before);
       await this.telegramService.sendMessage(
         userId,
-        `💰 <b>Pemasukan Dicatat via Shortcut</b>\n` +
-        `• <b>Jumlah:</b> ${formattedAmount}\n` +
-        `• <b>Kategori:</b> ${escHtml(streamName)}\n` +
+        `💰 <b>Pemasukan Dicatat</b>\n` +
+        `• <b>Jumlah:</b> ${rp(amount)}\n` +
+        `• <b>Jenis:</b> ${escHtml(streamName)}\n` +
         `• <b>Keterangan:</b> ${escHtml(income.description)}\n` +
-        `• <b>Rekening:</b> ${income.source}`
+        `• <b>Rekening:</b> ${income.source}` +
+        (line ? `\n\n${line}` : ''),
       );
     } catch (err: any) {
       this.logger.warn(`Gagal kirim notif Telegram quick income: ${err?.message}`);
@@ -204,8 +272,9 @@ export class IncomeService {
 
     const { status, streamId } = await this.classify(userId, parsed);
     const periodStart = streamId ? startOfWibWeek(parsed.occurredAt) : undefined;
+    const before = status === IncomeStatus.CONFIRMED ? await this.summaryOrNull(userId) : null;
 
-    return this.prisma.$transaction(async (tx) => {
+    const created = await this.prisma.$transaction(async (tx) => {
       const balanceApplied = await this.balanceService.adjustAfterBaseline(tx, userId, parsed.source, parsed.occurredAt, parsed.amount);
       return tx.income.create({
         data: {
@@ -222,6 +291,8 @@ export class IncomeService {
         },
       });
     });
+    if (before) await this.notifyImpact(userId, before, parsed.amount, parsed.description);
+    return created;
   }
 
   /** Pengirim = owner sendiri → INTERNAL. Cocok `matchKeywords` stream aktif → CONFIRMED. Pengirim
@@ -274,10 +345,12 @@ export class IncomeService {
       // streamId dari klien: wajib milik user yang sama (bukan hanya `id` income-nya).
       const stream = await this.prisma.incomeStream.findFirst({ where: { id: dto.streamId, userId }, select: { id: true } });
       if (!stream) throw new NotFoundException('Sumber pemasukan tidak ditemukan');
+      const before = income.status !== IncomeStatus.CONFIRMED ? await this.summaryOrNull(userId) : null;
       await this.prisma.income.updateMany({
         where: { id, userId },
         data: { status: IncomeStatus.CONFIRMED, streamId: dto.streamId, periodStart: startOfWibWeek(income.receivedAt) },
       });
+      if (before) await this.notifyImpact(userId, before, Number(income.amount), income.description);
       return this.prisma.income.findFirstOrThrow({ where: { id, userId } });
     }
 
@@ -294,39 +367,5 @@ export class IncomeService {
       if (deleted.balanceApplied) await this.balanceService.adjustBalance(tx, userId, deleted.source, -Number(deleted.amount));
       return deleted;
     });
-  }
-
-
-  /** Rekomendasi alokasi mingguan: forecast ekspektasi minggu ini (E03-S2) dikurangi target budget
-   *  mingguan (jumlah 7 DailyBudget) = leftover, lalu leftover dibagi tabung/invest/jajan-bebas.
-   *  Diganti dari rata-rata historis mentah ke forecast per stream — forecast selalu punya angka
-   *  (fallback ke typicalUnits/amount stream kalau belum ada histori check-in), jadi `isFallback`
-   *  sekarang berarti "belum ada stream aktif sama sekali" (forecast expected = 0), bukan lagi
-   *  "belum ada income tercatat X hari terakhir". Rasio 50/30/20 keputusan produk sederhana (sama
-   *  semangatnya dengan SAVINGS_FACTOR di atas) — tuning kalau prioritas finansial berubah. */
-  async getAllocationRecommendation(userId: number) {
-    const [week, budgets] = await Promise.all([this.incomeForecastService.getWeekForecast(userId), this.prisma.dailyBudget.findMany({ where: { userId } })]);
-
-    const weeklyIncome = week.totals.expected;
-    const weeklyBudgetTarget = budgets.reduce((sum, b) => sum + Number(b.amount), 0);
-    const leftover = Math.max(0, weeklyIncome - weeklyBudgetTarget);
-
-    const SAVE_RATIO = 0.5;
-    const INVEST_RATIO = 0.3;
-    const SPEND_RATIO = 0.2;
-
-    return {
-      windowDays: 7,
-      isFallback: weeklyIncome === 0,
-      weeklyIncome: Math.round(weeklyIncome),
-      weeklyBudgetTarget: Math.round(weeklyBudgetTarget),
-      leftover: Math.round(leftover),
-      allocation: {
-        save: Math.round(leftover * SAVE_RATIO),
-        invest: Math.round(leftover * INVEST_RATIO),
-        spend: Math.round(leftover * SPEND_RATIO),
-      },
-      ratios: { save: SAVE_RATIO, invest: INVEST_RATIO, spend: SPEND_RATIO },
-    };
   }
 }
