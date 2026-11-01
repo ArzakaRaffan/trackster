@@ -71,6 +71,7 @@ try {
     eq(t.budget, round500(pot / daysToMonday), 'jatah hari ini');
     eq(t.cycle.pasti[0].learned, false, 'belum dipelajari (riwayat < 3)');
     eq(t.cycle.daysLeft, daysToMonday, 'daysLeft');
+    eq(t.cycle.pastiPending, [], 'payday sebelum daftar tidak dianggap telat');
   });
 
   let tambahanPot;
@@ -89,7 +90,9 @@ try {
     const t = await ok('GET', '/budget/today', A.cookie);
     eq(t.cycle.pasti[0].received, 590000, 'pasti diterima');
     eq(t.cycle.pasti[0].expected, 0, 'perkiraan 0 setelah masuk');
-    eq(t.budget, round500((590000 + 300000) * 0.9 / daysToMonday), 'jatah = (pasti asli + tambahan) × 90%');
+    // Masuk ≤2 hari sebelum Senin (Sabtu/Minggu) = gaji lebih awal → periode baru mulai hari ini; bagi dengan sisa hari dari respons.
+    if (dow(today) === 0 || dow(today) === 6) eq(t.cycle.start, wibKey(today), 'gaji lebih awal membuka periode baru');
+    eq(t.budget, round500((590000 + 300000) * 0.9 / t.cycle.daysLeft), 'jatah = (pasti asli + tambahan) × 90%');
   });
 
   await test('gaya Hemat langsung diterapkan (sisihkan 15%), pratinjau 3 gaya tersedia', async () => {
@@ -100,7 +103,7 @@ try {
     eq(t.cycle.style, 'hemat', 'gaya aktif');
     eq(t.cycle.reservePct, 15, 'reservePct');
     eq(t.budget, hemat.allowance, 'jatah = pratinjau hemat');
-    eq(t.budget, round500((590000 + 300000) * 0.85 / daysToMonday), 'jatah hemat');
+    eq(t.budget, round500((590000 + 300000) * 0.85 / t.cycle.daysLeft), 'jatah hemat');
   });
 
   await test('gaya tidak dikenal → 400', async () => eq((await req('POST', '/budget/apply', A.cookie, { option: 'boros' })).status, 400, 'status'));

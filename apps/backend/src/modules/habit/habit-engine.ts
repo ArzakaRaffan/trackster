@@ -255,10 +255,11 @@ export function buildWeeklyHabits(i: WeeklyHabitsInput): WeeklyHabits {
       const pace = m.usualPerWeek * (elapsedDays / 7);
       if (m.usualPerWeek >= 3 && m.thisWeek <= pace * 0.5) {
         merchantInsights++;
+        const u = Math.round(m.usualPerWeek * 10) / 10, none = m.thisWeek === 0;
         push({
           id: `habit-down:${m.key}`, tone: 'good', score: 55,
-          textId: `${m.merchant} cuma ${m.thisWeek}× ${label.id}, biasanya ${times(Math.round(m.usualPerWeek * 10) / 10)}× per minggu. Mantap.`,
-          textEn: `${m.merchant} only ${m.thisWeek}× ${label.en}, usually ${timesEn(Math.round(m.usualPerWeek * 10) / 10)}× a week. Nice.`,
+          textId: `${m.merchant} ${none ? 'belum sekali pun' : `cuma ${m.thisWeek}×`} ${label.id}, biasanya ${times(u)}× per minggu. Mantap.`,
+          textEn: `${m.merchant} ${none ? 'not once' : `only ${m.thisWeek}×`} ${label.en}, usually ${timesEn(u)}× a week. Nice.`,
         });
       }
     }

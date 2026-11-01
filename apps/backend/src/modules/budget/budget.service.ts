@@ -261,8 +261,9 @@ export class BudgetService {
       return {
         id: p.id, name: p.name, usual: usual.amount, learned: usual.learned, paydays: dates.length,
         received: Math.round(received), receivedCount: rows.length, expected: Math.round(part.expected),
-        // Payday terjadwal yang sudah lewat tapi belum ada pemasukan tercatat → "belum masuk".
-        lateSince: due && due.getTime() < todayStart.getTime() ? wibDateKey(due) : null,
+        // Payday terjadwal yang sudah lewat tapi belum ada pemasukan tercatat → "belum masuk". Payday sebelum user mulai
+        // memakai Trackster tidak dihitung telat: uangnya kemungkinan sudah diterima sebelum daftar.
+        lateSince: due && due.getTime() < todayStart.getTime() && due.getTime() >= startOfWibDay(dataStartsAt).getTime() ? wibDateKey(due) : null,
       };
     });
     const tambahan = inPeriod.filter((i) => i.streamId == null || !pastiIds.has(i.streamId)).reduce((t, i) => t + Number(i.amount), 0);
