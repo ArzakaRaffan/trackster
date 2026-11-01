@@ -1,5 +1,5 @@
 import { Type } from 'class-transformer';
-import { ArrayMaxSize, ArrayMinSize, IsArray, IsISO8601, IsInt, IsNumber, IsOptional, IsString, Matches, Max, MaxLength, Min, MinLength, ValidateNested } from 'class-validator';
+import { ArrayMaxSize, ArrayMinSize, IsArray, IsBoolean, IsISO8601, IsInt, IsNumber, IsOptional, IsString, Matches, Max, MaxLength, Min, MinLength, ValidateNested } from 'class-validator';
 import { AVATAR_SPEC_RE } from './set-avatar.dto';
 
 class ParticipantInputDto {
@@ -98,6 +98,10 @@ export class CreateSplitBillDto {
 
   @IsOptional()
   taxAfterService?: boolean;
+
+  @IsOptional()
+  @IsBoolean()
+  equalFees?: boolean;
 
   @IsOptional()
   @IsString()

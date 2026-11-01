@@ -213,7 +213,7 @@ export class V3Logic extends React.Component {
   splitPayload(w) { const n = v => Number(String(v || '').replace(',', '.').replace(/[^\d.]/g, '')) || 0, items = w.items.filter(i => i.desc.trim() && n(digits(i.amount)) > 0);
     return { transactionId:w.txId || undefined, restaurantName:w.resto.trim(), billDate:new Date(w.date + 'T12:00:00+07:00').toISOString(), participants:w.people.map(p => ({ name:p.name })),
       items:items.map(i => ({ description:i.desc.trim(), amount:n(digits(i.amount)), quantity:Number(digits(i.qty)) || 1, shares:(i.who.length ? i.who : w.people.map(p => p.id)).map(pid => ({ participantIndex:w.people.findIndex(p => p.id === pid), weight:1 })).filter(x => x.participantIndex >= 0) })),
-      discountPercent:n(w.discPct), discountAmount:n(digits(w.discAmt)), servicePercent:n(w.svcPct), serviceFeeAmount:n(digits(w.svcAmt)), taxPercent:n(w.taxPct), taxAmount:n(digits(w.taxAmt)), deliveryFee:n(digits(w.delivery)), roundingUnit:Number(w.round) || 0, taxAfterService:!!w.tas,
+      discountPercent:n(w.discPct), discountAmount:n(digits(w.discAmt)), servicePercent:n(w.svcPct), serviceFeeAmount:n(digits(w.svcAmt)), taxPercent:n(w.taxPct), taxAmount:n(digits(w.taxAmt)), deliveryFee:n(digits(w.delivery)), roundingUnit:Number(w.round) || 0, taxAfterService:!!w.tas, equalFees:!!w.eqf,
       payerBankName:w.bank || undefined, payerAccountNumber:w.acc || undefined, payerAccountName:w.accName || undefined, receiptImage:w.receipt || undefined }; }
   later(fn, ms) { (this.tms = this.tms || []).push(setTimeout(fn, ms)); }
   spent() { return this.state.txs.filter(t => t.d === 6).reduce((a, t) => a + t.amt, 0); }
@@ -459,7 +459,8 @@ export class V3Logic extends React.Component {
     const subtotal = Object.values(sub).reduce((a, v) => a + v, 0) || 0;
     const disc = subtotal * n(b.discPct) / 100 + n(digits(b.discAmt)), base = subtotal - disc;
     const svc = base * n(b.svcPct) / 100 + n(digits(b.svcAmt)), taxBase = b.tas ? base + svc : base, tax = taxBase * n(b.taxPct) / 100 + n(digits(b.taxAmt)), del = n(digits(b.delivery)), ru = Number(b.round) || 0;
-    const totals = people.map(p => { const r = subtotal ? sub[p.id] / subtotal : 1 / P, d = disc * r, sv = svc * r, tx = tax * r, dl = del / P; let t = sub[p.id] - d + sv + tx + dl; if (ru) t = Math.ceil(t / ru) * ru; return { id:p.id, name:p.name, subtotal:sub[p.id], fee:sv + tx + dl - d, total:t }; });
+    const payers = people.filter(p => sub[p.id] > 0).length, rf = p => b.eqf ? (payers ? (sub[p.id] > 0 ? 1 / payers : 0) : 1 / P) : (subtotal ? sub[p.id] / subtotal : 1 / P);
+    const totals = people.map(p => { const r = subtotal ? sub[p.id] / subtotal : 1 / P, d = disc * r, sv = svc * rf(p), tx = tax * rf(p), dl = del / P; let t = sub[p.id] - d + sv + tx + dl; if (ru) t = Math.ceil(t / ru) * ru; return { id:p.id, name:p.name, subtotal:sub[p.id], fee:sv + tx + dl - d, total:t }; });
     return { items, subtotal, disc, svc, tax, del, totals, grand:totals.reduce((a, t) => a + t.total, 0) };
   }
   batch5(s, off) {
@@ -513,6 +514,7 @@ export class V3Logic extends React.Component {
       wzSubtotal:RP(calc.subtotal), wzHasCheck:chk > 0, wzCheckColor: diff === 0 ? 'var(--success-text)' : 'var(--danger-text)', wzCheckLabel: diff === 0 ? '✓ Cocok sama struk' : diff > 0 ? `Lebih ${RP(diff)}` : `Kurang ${RP(diff)}`,
       feeRows:feeDef.map(([label, pk, ak]) => ({ label, pct:wz[pk], amt:wz[ak], setPct:e => setW({ [pk]:e.target.value.replace(/[^\d.,]/g, '') }), setAmt:e => setW({ [ak]:fmtIn(e.target.value) }) })),
       tasStr:String(wz.tas), toggleTas:() => setW({ tas:!wz.tas }), tasBg: wz.tas ? 'var(--brand)' : 'var(--border-bold)', tasX: wz.tas ? '16px' : '0px',
+      eqfStr:String(!!wz.eqf), toggleEqf:() => setW({ eqf:!wz.eqf }), eqfBg: wz.eqf ? 'var(--brand)' : 'var(--border-bold)', eqfX: wz.eqf ? '16px' : '0px',
       wzPreview:calc.totals.map(t => ({ name:t.name, avCss:avatarCss(t.name), total:RP(t.total) })), wzGrand:RP(calc.grand),
       wzBackLabel: sp.step === 0 ? 'Batal' : 'Kembali', wzBack:() => sp.step === 0 ? this.go('split') : setS({ step:sp.step - 1 }),
       wzNextOff:String(!can[sp.step] || sp.submitting), wzNextBg: can[sp.step] ? 'var(--brand)' : off[0], wzNextFg: can[sp.step] ? 'var(--on-brand)' : off[1], wzSubmitting:!!sp.submitting,

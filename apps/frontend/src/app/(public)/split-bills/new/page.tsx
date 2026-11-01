@@ -70,6 +70,7 @@ export default function NewSplitBillPage() {
   const [deliveryFee, setDeliveryFee] = useState('');
   const [roundingUnit, setRoundingUnit] = useState<0 | 100 | 500 | 1000>(0);
   const [taxAfterService, setTaxAfterService] = useState(false);
+  const [equalFees, setEqualFees] = useState(false);
 
   // Rekening terakhir dipakai diingat di perangkat ini.
   useEffect(() => {
@@ -228,6 +229,7 @@ export default function NewSplitBillPage() {
         deliveryFee: parseFloat(deliveryFee) || 0,
         roundingUnit,
         taxAfterService,
+        equalFees,
         payerBankName: payerBankName.trim() || undefined,
         payerAccountNumber: payerAccountNumber.trim() || undefined,
         payerAccountName: payerAccountName.trim() || undefined,
@@ -275,6 +277,7 @@ export default function NewSplitBillPage() {
     deliveryFee: parseFloat(deliveryFee) || 0,
     roundingUnit,
     taxAfterService,
+    equalFees,
   };
   const preview = step === 2 ? calculate(splitInput) : null;
   const pickP = picking ? participants.find((p) => p.id === picking) ?? null : null;
@@ -434,6 +437,13 @@ export default function NewSplitBillPage() {
               <span>
                 Pajak setelah service?
                 <small>Hitung pajak dari subtotal + service fee</small>
+              </span>
+            </label>
+            <label className="pb-chk">
+              <input type="checkbox" checked={equalFees} onChange={(e) => setEqualFees(e.target.checked)} />
+              <span>
+                Pajak &amp; service dibagi rata?
+                <small>Tiap orang menanggung sama besar, bukan sesuai pesanan</small>
               </span>
             </label>
             <div className="pb-2">

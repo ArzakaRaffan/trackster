@@ -93,5 +93,5 @@ export const mapBill = (b: any) => ({
   paid: (b.participants ?? []).filter((p: any) => p.isPaid).map((p: any) => p.id),
   items: (b.items ?? []).map((i: any) => ({ id: i.id, desc: i.description, amount: fmtIn(i.amount), qty: String(i.quantity ?? 1), who: (i.shares ?? []).map((s: any) => s.participantId) })),
   discPct: pct(b.discountPercent), discAmt: fmtIn(b.discountAmount), svcPct: pct(b.servicePercent), svcAmt: fmtIn(b.serviceFeeAmount), taxPct: pct(b.taxPercent), taxAmt: fmtIn(b.taxAmount),
-  hasReceipt: !!b.receipt, tas: !!b.taxAfterService, delivery: fmtIn(b.deliveryFee), round: String(b.roundingUnit ?? 0),
+  hasReceipt: !!b.receipt, tas: !!b.taxAfterService, eqf: !!b.equalFees, delivery: fmtIn(b.deliveryFee), round: String(b.roundingUnit ?? 0),
 });

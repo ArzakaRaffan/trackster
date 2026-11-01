@@ -504,6 +504,7 @@ model SplitBill {
   deliveryFee     Decimal? @db.Decimal(12, 2)
   roundingUnit    Int      @default(0)
   taxAfterService Boolean  @default(false)
+  equalFees       Boolean  @default(false)
 
   receipt SplitBillReceipt?
 

@@ -42,6 +42,7 @@ export class SplitBillService {
       deliveryFee: bill.deliveryFee ? Number(bill.deliveryFee) : 0,
       roundingUnit: bill.roundingUnit as any,
       taxAfterService: bill.taxAfterService,
+      equalFees: bill.equalFees,
     };
 
     const calcResult = calculate(input);
@@ -76,6 +77,7 @@ export class SplitBillService {
           deliveryFee: dto.deliveryFee ?? 0,
           roundingUnit: dto.roundingUnit ?? 0,
           taxAfterService: dto.taxAfterService ?? false,
+          equalFees: dto.equalFees ?? false,
           payerBankName: dto.payerBankName,
           payerAccountNumber: dto.payerAccountNumber,
           payerAccountName: dto.payerAccountName,
@@ -287,6 +289,7 @@ export class SplitBillService {
       deliveryFee: bill.deliveryFee,
       roundingUnit: bill.roundingUnit,
       taxAfterService: bill.taxAfterService,
+      equalFees: bill.equalFees,
       payerBankName: bill.payerBankName,
       payerAccountNumber: bill.payerAccountNumber,
       payerAccountName: bill.payerAccountName,
