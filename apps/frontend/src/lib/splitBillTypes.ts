@@ -66,6 +66,7 @@ export interface SplitBillDetail extends SplitBillListItem {
 }
 
 export interface PublicSplitBillSummary {
+  hasReceipt?: boolean;
   restaurantName: string;
   billDate: string;
   taxAmount: number;

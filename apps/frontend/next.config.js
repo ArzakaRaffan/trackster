@@ -10,7 +10,7 @@ const csp = [
   `script-src 'self' 'unsafe-inline'${isDev ? " 'unsafe-eval'" : ''}`,
   "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
   "font-src 'self' data: https://fonts.gstatic.com",
-  "img-src 'self' data: blob:",
+  `img-src 'self' data: blob: ${apiOrigin}`,
   `connect-src 'self' ${apiOrigin} https://fonts.googleapis.com https://fonts.gstatic.com${isDev ? ' ws:' : ''}`, // html-to-image mengambil font untuk disematkan
   "worker-src 'self' blob:",
   "manifest-src 'self'",

@@ -343,7 +343,10 @@ export function useLive(enabled: boolean, path: string, chatActive: number | nul
       splitAvatar: (slug: string, pid: number, avatar: string) => api.patch(`/split-bills/public/${slug}/participants/${pid}/avatar`, { avatar }),
       splitPaid: (slug: string, pid: number) => api.patch(`/split-bills/public/${slug}/participants/${pid}/mark-paid`, {}),
       splitAssign: (billId: number, itemId: number, pids: number[]) => api.patch(`/split-bills/${billId}/items/${itemId}/assign`, { shares: pids.map((participantId) => ({ participantId, weight: 1 })) }),
-      scanReceipt: async (imageBase64: string) => api.post<{ items: { description: string; amount: number; quantity: number }[] }>('/split-bills/scan-receipt', { imageBase64: await shrinkDataUrl(imageBase64) }),
+      scanReceipt: async (imageBase64: string) => ({
+        ...(await api.post<{ items: { description: string; amount: number; quantity: number }[] }>('/split-bills/scan-receipt', { imageBase64: await shrinkDataUrl(imageBase64) })),
+        thumb: await shrinkDataUrl(imageBase64, 900, 0.6), // pratinjau + disimpan bersama bill
+      }),
       setMerchantIcon: (rawDescription: string, icon: string | null) => api.put('/merchant-aliases/icon', { rawDescription, icon }),
       setCategoryIcon: (category: string, icon: string | null) => api.put('/merchant-aliases/category-icons', { category, icon }),
       saveAlias: (id: number, displayName: string) => api.put(`/merchant-aliases/${id}`, { displayName }),

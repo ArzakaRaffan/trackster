@@ -82,6 +82,8 @@ export class SplitBillService {
         },
       });
 
+      if (dto.receiptImage) await tx.splitBillReceipt.create({ data: { splitBillId: bill.id, image: dto.receiptImage } });
+
       const participants: SplitBillParticipant[] = [];
       for (const p of dto.participants) {
         participants.push(
@@ -189,7 +191,7 @@ export class SplitBillService {
     return this.prisma.splitBill.findMany({
       where: { createdByUserId: userId },
       orderBy: { billDate: 'desc' },
-      include: { participants: true, items: { include: { shares: true } } },
+      include: { participants: true, items: { include: { shares: true } }, receipt: { select: { splitBillId: true } } },
     });
   }
 
@@ -267,7 +269,7 @@ export class SplitBillService {
   async getPublicSummary(slug: string) {
     const bill = await this.prisma.splitBill.findUnique({
       where: { publicSlug: slug },
-      include: { participants: true, items: { include: { shares: true } } },
+      include: { participants: true, items: { include: { shares: true } }, receipt: { select: { splitBillId: true } } },
     });
     if (!bill) throw new NotFoundException('Split bill tidak ditemukan');
 
@@ -288,6 +290,7 @@ export class SplitBillService {
       payerBankName: bill.payerBankName,
       payerAccountNumber: bill.payerAccountNumber,
       payerAccountName: bill.payerAccountName,
+      hasReceipt: !!bill.receipt,
       items: bill.items.map((i) => ({
         id: i.id,
         description: i.description,
@@ -297,6 +300,14 @@ export class SplitBillService {
       })),
       participants: totals,
     };
+  }
+
+  /** Foto struk lewat link publik (data URL → mime + byte). */
+  async getReceiptPublic(slug: string) {
+    const r = await this.prisma.splitBillReceipt.findFirst({ where: { splitBill: { publicSlug: slug } } });
+    const m = r && /^data:(image\/[a-z]+);base64,(.+)$/.exec(r.image);
+    if (!m) throw new NotFoundException('Foto struk tidak ada');
+    return { mime: m[1], bytes: Buffer.from(m[2], 'base64') };
   }
 
   /** Ganti avatar peserta lewat link publik — sama tingkat kepercayaannya dengan togglePaidPublic (siapa pun yang punya link). */

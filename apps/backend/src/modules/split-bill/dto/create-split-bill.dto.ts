@@ -114,6 +114,13 @@ export class CreateSplitBillDto {
   @MaxLength(200)
   payerAccountName?: string;
 
+  // Foto struk (data URL, sudah dikecilkan di browser ±900px).
+  @IsOptional()
+  @IsString()
+  @MaxLength(400_000)
+  @Matches(/^data:image\/(jpeg|png|webp);base64,[A-Za-z0-9+/=]+$/)
+  receiptImage?: string;
+
   @IsArray()
   @ArrayMaxSize(200)
   @ArrayMinSize(1)
