@@ -12,18 +12,13 @@ const fetcher = (u: string) => api.get<any>(u);
 // ±20 endpoint dimuat bersamaan: fokus tab ulang paling sering sekali per menit (default SWR 5 dtk = badai request di HP).
 const useGet = (key: string | null, opts: Record<string, unknown> = {}) => useSWR<any>(key, fetcher, { focusThrottleInterval: 60_000, ...opts });
 
-const OPT_META: Record<string, { label: string; desc: string }> = {
-  hemat: { label: 'Hemat', desc: 'Kejar goal, dana cadangan 15%' },
-  seimbang: { label: 'Seimbang', desc: 'Default — cadangan 10%' },
-  longgar: { label: 'Longgar', desc: 'Ada acara — cadangan 5%' },
-};
 const MON = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des'];
 const dm = (iso: string) => { const [, m, d] = iso.split('-').map(Number); return `${d} ${MON[m - 1]}`; };
 const STATUS_ROW: Record<string, [string, string, string]> = {
   RECEIVED: ['Sudah masuk', 'var(--success-text)', 'var(--success-bold)'],
-  PARTIAL: ['Sebagian', 'var(--warning-text)', 'var(--warning-bold)'],
-  PENDING: ['Menunggu', 'var(--text-subtle)', 'var(--border-bold)'],
-  MISSED: ['Terlewat', 'var(--danger-text)', 'var(--danger-bold)'],
+  PENDING: ['Belum masuk', 'var(--text-subtle)', 'var(--border-bold)'],
+  LATE: ['Lewat jadwal', 'var(--warning-text)', 'var(--warning-bold)'],
+  EXTRA: ['Tambahan', 'var(--success-text)', 'var(--brand)'],
 };
 
 /**
@@ -55,9 +50,8 @@ export function useLive(enabled: boolean, path: string, chatActive: number | nul
   const incRes = useGet(on('/app/income', '/income')); // riwayat penuh, hanya daftar di layar Pemasukan
   const streamsRes = useGet(k('/income-streams'));
   const pendRes = useGet(k('/income?status=PENDING'));
-  const weekF = useGet(on('/app/income', '/income/forecast/week'));
-  const horizonF = useGet(on('/app/income', '/income/forecast/horizon?weeks=4'));
-  const draftRes = useGet(on('/app/income', '/income/checkin')); // juga /app/income/checkin
+  // Kebiasaan minggu ini (Beranda & Tanya Track) — insight dua bahasa dari backend, tanpa AI.
+  const habitsRes = useGet(k('/habits'), { refreshInterval: 300_000 });
   const subsRes = useGet(k('/subscriptions'));
   const streamSugRes = useGet(on('/app/income', '/income-streams/suggestions'));
   const sugSubRes = useGet(on('/app/subscriptions', '/subscriptions/suggestions'));
@@ -83,7 +77,6 @@ export function useLive(enabled: boolean, path: string, chatActive: number | nul
   const meRes = useGet(k('/auth/me'));
   // Profil & onboarding (wizard /setup): di wizard di-poll supaya kode Gmail & email pertama muncul sendiri.
   const profileRes = useGet(k('/profile'), { refreshInterval: path === '/setup' ? 4000 : 0 });
-  const sugRes = useGet(enabled && path.startsWith('/app/budget') ? '/ai/budget-suggestions' : null);
 
   const manual = useMemo(() => {
     const m = [0, 0, 0, 0, 0, 0, 0];
@@ -91,7 +84,6 @@ export function useLive(enabled: boolean, path: string, chatActive: number | nul
     return m;
   }, [budgets.data]);
 
-  const bmode: string = today.data?.mode ?? bsetRes.data?.mode ?? 'FIXED';
   const allowMap = useMemo(() => {
     const snap: Record<string, number> = {};
     for (const a of allowRes.data ?? []) snap[a.date] = Number(a.amount);
@@ -125,53 +117,28 @@ export function useLive(enabled: boolean, path: string, chatActive: number | nul
   const streams = useMemo(() => (streamsRes.data ?? []).map(mapStream), [streamsRes.data]);
   const pendingList = useMemo(() => (pendRes.data ?? []).map(mapIncome), [pendRes.data]);
 
+  // Kartu "Masuk periode ini" di Pemasukan: dari budget periode (pasti + tambahan) dan kebiasaan pemasukan.
   const weekInfo = useMemo(() => {
-    const w = weekF.data;
-    if (!w) return null;
-    const rows = w.streams.map((s: any) => {
-      const st = s.status === 'PENDING' && s.received > 0 ? 'PARTIAL' : s.status;
-      const [label, color, dot] = STATUS_ROW[st] ?? STATUS_ROW.PENDING;
-      return { name: s.name, amounts: st === 'RECEIVED' ? RPf(s.received) : `${RPf(s.received)} / ${RPf(s.expected)}`, status: label, color, dot };
+    const c = today.data?.cycle;
+    if (!c) return null;
+    const received = (c.pasti ?? []).reduce((a: number, p: any) => a + p.received, 0) + c.tambahan;
+    const usual = habitsRes.data?.income?.usualTotal ?? null;
+    const expected = usual ?? c.income;
+    const rows = (c.pasti ?? []).map((p: any) => {
+      const [status, color, dot] = STATUS_ROW[p.receivedCount ? 'RECEIVED' : p.lateSince ? 'LATE' : 'PENDING'];
+      return { name: p.name, amounts: p.receivedCount ? RPf(p.received) : `${RPf(0)} / ${RPf(p.usual)}`, status, color, dot };
     });
-    const hz: any[] = horizonF.data ?? [];
-    const sum = (k: string) => hz.reduce((a, x) => a + (x.totals?.[k] ?? 0), 0);
+    if (c.tambahan > 0) { const [status, color, dot] = STATUS_ROW.EXTRA; rows.push({ name: 'Pemasukan tambahan', amounts: RPf(c.tambahan), status, color, dot }); }
     return {
-      weekLabel: `Masuk minggu ini (${dm(w.weekStart)})`, received: RPf(w.totals.received), expected: `dari perkiraan ${RPf(w.totals.expected)}`, rows,
-      pct: (Number(w.totals.expected) > 0 ? Math.min(100, Number(w.totals.received) / Number(w.totals.expected) * 100) : 0).toFixed(0) + '%',
-      fc: [[w.totals.conservative, w.totals.expected, w.totals.max], [sum('conservative'), sum('expected'), sum('max')]],
-      upside: RPf(w.upsideMonthly ?? 0), irregular: w.streams.find((s: any) => s.kind === 'IRREGULAR')?.name ?? 'Project desain',
+      weekLabel: `Masuk ${c.period === 'WEEKLY' ? 'minggu' : 'bulan'} ini (${dm(c.start)})`, received: RPf(received),
+      expected: usual != null ? `biasanya ${RPf(usual)}` : `dari perkiraan ${RPf(c.income)}`, rows,
+      pct: (expected > 0 ? Math.min(100, received / expected * 100) : 0).toFixed(0) + '%',
     };
-  }, [weekF.data, horizonF.data]);
-
-  const allocIncome = weekF.data ? Number(weekF.data.totals.expected) : undefined;
-
-  const checkin = useMemo(() => {
-    const d = draftRes.data;
-    if (!d) return null;
-    const byId: Record<number, any> = {};
-    for (const s of d.streams) byId[s.id] = s;
-    return { weekStart: d.weekStart, label: `Minggu ${dm(d.weekStart)} – ${dm(d.weekEndLabel)}`, byId, totalExpected: d.totalExpected, totalRecorded: d.totalRecorded };
-  }, [draftRes.data]);
+  }, [today.data, habitsRes.data]);
 
   // ---- langganan & target ----
   const subs = useMemo(() => (subsRes.data ?? []).map(mapSub), [subsRes.data]);
   const goals = useMemo(() => (goalsRes.data ?? []).map(mapGoal), [goalsRes.data]);
-
-  // ---- budget advisor ----
-  const budget = useMemo(() => {
-    const s = sugRes.data;
-    if (!s) return null;
-    return {
-      opts: s.options.map((o: any) => ({ k: o.option, label: OPT_META[o.option].label, desc: OPT_META[o.option].desc, total: o.totalWeekly, save: o.weeklySavings, days: o.dailyAmounts, flag: o.realismFlag })),
-      rec: s.advice?.recommended ?? 'seimbang', reason: s.advice?.reason ?? null, weekStart: s.weekStart,
-      basis: [
-        ['Pemasukan ekspektasi', RPf(s.input.expectedIncome)],
-        ['Pemasukan konservatif', RPf(s.input.conservativeIncome)],
-        ['Komitmen (langganan jatuh tempo)', RPf(s.input.commitments)],
-        ['Rata-rata rutin harian (8 minggu)', RPf(s.input.avgRoutinePerDay) + '/hari'],
-      ],
-    };
-  }, [sugRes.data]);
 
   // ---- setting ----
   const st = useMemo(() => {
@@ -285,13 +252,23 @@ export function useLive(enabled: boolean, path: string, chatActive: number | nul
           occurredAt: x.dateISO === wibISO() ? new Date().toISOString() : new Date(`${x.dateISO}T12:00:00+07:00`).toISOString(),
         }),
       saveBudget: (m: number[]) => api.put('/budget', { budgets: m.map((amount, dayOfWeek) => ({ dayOfWeek, amount })) }),
-      saveBudgetSettings: (body: { mode?: string; anchorStreamId?: number | null; reservePct?: number }) => api.put('/budget/settings', body),
-      applyBudget: (option: string, week: string) => api.post('/budget/apply', { option, week }),
+      saveBudgetSettings: (body: Record<string, unknown>) => api.put('/budget/settings', body),
+      // Gaya langsung diterapkan: backend mengembalikan ringkasan hari ini yang baru → cache diganti tanpa menunggu refetch.
+      applyStyle: async (option: string) => {
+        const sum = await api.post<any>('/budget/apply', { option });
+        await mutate('/budget/today', sum, { revalidate: false });
+        return sum;
+      },
       sync: () => api.post<any>('/sync/trigger'),
       reportData: async (tab: number, off: number) => {
         if (tab <= 1) {
           const date = tab === 0 ? addDaysISO(wibISO(), off * 7) : monthAnchor(off);
-          return buildPeriodReport(tab as 0 | 1, await api.get<any>(`/reports?period=${tab === 0 ? 'week' : 'month'}&date=${date}`));
+          // Laporan mingguan ikut memuat kebiasaan minggu itu (GET /habits?week=).
+          const [rep, habits] = await Promise.all([
+            api.get<any>(`/reports?period=${tab === 0 ? 'week' : 'month'}&date=${date}`),
+            tab === 0 ? api.get<any>(`/habits?week=${date}`).catch(() => null) : null,
+          ]);
+          return { ...buildPeriodReport(tab as 0 | 1, rep), habits };
         }
         const agg = await api.get<any>(`/reports/aggregate?period=${tab === 2 ? '6m' : 'all'}`);
         const records = tab === 3 ? await api.get<any>('/reports/records') : null;
@@ -349,15 +326,19 @@ export function useLive(enabled: boolean, path: string, chatActive: number | nul
       saveAlias: (id: number, displayName: string) => api.put(`/merchant-aliases/${id}`, { displayName }),
       delAlias: (id: number) => api.delete(`/merchant-aliases/${id}`),
       // pemasukan
-      saveIncome: (id: number | null, x: { amount: number; desc: string; src: string; dateISO: string }) => {
-        const body = { amount: x.amount, description: x.desc, source: x.src, receivedAt: new Date(`${x.dateISO}T12:00:00+07:00`).toISOString() };
-        return id ? api.put(`/income/${id}`, body) : api.post('/income', body);
+      // kind: 'auto' = backend mencocokkan ke pemasukan pasti yang mirip, 'extra' = tambahan (streamId null), angka = pemasukan pasti itu.
+      saveIncome: (id: number | null, x: { amount: number; desc: string; src: string; dateISO: string; kind?: string }) => {
+        // Hari ini = jam sekarang (seperti addTx): jam 12.00 tetap bisa "masa depan" pagi hari → belum ikut budget periode.
+        const receivedAt = x.dateISO === wibISO() ? new Date().toISOString() : new Date(`${x.dateISO}T12:00:00+07:00`).toISOString();
+        const body = { amount: x.amount, description: x.desc, source: x.src, receivedAt };
+        if (id) return api.put(`/income/${id}`, body);
+        const streamId = !x.kind || x.kind === 'auto' ? undefined : x.kind === 'extra' ? null : Number(x.kind);
+        return api.post('/income', { ...body, ...(streamId !== undefined ? { streamId } : {}) });
       },
       delIncome: (id: number) => api.delete(`/income/${id}`),
       resolveIncome: (id: number, body: { streamId?: number; notIncome?: boolean }) => api.patch(`/income/${id}/resolve`, body),
       saveStream: (id: number | null, f: any) => (id ? api.put(`/income-streams/${id}`, streamPayload(f)) : api.post('/income-streams', streamPayload(f))),
       delStream: (id: number) => api.delete(`/income-streams/${id}`),
-      submitCheckin: (week: string, entries: any[]) => api.post('/income/checkin', { week, entries }),
       // langganan & target
       saveSub: (id: number | null, b: any) => (id ? api.put(`/subscriptions/${id}`, b) : api.post('/subscriptions', b)),
       delSub: (id: number) => api.delete(`/subscriptions/${id}`),
@@ -392,8 +373,8 @@ export function useLive(enabled: boolean, path: string, chatActive: number | nul
       txs, manual, incomes, streams, subs, goals, notifs,
       todayBudget: today.data ? Number(today.data.budget) : undefined,
       todayIncome: today.data ? Number(today.data.totalIncome) : undefined,
-      bmode, allowMap, bset: bsetRes.data ?? null, cyc: today.data?.cycle ?? null, todayBig: today.data ? Number(today.data.bigSpent ?? 0) : 0, bigThr: today.data?.cycle ? today.data.bigThreshold ?? null : null,
-      runwayInfo, weekInfo, allocIncome, checkin, budget,
+      allowMap, bset: bsetRes.data ?? null, cyc: today.data?.cycle ?? null, todayBig: today.data ? Number(today.data.bigSpent ?? 0) : 0, bigThr: today.data?.bigThreshold ?? null,
+      habits: habitsRes.data ?? null, runwayInfo, weekInfo,
       pendingList, pending: pendingList.length > 0,
     },
   };

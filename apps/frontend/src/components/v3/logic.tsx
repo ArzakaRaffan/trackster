@@ -75,12 +75,7 @@ const TX0 = [
   T(5,'GOJEK *GORIDE','Gojek',null,'JAGO','08.55','TRANSPORT',18500), T(5,'KANTIN KANTOR',null,null,'BCA','12.15','MAKANAN',47200), T(5,'SHOPEE','Shopee',null,'BCA','20.30','BELANJA',105500),
   T(6,'KOPI KENANGAN GRAND IND','Kopi Kenangan',null,'BCA','08.14','MAKANAN',32000,'Meeting sama klien'), T(6,'GOJEK *GORIDE','Gojek','Ojek ke kantor','JAGO','09.02','TRANSPORT',18500), T(6,'INDOMARET TEBET',null,null,'BCA','12.40','BELANJA',34000)
 ];
-const OPTS = [
-  { k:'hemat', label:'Hemat', desc:'Kejar goal, dana cadangan 15%', total:1260000, save:420000, days:[200000,160000,160000,170000,170000,200000,200000], flag:null },
-  { k:'seimbang', label:'Seimbang', desc:'Default — cadangan 10%', total:1440000, save:240000, days:[250000,180000,180000,180000,200000,200000,250000], flag:null },
-  { k:'longgar', label:'Longgar', desc:'Ada acara — cadangan 5%', total:1610000, save:70000, days:[280000,200000,200000,200000,220000,230000,280000], flag:'Tabungan minggu ini di bawah setoran Kantong Liburan (Rp150.000).' }
-];
-const KIND_L = { FIXED:'Tetap', SESSION:'Per sesi', DEDUCTION:'Potongan absen', VARIABLE:'Variabel bulanan', IRREGULAR:'Tak tentu' };
+const KIND_L = { FIXED:'Pasti', IRREGULAR:'Tidak pasti', SESSION:'Pasti · per sesi (lama)', DEDUCTION:'Pasti · potongan absen (lama)', VARIABLE:'Pasti · variabel (lama)' };
 const STREAMS0 = [
   { id:1, name:'Uang saku ortu', kind:'FIXED', cadence:'WEEKLY', source:'BCA', payDOW:'1', payDOM:'', amount:'500000', rate:'', extra:'', maxU:'', ded:'', typical:'', keywords:'SUHARTO', active:true },
   { id:2, name:'Les privat', kind:'SESSION', cadence:'WEEKLY', source:'JAGO', payDOW:'6', payDOM:'', amount:'', rate:'150000', extra:'25000', maxU:'5', ded:'', typical:'4', keywords:'', active:true },
@@ -125,7 +120,21 @@ const SUG_EN = {"Terdeteksi dari transaksimu": "Detected from your transactions"
   "Perintah di chat bot (tanpa AI, langsung dijawab)": "Bot chat commands (no AI, instant reply)", "catat pengeluaran (tambah “jago”/“bca” atau “kemarin”) ·": "log an expense (add “jago”/“bca” or “kemarin” for yesterday) ·",
   "catat pemasukan": "log income", "sisa jatah ·": "today’s allowance ·", "dampak sebelum belanja ·": "impact before you buy ·", "ringkasan tiap 07:00": "summary every 07:00"};
 // Kamus EN tambahan: cara menghitung budget (siklus gajian / saldo). Teks berangka dibuat dua bahasa langsung di render.
-const CYC_EN = {"Cara menghitung budget": "How your budget is calculated", "Tetap per hari": "Fixed per day", "Kamu atur nominal budget tiap hari.": "You set an amount for each day.", "Ikut gajian": "Follow payday", "Sisa uang sampai gajian berikutnya dibagi ke sisa hari.": "Money left until next payday, split across the remaining days.", "Dari saldo": "From balance", "Untuk pemasukan harian atau tak tentu: saldo dibagi 30 hari.": "For daily or irregular income: your balance split over 30 days.", "Pemasukan utama (penentu tanggal gajian)": "Main income (sets your payday)", "Pilih pemasukan…": "Choose income…", "Belum ada pemasukan rutin (mingguan atau bulanan). Tambahkan dulu di Pemasukan → Sumber.": "No recurring (weekly or monthly) income yet. Add one in Income → Sources first.", "Ke Pemasukan": "Go to Income", "Sisihkan untuk tabungan": "Set aside for savings", "Simpan cara hitung": "Save", "Menyimpan…": "Saving…", "✓ Tersimpan": "✓ Saved", "Jatah hari ini": "Today's allowance", "Atur bobot hari": "Set day weights", "Persentase = bobot tiap hari. Hari berbobot besar dapat jatah lebih besar (mis. weekend).": "Percent = weight of each day. Heavier days get a bigger share (e.g. weekends).", "Nominal per hari diatur di bawah.": "Set each day's amount below.", "Jatah harian berubah tiap hari mengikuti sisa uang sampai gajian.": "Your daily allowance updates every day from the money left until payday.", "Jatah harian = saldo ÷ 30 hari, dikurangi langganan yang akan jatuh tempo.": "Daily allowance = balance ÷ 30 days, minus upcoming subscriptions.", "Biasanya kamu terima uang kapan?": "When do you usually get paid?", "Budget harian dihitung dari sini. Bisa diganti di halaman Budget.": "Your daily budget is based on this. You can change it on the Budget page.", "Bulanan": "Monthly", "Tidak tentu / harian": "Irregular / daily", "Hari terima": "Pay day", "Tanggal terima (1–31)": "Pay date (1–31)", "Biasanya berapa? (Rp)": "Usually how much? (Rp)", "Belum yakin? Lewati saja: budget harian pakai angka tetap di bawah.": "Not sure? Skip it: your daily budget uses the fixed amount below.", "Budget harian = sisa uang sampai gajian berikutnya ÷ sisa hari. Menyesuaikan sendiri tiap hari.": "Daily budget = money left until next payday ÷ days left. It adjusts every day.", "Budget harian = saldo rekening ÷ 30 hari. Cocok untuk pemasukan harian atau tidak tentu.": "Daily budget = account balance ÷ 30 days. Good for daily or irregular income.", "Pemasukan utama": "Main income"};
+const CYC_EN = {"Jatah harian dari kebiasaanmu": "Daily allowance from your habits", "Cara hitung budget sekarang lebih simpel": "Your budget is now simpler", "Sudah benar": "Looks right", "Ubah pengaturan": "Change settings", "Jatah hari ini": "Today's allowance", "Dari mana angka ini": "Where this number comes from", "Gaya budget": "Budget style", "Aktif": "Active", "/hari": "/day", "Pengaturan budget": "Budget settings", "Periode budget": "Budget period", "Minggu budget mulai hari": "Budget week starts on", "Bulan budget mulai tanggal (1–31)": "Budget month starts on day (1–31)", "Dasar budget": "Budget basis", "Pemasukan pasti": "Fixed income", "Belum ada pemasukan pasti. Tambahkan supaya budget langsung terhitung dari pemasukanmu.": "No fixed income yet. Add one so your budget is calculated from your income.", "Pemasukan tidak pasti (freelance, project) cukup dicatat saat masuk, budget periode itu langsung bertambah.": "Irregular income (freelance, projects): just record it when it arrives and that period's budget grows right away.", "Kelola pemasukan": "Manage income", "Pakai angka ini": "Use this number", "Pola harian": "Daily pattern", "Nominal di sini hanya perbandingan antarhari, bukan jatah. Hari bernominal besar dapat porsi lebih besar.": "These amounts only compare days, they aren't allowances. Bigger days get a bigger share.", "Pemasukan pasti kamu?": "Your fixed income?", "Uang yang rutin kamu terima: gaji, uang saku, honor tetap. Budget harian langsung dihitung dari sini.": "Money you receive regularly: salary, allowance, a fixed fee. Your daily budget is calculated from it right away.", "Biasanya masuk hari": "Usually arrives on", "Biasanya masuk tanggal (1–31)": "Usually arrives on day (1–31)", "Kalau begitu, mau belanja berapa?": "Then how much do you want to spend?", "Jatah harianmu kira-kira": "Your daily allowance is about", "Lihat dampak ke budget": "See the effect on your budget", "Jenis": "Type", "Mingguan": "Weekly", "Bulanan": "Monthly", "Nggak ada yang pasti": "Nothing fixed", "Per minggu": "Per week", "Per bulan": "Per month", "Biasanya berapa? (Rp)": "Usually how much? (Rp)", "Menyimpan…": "Saving…", "✓ Tersimpan": "✓ Saved", "Pemasukan utama": "Main income"};
+// Demo (/demo): contoh objek periode dari GET /budget/today.cycle dan kebiasaan dari GET /habits — angka saling cocok
+// (pasti 500rb masuk + 600rb perkiraan + tambahan 500rb − sisihkan 10% = 1,44jt; − langganan 55rb − terpakai 385rb = sisa 1jt).
+const DEMO_W = [.17, .13, .13, .13, .13, .14, .17];
+const DEMO_CYC = { mode:'PERIOD', basis:'INCOME', period:'WEEKLY', periodDay:1, start:'2026-09-28', end:'2026-10-05', daysTotal:7, daysLeft:5, allowance:175500, periodBudget:1440000, income:1600000, reserve:160000, prorate:1, remaining:1000000, deficit:false,
+  tambahan:500000, reservePct:10, target:null, targetIsUsual:false, carry:0, commitments:55000, firstPeriod:false, pastiPending:[], usualSpend:1330000, weeksObserved:8, style:'seimbang',
+  pasti:[{ id:1, name:'Uang saku ortu', usual:500000, learned:true, paydays:1, received:500000, receivedCount:1, expected:0, lateSince:null }, { id:2, name:'Les privat', usual:600000, learned:true, paydays:1, received:0, receivedCount:0, expected:600000, lateSince:null }],
+  styles:[{ option:'hemat', reservePct:15, target:null, allowance:161500, periodBudget:1360000 }, { option:'seimbang', reservePct:10, target:null, allowance:175500, periodBudget:1440000 }, { option:'longgar', reservePct:5, target:null, allowance:189500, periodBudget:1520000 }],
+  weights:DEMO_W, weightsLearned:true, autoWeights:true, rolloverEnabled:false, needsReview:false, balance:4230000, runwayDays:23 };
+const DEMO_HAB = { learning:null, closed:false, spending:{ usualWeekly:1330000, thisWeek:540000 }, income:{ usualTotal:1550000 }, insights:[
+  { id:'habit-up:kopi', tone:'warn', textId:'Kopi Kenangan 3× minggu ini, biasanya 2× per minggu.', textEn:'Kopi Kenangan 3× this week, usually 2× a week.' },
+  { id:'streak', tone:'good', textId:'4 hari berturut-turut belanja di bawah jatah.', textEn:'4 days in a row under your daily budget.' },
+  { id:'peak-dow', tone:'info', textId:'Kamu biasanya paling banyak belanja di hari Sabtu (1,6× rata-rata harian).', textEn:'You usually spend the most on Saturdays (1.6× your daily average).' }] };
+const DAYN_EN = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+const MON_S = ['Jan','Feb','Mar','Apr','Mei','Jun','Jul','Agu','Sep','Okt','Nov','Des'];
 export class V3Logic extends React.Component {
   constructor(props) {
     super(props);
@@ -138,7 +147,7 @@ export class V3Logic extends React.Component {
     }
   }
   liveCall(fn) { const L = this.props.live; if (L === undefined) return false; Promise.resolve().then(fn).then(() => L.refresh && L.refresh()).catch(e => { this.toast((e && e.message) || 'Gagal menyimpan.'); L.refresh && L.refresh(); }); return true; }
-  syncLive(pl) { const L = this.props.live; if (!L) return; const cur = L.flat || {}, prev = (pl && pl.flat) || {}, patch = {}; for (const k of Object.keys(cur)) if (cur[k] !== prev[k]) patch[k] = cur[k]; for (const g of ['chat', 'st', 'split']) if (L[g] && L[g] !== (pl && pl[g])) patch[g] = { ...this.state[g], ...L[g] }; if (patch.budget && patch.budget.rec && !this._optSet) { this._optSet = 1; patch.opt = patch.budget.rec; } if (Object.keys(patch).length) this.setState(patch); }
+  syncLive(pl) { const L = this.props.live; if (!L) return; const cur = L.flat || {}, prev = (pl && pl.flat) || {}, patch = {}; for (const k of Object.keys(cur)) if (cur[k] !== prev[k]) patch[k] = cur[k]; for (const g of ['chat', 'st', 'split']) if (L[g] && L[g] !== (pl && pl[g])) patch[g] = { ...this.state[g], ...L[g] }; if (Object.keys(patch).length) this.setState(patch); }
   chatInputRef = React.createRef(); rootRef = React.createRef(); mascotRef = React.createRef(); chatScrollRef = React.createRef(); lpRef = React.createRef(); lpBoxRef = React.createRef();
   componentDidUpdate(pp, ps) { this.modalFocus(ps); this.loadAna(); this.loadReport(); this.searchLive(ps); if (ps && ps.chat && ps.chat.active !== this.state.chat.active && this.props.onChatActive) this.props.onChatActive(this.state.chat.active); this.syncLive(pp.live); this.syncPath(pp); this.persistPrefs(ps); if (pp && pp.mulai !== this.props.mulai) this.v3start(this.props.mulai); this.v3tr(); this.lpScan(); { const t = document.querySelector('[role=tablist] [aria-selected=true]'); if (t && t !== this._tabSel) { this._tabSel = t; t.scrollIntoView({ block:'nearest', inline:'center' }); } } { const bx = this.lpBoxRef.current, k = (this.state.lpChat || []).length + (this.state.lpTyping ? .5 : 0); if (bx && this._boxN !== k) { this._boxN = k; bx.scrollTop = bx.scrollHeight; } } const el = this.chatScrollRef.current; if (el && this.state.page === 'chat') { const n = el.scrollHeight; if (n !== this._lastH) { this._lastH = n; el.scrollTop = n; } } }
   // bp awal dari lebar jendela (client-only) supaya ponsel tidak sempat merender layout desktop sebelum ResizeObserver jalan
@@ -400,8 +409,10 @@ export class V3Logic extends React.Component {
       }
       if (cd.type === 'goal') return { isSim:false, isGoal:true, isBudget:false, name:cd.name, meta:`Target ${RP(cd.target)} · sebelum ${cd.deadline} · ~${RP(cd.weekly)}/minggu`, ...btn('Buat goal', 'Goal dibuat'),
         act:run(() => { if (this.props.live !== undefined) this.liveCall(() => this.props.live.actions.addGoal({ name:cd.name, targetAmount:cd.target, targetDate:cd.rawDeadline ? new Date(cd.rawDeadline).toISOString() : undefined })); else this.setState(z => ({ goals:[...z.goals, { id:Date.now(), name:cd.name, target:cd.target, date:null, current:0 }] })); }) };
-      return { isSim:false, isGoal:false, isBudget:true, name:`Budget ${cd.label} · ${RP(cd.total)}/minggu`, meta:cd.note, days:cd.days.map((v, i) => ({ d:['Min','Sen','Sel','Rab','Kam','Jum','Sab'][i], v:Math.round(v / 1000) + 'rb' })), ...btn('Terapkan', 'Diterapkan'),
-        act:run(() => { if (this.props.live !== undefined) this.liveCall(() => this.props.live.actions.saveBudget([...cd.days])); else this.setState({ manual:[...cd.days] }); }) };
+      // Kartu proposeBudget: gaya (hemat/seimbang/longgar) + pratinjau jatah. Kartu lama tanpa pratinjau tetap tampil.
+      const perDay = cd.perDay != null;
+      return { isSim:false, isGoal:false, isBudget:true, name: perDay ? `Gaya ${cd.label} · ${RP(cd.perDay)}/hari` : `Budget ${cd.label}${cd.total ? ' · ' + RP(cd.total) + '/minggu' : ''}`, meta:cd.note || (perDay && cd.periodBudget ? `Budget periode ${RP(cd.periodBudget)}` : ''), days:(cd.days || []).map((v, i) => ({ d:['Min','Sen','Sel','Rab','Kam','Jum','Sab'][i], v:Math.round(v / 1000) + 'rb' })), ...btn('Terapkan', 'Diterapkan'),
+        act:run(() => { if (cd.option) this.applyStyle(cd.option, cd.label); else this.setState({ manual:[...cd.days] }); }) };
     };
     const baseMsgs = thread ? thread.msgs : [];
     const list = c.pendingUser ? [...baseMsgs, { role:'user', text:c.pendingUser }] : baseMsgs;
@@ -599,14 +610,20 @@ export class V3Logic extends React.Component {
   }
   b2Title3(s) { return { day: s.dayIdx >= 0 ? (DAYS[s.dayIdx] || [])[1] : (s.dayLabel || 'Detail transaksi'), share:'Bagikan laporan', mem: s.memId ? 'Edit memory' : 'Tambah memory', bal: s.bf ? `Sesuaikan saldo ${s.bf.src === 'JAGO' ? 'Jago' : 'BCA'}` : '', tg:'Konfigurasi Telegram' }[s.modal]; }
   runSim() { clearTimeout(this.t5); this.setState({ simLoading:true }); if (this.props.live !== undefined) { const id = this.state.goalId, cut = this.state.simCut; this.t5 = setTimeout(() => { if (id == null) return this.setState({ simLoading:false }); this.props.live.actions.simulateGoal(id, cut).then(r => this.setState({ simRes:r, simLoading:false })).catch(() => this.setState({ simLoading:false })); }, 250); return; } this.t5 = setTimeout(() => this.setState({ simLoading:false }), 350); }
-  ciAmount(st, e) {
-    const n = v => Number(v) || 0;
-    if (st.kind === 'FIXED') return n(st.amount);
-    if (st.kind === 'SESSION') return e.units * n(st.rate) + Math.min(e.extra, e.units) * n(st.extra);
-    if (st.kind === 'DEDUCTION') return Math.max(0, n(st.amount) - e.units * n(st.ded));
-    return Number(digits(e.amount)) || 0;
+  /** Gaya hemat/seimbang/longgar — langsung diterapkan (POST /budget/apply mengembalikan ringkasan baru). */
+  applyStyle(option, label) {
+    if (this.state.styleBusy) return;
+    const L = this.props.live, name = label || option;
+    if (L === undefined) {
+      const c = this.state.cyc || DEMO_CYC, o = c.styles.find(x => x.option === option); if (!o) return;
+      this.setState({ cyc:{ ...c, style:option, reservePct:o.reservePct ?? c.reservePct, periodBudget:o.periodBudget, allowance:o.allowance, remaining:c.remaining + (o.periodBudget - c.periodBudget), reserve:Math.round(c.income * (o.reservePct ?? 0) / 100) }, todayBudget:o.allowance });
+      this.toast(`Gaya ${name} diterapkan. Jatah hari ini ${RP(o.allowance)}.`); return;
+    }
+    this.setState({ styleBusy:option });
+    L.actions.applyStyle(option).then(sum => { this.setState({ styleBusy:null, cyc:sum.cycle, todayBudget:Number(sum.budget) }); this.toast(`Gaya ${name} diterapkan. Jatah hari ini ${RP(sum.budget)}.`); L.refresh(); })
+      .catch(e => { this.setState({ styleBusy:null }); this.toast((e && e.message) || 'Gagal menerapkan gaya.'); });
   }
-  renderVals() { this.S = this.state; if (this.props.live !== undefined) v3SetupDates(this.S.manual, this.S.bmode && this.S.bmode !== 'FIXED' ? dynamicBudgetOf(this.S.manual, this.S.allowMap || {}, this.S.todayBudget ?? 0) : undefined); const v = this.rv0(); for (const k of Object.getOwnPropertyNames(Object.getPrototypeOf(this))) if (k.startsWith('rv_')) Object.assign(v, this[k](this.S, this.props, v)); return v; }
+  renderVals() { this.S = this.state; if (this.props.live !== undefined) v3SetupDates(this.S.manual, dynamicBudgetOf(this.S.manual, this.S.allowMap || {}, this.S.todayBudget ?? 0)); const v = this.rv0(); for (const k of Object.getOwnPropertyNames(Object.getPrototypeOf(this))) if (k.startsWith('rv_')) Object.assign(v, this[k](this.S, this.props, v)); return v; }
   rv_pre(s0, props) { const h = this.v3h(s0); const s = { ...s0, ckS:s0.ckS ?? {}, budget:s0.wzBudget ?? ((props.live !== undefined && s0.manual && Math.max(...s0.manual)) || 150000) };
     const { RP, NUM, seg, isMob, isDesk, isTab } = h;
     const PRE = ['landing', 'auth', 'wizard'];
@@ -629,17 +646,19 @@ export class V3Logic extends React.Component {
     // Gmail kini mengirim link konfirmasi (vf-…), bukan kode angka — backend menyimpannya di forwardCode.
     const isGmailLink = (v) => /^https:\/\/mail\.google\.com\/mail\/vf-/.test(v);
     const copy = (v, ok) => { if (typeof navigator !== 'undefined' && navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(v).then(() => this.toast(ok)).catch(() => this.toast('Gagal menyalin. Salin manual.')); else this.toast('Gagal menyalin. Salin manual.'); };
-    // Jadwal pemasukan (langkah 7): mingguan/bulanan → buat stream "Pemasukan utama" + mode CYCLE; tidak tentu → mode BALANCE; kosong → mode tetap (slider).
-    const pay = s.wzPay || '', payDow = s.wzPayDow ?? '5', payDom = s.wzPayDom ?? '25', payAmt = s.wzPayAmt ?? '';
+    // Pemasukan pasti (langkah 7): mingguan/bulanan → stream "Pemasukan pasti" + budget ikut pemasukan (langsung jadi jatah harian);
+    // nggak ada yang pasti → target belanja sendiri per minggu/bulan. Kosong → setelan bawaan (banner tinjau di Budget).
+    const pay = s.wzPay || '', payDow = s.wzPayDow ?? '1', payDom = s.wzPayDom ?? '25', payAmt = s.wzPayAmt ?? '', tgtP = s.wzTgtP || 'WEEKLY', amtN = Number(digits(payAmt)) || 0;
+    const payDays = (pay === 'NONE' ? tgtP : pay) === 'MONTHLY' ? 30 : 7;
     const savePay = () => {
       if (!pay) return null;
-      if (pay === 'NONE') return lv.actions.saveBudgetSettings({ mode:'BALANCE' });
-      const have = (s.streams || []).find(x => x.name === 'Pemasukan utama' && x.cadence === pay);
-      const f = { name:'Pemasukan utama', kind:'FIXED', cadence:pay, active:true, source:pf && pf.banks.includes('JAGO') && !pf.banks.includes('BCA') ? 'JAGO' : 'BCA', payDOW:payDow, payDOM:payDom, amount:digits(payAmt) };
-      return lv.actions.saveStream(have ? have.id : null, f).then(st => lv.actions.saveBudgetSettings({ mode:'CYCLE', anchorStreamId:(st && st.id) || (have && have.id) }));
+      if (pay === 'NONE') return lv.actions.saveBudgetSettings({ period:tgtP, periodDay:1, basis:'TARGET', targetAmount:amtN });
+      const have = (s.streams || []).find(x => (x.name === 'Pemasukan pasti' || x.name === 'Pemasukan utama') && x.cadence === pay);
+      const f = { name:'Pemasukan pasti', kind:'FIXED', cadence:pay, active:true, source:pf && pf.banks.includes('JAGO') && !pf.banks.includes('BCA') ? 'JAGO' : 'BCA', payDOW:payDow, payDOM:payDom, amount:String(amtN) };
+      return lv.actions.saveStream(have ? have.id : null, f).then(st => lv.actions.saveBudgetSettings({ period:pay, periodDay:pay === 'WEEKLY' ? Number(payDow) : Number(payDom), basis:'INCOME', reservePct:10, anchorStreamId:(st && st.id) || (have && have.id) }));
     };
-    const payErr = !pay || pay === 'NONE' ? '' : !(Number(digits(payAmt)) > 0) ? 'Isi perkiraan nominal pemasukanmu dulu.' : pay === 'MONTHLY' && !(Number(payDom) >= 1 && Number(payDom) <= 31) ? 'Tanggal terima harus 1–31.' : '';
-    const finishLive = () => { if (payErr) return this.toast(payErr); const m = [0, 1, 2, 3, 4, 5, 6].map(() => s.budget); return Promise.resolve(savePay()).then(() => Promise.all([s.wzBudget && !pay ? lv.actions.saveBudget(m) : null, lv.actions.finishOnboarding()])).then(() => lv.refreshProfile()).then(() => { lv.refresh(); this.setState({ pre:null, page:'dash' }); }).catch(e => this.toast((e && e.message) || 'Gagal menyimpan. Coba lagi.')); };
+    const payErr = !pay ? '' : !(amtN > 0) ? 'Isi nominalnya dulu.' : pay === 'MONTHLY' && !(Number(payDom) >= 1 && Number(payDom) <= 31) ? 'Tanggal terima harus 1–31.' : '';
+    const finishLive = () => { if (payErr) return this.toast(payErr); return Promise.resolve(savePay()).then(() => lv.actions.finishOnboarding()).then(() => lv.refreshProfile()).then(() => { lv.refresh(); this.setState({ pre:null, page:'dash' }); }).catch(e => this.toast((e && e.message) || 'Gagal menyimpan. Coba lagi.')); };
     const saveStep0 = () => {
       const nums = (s.accNums ?? (pf ? pf.accounts.map(a => a.accountNumber).join(', ') : '')).split(/[,;\n]/).map(x => x.replace(/\D/g, '')).filter(Boolean);
       if (nums.some(x => x.length < 6 || x.length > 20)) return this.setState({ wzErr0:'Nomor rekening harus 6–20 digit.' });
@@ -713,12 +732,16 @@ export class V3Logic extends React.Component {
       simBad:() => this.setState({ testSt:'bad' }),
       simIdle:() => this.setState({ testSt:'idle' }),
       budgetTxt2:RP(s.budget), budgetVal:String(s.budget), onBudget:e => this.setState({ wzBudget:parseInt(e.target.value, 10) }),
-      payOpts:[['WEEKLY', 'Mingguan'], ['MONTHLY', 'Bulanan'], ['NONE', 'Tidak tentu / harian']].map(([k, label]) => ({ label, checked:String(pay === k), bd: pay === k ? 'var(--text)' : 'var(--border)', bg: pay === k ? 'var(--brand-subtle)' : 'transparent', onClick:() => this.setState({ wzPay: pay === k ? '' : k }) })),
-      payWeekly:pay === 'WEEKLY', payMonthly:pay === 'MONTHLY', payHasAmt:pay === 'WEEKLY' || pay === 'MONTHLY', budSliderShow:!pay,
+      payOpts:[['WEEKLY', 'Mingguan'], ['MONTHLY', 'Bulanan'], ['NONE', 'Nggak ada yang pasti']].map(([k, label]) => ({ label, checked:String(pay === k), bd: pay === k ? 'var(--text)' : 'var(--border)', bg: pay === k ? 'var(--brand-subtle)' : 'transparent', onClick:() => this.setState({ wzPay: pay === k ? '' : k }) })),
+      payWeekly:pay === 'WEEKLY', payMonthly:pay === 'MONTHLY', payHasAmt:!!pay, payTargetShow:pay === 'NONE',
+      tgtPeriodOpts:[['WEEKLY', 'Per minggu'], ['MONTHLY', 'Per bulan']].map(([k, label]) => ({ label, checked:String(tgtP === k), bd: tgtP === k ? 'var(--text)' : 'var(--border)', bg: tgtP === k ? 'var(--brand-subtle)' : 'transparent', onClick:() => this.setState({ wzTgtP:k }) })),
+      payAmtLabel: pay === 'NONE' ? `Mau belanja berapa per ${tgtP === 'WEEKLY' ? 'minggu' : 'bulan'}? (Rp)` : 'Biasanya berapa? (Rp)', payAmtPh: pay === 'NONE' ? '1.000.000' : pay === 'MONTHLY' ? '3.000.000' : '600.000',
       payDow, payDowOpts:[1, 2, 3, 4, 5, 6, 0].map(d => ({ value:String(d), label:DAYN[d] })), onPayDow:e => this.setState({ wzPayDow:e.target.value }),
       payDom, onPayDom:e => this.setState({ wzPayDom:digits(e.target.value).slice(0, 2) }),
       payAmt:payAmt ? Number(digits(payAmt)).toLocaleString('id-ID') : '', onPayAmt:e => this.setState({ wzPayAmt:digits(e.target.value) }),
-      payNote:!pay ? 'Belum yakin? Lewati saja: budget harian pakai angka tetap di bawah.' : pay === 'NONE' ? 'Budget harian = saldo rekening ÷ 30 hari. Cocok untuk pemasukan harian atau tidak tentu.' : 'Budget harian = sisa uang sampai gajian berikutnya ÷ sisa hari. Menyesuaikan sendiri tiap hari.',
+      payPreviewShow:!!pay && amtN > 0, payPreview:'≈ ' + RP(Math.round(amtN * (pay === 'NONE' ? 1 : .9) / payDays / 500) * 500) + ' per hari',
+      payPreviewNote: pay === 'NONE' ? `${RP(amtN)} per ${tgtP === 'WEEKLY' ? 'minggu' : 'bulan'} dibagi ${payDays} hari, menyesuaikan pola harianmu.` : `${RP(amtN)} − sisihkan 10% = ${RP(amtN * .9)}, dibagi ${payDays} hari. Pemasukan tambahan langsung menaikkan angka ini.`,
+      payNote: !pay ? 'Belum yakin? Lewati saja, nanti bisa diatur di halaman Budget.' : pay === 'NONE' ? 'Pemasukan yang masuk tetap dicatat; budget-mu pakai angka ini. Setelah 3 minggu Trackster menyarankan angka dari kebiasaan belanjamu.' : 'Setelah 3 kali pemasukan tercatat, Trackster memakai nominal yang benar-benar masuk, bukan angka ini.',
       tgLabel:(isLive ? !!(pf && pf.checklist.telegram) : s.tgOn) ? '✓ Terhubung' : 'Hubungkan', tgBg:(isLive ? !!(pf && pf.checklist.telegram) : s.tgOn) ? 'var(--brand-subtle)' : 'transparent', tgC:'var(--text)', connectTg:() => { if (isLive) return this.linkTelegram(); this.setState(st => ({ tgOn:!st.tgOn })); this.toast(s.tgOn ? 'Telegram diputus.' : 'Telegram terhubung.'); },
       toastPwa:() => this.toast('iOS: Bagikan → Tambah ke Layar Utama. Android: menu ⋮ → Instal aplikasi.'),
       finishWiz:() => { if (isLive) return finishLive(); this.setState({ pre:null, page:'dash' }); this.toast('Selamat datang di Trackster!'); }
@@ -737,12 +760,12 @@ export class V3Logic extends React.Component {
 
   rv_shell(s, props) {
     const bp = s.bp, desk = bp === 'd', pg = s.page, mob = !desk;
-    const TXG = ['today', 'weekly'], PLG = ['budget', 'income', 'checkin', 'goals', 'subs'];
+    const TXG = ['today', 'weekly'], PLG = ['budget', 'income', 'goals', 'subs'];
     const act = pg === 'dash' ? 'dash' : TXG.includes(pg) ? 'today' : PLG.includes(pg) ? 'budget' : ['reports','analysis','chat','memory'].includes(pg) ? 'insight' : 'me';
     const PATH = { dash:'M3 10.5 12 3l9 7.5V20a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z', today:'M4 2v20l2-1 2 1 2-1 2 1 2-1 2 1 2-1 2 1V2l-2 1-2-1-2 1-2-1-2 1-2-1-2 1Z M8 8h8 M8 12h8 M8 16h5', budget:'M8 2v4 M16 2v4 M3 10h18 M5 4h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z', me:'M4 6h16 M4 12h16 M4 18h16', insight:'M3 3v18h18 M8 17v-5 M13 17V8 M18 17v-3' };
     const tb = (k, label) => { const on = act === k; return { tab:true, center:false, label, d:PATH[k], cur:on ? 'page' : 'false', c:on ? 'var(--brand-text)' : 'var(--text-subtle)', fw:on ? 700 : 500, pill:on ? 'var(--brand-subtle)' : 'transparent', go:() => this.go(k === 'insight' ? 'reports' : k) }; };
     const chips = (list) => list.map(([k, l]) => ({ l, on:String(pg === k), bg:pg === k ? 'var(--brand)' : 'var(--neutral)', c:pg === k ? 'var(--on-brand)' : 'var(--text)', go:() => this.go(k) }));
-    const strip = TXG.includes(pg) ? chips([['today', 'Hari ini'], ['weekly', 'Mingguan']]) : PLG.includes(pg) ? chips([['budget', 'Budget'], ['income', 'Pemasukan'], ['checkin', 'Check-in'], ['goals', 'Target'], ['subs', 'Langganan']]) : [];
+    const strip = TXG.includes(pg) ? chips([['today', 'Hari ini'], ['weekly', 'Mingguan']]) : PLG.includes(pg) ? chips([['budget', 'Budget'], ['income', 'Pemasukan'], ['goals', 'Target'], ['subs', 'Langganan']]) : [];
     return {
       isMob:mob, isDesk:desk, showSide:desk, showBottom:mob && !s.pre, mascotStill:String((props.mascot ?? 'aktif') !== 'aktif'),
       mainPad:desk ? '28px 64px 120px 48px' : '8px 16px 168px', h1s:desk ? '32px' : '26px', h1l:desk ? '40px' : '32px',
@@ -760,7 +783,7 @@ export class V3Logic extends React.Component {
     const P = { rep:'M3 3v18h18 M7 16V9 M12 16V5 M17 16v-4', ana:'M21 12A9 9 0 1 1 12 3v9z', chat:'M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z', mem:'M9 18h6 M10 22h4 M12 2a7 7 0 0 0-4 12.7V17h8v-2.3A7 7 0 0 0 12 2z', chk:'M9 11l3 3L22 4 M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11', goal:'M12 22a10 10 0 1 0 0-20 10 10 0 0 0 0 20z M12 18a6 6 0 1 0 0-12 6 6 0 0 0 0 12z M12 14a2 2 0 1 0 0-4 2 2 0 0 0 0 4z', sub:'M3 12a9 9 0 0 1 15.5-6.3L21 8 M21 3v5h-5 M21 12a9 9 0 0 1-15.5 6.3L3 16 M3 21v-5h5', split:'M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2 M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8z M22 21v-2a4 4 0 0 0-3-3.9 M16 3.1a4 4 0 0 1 0 7.8', mail:'M4 4h16v16H4z M4 8l8 5 8-5', shield:'M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z', cog:'M12 8a4 4 0 1 0 0 8 4 4 0 0 0 0-8z M12 2v3 M12 19v3 M2 12h3 M19 12h3' };
     return { meGroups:[
       { title:'Insight', items:[it('Laporan', 'Minggu, bulan, 6 bulan, semua. Bisa dibagikan sebagai gambar', P.rep, 'reports'), it('Analisis', 'Kebiasaan, anomali, dan pembelian besar', P.ana, 'analysis'), it('Tanya Track', 'Simulasi beli, proposal budget dan target', P.chat, 'chat'), it('Yang Track ingat', 'Hal yang Track tahu tentangmu. Kamu yang atur', P.mem, 'memory')] },
-      { title:'Rencana lainnya', items:[it('Check-in pemasukan', 'Konfirmasi gaji dan freelance mingguan', P.chk, 'checkin'), it('Target tabungan', 'Kantong, progres, dan simulasi nabung', P.goal, 'goals'), it('Langganan', 'Tagihan rutin dan pengingat kalender', P.sub, 'subs')] },
+      { title:'Rencana lainnya', items:[it('Target tabungan', 'Kantong, progres, dan simulasi nabung', P.goal, 'goals'), it('Langganan', 'Tagihan rutin dan pengingat kalender', P.sub, 'subs')] },
       { title:'Bersama teman dan alat bantu', items:[it('Split bill dan patungan', 'Bagi tagihan, kirim tautan ke WhatsApp', P.split, 'split'), it('Kalkulator', 'Tabungan dan cicilan atau PayLater', P.goal, 'calc')] },
       { title:'Koneksi dan data', items:[it('Sumber data', 'Status email bank dan alamat penerusan', P.mail, 'sources', s.cond && s.cond !== 'aktif' ? '1 perlu dicek' : ''), it('Privasi dan data kamu', 'Apa yang masuk, log email, ekspor, hapus akun', P.shield, 'privacy'), it('Rapikan kategori', 'Satu merchant, satu kategori untuk semua transaksinya', P.chk, 'tidy'), it('Setting', 'Email bank, Telegram, saldo bank, alias', P.cog, 'settings'), { l:'Pasang ke layar utama', s:'Buka Trackster seperti aplikasi, tanpa toko aplikasi', d:P.mail, badge:'', go:() => this.setState({ pwaOpen:true }) }] }
     ] };
@@ -910,7 +933,7 @@ export class V3Logic extends React.Component {
       sideMini:mini, sideW:mini ? '76px' : '264px', sideFull:!mini, sideJustify:mini ? 'center' : 'flex-start', sideStack:mini ? 'column' : 'row', sideRot:mini ? '180deg' : '0deg', sideToggleLabel:mini ? 'Perlebar sidebar' : 'Ciutkan sidebar', toggleSide:() => this.setState({ sideMini:!mini }),
       sideGroups:[
         { title:'Harian', items:[it('dash', 'Beranda', I.dash), it('today', 'Hari ini', I.sun), it('weekly', 'Mingguan', I.bars)] },
-        { title:'Rencana', items:[it('budget', 'Budget', I.wallet), it('income', 'Pemasukan', I.income, s.pending ? '1' : ''), it('checkin', 'Check-in', I.checklist), it('goals', 'Target tabungan', P.goals), it('subs', 'Langganan', P.subs)] },
+        { title:'Rencana', items:[it('budget', 'Budget', I.wallet), it('income', 'Pemasukan', I.income, s.pending ? '1' : ''), it('goals', 'Target tabungan', P.goals), it('subs', 'Langganan', P.subs)] },
         { title:'Insight', items:[it('reports', 'Laporan', P.rep), it('analysis', 'Analisis', P.ana), it('chat', 'Tanya Track', P.chat), it('tidy', 'Rapikan kategori', P.tidy)] },
         { title:'Selengkapnya', items:[it('split', 'Split bill', P.split), it('calc', 'Kalkulator', P.calc), it('sources', 'Sumber data', P.src), it('privacy', 'Privasi', P.priv), it('settings', 'Setting', P.cog)] }
       ],
@@ -960,12 +983,23 @@ export class V3Logic extends React.Component {
     if (this._lastLang !== undefined && this._lastLang !== en && !this.props.reducedMotion && root.animate) root.animate([{ opacity:.35 }, { opacity:1 }], { duration:240, easing:'cubic-bezier(.2,0,0,1)' });
     this._lastLang = en; try { document.documentElement.lang = en ? 'en' : 'id'; } catch (e) {}
   }
-  rv_alloc(s) {
-    const RPf = n => 'Rp' + Math.round(n).toLocaleString('id-ID'), inc = this.props.live !== undefined ? (s.allocIncome || 0) : 1250000, a = s.alloc ?? [50, 30, 20], spent = s.txs.filter(t => t.cat !== 'TRANSFER').reduce((x, t) => x + t.amt, 0), bud = (s.manual || []).reduce((x, y) => x + y, 0), left = Math.max(0, bud - spent);
-    const set = (i, d) => this.setState(z => { const v = [...(z.alloc ?? [50, 30, 20])]; if (i === 0) { v[0] = Math.max(20, Math.min(80, v[0] + d)); v[2] = Math.max(0, 100 - v[0] - v[1]); v[1] = 100 - v[0] - v[2]; } else if (i === 1) { v[1] = Math.max(0, Math.min(60, v[1] + d)); v[2] = Math.max(0, 100 - v[0] - v[1]); v[1] = 100 - v[0] - v[2]; } else { v[2] = Math.max(0, Math.min(60, v[2] + d)); v[1] = Math.max(0, 100 - v[0] - v[2]); v[2] = 100 - v[0] - v[1]; } return { alloc:v }; });
-    const cols = ['var(--text)', 'var(--warning-bold)', 'var(--brand)'], shapes = ['border-radius:2px', 'border-radius:50%', 'transform:rotate(45deg)'], L = ['Kebutuhan', 'Keinginan', 'Tabungan'], N = ['Makan, transport, tagihan, kos', 'Jajan, hiburan, belanja', 'Masuk ke kantong target'];
-    const cells = []; a.forEach((p, i) => { const c = Math.round(p / 5); for (let k = 0; k < c; k++) cells.push({ bg:cols[i] }); }); while (cells.length < 20) cells.push({ bg:cols[2] }); cells.length = 20;
-    return { al:{ income:RPf(inc), ratio:a.join('/'), canSave:RPf(inc * a[2] / 100 + left), canSaveNote:a[2] + '% dari pemasukan (' + RPf(inc * a[2] / 100) + ') ditambah sisa budget minggu ini (' + RPf(left) + ').', cells, rows:a.map((p, i) => ({ l:L[i], pct:p, amt:RPf(inc * p / 100), c:cols[i], shape:shapes[i], note:N[i], minus:() => set(i, -5), plus:() => set(i, 5) })) } };
+  /** Kartu "Kebiasaanmu minggu ini" (Beranda) & kebiasaan minggu laporan — GET /habits (insight dua bahasa dari backend). */
+  rv_hab(s) {
+    const live = this.props.live !== undefined, en = (s.lang ?? 'id') === 'en';
+    const TONE = { warn:['var(--warning-subtle)', 'var(--warning-bold)'], good:['var(--success-subtle)', 'var(--success-bold)'], info:['var(--neutral)', 'var(--border-bold)'] };
+    const build = (h, title, sub, current) => {
+      if (!h) return { title, sub, learning:false, learnTxt:'', learnSeg:[], items:[], empty:true, emptyTxt:en ? 'Loading your habits…' : 'Memuat kebiasaanmu…' };
+      const L = h.learning, items = (h.insights || []).map(x => ({ text:en ? x.textEn : x.textId, bg:(TONE[x.tone] || TONE.info)[0], dot:(TONE[x.tone] || TONE.info)[1] }));
+      const wk = L ? Math.min(L.needed, L.weeksObserved + 1) : 0;
+      return { title, sub, items, learning:!!L,
+        learnTxt: L ? (en ? `Trackster is still getting to know your habits: week ${wk} of ${L.needed}. Keep recording; comparisons like “usually” appear after that.` : `Trackster masih kenalan sama kebiasaanmu: minggu ${wk} dari ${L.needed}. Terus catat ya, perbandingan “biasanya” muncul setelah itu.`) : '',
+        learnSeg: L ? Array.from({ length:L.needed }, (_, i) => ({ bg: i < wk ? 'var(--brand)' : 'var(--border)' })) : [],
+        empty:!L && !items.length, emptyTxt: current ? (en ? 'Nothing stands out this week. Your habits look steady.' : 'Belum ada yang menonjol minggu ini. Kebiasaanmu stabil.') : (en ? 'Nothing stood out that week.' : 'Tidak ada yang menonjol di minggu itu.') };
+    };
+    const hd = live ? s.habits : DEMO_HAB, sp = hd && hd.spending;
+    const sub = sp && sp.usualWeekly ? (en ? `usually ${RP(sp.usualWeekly)}/week · this week ${RP(sp.thisWeek)}` : `biasanya ${RP(sp.usualWeekly)}/minggu · minggu ini ${RP(sp.thisWeek)}`) : '';
+    const rh = live ? s.rpView && s.rpView.habits : DEMO_HAB;
+    return { hab:build(hd, en ? 'Your habits this week' : 'Kebiasaanmu minggu ini', sub, true), rpHab:build(rh, rh && !rh.closed ? (en ? 'Habits this week' : 'Kebiasaan minggu ini') : (en ? 'Habits that week' : 'Kebiasaan minggu itu'), '', !!(rh && !rh.closed)), rpHabShow:s.rp.tab === 0 && !!rh };
   }
   rv_chatui(s) {
     const d = s.bp === 'd', open = s.chatHist ?? d;
@@ -1054,13 +1088,12 @@ export class V3Logic extends React.Component {
   // Teks contoh yang tertulis langsung di markup prototipe -> data asli (kunci *Txt; di /demo tidak ada = teks asli prototipe)
   rv_live(s) {
     if (this.props.live === undefined) return { incPct:'48%' };
-    const RPf = n => 'Rp' + Math.abs(Math.round(n)).toLocaleString('id-ID'), w = s.weekInfo, r = s.runwayInfo, c = s.checkin, pl = s.pendingList || [], p = pl[0];
+    const RPf = n => 'Rp' + Math.abs(Math.round(n)).toLocaleString('id-ID'), w = s.weekInfo, r = s.runwayInfo, pl = s.pendingList || [], p = pl[0];
     const act = (s.subs || []).filter(x => x.active), burn = act.reduce((a, x) => a + (x.cycle === 'YEARLY' ? x.amount / 12 : x.amount), 0), soon = act.filter(x => { const dl = daysTo(x.due); return dl >= 0 && dl <= x.remind; }).length;
     return { subsBurnTxt:RPf(burn), dashSubCountTxt:`${act.length} aktif ·`, dashSubSoonTxt:`${soon} jatuh tempo dekat`,
       runBurnTxt:r ? r.burn : '', runDaysTxt:r ? r.days : '', runBalTxt:r ? r.balance : '',
-      incWeekTxt:w ? w.weekLabel : '', incPct:w ? w.pct : '0%', incReceivedTxt:w ? w.received : '', incExpectedTxt:w ? w.expected : '', upsideTxt:w ? w.upside : '', upsideNoteTxt:w ? ` dari pemasukan tak terduga (${w.irregular}), tidak dihitung di angka di atas karena tidak bisa diandalkan.` : '',
-      pendTitleTxt:`Perlu dicek (${pl.length}).`, pendAmtTxt:p ? '+' + RPf(p.amt) : '', pendDescTxt:p ? p.desc : '',
-      ciWeekTxt:c ? c.label : '', ciExpTxt:c ? RPf(c.totalExpected) : '', ciRecTxt:c ? RPf(c.totalRecorded) : '', budgetReasonTxt:(s.budget && s.budget.reason) || '' };
+      incWeekTxt:w ? w.weekLabel : '', incPct:w ? w.pct : '0%', incReceivedTxt:w ? w.received : '', incExpectedTxt:w ? w.expected : '',
+      pendTitleTxt:`Perlu dicek (${pl.length}).`, pendAmtTxt:p ? '+' + RPf(p.amt) : '', pendDescTxt:p ? p.desc : '' };
   }
   rv_dash(s, p, v) {
     const over = v.hero && v.hero.over;
@@ -1076,37 +1109,30 @@ export class V3Logic extends React.Component {
     const s = this.S, h = React.createElement;
     const dark = (this.state.themeOv ?? this.props.theme ?? 'dark') === 'dark', presence = this.props.mascot ?? 'aktif', sisa = (this.props.heroFocus ?? 'sisa') === 'sisa';
     const neutral = (on, label) => on;
-    const PAGES = { tidy:['Rapikan kategori','Satu merchant, satu kategori'], calc:['Kalkulator','Tabungan dan cicilan'], me:['Menu','Semua fitur Trackster'], analysis:['Analisis','Kebiasaan, anomali, dan pembelian besar'], sources:['Sumber data','Email bank, alamat penerusan, integrasi'], privacy:['Privasi dan data kamu','Yang masuk, yang tidak, dan kendalimu'], dash:['Dashboard',TODAY_LABEL], today:['Hari ini',TODAY_LABEL], weekly:['Mingguan','7 hari terakhir'], budget:['Budget','Atur budget harian'], income:['Pemasukan','Kelola arus masuk'], checkin:['Check-in pemasukan','Jaring pengaman mingguan'], subs:['Langganan','Tagihan rutin yang kamu catat'], settings:['Setting','Akun & sinkronisasi'], chat:['Tanya Track','AI financial buddy'], reports:['Laporan','Analisis pengeluaran'], split:['Split bill','Bagi tagihan bareng teman'], splitNew:['Buat split bill','3 langkah'], splitDetail:[(this.state.split.bills.find(x => x.id === this.state.split.activeId) || {}).resto || 'Split bill','Detail split bill'], memory:['Yang Track ingat','Tanya Track'], goals:['Target tabungan','Kantong untuk tiap tujuan'] };
+    const PAGES = { tidy:['Rapikan kategori','Satu merchant, satu kategori'], calc:['Kalkulator','Tabungan dan cicilan'], me:['Menu','Semua fitur Trackster'], analysis:['Analisis','Kebiasaan, anomali, dan pembelian besar'], sources:['Sumber data','Email bank, alamat penerusan, integrasi'], privacy:['Privasi dan data kamu','Yang masuk, yang tidak, dan kendalimu'], dash:['Dashboard',TODAY_LABEL], today:['Hari ini',TODAY_LABEL], weekly:['Mingguan','7 hari terakhir'], budget:['Budget','Jatah harian dari kebiasaanmu'], income:['Pemasukan','Kelola arus masuk'], subs:['Langganan','Tagihan rutin yang kamu catat'], settings:['Setting','Akun & sinkronisasi'], chat:['Tanya Track','AI financial buddy'], reports:['Laporan','Analisis pengeluaran'], split:['Split bill','Bagi tagihan bareng teman'], splitNew:['Buat split bill','3 langkah'], splitDetail:[(this.state.split.bills.find(x => x.id === this.state.split.activeId) || {}).resto || 'Split bill','Detail split bill'], memory:['Yang Track ingat','Tanya Track'], goals:['Target tabungan','Kantong untuk tiap tujuan'] };
     const OTHER = { tidy:'Rapikan kategori', calc:'Kalkulator', goals:'Target tabungan', subs:'Langganan', reports:'Laporan', analysis:'Analisis', chat:'Tanya Track', split:'Split bill', sources:'Sumber data', privacy:'Privasi', settings:'Setting' };
     const navItem = (k, label, icon, badge) => { const on = s.page === k; return { label, icon, current: on ? 'page' : undefined, bg: on ? 'var(--neutral)' : 'transparent', hover: on ? 'var(--neutral-hover)' : 'var(--hover)', color: on ? 'var(--text)' : 'var(--text-subtle)', weight: on ? 700 : 500, hasBadge: !!badge, badge: badge || '', onClick:() => this.go(k) }; };
-    const nav = [navItem('dash','Dashboard',I.dash), navItem('today','Hari ini',I.sun), navItem('weekly','Mingguan',I.bars), navItem('budget','Budget',I.wallet), navItem('income','Pemasukan',I.income, this.props.live !== undefined ? (s.pendingList ? s.pendingList.length : 0) : (s.pending ? 1 : 0)), navItem('checkin','Check-in',I.checklist)];
+    const nav = [navItem('dash','Dashboard',I.dash), navItem('today','Hari ini',I.sun), navItem('weekly','Mingguan',I.bars), navItem('budget','Budget',I.wallet), navItem('income','Pemasukan',I.income, this.props.live !== undefined ? (s.pendingList ? s.pendingList.length : 0) : (s.pending ? 1 : 0))];
     const moreNav = Object.entries(OTHER).map(([k, label]) => ({ label, current: s.page === k ? 'page' : undefined, bg: s.page === k ? 'var(--neutral)' : 'transparent', color: s.page === k ? 'var(--text)' : 'var(--text-subtle)', onClick:() => this.go(k) }));
-    const crumbs = { today:['Dashboard','dash'], checkin:['Pemasukan','income'], memory:['Tanya Track','chat'], splitNew:['Split bill','split'], splitDetail:['Split bill','split'] };
+    const crumbs = { today:['Dashboard','dash'], memory:['Tanya Track','chat'], splitNew:['Split bill','split'], splitDetail:['Split bill','split'] };
     const pg = PAGES[s.page] || [OTHER[s.page], 'Belum didesain ulang'];
 
     // today
     // Mode dinamis: pembelian besar (s.todayBig dari backend) sudah mengurangi sisa siklus, jadi tidak dihitung "lewat budget" hari ini.
-    const tTx = s.txs.filter(t => t.d === 6), spentAll = tTx.reduce((a, t) => a + t.amt, 0), big = Math.min(spentAll, s.todayBig || 0), spent = spentAll - big, budget = s.todayBudget ?? 200000, over = spent > budget, ratio = budget > 0 ? spent / budget : (spent > 0 ? 1 : 0), near = !over && ratio >= .8;
+    const tTx = s.txs.filter(t => t.d === 6), spentAll = tTx.reduce((a, t) => a + t.amt, 0), big = Math.min(spentAll, s.todayBig || 0), spent = spentAll - big, budget = s.todayBudget ?? (s.cyc || DEMO_CYC).allowance, over = spent > budget, ratio = budget > 0 ? spent / budget : (spent > 0 ? 1 : 0), near = !over && ratio >= .8;
     const st = over ? ['Over budget','var(--danger-text)','var(--danger-subtle)',I.octagon,'var(--danger-bold)'] : near ? ['Hampir habis','var(--warning-text)','var(--warning-subtle)',I.triangle,'var(--warning-bold)'] : ['Aman','var(--success-text)','var(--success-subtle)',I.check,'var(--success-bold)'];
     const hero = { label: sisa ? (over ? 'Lewat budget hari ini' : 'Sisa hari ini') : 'Terpakai hari ini', value: sisa ? RP(Math.abs(budget - spent)) : RP(spent), valueColor: over ? 'var(--danger-text)' : 'var(--text)',
       status:st[0], statusColor:st[1], statusBg:st[2], statusIcon:st[3], bar:st[4], pct:Math.min(100, ratio * 100) + '%', pctN:Math.round(Math.min(100, ratio * 100)), over, overBy:RP(spent - budget), tgSent:!!s.st?.tgConfigured,
       peek: sisa ? `Terpakai ${RP(spent)} dari ${RP(budget)}` : `${over ? 'Lewat' : 'Sisa'} ${RP(Math.abs(budget - spent))} dari ${RP(budget)}`,
       stats: [{ label:'Budget', value:RP(budget), color:'var(--text)' }, sisa ? { label:'Terpakai', value:RP(spent), color:'var(--text)' } : { label: over ? 'Lewat' : 'Sisa', value:RP(Math.abs(budget - spent)), color: over ? 'var(--danger-text)' : 'var(--success-text)' }] };
-    const cy = s.cyc, en = (s.lang ?? 'id') === 'en';
+    // Baris info di bawah hero (Beranda & Hari ini): sisa budget periode + pemasukan pasti yang belum masuk.
+    const en = (s.lang ?? 'id') === 'en', cy = this.props.live !== undefined ? s.cyc : (s.cyc || DEMO_CYC);
     hero.hasCycle = !!cy; hero.cycleTxt = '';
     if (cy) {
-      const left = cy.remaining - spentAll, parts = [];
-      if (cy.mode === 'CYCLE') {
-        parts.push(left < 0 ? (en ? `This cycle is ${RP(left)} short` : `Siklus ini minus ${RP(left)}`) : (en ? `${RP(left)} left until payday` : `Sisa ${RP(left)} sampai gajian`));
-        parts.push(en ? `payday in ${cy.daysLeft} day${cy.daysLeft > 1 ? 's' : ''}` : `gajian ${cy.daysLeft} hari lagi`);
-        if (cy.anchorPending) parts.push(en ? 'pay not recorded yet' : 'gaji belum tercatat');
-        // Siklus pertama setelah daftar (backend): dari saldo, atau masih perkiraan gaji kalau saldo belum pernah diisi.
-        if (cy.firstCycle === 'BALANCE') parts.push(en ? 'first cycle: based on your balance' : 'siklus pertama: dihitung dari saldo');
-        if (cy.firstCycle === 'ESTIMATE') parts.push(en ? 'set your balance in Settings → Bank balance for a more accurate number' : 'isi saldo di Setting → Saldo bank supaya lebih akurat');
-      } else {
-        parts.push(en ? `Available ${RP(Math.max(0, left))}` : `Saldo tersedia ${RP(Math.max(0, left))}`);
-        if (cy.runwayDays != null) parts.push(en ? `lasts ~${cy.runwayDays} days` : `cukup ±${cy.runwayDays} hari`);
-      }
+      const left = cy.remaining - spentAll, parts = [], wkP = cy.period === 'WEEKLY', lbl = en ? (wkP ? 'this week' : 'this month') : (wkP ? 'minggu ini' : 'bulan ini');
+      parts.push(left < 0 ? (en ? `Budget ${lbl} is ${RP(left)} over` : `Budget ${lbl} lewat ${RP(left)}`) : (en ? `${RP(left)} left ${lbl}` : `Sisa ${RP(left)} ${lbl}`));
+      parts.push(en ? `${cy.daysLeft} day${cy.daysLeft > 1 ? 's' : ''} to go` : `${cy.daysLeft} hari lagi`);
+      for (const p of cy.pastiPending || []) parts.push(en ? `${p.name} not recorded yet` : `${p.name} belum masuk`);
       if (big > 0) parts.push(en ? `big purchase ${RP(big)} not counted today` : `pembelian besar ${RP(big)} tidak dihitung hari ini`);
       hero.cycleTxt = parts.join(' · ');
     }
@@ -1129,33 +1155,102 @@ export class V3Logic extends React.Component {
     const dayRows = days.map((d, i) => { const o = d.routine > d.budget, open = s.openDay === i; return { label:d.label, date:d.full.split(', ')[1], isToday:d.iso === TODAY_ISO, pct:Math.min(100, d.spent / d.budget * 100) + '%', bar: o ? 'var(--danger-bold)' : 'var(--success-bold)', amounts:`${RP(d.spent)} / ${RP(d.budget)}`, amtColor: o ? 'var(--danger-text)' : 'var(--text-subtle)', expanded:String(open), rot: open ? '180deg' : '0deg', rows: open ? '1fr' : '0fr', openBg: open ? 'var(--hover)' : 'transparent', tab: open ? 0 : -1, toggle:() => this.setState({ openDay: open ? null : i }),
       tx:d.tx.map(t => ({ title:this.title(t), meta:txMeta(t), amount:'−' + RP(t.amt), open:() => this.openTx(t) })) }; });
 
-    // budget
-    const DS = ['Min','Sen','Sel','Rab','Kam','Jum','Sab'];
-    // Cara menghitung budget (BudgetSetting.mode). `dyn` = mode tersimpan; pilihan di layar (bmSel dst.) baru berlaku setelah Simpan.
-    const bsetL = s.bset || { mode:s.bmode || 'FIXED', anchorStreamId:null, reservePct:10 }, dyn = (s.bmode || bsetL.mode) !== 'FIXED';
-    const bmSel = s.bmSel ?? bsetL.mode, anchorSel = s.anchorSel ?? (bsetL.anchorStreamId != null ? String(bsetL.anchorStreamId) : ''), resSel = s.resSel ?? bsetL.reservePct;
+    // budget — periode + dasar budget (docs/budget-kebiasaan.md). Live: GET /budget/today → cycle; demo: DEMO_CYC.
+    const DS = ['Min','Sen','Sel','Rab','Kam','Jum','Sab'], isLiveB = this.props.live !== undefined, cyB = (isLiveB ? s.cyc : s.cyc || DEMO_CYC) || DEMO_CYC, DN = en ? DAYN_EN : DAYN;
     const pick = on => ({ checked:String(on), bg: on ? 'var(--brand-subtle)' : 'var(--neutral)', hover: on ? 'var(--brand-subtle)' : 'var(--neutral-hover)', ring: on ? 'inset 0 0 0 2px var(--brand)' : 'none', labelColor: on ? 'var(--brand-text)' : 'var(--text)' });
-    const modeOpts = [['FIXED', 'Tetap per hari', 'Kamu atur nominal budget tiap hari.'], ['CYCLE', 'Ikut gajian', 'Sisa uang sampai gajian berikutnya dibagi ke sisa hari.'], ['BALANCE', 'Dari saldo', 'Untuk pemasukan harian atau tak tentu: saldo dibagi 30 hari.']]
-      .map(([k, label, desc]) => ({ label, desc, ...pick(bmSel === k), onClick:() => this.setState({ bmSel:k, modeState:'idle' }) }));
-    const anchorList = (s.streams || []).filter(x => x.active && (x.cadence === 'WEEKLY' || x.cadence === 'MONTHLY'));
-    const anchorOpts = anchorList.map(x => ({ value:String(x.id), label:`${x.name} · ${x.cadence === 'WEEKLY' ? 'tiap ' + DAYN[Number(x.payDOW) || 0] : 'tiap tanggal ' + (x.payDOM || '?')}` }));
-    const reserveOpts = [5, 10, 15].map(pc => ({ label:pc + '%', ...pick(resSel === pc), onClick:() => this.setState({ resSel:pc, modeState:'idle' }) }));
-    const modeNote = { FIXED:'Nominal per hari diatur di bawah.', CYCLE:'Jatah harian berubah tiap hari mengikuti sisa uang sampai gajian.', BALANCE:'Jatah harian = saldo ÷ 30 hari, dikurangi langganan yang akan jatuh tempo.' }[bmSel];
-    const saveMode = () => {
-      if (s.modeState === 'saving') return;
-      if (bmSel === 'CYCLE' && !anchorSel) return this.toast(anchorList.length ? 'Pilih pemasukan utama dulu.' : 'Tambahkan pemasukan rutin dulu di Pemasukan.');
-      if (this.props.live === undefined) { this.setState({ bmode:bmSel, bset:{ mode:bmSel, anchorStreamId:anchorSel ? Number(anchorSel) : null, reservePct:resSel }, modeState:'saved' }); return; }
-      this.setState({ modeState:'saving' });
-      this.props.live.actions.saveBudgetSettings({ mode:bmSel, reservePct:resSel, ...(bmSel === 'CYCLE' ? { anchorStreamId:Number(anchorSel) } : {}) })
-        .then(() => this.props.live.refresh()).then(() => this.setState({ modeState:'saved' }))
-        .catch(e => { this.setState({ modeState:'idle' }); this.toast((e && e.message) || 'Gagal menyimpan cara hitung.'); });
+    const perW = p => p === 'WEEKLY' ? (en ? 'week' : 'minggu') : (en ? 'month' : 'bulan'), pw = perW(cyB.period);
+    const endK = cyB.end.split('-').map(Number), endDow = new Date(Date.UTC(endK[0], endK[1] - 1, endK[2])).getUTCDay();
+    const untilTxt = cyB.period === 'WEEKLY' ? (en ? 'until ' : 'sampai ') + DN[endDow] : (en ? `until ${MON_S[endK[1] - 1]} ${endK[2]}` : `sampai ${endK[2]} ${MON_S[endK[1] - 1]}`);
+    const startTxt = cyB.period === 'WEEKLY' ? DN[cyB.periodDay] : (en ? 'day ' : 'tanggal ') + cyB.periodDay;
+    const committed = cyB.periodBudget - cyB.commitments, spentBefore = Math.max(0, committed - cyB.remaining), spentPeriod = spentBefore + spentAll, leftPeriod = cyB.remaining - spentAll;
+    const usedPct = committed > 0 ? Math.min(100, spentPeriod / committed * 100) : (spentPeriod > 0 ? 100 : 0);
+    const sgn = n => (n < 0 ? '−' : '') + RP(n);
+    const row = (label, value, color, note) => ({ label, value, color, note:note || '', hasNote:!!note });
+    const bpRows = [];
+    if (cyB.basis === 'INCOME') {
+      for (const p of cyB.pasti || []) {
+        const usual = en ? `usually ${RP(p.usual)}${p.learned ? ' (from your history)' : ' (the amount you entered)'}` : `biasanya ${RP(p.usual)}${p.learned ? ' (dari kebiasaanmu)' : ' (angka yang kamu isi)'}`;
+        const st = p.receivedCount ? (en ? 'received ✓' : 'sudah masuk ✓') : p.lateSince ? (en ? 'not recorded yet, counted as expected' : 'belum tercatat, dihitung perkiraan') : p.paydays ? (en ? 'expected' : 'perkiraan, belum masuk') : (en ? `no payday this ${pw}` : `tidak ada jadwal ${pw} ini`);
+        bpRows.push(row(p.name, '+' + RP(p.received + p.expected * (cyB.prorate ?? 1)), 'var(--success-text)', st + ' · ' + usual));
+      }
+      if (!(cyB.pasti || []).length) bpRows.push(row(en ? 'Fixed income' : 'Pemasukan pasti', RP(0), 'var(--text-subtle)', en ? 'none yet' : 'belum ada'));
+      bpRows.push(row(en ? 'Extra income' : 'Pemasukan tambahan', '+' + RP(cyB.tambahan), cyB.tambahan ? 'var(--success-text)' : 'var(--text-subtle)', en ? `irregular income already received this ${pw}` : `pemasukan tidak pasti yang sudah masuk ${pw} ini`));
+      bpRows.push(row((en ? 'Set aside ' : 'Disisihkan ') + cyB.reservePct + '%', '−' + RP(cyB.reserve), 'var(--text)', en ? 'stays in your account as savings' : 'tetap di rekening sebagai tabungan'));
+    } else {
+      bpRows.push(row(en ? `Target this ${pw}` : `Target ${pw} ini`, RP(cyB.periodBudget - cyB.carry), 'var(--text)', cyB.targetIsUsual ? (en ? 'same as your usual routine spending' : 'sama dengan belanja rutinmu biasanya') : (en ? 'the amount you set' : 'angka yang kamu tentukan')));
+    }
+    if (cyB.carry) bpRows.push(row(en ? `Left over from last ${pw}` : `Sisa ${pw} lalu`, '+' + RP(cyB.carry), 'var(--success-text)'));
+    if (cyB.commitments) bpRows.push(row(en ? 'Upcoming subscriptions' : 'Langganan yang akan jatuh tempo', '−' + RP(cyB.commitments), 'var(--text)', en ? 'kept aside so they don’t eat your daily budget' : 'disiapkan dulu supaya tidak memakan jatah harian'));
+    bpRows.push(row(en ? 'Spent before today' : 'Sudah terpakai sebelum hari ini', '−' + RP(spentBefore), 'var(--text)'));
+    const OPT_L = { hemat:en ? 'Saver' : 'Hemat', seimbang:en ? 'Balanced' : 'Seimbang', longgar:en ? 'Relaxed' : 'Longgar' };
+    const bpStyles = (cyB.styles || []).map(o => { const on = cyB.style === o.option; return { ...pick(on), on, label:OPT_L[o.option], busy:String(s.styleBusy === o.option),
+      desc: o.reservePct != null ? (en ? `Set aside ${o.reservePct}% of income` : `Sisihkan ${o.reservePct}% pemasukan`) : (en ? `${Math.round(o.target / cyB.usualSpend * 100)}% of your usual spending` : `${Math.round(o.target / cyB.usualSpend * 100)}% dari belanja biasanya`),
+      perDay:RP(o.allowance), periodTxt:(en ? `Budget this ${pw} ` : `Budget ${pw} ini `) + RP(o.periodBudget), onClick:() => this.applyStyle(o.option, OPT_L[o.option]) }; });
+    // Pengaturan: draft lokal (bp*) di atas setelan tersimpan; berlaku setelah Simpan.
+    const bset = s.bset || {}, dP = s.bpPeriod ?? cyB.period, dDay = s.bpDay ?? String(cyB.periodDay), dBasis = s.bpBasis ?? cyB.basis, dCarry = s.bpCarry ?? !!cyB.rolloverEnabled;
+    const dTarget = s.bpTarget ?? (bset.targetAmount ? String(Math.round(bset.targetAmount)) : '');
+    const usualPer = cyB.usualSpend != null && cyB.daysTotal ? Math.round(cyB.usualSpend / cyB.daysTotal * (dP === 'WEEKLY' ? 7 : 30) / 500) * 500 : null;
+    const setDraft = patch => this.setState({ ...patch, bpSaveState:'idle' });
+    const clearDraft = { bpPeriod:undefined, bpDay:undefined, bpBasis:undefined, bpTarget:undefined, bpCarry:undefined };
+    const bpSave = () => {
+      if (s.bpSaveState === 'saving') return;
+      const day = Number(dDay), tgt = Number(digits(dTarget)) || 0;
+      if (dP === 'MONTHLY' && !(day >= 1 && day <= 31)) return this.toast(en ? 'Start date must be 1–31.' : 'Tanggal mulai harus 1–31.');
+      if (dBasis === 'TARGET' && !tgt && usualPer == null) return this.toast(en ? 'Fill in how much you want to spend first.' : 'Isi dulu mau belanja berapa.');
+      const body = { period:dP, periodDay:day, basis:dBasis, rolloverEnabled:dCarry, ...(dBasis === 'TARGET' ? { targetAmount:tgt || null } : {}) };
+      if (!isLiveB) { this.setState({ ...clearDraft, bpSaveState:'saved', cyc:{ ...cyB, period:dP, periodDay:day, basis:dBasis, rolloverEnabled:dCarry, needsReview:false } }); return; }
+      this.setState({ bpSaveState:'saving' });
+      this.props.live.actions.saveBudgetSettings(body).then(() => this.props.live.refresh()).then(() => this.setState({ ...clearDraft, bpSaveState:'saved' }))
+        .catch(e => { this.setState({ bpSaveState:'idle' }); this.toast((e && e.message) || (en ? 'Failed to save settings.' : 'Gagal menyimpan pengaturan.')); });
     };
-    const wSum = s.manual.reduce((a, v) => a + (v || 0), 0);
-    const bud = { total:dyn ? RP(s.todayBudget ?? 0) : RP(wSum), strip:s.manual.map((v, i) => ({ day:DS[i], value:dyn ? (wSum > 0 ? Math.round((v || 0) / wSum * 100) : 14) + '%' : Math.round(v / 1000) + 'rb' })),
+    // Pola harian: bobot dari backend (dipelajari dari kebiasaan atau nominal per hari).
+    const Wt = cyB.weights || [0, 0, 0, 0, 0, 0, 0].map(() => 1 / 7), autoW = s.bpManual ? false : cyB.autoWeights !== false, ORD = [1, 2, 3, 4, 5, 6, 0];
+    const todayDow = new Date(TODAY_ISO + 'T00:00:00Z').getUTCDay(), peak = ORD.reduce((a, d) => (Wt[d] > Wt[a] ? d : a), 1);
+    const bud = { total:RP(s.todayBudget ?? cyB.allowance), strip:ORD.map(d => ({ day:DS[d], value:Math.round(Wt[d] * 100) + '%', bg: d === todayDow ? 'var(--brand-subtle)' : 'var(--neutral)' })),
       inputs:s.manual.map((v, i) => ({ day:DAYN[i], value: v ? v.toLocaleString('id-ID') : '', onChange:e => { const n = Number(digits(e.target.value)) || 0; this.setState(x => { const m = [...x.manual]; m[i] = n; return { manual:m, saveState:'idle' }; }); } })) };
-    const OP = (s.budget && s.budget.opts) || (this.props.live !== undefined ? [] : OPTS); const options = OP.map(o => { const on = o.k === s.opt; return { label:o.label, desc:o.desc, total:RP(o.total), save:RP(o.save), rec:o.k === ((s.budget && s.budget.rec) || 'seimbang'), hasFlag:!!o.flag, flag:o.flag || '', checked:String(on), bg: on ? 'var(--brand-subtle)' : 'var(--neutral)', hover: on ? 'var(--brand-subtle)' : 'var(--neutral-hover)', ring: on ? 'inset 0 0 0 2px var(--brand)' : 'none', labelColor: on ? 'var(--brand-text)' : 'var(--text)', barColor: on ? 'var(--brand)' : 'var(--border-bold)', bars:o.days.map((v, i) => ({ h:Math.max(4, v / 280000 * 26) + 'px', d:DS[i] })), onClick:() => this.setState({ opt:o.k, applyState:'idle' }) }; });
-    const optObj = OP.find(o => o.k === s.opt) || OP[0] || { label:'', days:[] };
-    const basis = ((s.budget && s.budget.basis) || [['Pemasukan ekspektasi','Rp2.000.000'],['Pemasukan konservatif','Rp1.450.000'],['Komitmen (langganan jatuh tempo)','Rp54.990'],['Rata-rata rutin harian (8 minggu)','Rp176.000/hari']]).map(([label, value]) => ({ label, value }));
+    const reviewTarget = bset.targetAmount ?? cyB.periodBudget;
+    const bp = {
+      bpReview:!!cyB.needsReview,
+      bpReviewTxt: cyB.basis === 'INCOME'
+        ? (en ? `Your budget now follows your fixed income per ${pw}, starting every ${startTxt}. Extra income raises that ${pw}'s budget right away.` : `Sekarang budget-mu ikut pemasukan pasti per ${pw}, mulai tiap ${startTxt}. Pemasukan tambahan langsung menambah budget ${pw} itu.`)
+        : (en ? `Your budget is now ${RP(reviewTarget)} per ${pw}, starting every ${startTxt}. Have a fixed income? Choose “Follow income” below.` : `Sekarang budget-mu ${RP(reviewTarget)} per ${pw}, mulai tiap ${startTxt}. Punya pemasukan pasti? Pilih “Ikut pemasukan” di bawah.`),
+      bpConfirm:() => { if (!isLiveB) return this.setState({ cyc:{ ...cyB, needsReview:false } }); this.props.live.actions.saveBudgetSettings({}).then(() => this.props.live.refresh()).then(() => this.toast(en ? 'Saved.' : 'Tersimpan.')).catch(e => this.toast((e && e.message) || 'Gagal menyimpan.')); },
+      bpGoSettings:() => { const el = typeof document !== 'undefined' && document.getElementById('bp-settings'); if (el) el.scrollIntoView({ behavior:'smooth', block:'start' }); },
+      bpPeriodTxt: en ? `Budget this ${pw} ${RP(cyB.periodBudget)} · ${cyB.daysLeft} day${cyB.daysLeft > 1 ? 's' : ''} left (${untilTxt})` : `Budget ${pw} ini ${RP(cyB.periodBudget)} · ${cyB.daysLeft} hari lagi (${untilTxt})`,
+      bpBarPct:usedPct + '%', bpBarColor: leftPeriod < 0 ? 'var(--danger-bold)' : usedPct >= 80 ? 'var(--warning-bold)' : 'var(--brand)',
+      bpStats:[{ label:en ? 'Spent' : 'Terpakai', value:RP(spentPeriod), color:'var(--text)' }, { label: leftPeriod < 0 ? (en ? 'Over' : 'Lewat') : (en ? 'Left' : 'Sisa'), value:RP(leftPeriod), color: leftPeriod < 0 ? 'var(--danger-text)' : 'var(--success-text)' },
+        cyB.basis === 'INCOME' ? { label:en ? 'Set aside' : 'Disisihkan', value:RP(cyB.reserve), color:'var(--text-subtle)' } : { label:en ? 'Avg. left/day' : 'Rerata sisa/hari', value:RP(Math.max(0, leftPeriod) / Math.max(1, cyB.daysLeft)), color:'var(--text-subtle)' }],
+      bpNoteShow:!!(cyB.firstPeriod || cyB.deficit),
+      bpNote:[cyB.firstPeriod ? (en ? `First ${pw}: counted from the day you started using Trackster (${Math.round((cyB.prorate ?? 1) * 100)}% of the ${pw}).` : `${pw === 'minggu' ? 'Minggu' : 'Bulan'} pertama: dihitung sejak kamu mulai memakai Trackster (${Math.round((cyB.prorate ?? 1) * 100)}% dari ${pw}).`) : '', cyB.deficit ? (en ? `This ${pw}'s budget is used up, so today's allowance is Rp0 ${untilTxt}.` : `Budget ${pw} ini sudah habis, jadi jatah hari ini Rp0 ${untilTxt}.`) : ''].filter(Boolean).join(' '),
+      bpRows, bpTotalLabel:en ? `Left for ${cyB.daysLeft} day${cyB.daysLeft > 1 ? 's' : ''}` : `Sisa untuk ${cyB.daysLeft} hari`, bpTotalValue:sgn(cyB.remaining), bpTotalColor: cyB.remaining < 0 ? 'var(--danger-text)' : 'var(--text)',
+      bpFormula: en ? 'Today’s allowance = what’s left ÷ days left, weighted by your daily pattern. Spending today doesn’t change today’s allowance; a big purchase lowers what’s left without counting as over budget today.' : 'Jatah hari ini = sisa ÷ sisa hari, ditimbang pola harianmu. Belanja hari ini tidak mengubah jatah hari ini; pembelian besar mengurangi sisa tanpa dihitung lewat budget hari ini.',
+      bpStyleHint: cyB.basis === 'INCOME' ? (en ? 'How much of your income to set aside. Applies as soon as you pick one.' : 'Seberapa banyak pemasukan yang disisihkan. Langsung berlaku begitu dipilih.') : (en ? 'Based on your usual routine spending. Applies as soon as you pick one.' : 'Patokan dari belanja rutinmu biasanya. Langsung berlaku begitu dipilih.'),
+      bpStyles, bpStylesShow:bpStyles.length > 0, bpStylesNone:!bpStyles.length,
+      bpStylesNoneTxt: en ? 'Styles appear once Trackster knows your spending habits (about 3 weeks). Meanwhile, set the amount in Budget settings.' : 'Gaya muncul setelah Trackster kenal kebiasaan belanjamu (±3 minggu). Sementara itu, tentukan angkanya di Pengaturan budget.',
+      bpPeriodOpts:[['WEEKLY', en ? 'Weekly' : 'Mingguan'], ['MONTHLY', en ? 'Monthly' : 'Bulanan']].map(([k, label]) => ({ label, ...pick(dP === k), onClick:() => setDraft({ bpPeriod:k, bpDay: k === cyB.period ? String(cyB.periodDay) : '1' }) })),
+      bpPeriodWeekly:dP === 'WEEKLY', bpPeriodMonthly:dP === 'MONTHLY',
+      bpDayOpts:ORD.map(d => ({ value:String(d), label:DN[d] })), bpDayVal:dP === 'WEEKLY' ? dDay : '1', onBpDay:e => setDraft({ bpDay:e.target.value }),
+      bpDomVal:dP === 'MONTHLY' ? dDay : '', onBpDom:e => setDraft({ bpDay:digits(e.target.value).slice(0, 2) }),
+      bpBasisOpts:[['INCOME', en ? 'Follow income' : 'Ikut pemasukan', en ? 'Your fixed income (learned from your history) + extra income that arrives, minus what you set aside.' : 'Pemasukan pasti (dipelajari dari kebiasaanmu) + tambahan yang masuk, dikurangi yang disisihkan.'],
+        ['TARGET', en ? 'Set it yourself' : 'Tentukan sendiri', en ? 'You decide how much to spend per week or month. Good when your income isn’t fixed.' : 'Kamu tentukan mau belanja berapa per minggu/bulan. Cocok kalau pemasukan nggak tentu.']]
+        .map(([k, label, desc]) => ({ label, desc, ...pick(dBasis === k), onClick:() => setDraft({ bpBasis:k }) })),
+      bpIncomeOn:dBasis === 'INCOME', bpTargetOn:dBasis === 'TARGET',
+      bpPastiList:(cyB.pasti || []).map(p => { const st = (s.streams || []).find(x => x.id === p.id), when = st ? (st.cadence === 'WEEKLY' ? (en ? 'every ' : 'tiap ') + DN[Number(st.payDOW) || 0] : (en ? 'monthly on day ' : 'tiap tanggal ') + (st.payDOM || '?')) : '';
+        return { name:p.name, amount:RP(p.usual), meta:[when, p.learned ? (en ? 'amount learned from your history' : 'nominal dari kebiasaanmu') : (en ? 'the amount you entered, learned after 3 payments' : 'angka yang kamu isi, dipelajari setelah 3 kali masuk')].filter(Boolean).join(' · ') }; }),
+      bpPastiNone:!(cyB.pasti || []).length,
+      bpTargetLabel: en ? `How much do you want to spend per ${perW(dP)}?` : `Mau belanja berapa per ${perW(dP)}?`, bpTargetVal: dTarget ? Number(digits(dTarget)).toLocaleString('id-ID') : '',
+      onBpTarget:e => setDraft({ bpTarget:digits(e.target.value) }), bpTargetPh: usualPer ? usualPer.toLocaleString('id-ID') : '1.000.000',
+      bpUsualShow:usualPer != null, bpUsualTxt: usualPer == null ? '' : en ? `You usually spend ${RP(usualPer)} per ${perW(dP)} on routine stuff.` : `Biasanya kamu belanja rutin ${RP(usualPer)} per ${perW(dP)}.`, bpUseUsual:() => setDraft({ bpTarget:String(usualPer) }),
+      bpCarry:dCarry, onBpCarry:e => setDraft({ bpCarry:e.target.checked }), bpCarryTxt: en ? `Carry what’s left of last ${perW(dP)} into this ${perW(dP)}` : `Sisa ${perW(dP)} lalu ikut ke ${perW(dP)} ini`,
+      bpSaveNote: en ? 'Your allowance is recalculated as soon as you save.' : 'Jatah dihitung ulang begitu disimpan.', bpSave, bpBusy:String(s.bpSaveState === 'saving'),
+      bpSaveLabel:{ idle:en ? 'Save settings' : 'Simpan pengaturan', saving:'Menyimpan…', saved:'✓ Tersimpan' }[s.bpSaveState || 'idle'],
+      bpWeightOpts:[['auto', en ? 'Learn from my habits' : 'Belajar dari kebiasaan'], ['manual', en ? 'Set manually' : 'Atur sendiri']].map(([k, label]) => ({ label, ...pick(k === 'auto' ? autoW : !autoW),
+        onClick:() => { if (k === 'manual') return this.setState({ bpManual:true }); this.setState({ bpManual:false }); if (!isLiveB) return this.setState({ cyc:{ ...cyB, autoWeights:true } }); this.liveCall(() => this.props.live.actions.saveBudgetSettings({ autoWeights:true })); } })),
+      bpWeightNote: !autoW ? (en ? 'You set how days compare. A bigger amount means a bigger share of the budget.' : 'Kamu atur sendiri perbandingan antarhari. Nominal lebih besar = porsi lebih besar.')
+        : cyB.weightsLearned ? (en ? `Learned from your routine spending over the last ${Math.min(8, cyB.weeksObserved)} weeks: ${DN[peak]} gets the biggest share.` : `Dipelajari dari belanja rutinmu ${Math.min(8, cyB.weeksObserved)} minggu terakhir: hari ${DN[peak]} dapat porsi paling besar.`)
+        : (en ? `Not enough history yet (needs 4 weeks, have ${cyB.weeksObserved}). Your days use the default split for now.` : `Belum cukup riwayat (butuh 4 minggu, baru ${cyB.weeksObserved}). Sementara pakai pembagian bawaan.`),
+      bpManualShow:!autoW,
+    };
 
     // income
     const streamOpts = s.streams.map(x => ({ value:String(x.id), label:x.name }));
@@ -1166,7 +1261,10 @@ export class V3Logic extends React.Component {
       items:groupsMap[k].map(x => { const key = 'i' + x.id, mo = s.rowMenu === key; return { desc:x.desc, meta:[x.src === 'JAGO' ? 'Jago' : x.src, x.stream, fmtDate(x.date)].filter(Boolean).join(' · '), hasStatus:x.status !== 'CONFIRMED', status: x.status === 'PENDING' ? 'Menunggu' : x.status, amount:'+' + RP(x.amt), menuOpen:String(mo), menuOpenB:mo,
         menu:() => this.setState({ rowMenu: mo ? null : key }), edit:() => this.setState({ rowMenu:null, modal:'income', infId:x.id, inf:{ amount:fmtIn(x.amt), desc:x.desc, src:x.src, date:x.date } }),
         del:() => { this.setState({ rowMenu:null }); this.confirm({ title:'Hapus pemasukan?', body:`"${x.desc}" (${RP(x.amt)}) akan dihapus dari riwayat.`, primary:'Hapus', secondary:'Batal', danger:true, onPrimary:() => { this.setState(z => ({ incomes:z.incomes.filter(y => y.id !== x.id) })); this.liveCall(() => this.props.live.actions.delIncome(x.id)); this.toast('Pemasukan dihapus.'); } }); } }; }) }));
-    const summary = x => { const n = v => RP(Number(v) || 0); switch (x.kind) { case 'FIXED': return `${n(x.amount)}/${x.cadence === 'MONTHLY' ? 'bulan' : 'minggu'}`; case 'SESSION': return `${n(x.rate)}/sesi + ${n(x.extra)} offline · maks ${x.maxU || 0}x/minggu`; case 'DEDUCTION': return `maks ${n(x.amount)} · −${n(x.ded)}/absen`; case 'VARIABLE': return `~${n(x.amount)}/bulan (estimasi)`; default: return 'Tak terjadwal — dihitung terpisah'; } };
+    const summary = x => { const n = v => RP(Number(v) || 0), when = x.cadence === 'WEEKLY' ? 'tiap ' + DAYN[Number(x.payDOW) || 0] : x.cadence === 'MONTHLY' ? 'tiap tanggal ' + (x.payDOM || '?') : '';
+      if (x.kind === 'IRREGULAR') return 'Dicatat saat masuk, langsung menambah budget periode itu';
+      if (x.kind === 'FIXED') return [`biasanya ${n(x.amount)}/${x.cadence === 'MONTHLY' ? 'bulan' : 'minggu'}`, when].filter(Boolean).join(' · ');
+      return [when, 'nominal dipelajari dari pemasukan yang masuk'].filter(Boolean).join(' · '); };
     // Saran sumber dari uang masuk rutin (GET /income-streams/suggestions). "Jadikan sumber" = form terisi + tautkan riwayat (linkPast).
     const ssHide = s.ssHide ?? (() => { try { return JSON.parse(localStorage.getItem('v3-ssug-hide') || '[]'); } catch (e) { return []; } })();
     const SS = this.props.live === undefined ? [] : (s.streamSug || []);
@@ -1180,27 +1278,9 @@ export class V3Logic extends React.Component {
       edit:() => this.setState({ rowMenu:null, modal:'stream', sfId:x.id, sf:{ ...x }, sfAdv:false }),
       del:() => { this.setState({ rowMenu:null }); this.confirm({ title:'Hapus sumber?', body:`Sumber "${x.name}" akan dihapus. Riwayat pemasukannya tetap tersimpan.`, primary:'Hapus', secondary:'Batal', danger:true, onPrimary:() => { this.setState(z => ({ streams:z.streams.filter(y => y.id !== x.id) })); this.liveCall(() => this.props.live.actions.delStream(x.id)); this.toast('Sumber dihapus.'); } }); } }; });
     const weekStreams = s.weekInfo ? s.weekInfo.rows : [['Uang saku ortu','Rp500.000','Sudah masuk','var(--success-text)','var(--success-bold)'],['Les privat','Rp450.000 / Rp600.000','Sebagian','var(--warning-text)','var(--warning-bold)'],['Part-time kafe','Rp0 / Rp900.000','Menunggu','var(--text-subtle)','var(--border-bold)']].map(([name, amounts, status, color, dot]) => ({ name, amounts, status, color, dot }));
-    const incTabs = ['Riwayat','Sumber','Perkiraan'].map((l, i) => ({ label:l, selected:String(s.incTab === i), color: s.incTab === i ? 'var(--text)' : 'var(--text-subtle)', weight: s.incTab === i ? 700 : 500, onClick:() => this.setState({ incTab:i, rowMenu:null }) }));
+    const incTabs = ['Riwayat','Sumber'].map((l, i) => ({ label:l, selected:String(s.incTab === i), color: s.incTab === i ? 'var(--text)' : 'var(--text-subtle)', weight: s.incTab === i ? 700 : 500, onClick:() => this.setState({ incTab:i, rowMenu:null }) }));
     const PL = { week:'Minggu ini', month:'Bulan ini', all:'Semua' };
     const periodItems = Object.entries(PL).map(([k, l]) => ({ label:l, checked:String(s.period === k), tick: s.period === k ? '✓' : '', onClick:() => this.setState({ period:k, periodOpen:false }) }));
-    const FC = (s.weekInfo ? s.weekInfo.fc : [[1450000,2000000,2275000],[5800000,8000000,9100000]])[s.fc];
-    const fcTiles = [['Konservatif',FC[0],'var(--neutral)','var(--text-subtle)'],['Ekspektasi',FC[1],'var(--brand-subtle)','var(--brand-text)'],['Maks',FC[2],'var(--neutral)','var(--text-subtle)']].map(([label, v, bg, labelColor]) => ({ label, value:RP(v), bg, labelColor }));
-    const fcSegs = ['Minggu ini','~4 minggu'].map((l, i) => ({ label:l, checked:String(s.fc === i), weight: s.fc === i ? 700 : 500, color: s.fc === i ? 'var(--text)' : 'var(--text-subtle)', onClick:() => this.setState({ fc:i }) }));
-
-    // check-in
-    const ciStreams = s.streams.filter(x => x.active && (x.cadence === 'WEEKLY' || x.kind === 'IRREGULAR' || x.kind === 'VARIABLE'));
-    let ciTotal = this.props.live !== undefined ? 0 : 500000;
-    const stepper = (label, value, min, max, set) => ({ label, value, decOff:String(value <= min), incOff:String(value >= max), decColor: value <= min ? 'var(--text-subtlest)' : 'var(--text)', incColor: value >= max ? 'var(--text-subtlest)' : 'var(--text)', dec:() => value > min && set(value - 1), inc:() => value < max && set(value + 1) });
-    const setCi = (id, patch) => this.setState(z => ({ ci:{ ...z.ci, [id]:{ ...(z.ci[id] || { units:0, extra:0, amount:'' }), ...patch } } }));
-    const ciRows = ciStreams.map(x => {
-      const dr = s.checkin && s.checkin.byId[x.id]; if (this.props.live !== undefined ? (dr && dr.alreadyFilled) : x.id === 1) { const rec = this.props.live !== undefined ? dr.recordedAmount : 500000; ciTotal += this.props.live !== undefined ? rec : 0; return { name:x.name, kind:KIND_L[x.kind], amount:'✓ ' + RP(rec), amountColor:'var(--success-text)', opacity:.7, hasNote:true, note:'Sudah tercatat otomatis dari email bank.', hasSteppers:false, hasInput:false, steppers:[] }; }
-      const e = s.ci[x.id] || { units:0, extra:0, amount:'' }, amt = this.ciAmount(x, e); ciTotal += amt;
-      const base = { name:x.name, kind:KIND_L[x.kind], amount:'Tercatat ' + RP(amt), amountColor:'var(--text)', opacity:1, hasNote:false, note:'', hasSteppers:false, hasInput:false, steppers:[], inputLabel:'', placeholder:'', value:'' };
-      if (x.kind === 'FIXED') return { ...base, hasNote:true, note:`Otomatis tercatat ${RP(Number(x.amount))} saat disimpan.` };
-      if (x.kind === 'SESSION') return { ...base, hasSteppers:true, steppers:[stepper('Jumlah sesi', e.units, 0, Number(x.maxU) || 9, v => setCi(x.id, { units:v, extra:Math.min(e.extra, v) })), stepper('Sesi offline (dapat transport)', Math.min(e.extra, e.units), 0, e.units, v => setCi(x.id, { extra:v }))] };
-      if (x.kind === 'DEDUCTION') return { ...base, hasSteppers:true, steppers:[stepper('Berapa hari absen?', e.units, 0, Number(x.maxU) || 7, v => setCi(x.id, { units:v }))] };
-      return { ...base, hasInput:true, inputLabel: x.kind === 'VARIABLE' ? 'Nominal bulan ini' : 'Nominal (opsional)', placeholder: x.kind === 'VARIABLE' ? Number(x.amount).toLocaleString('id-ID') : '0', value:e.amount, onInput:ev => setCi(x.id, { amount:fmtIn(ev.target.value) }) };
-    });
 
     // modals
     const tx = s.txs.find(t => t.id === s.txId) || (s.txObj && s.txObj.id === s.txId ? s.txObj : undefined);
@@ -1210,12 +1290,12 @@ export class V3Logic extends React.Component {
     const ex = s.ex || {}, exOk = !!digits(ex.amount) && !!(ex.desc || '').trim();
     const inf = s.inf || {}, infOk = !!digits(inf.amount) && !!(inf.desc || '').trim();
     const sf = s.sf || {}, sfOk = !!(sf.name || '').trim();
-    const sfSetter = k => e => { const v = e.target.value; this.setState(z => { const n = { ...z.sf, [k]:v }; if (k === 'kind') n.cadence = v === 'VARIABLE' ? 'MONTHLY' : v === 'IRREGULAR' ? 'NONE' : 'WEEKLY'; return { sf:n }; }); };
+    const sfSetter = k => e => { const v = e.target.value; this.setState(z => { const n = { ...z.sf, [k]:v }; if (k === 'kind') n.cadence = v === 'IRREGULAR' ? 'NONE' : v === 'VARIABLE' ? 'MONTHLY' : (z.sf.cadence === 'NONE' || !z.sf.cadence ? 'WEEKLY' : z.sf.cadence); return { sf:n }; }); };
     const numF = (label, k, rp) => ({ label, value: rp ? fmtIn(sf[k]) : (sf[k] || ''), rp:!!rp, isInput:true, isSelect:false, onChange:e => this.setState(z => ({ sf:{ ...z.sf, [k]:digits(e.target.value) } })) });
     const sfFields = [];
     if (sf.cadence === 'WEEKLY') sfFields.push({ label:'Hari biasa diterima', value:sf.payDOW || '', isSelect:true, isInput:false, rp:false, onChange:sfSetter('payDOW') });
     if (sf.cadence === 'MONTHLY') sfFields.push(numF('Tanggal biasa diterima (1-31)', 'payDOM'));
-    if (['FIXED','DEDUCTION','VARIABLE'].includes(sf.kind)) sfFields.push(numF(sf.kind === 'DEDUCTION' ? 'Nominal maks (tanpa absen)' : sf.kind === 'VARIABLE' ? 'Estimasi nominal bulanan' : 'Nominal', 'amount', true));
+    if (['FIXED','DEDUCTION','VARIABLE'].includes(sf.kind)) sfFields.push(numF(sf.kind === 'DEDUCTION' ? 'Nominal maks (tanpa absen)' : sf.kind === 'VARIABLE' ? 'Estimasi nominal bulanan' : 'Biasanya berapa?', 'amount', true));
     if (sf.kind === 'SESSION') sfFields.push(numF('Rate per sesi','rate',true), numF('Ekstra sesi offline','extra',true), numF('Maks sesi/minggu','maxU'), numF('Biasanya berapa sesi','typical'));
     if (sf.kind === 'DEDUCTION') sfFields.push(numF('Potongan per hari absen','ded',true), numF('Hari kerja/minggu','maxU'));
     const cf = s.cf || {};
@@ -1233,35 +1313,26 @@ export class V3Logic extends React.Component {
       toggleBell:() => this.setState({ bell:!s.bell }), bellOpen:s.bell, bellExpanded:String(s.bell),
       notifs:this.props.live !== undefined ? ((s.notifs && s.notifs.length) ? s.notifs.map(n => ({ title:n.title, body:n.body, icon:I[n.icon], color:n.color, onClick:() => this.go(n.target) })) : [{ title:'Tidak ada notifikasi baru', body:'Semuanya terkendali.', icon:I.check, color:'var(--success-text)', onClick:() => this.setState({ bell:false }) }]) : [{ title:'1 transfer perlu dicek', body:'+Rp750.000 dari ANDI PRATAMA', icon:I.triangle, color:'var(--warning-text)', onClick:() => { this.go('income'); } }, { title:'Langganan jatuh tempo', body:'Spotify Premium, 2 hari lagi', icon:I.repeat, color:'var(--text-subtle)', onClick:() => this.go('subs') }],
       openExpense:() => this.setState({ modal:'expense', ex:{ amount:'', desc:'', cat:'LAINNYA', src:'BCA', date:TODAY_ISO } }),
-      isDash:s.page === 'dash', isToday:s.page === 'today', isWeekly:s.page === 'weekly', isBudget:s.page === 'budget', isIncome:s.page === 'income', isCheckin:s.page === 'checkin', isOther:!PAGES[s.page],
-      goToday:() => this.go('today'), goSubs:() => this.go('subs'), goCheckin:() => this.go('checkin'), goIncome:() => this.go('income'),
+      isDash:s.page === 'dash', isToday:s.page === 'today', isWeekly:s.page === 'weekly', isBudget:s.page === 'budget', isIncome:s.page === 'income', isOther:!PAGES[s.page],
+      goToday:() => this.go('today'), goSubs:() => this.go('subs'), goBudget:() => this.go('budget'), goIncome:() => this.go('income'),
       hero, net, quick, dots, carX:`-${s.car * 100}%`, car0Hidden:String(s.car !== 0), car1Hidden:String(s.car !== 1), car1Tab: s.car === 1 ? 0 : -1, carPrev:() => this.setState({ car:(s.car + 1) % 2 }), carNext:() => this.setState({ car:(s.car + 1) % 2 }),
       toggleRunway:() => this.setState({ runway:!s.runway }), runwayExpanded:String(s.runway), runwayRot: s.runway ? '180deg' : '0deg', runwayRows: s.runway ? '1fr' : '0fr',
       runway: s.runwayInfo ? { value:s.runwayInfo.value, badge:s.runwayInfo.short ? 'Defisit' : 'Aman', color:s.runwayInfo.short ? 'var(--danger-text)' : 'var(--success-text)', bg:s.runwayInfo.short ? 'var(--danger-subtle)' : 'var(--success-subtle)' } : { value:'Rp4.049.000', badge:'Aman', color:'var(--success-text)', bg:'var(--success-subtle)' },
       todayRows, todayCount:tTx.length, todayEmpty:tTx.length === 0,
       wk, bars, dayRows,
-      budHeroLabel:dyn ? 'Jatah hari ini' : 'Total budget minggu ini', manualBtnTxt:dyn ? 'Atur bobot hari' : 'Edit manual', budNoteShow:dyn, budNote:'Persentase = bobot tiap hari. Hari berbobot besar dapat jatah lebih besar (mis. weekend).', allocShow:!dyn, sugShow:!dyn,
-      modeOpts, anchorShow:bmSel === 'CYCLE' && anchorList.length > 0, anchorNone:bmSel === 'CYCLE' && anchorList.length === 0, anchorOpts, anchorVal:anchorSel, onAnchor:e => this.setState({ anchorSel:e.target.value, modeState:'idle' }),
-      reserveShow:bmSel !== 'FIXED', reserveOpts, modeNote, saveMode, modeBusy:String(s.modeState === 'saving'), modeSaveLabel:{ idle:'Simpan cara hitung', saving:'Menyimpan…', saved:'✓ Tersimpan' }[s.modeState || 'idle'],
-      bud, toggleManual:() => this.setState({ manualOpen:!s.manualOpen }), manualExpanded:String(s.manualOpen), manualRot: s.manualOpen ? '180deg' : '0deg', manualRows: s.manualOpen ? '1fr' : '0fr', manualTab: s.manualOpen ? 0 : -1,
-      saveLabel:{ idle:'Simpan budget', saving:'Menyimpan...', saved:'✓ Tersimpan' }[s.saveState],
-      saveManual:() => { this.setState({ saveState:'saving' }); if (this.props.live !== undefined) { this.props.live.actions.saveBudget(s.manual).then(() => this.props.live.refresh()).then(() => this.setState({ saveState:'saved' })).catch(e => { this.setState({ saveState:'idle' }); this.toast((e && e.message) || 'Gagal menyimpan budget.'); }); return; } this.t4 = setTimeout(() => this.setState({ saveState:'saved' }), 700); },
+      bud, ...bp, saveLabel:{ idle:en ? 'Save day weights' : 'Simpan bobot hari', saving:'Menyimpan…', saved:'✓ Tersimpan' }[s.saveState],
+      saveManual:() => { this.setState({ saveState:'saving' }); if (this.props.live !== undefined) { this.props.live.actions.saveBudget(s.manual).then(() => this.props.live.actions.saveBudgetSettings({ autoWeights:false })).then(() => this.props.live.refresh()).then(() => this.setState({ saveState:'saved', bpManual:false })).catch(e => { this.setState({ saveState:'idle' }); this.toast((e && e.message) || 'Gagal menyimpan bobot hari.'); }); return; } this.t4 = setTimeout(() => this.setState({ saveState:'saved' }), 700); },
       showMascot: presence !== 'sembunyi' && s.page !== 'chat', mascotSm:this.mascot(28, 'happy'), mascotMd:this.mascot(44, tipOpen ? (isRem ? 'alert' : 'happy') : (isRem && !s.tipDismissed ? 'alert' : 'idle')),
-      options, basis, toggleBasis:() => this.setState({ basis:!s.basis }), basisExpanded:String(s.basis), basisRot: s.basis ? '180deg' : '0deg', basisRows: s.basis ? '1fr' : '0fr',
-      applyBusy:String(s.applyState === 'applying'), applyLabel:{ idle:`Terapkan opsi ${optObj.label}`, applying:'Menerapkan...', applied:'✓ Diterapkan!' }[s.applyState],
-      applyOption:() => { if (s.applyState !== 'idle') return; this.setState({ applyState:'applying' }); if (this.props.live !== undefined) { this.props.live.actions.applyBudget(s.opt, s.budget && s.budget.weekStart).then(() => this.props.live.refresh()).then(() => { this.setState({ applyState:'applied' }); setTimeout(() => this.setState({ applyState:'idle' }), 3000); }).catch(e => { this.setState({ applyState:'idle' }); this.toast((e && e.message) || 'Gagal menerapkan budget.'); }); return; } this.t4 = setTimeout(() => { this.setState({ applyState:'applied', manual:[...optObj.days] }); setTimeout(() => this.setState({ applyState:'idle' }), 3000); }, 800); },
       weekStreams, pendingVisible:s.pending, pendingPick:s.pick, streamOpts, onPendingPick:e => this.setState({ pick:e.target.value }), pendingNoPick:String(!s.pick),
       pendingBtnBg: s.pick ? 'var(--text)' : 'var(--neutral)', pendingBtnFg: s.pick ? 'var(--page)' : 'var(--text-subtlest)',
       resolvePending:() => { if (!s.pick) return; const st = s.streams.find(x => String(x.id) === s.pick); if (this.props.live !== undefined) { const it = s.pendingList && s.pendingList[0]; if (!it) return; this.liveCall(() => this.props.live.actions.resolveIncome(it.id, { streamId:Number(s.pick) })); this.setState({ pick:'' }); this.toast('Dicatat sebagai ' + (st ? st.name : 'pemasukan') + '.'); return; } this.setState(z => ({ pending:false, incomes:[INC(750000,'TRSF E-BANKING ANDI PRATAMA','BCA','2026-09-29',st && st.name), ...z.incomes] })); this.toast(`Dicatat sebagai ${st ? st.name : 'pemasukan'}.`); },
       markInternal:() => { if (this.props.live !== undefined) { const it = s.pendingList && s.pendingList[0]; if (it) this.liveCall(() => this.props.live.actions.resolveIncome(it.id, { notIncome:true })); this.toast('Ditandai bukan pemasukan.'); return; } this.setState({ pending:false }); this.toast('Ditandai bukan pemasukan.'); },
-      incTabs, incTabX:`calc(${s.incTab} * var(--inc-tw))`, tabHist:s.incTab === 0, tabSrc:s.incTab === 1, tabFc:s.incTab === 2,
+      incTabs, incTabX:`calc(${s.incTab} * var(--inc-tw))`, tabHist:s.incTab === 0, tabSrc:s.incTab === 1,
       togglePeriod:() => this.setState({ periodOpen:!s.periodOpen }), periodOpen:s.periodOpen, periodExpanded:String(s.periodOpen), periodLabel:PL[s.period], periodItems,
-      histGroups, histEmpty:list.length === 0, streamRows, streamSug, hasStreamSug:streamSug.length > 0, fcTiles, fcSegs, fcX:(s.fc * 100) + '%',
-      openIncomeNew:() => this.setState({ modal:'income', infId:null, inf:{ amount:'', desc:'', src:'BCA', date:TODAY_ISO } }),
+      histGroups, histEmpty:list.length === 0, streamRows, streamSug, hasStreamSug:streamSug.length > 0,
+      openIncomeNew:() => this.setState({ modal:'income', infId:null, inf:{ amount:'', desc:'', src:'BCA', date:TODAY_ISO, kind:'auto' } }),
       openStreamNew:() => this.setState({ modal:'stream', sfId:null, sfAdv:false, sf:{ name:'', kind:'FIXED', cadence:'WEEKLY', source:'BCA', payDOW:'', payDOM:'', amount:'', rate:'', extra:'', maxU:'', ded:'', typical:'', keywords:'', active:true } }),
       anyMenu: !!s.rowMenu || s.periodOpen || s.bell, closeMenus:() => this.setState({ rowMenu:null, periodOpen:false, bell:false }),
-      ciRows, ciEmpty:ciRows.length === 0, ciTotal:RP(ciTotal), ciOpen:s.ciState !== 'done' && ciRows.length > 0, ciDone:s.ciState === 'done', ciSaving:s.ciState === 'saving', ciBusy:String(s.ciState === 'saving'), ciBtn: s.ciState === 'saving' ? 'Menyimpan...' : 'Simpan semua',
-      ciSave:() => { if (s.ciState !== 'open') return; this.setState({ ciState:'saving' }); if (this.props.live !== undefined) { const entries = []; for (const x of ciStreams) { const dr = s.checkin && s.checkin.byId[x.id], e = s.ci[x.id] || { units:0, extra:0, amount:'' }; if (dr && dr.alreadyFilled) continue; if (x.kind === 'IRREGULAR') { const a = Number(digits(e.amount)) || 0; if (a > 0) entries.push({ streamId:x.id, amount:a }); } else if (dr && !dr.scheduled && x.kind !== 'VARIABLE') continue; else if (x.kind === 'VARIABLE') { const a = Number(digits(e.amount)) || 0; if (a > 0) entries.push({ streamId:x.id, amount:a }); } else if (x.kind === 'SESSION') entries.push({ streamId:x.id, units:e.units, extraUnits:Math.min(e.extra, e.units) }); else if (x.kind === 'DEDUCTION') entries.push({ streamId:x.id, units:e.units }); else entries.push({ streamId:x.id }); } (entries.length ? this.props.live.actions.submitCheckin(s.checkin.weekStart, entries) : Promise.resolve()).then(() => this.props.live.refresh()).then(() => this.setState({ ciState:'done' })).catch(e => { this.setState({ ciState:'open' }); this.toast((e && e.message) || 'Gagal menyimpan check-in.'); }); return; } this.t4 = setTimeout(() => this.setState({ ciState:'done' }), 900); }, ciReset:() => this.setState({ ciState:'open' }),
       hasModal:!!s.modal, closeModal:() => this.closeModal(), mTitle:mTitles[s.modal] || this.b2Title(s) || this.b2Title3(s) || '', mHasSub: (s.modal === 'tx' && !!tx && !!tx.alias) || s.modal === 'contrib' || s.modal === 'sim', mSub: s.modal === 'contrib' ? 'Setor / tarik' : s.modal === 'sim' ? 'Simulasi target' : (tx ? tx.raw : ''),
       mTx:s.modal === 'tx' && !!tx, mExpense:s.modal === 'expense', mIncome:s.modal === 'income', mStream:s.modal === 'stream', mConfirm:s.modal === 'confirm',
       tx: tx ? { srcCss:brandCss(tx.src), iconCss:iconCss(this.iconOf(tx)), iconInitial:this.iconOf(tx) ? '' : this.title(tx).trim().charAt(0).toUpperCase(), iconLabel:tx.icon ? iconLabel(tx.icon) : this.autoOf(tx) ? iconLabel(this.autoOf(tx)) + ' (otomatis)' : 'Pilih logo untuk merchant ini', amount:'−' + RP(tx.amt), meta:`${tx.src === 'JAGO' ? 'Jago' : tx.src} · ${tx.dl || (DAYS[tx.d] || [])[1] || ''} · ${tx.time}`, cat:tx.cat, raw:tx.raw, hasCap:!!tx.cap, cap:tx.cap || '', aliasDraft:s.aliasDraft, noteDraft:s.noteDraft,
@@ -1289,10 +1360,12 @@ export class V3Logic extends React.Component {
       ex, exSet:{ amount:e => this.setState(z => ({ ex:{ ...z.ex, amount:fmtIn(e.target.value) } })), desc:e => this.setState(z => ({ ex:{ ...z.ex, desc:e.target.value } })), cat:e => this.setState(z => ({ ex:{ ...z.ex, cat:e.target.value } })), src:e => this.setState(z => ({ ex:{ ...z.ex, src:e.target.value } })), date:e => this.setState(z => ({ ex:{ ...z.ex, date:e.target.value } })) },
       exOff:String(!exOk), exBtnBg: exOk ? 'var(--brand)' : off[0], exBtnFg: exOk ? 'var(--on-brand)' : off[1], exSaving:s.exSaving, exBtn: s.exSaving ? 'Menyimpan...' : 'Tambah pengeluaran',
       submitExpense:() => { if (!exOk || s.exSaving) return; this.setState({ exSaving:true }); if (this.props.live !== undefined) { this.props.live.actions.addTx({ amount:Number(digits(ex.amount)), desc:ex.desc.trim(), cat:ex.cat, src:ex.src, dateISO:ex.date }).then(() => this.props.live.refresh()).then(() => { this.setState({ exSaving:false, modal:null }); this.toast('Pengeluaran dicatat.'); }).catch(e => { this.setState({ exSaving:false }); this.toast((e && e.message) || 'Gagal mencatat pengeluaran.'); }); return; } this.t4 = setTimeout(() => { const d = DATE_IDX[ex.date] ?? 6; this.setState(z => ({ exSaving:false, modal:null, txs:[...z.txs, T(d, ex.desc.trim(), null, null, ex.src, new Date().toTimeString().slice(0,5).replace(':','.'), ex.cat, Number(digits(ex.amount)))] })); this.toast('Pengeluaran dicatat.'); }, 600); },
-      inf, infSet:{ amount:e => this.setState(z => ({ inf:{ ...z.inf, amount:fmtIn(e.target.value) } })), desc:e => this.setState(z => ({ inf:{ ...z.inf, desc:e.target.value } })), src:e => this.setState(z => ({ inf:{ ...z.inf, src:e.target.value } })), date:e => this.setState(z => ({ inf:{ ...z.inf, date:e.target.value } })) },
+      inf, infSet:{ amount:e => this.setState(z => ({ inf:{ ...z.inf, amount:fmtIn(e.target.value) } })), desc:e => this.setState(z => ({ inf:{ ...z.inf, desc:e.target.value } })), src:e => this.setState(z => ({ inf:{ ...z.inf, src:e.target.value } })), date:e => this.setState(z => ({ inf:{ ...z.inf, date:e.target.value } })), kind:e => this.setState(z => ({ inf:{ ...z.inf, kind:e.target.value } })) },
+      infKindShow:!s.infId, infKindOpts:[{ value:'auto', label:'Otomatis (dicocokkan)' }, ...s.streams.filter(x => x.active && x.kind !== 'IRREGULAR' && x.cadence !== 'NONE').map(x => ({ value:String(x.id), label:'Pasti · ' + x.name })), { value:'extra', label:'Tambahan (tidak pasti)' }],
+      infKindNote:{ auto:'Kalau nominalnya mirip pemasukan pasti, otomatis dihitung sebagai pemasukan pasti itu.', extra:'Langsung menambah budget periode ini.' }[inf.kind || 'auto'] || 'Menggantikan perkiraan pemasukan pasti periode ini.',
       infOff:String(!infOk), infBtnBg: infOk ? 'var(--brand)' : off[0], infBtnFg: infOk ? 'var(--on-brand)' : off[1], infBtn: s.infId ? 'Simpan perubahan' : 'Tambah pemasukan',
-      submitIncome:() => { if (!infOk) return; const amt = Number(digits(inf.amount)); if (this.props.live !== undefined) { this.liveCall(() => this.props.live.actions.saveIncome(s.infId, { amount:amt, desc:inf.desc.trim(), src:inf.src, dateISO:inf.date })); this.setState({ modal:null }); this.toast(s.infId ? 'Pemasukan diperbarui.' : 'Pemasukan dicatat.'); return; } if (s.infId) this.setState(z => ({ incomes:z.incomes.map(x => x.id === z.infId ? { ...x, amt, desc:inf.desc, src:inf.src, date:inf.date } : x), modal:null })); else this.setState(z => ({ incomes:[INC(amt, inf.desc, inf.src, inf.date, null), ...z.incomes], modal:null })); this.toast(s.infId ? 'Pemasukan diperbarui.' : 'Pemasukan dicatat.'); },
-      sf, sfSet:{ name:sfSetter('name'), kind:sfSetter('kind'), cadence:sfSetter('cadence'), source:sfSetter('source'), keywords:sfSetter('keywords') }, kindOpts:Object.keys(KIND_L).map(k => ({ value:k, label:KIND_L[k] })), dayOpts:DAYN.map((d, i) => ({ value:String(i), label:d })),
+      submitIncome:() => { if (!infOk) return; const amt = Number(digits(inf.amount)); if (this.props.live !== undefined) { this.liveCall(() => this.props.live.actions.saveIncome(s.infId, { amount:amt, desc:inf.desc.trim(), src:inf.src, dateISO:inf.date, kind:inf.kind })); this.setState({ modal:null }); this.toast(s.infId ? 'Pemasukan diperbarui.' : 'Pemasukan dicatat.'); return; } if (s.infId) this.setState(z => ({ incomes:z.incomes.map(x => x.id === z.infId ? { ...x, amt, desc:inf.desc, src:inf.src, date:inf.date } : x), modal:null })); else this.setState(z => ({ incomes:[INC(amt, inf.desc, inf.src, inf.date, null), ...z.incomes], modal:null })); this.toast(s.infId ? 'Pemasukan diperbarui.' : 'Pemasukan dicatat.'); },
+      sf, sfSet:{ name:sfSetter('name'), kind:sfSetter('kind'), cadence:sfSetter('cadence'), source:sfSetter('source'), keywords:sfSetter('keywords') }, kindOpts:['FIXED', 'IRREGULAR', ...(['SESSION', 'DEDUCTION', 'VARIABLE'].includes(sf.kind) ? [sf.kind] : [])].map(k => ({ value:k, label:k === 'FIXED' ? 'Pasti (rutin)' : KIND_L[k] })), dayOpts:DAYN.map((d, i) => ({ value:String(i), label:d })),
       sfCadenceOff: sf.kind === 'IRREGULAR' || sf.kind === 'VARIABLE', sfCadenceOpacity: (sf.kind === 'IRREGULAR' || sf.kind === 'VARIABLE') ? .5 : 1, sfFields,
       toggleSfAdv:() => this.setState({ sfAdv:!s.sfAdv }), sfAdvExpanded:String(s.sfAdv), sfAdvRot: s.sfAdv ? '180deg' : '0deg', sfAdvRows: s.sfAdv ? '1fr' : '0fr',
       sfActiveStr:String(!!sf.active), toggleSfActive:() => this.setState(z => ({ sf:{ ...z.sf, active:!z.sf.active } })), swBg: sf.active ? 'var(--brand)' : 'var(--border-bold)', swX: sf.active ? '16px' : '0px',

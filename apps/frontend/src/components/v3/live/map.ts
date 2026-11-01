@@ -74,7 +74,8 @@ export function mapCard(c: any): any {
     };
   }
   if (c?.type === 'goal-proposal') return { type: 'goal', name: c.name, target: c.target, deadline: fmtDeadline(c.deadline), rawDeadline: c.deadline ?? null, weekly: c.weeklyContribution ?? 0 };
-  return { type: 'budget', label: OPTION_LABEL[c.option] ?? c.option, total: c.totalWeekly, note: c.note ?? c.realismFlag ?? '', days: c.dailyAmounts ?? [] };
+  // proposeBudget: gaya (hemat/seimbang/longgar) + pratinjau jatah; kartu lama membawa nominal per hari.
+  return { type: 'budget', option: c.option ?? null, label: OPTION_LABEL[c.option] ?? c.option, total: c.totalWeekly ?? null, perDay: c.allowance ?? null, periodBudget: c.periodBudget ?? null, note: c.note ?? c.realismFlag ?? '', days: c.dailyAmounts ?? [] };
 }
 
 export const mapMsg = (m: any) => ({ role: m.role, text: m.content, cards: (m.attachments ?? []).map(mapCard) });

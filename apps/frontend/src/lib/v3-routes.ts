@@ -2,12 +2,13 @@
 export type V3Target = { pre: 'landing' | 'auth' | 'wizard' | null; page: string };
 
 const PAGES: Record<string, string> = {
-  dash: '', today: '/today', weekly: '/weekly', budget: '/budget', income: '/income', checkin: '/income/checkin',
+  dash: '', today: '/today', weekly: '/weekly', budget: '/budget', income: '/income',
   goals: '/goals', subs: '/subscriptions', reports: '/reports', analysis: '/insights', chat: '/chat', memory: '/chat/memory',
   tidy: '/categorize', me: '/more', settings: '/settings', sources: '/sources', privacy: '/privacy', calc: '/calc',
   split: '/split', splitNew: '/split/new', splitDetail: '/split/detail',
 };
-const BY_PATH = Object.fromEntries(Object.entries(PAGES).map(([k, v]) => [v, k]));
+// '/income/checkin' = tautan lama (check-in mingguan sudah dihapus) → layar Pemasukan.
+const BY_PATH: Record<string, string> = { ...Object.fromEntries(Object.entries(PAGES).map(([k, v]) => [v, k])), '/income/checkin': 'income' };
 
 export function stateToPath(base: string, s: { pre?: string | null; page?: string }): string | null {
   if (s.pre === 'landing') return '/';

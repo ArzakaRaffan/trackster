@@ -29,7 +29,7 @@ const ifNode = (name) => find(tree, (n) => n.tag === 'sc-if' && attr(n, 'value')
 const IF_UNITS = {
   Landing: 'vLanding', Auth: 'vAuth', Wizard: 'vWizard', Sidebar: 'showSide', Coach: 'coachShow', Strip: 'stripShow',
   Me: 'vMe', Analysis: 'vAna', Sources: 'vSrc', Privacy: 'vPriv', Tidy: 'vTidy', Calculator: 'vCalc',
-  Dashboard: 'isDash', Today: 'isToday', Weekly: 'isWeekly', Budget: 'isBudget', Income: 'isIncome', Checkin: 'isCheckin',
+  Dashboard: 'isDash', Today: 'isToday', Weekly: 'isWeekly', Budget: 'isBudget', Income: 'isIncome',
   Subs: 'isSubs', Goals: 'isGoals', Settings: 'isSettings', Chat: 'isChat', Memory: 'isMemory', SplitList: 'isSplit',
   SplitNew: 'isSplitNew', SplitDetail: 'isSplitDetail', Reports: 'isReports', Other: 'isOther', BottomNav: 'showBottom',
   MascotTip: 'showMascot', MenuLayer: 'anyMenu', Modal: 'hasModal', Pwa: 'pwaOpen',
@@ -42,9 +42,6 @@ em.setLiterals(new Map(Object.entries({
   'Rp181.000/hari': 'runBurnTxt', '1 hari': 'runDaysTxt', 'Rp4.230.000': 'runBalTxt',
   'Masuk minggu ini (29 Sep)': 'incWeekTxt', 'Rp950.000': 'incReceivedTxt', 'dari perkiraan Rp2.000.000': 'incExpectedTxt',
   'Perlu dicek (1).': 'pendTitleTxt', '+Rp750.000': 'pendAmtTxt', 'TRSF E-BANKING ANDI PRATAMA': 'pendDescTxt',
-  'Rp1.200.000/bulan': 'upsideTxt', 'dari pemasukan tak terduga (Project desain), tidak dihitung di angka di atas karena tidak bisa diandalkan.': 'upsideNoteTxt',
-  'Minggu 22 Sep – 28 Sep': 'ciWeekTxt', 'Rp2.300.000': 'ciExpTxt', 'Rp500.000': 'ciRecTxt',
-  'Minggu lalu kamu lewat budget 2 kali, dua-duanya pas weekend. Seimbang kasih ruang lebih di Sabtu–Minggu tanpa ganggu tabungan.': 'budgetReasonTxt',
 })));
 const holes = {};
 fs.mkdirSync(path.join(OUT, 'views'), { recursive: true });
