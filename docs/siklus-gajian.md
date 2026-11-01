@@ -1,4 +1,7 @@
-# Siklus Gajian — Desain (belum diimplementasi)
+# Siklus Gajian — Desain (DIGANTIKAN)
+
+> **Digantikan 2026-11-01 oleh [`budget-kebiasaan.md`](budget-kebiasaan.md).** Mode FIXED/CYCLE/BALANCE, check-in mingguan,
+> forecast dan advisor 50/30/20 sudah dihapus. Dokumen ini disimpan sebagai riwayat keputusan.
 
 > Status: **desain disetujui, belum ada kode.** Dibahas 2026-10-15.
 > Bersinggungan dengan migrasi multi-user (schema + wizard) — baca `docs/multi-user/README.md` sebelum mulai,

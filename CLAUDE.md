@@ -45,10 +45,12 @@ Konteks tambahan (`Product.md`, `Decisions.md`, `Gotchas.md` hanya ada lokal —
 
 ## Domain Logic — Budget Harian
 
-- `BudgetSetting.mode`: **FIXED** (default, perilaku lama: nominal `DailyBudget` per hari + rollover mingguan), **CYCLE** (jatah = sisa uang siklus gajian ÷ sisa hari, siklus ikut `anchorStreamId`), **BALANCE** (jatah = saldo ÷ `horizonDays`). Di mode dinamis, nominal `DailyBudget` dipakai sebagai **bobot** hari.
-- Semua pemakai budget (alert Telegram, AI, mascot, ingest) lewat `BudgetService.getTodaySummary()` — ubah rumus di sana saja. Engine murni: `budget/budget-cycle.ts`. Desain & fase: [`docs/siklus-gajian.md`](docs/siklus-gajian.md).
-- Mode dinamis: pembelian besar (`isBigPurchase`) tetap mengurangi sisa siklus tapi **tidak** dihitung di `isOverBudget` hari ini (Telegram kirim notifikasi dampak, bukan alert).
-- Jatah dinamis tidak bisa direkonstruksi → disimpan per hari di `DailyAllowance`; analytics membaca snapshot itu (fallback nominal `DailyBudget`). Kode yang menimpa `DailyBudget` massal (mis. cron alokasi) harus melewati mode dinamis — di sana nominalnya = bobot pilihan user.
+- **Budget dari kebiasaan** (desain: [`docs/budget-kebiasaan.md`](docs/budget-kebiasaan.md)): periode mingguan/bulanan (`BudgetSetting.period`/`periodDay`). Basis **INCOME** = Σ pemasukan pasti periode ini + tambahan yang sudah masuk − disisihkan `reservePct`; basis **TARGET** = `targetAmount` (null = belanja rutin biasanya). Jatah hari ini = (budget + carry − langganan mendatang − belanja sebelum hari ini) ÷ sisa hari, berbobot pola harian, beku terhadap belanja hari ini.
+- Pemasukan pasti = stream aktif WEEKLY/MONTHLY non-IRREGULAR; nominal "biasanya" = median ≤6 pembayaran CONFIRMED (≥3), sebelum itu angka yang diisi. Yang sudah masuk menggantikan perkiraan. Pemasukan tanpa sumber ±20% dari biasanya → ditautkan otomatis (anti dobel). Periode pertama (daftar di tengah periode) diprorata.
+- `period = null` = setelan lama (FIXED/CYCLE/BALANCE) → diturunkan on-the-fly + `needsReview` (banner). Tidak ada data yang ditulis ulang; kolom `mode`/`horizonDays` tidak dipakai lagi.
+- Semua pemakai budget (alert Telegram, AI, mascot, ingest, notif pemasukan) lewat `BudgetService.getTodaySummary()` — ubah rumus di sana saja. Engine murni: `budget/budget-period.ts`; kebiasaan: `habit/habit-engine.ts` (satu sumber "biasanya").
+- Pembelian besar (`isBigPurchase`) tetap mengurangi sisa periode tapi **tidak** dihitung di `isOverBudget` hari ini (Telegram kirim notifikasi dampak, bukan alert).
+- Jatah dinamis tidak bisa direkonstruksi → disimpan per hari di `DailyAllowance` (semua user); analytics membaca snapshot itu. Nominal `DailyBudget` = bobot hari "atur sendiri" (`autoWeights=false`), jangan ditimpa massal.
 - Kolom `@db.Date` (mis. `Subscription.nextDueDate`): Prisma memotong parameter filter ke tanggal UTC — kirim batas sebagai tanggal kalender WIB (`new Date(wibDateKey(x) + 'T00:00:00Z')`), bukan instant 00:00 WIB.
 - `Subscription.nextDueDate` tersimpan bisa **basi** (lewat): jangan filter `nextDueDate` langsung untuk "jatuh tempo di rentang X". Pakai `subscription/subscription-due.ts` (`commitmentsBetween`/`dueDatesBetween`, menggulir per siklus di memori). `SubscriptionService.findAll()` juga menggulir & menyimpan tanggal basi.
 

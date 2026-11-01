@@ -1,6 +1,6 @@
 # Trackster — Codemap (mau ubah X, buka di mana)
 
-Snapshot 2026-10-05 (diperbarui 2026-10-17). Kalau nambah module/route/cron, update file ini.
+Snapshot 2026-10-05 (diperbarui 2026-11-01: budget dari kebiasaan). Kalau nambah module/route/cron, update file ini.
 
 ## Backend — `apps/backend/src/modules/`
 
@@ -12,9 +12,10 @@ Snapshot 2026-10-05 (diperbarui 2026-10-17). Kalau nambah module/route/cron, upd
 | sync | `/sync` | trigger manual, backfill rentang tanggal (default tanpa notif Telegram), next-run, logs. |
 | transaction | `/transactions` | list+filter, weekly/monthly/summary/day/insights, create manual, note/category/alias. `createFromParsed()` = jalur sync. `getInsights()` = sumber data semua fitur analitik/AI. |
 | balance | `/balance` | saldo per source, koreksi manual, histori adjustment. `adjustBalance(tx, source, delta)` wajib di dalam `$transaction`. |
-| budget | `/budget` | budget per hari, `today` summary, `runway`, `settings` (mode FIXED/CYCLE/BALANCE), `allowances` (snapshot jatah per tanggal). Engine siklus gajian murni di `budget-cycle.ts` (docs/siklus-gajian.md). |
-| income | `/income` | CRUD + `allowance-suggestion` + `allocation`. |
-| income-stream | `/income-streams` | CRUD sumber pemasukan; `GET suggestions` (`stream-detect.ts`, uang masuk rutin tanpa sumber); `POST {linkPast:true}` menautkan riwayat yang cocok keyword. |
+| budget | `/budget` | `today` summary (`cycle` = objek periode + rincian + gaya), `settings` (periode/dasar/target/carry/bobot; setelan lama diturunkan otomatis + `needsReview`), `apply` (gaya hemat/seimbang/longgar, langsung berlaku), `allowances` (snapshot jatah per tanggal), `runway`, `GET/PUT /budget` (nominal per hari = bobot "atur sendiri"). Engine murni `budget-period.ts` (docs/budget-kebiasaan.md). |
+| habit | `/habits?week=` | Kebiasaan mingguan: engine murni `habit-engine.ts` (belanja & pemasukan vs minggu-minggu penuh sebelumnya, insight dua bahasa tanpa AI). Dipakai Beranda, Laporan mingguan, Telegram Senin & `/pagi`, snapshot/tool AI `getHabits`, maskot, simulasi rencana. |
+| income | `/income` | CRUD (POST `streamId`: angka = pasti, `null` = tambahan, kosong = dicocokkan otomatis ±20% "biasanya"), `resolve`. Pemasukan tercatat → notif Telegram dampak ke jatah. |
+| income-stream | `/income-streams` | CRUD sumber pemasukan (pasti = WEEKLY/MONTHLY non-IRREGULAR; jenis lama SESSION/DEDUCTION/VARIABLE tetap dihitung pasti, nominal dipelajari); `GET suggestions` (`stream-detect.ts`, uang masuk rutin tanpa sumber); `POST {linkPast:true}` menautkan riwayat yang cocok keyword. |
 | merchant-alias | `/merchant-aliases` | CRUD alias. |
 | goal | `/goal` | Kantong: create, contribute, archive, simulate (what-if). |
 | subscription | `/subscriptions`, `/calendar` | CRUD + sync event Google Calendar (`googleCalendarEventId`). Jatuh tempo basi digulir otomatis (`subscription-due.ts`, dipakai juga komitmen budget/advisor). `GET suggestions` = deteksi tagihan bulanan berulang (`recurring-detect.ts`). `GET calendar-link` → feed publik `GET /calendar/<userId>-<sig>.ics` (HMAC userId+tokenVersion, `subscription-ics.ts`). |
@@ -26,7 +27,7 @@ Snapshot 2026-10-05 (diperbarui 2026-10-17). Kalau nambah module/route/cron, upd
 - `ai.service.ts` — client OpenAI-compat/Anthropic-style + `runToolLoop()`. Env: `AI_BASE_URL`,
   `AI_API_KEY`, `AI_AUTH_HEADER` (default `x-bf-vk`), `AI_MODEL`; fallback ke `SPLITBILL_AI_*`.
 - `ai-finance-tools.service.ts` — tools: getTodaySummary, getWeeklySummary, getInsights,
-  getMonthlySummary, getAllTimeSummary, getIncomeAllocation, logExpense. Tool baru = reuse service
+  getMonthlySummary, getAllTimeSummary, getHabits, proposeBudget (gaya), logExpense, logIncome, … Tool baru = reuse service
   yang ada, jangan query Prisma manual.
 - `ai-chat.service.ts` — chat handler + `categorize()` (dipanggil dari sync).
 - `ai-reports.service.ts` — cron weekly & monthly + `computeAndSaveHealthScore()`.
@@ -36,9 +37,8 @@ Snapshot 2026-10-05 (diperbarui 2026-10-17). Kalau nambah module/route/cron, upd
 | Jadwal | Job |
 | --- | --- |
 | tiap 5 menit | Gmail sync → parse → kategori AI → simpan + adjust saldo → cek budget → alert |
-| Minggu 20:00 WIB | Weekly insight ke Telegram + simpan Health Score |
-| Minggu 21:00 WIB | Alokasi 50/30/20 → timpa `DailyBudget` (dilewati untuk mode CYCLE/BALANCE) |
-| tiap hari 00:05 WIB | Snapshot `DailyAllowance` untuk user mode CYCLE/BALANCE |
+| Senin 06:00 / 07:00 WIB | Tutup laporan minggu lalu (stats + kebiasaan + narasi AI) → kirim ke Telegram (bullet kebiasaan + narasi) + Health Score |
+| tiap hari 00:05 WIB | Snapshot `DailyAllowance` (semua user) |
 | tiap hari 07:00 WIB | Ringkasan pagi Telegram (hanya `dailyBrief` = true, lewat `/pagi`) |
 | tiap hari 20:00 WIB (eksekusi cuma di hari terakhir bulan) | Monthly report card ke Telegram |
 
@@ -51,7 +51,7 @@ semua layar; route cuma menentukan layar mana yang aktif.
 | --- | --- |
 | `/`, `/login`, `/setup` | Landing, masuk, wizard setup (nyata) — layar `pre` prototipe |
 | `/app`, `/app/today`, `/app/weekly` | Beranda, Hari ini, Mingguan (7 hari terakhir) |
-| `/app/budget`, `/app/income`, `/app/income/checkin`, `/app/goals`, `/app/subscriptions` | Rencana |
+| `/app/budget`, `/app/income`, `/app/goals`, `/app/subscriptions` | Rencana (`/app/income/checkin` lama → Pemasukan) |
 | `/app/reports`, `/app/insights`, `/app/chat`, `/app/chat/memory`, `/app/categorize` | Insight (insights = Analisis) |
 | `/app/more`, `/app/split`, `/app/calc`, `/app/sources`, `/app/privacy`, `/app/settings` | Menu |
 | `/demo/*` | Prototipe dengan data contoh (tombol "Coba pakai data contoh" di landing) |
@@ -132,4 +132,9 @@ Dipakai di baris Hari ini, detail transaksi, Setting → Alias merchant (+ logo 
 ## Audit 2026-10-18 (`docs/multi-user/11-Audit-2026-10-18.md`)
 - Saldo: `Transaction/Income.balanceApplied` — hapus/edit membalik saldo hanya kalau true; `BalanceService.correctBalance` menyerap semua baris source itu; `adjustAfterBaseline()` = aturan baseline + gerakkan saldo.
 - `GmailSyncService.syncEmails` dikunci per user; email RECORDED tak diunduh ulang; `EmailSyncLog` > 30 hari dibuang.
-- `useLive`: riwayat/forecast/check-in pemasukan, target, rapikan kategori dimuat hanya di layarnya (Beranda 27 → 21 request).
+- `useLive`: riwayat pemasukan, target, rapikan kategori dimuat hanya di layarnya (Beranda 27 → 21 request).
+
+## Budget dari kebiasaan (2026-11-01, branch `feat/budget-kebiasaan`)
+- Dihapus: modul `income-checkin` (2 cron), `budget-allocation` (cron Minggu 21:00), BudgetAdvisor + cron saran budget, `/ai/budget-suggestions`, `/income/forecast/*`, `/income/allocation`, `/budget/rollover`, layar Check-in. `calcStreamForecast` (murni) tetap untuk Invest.
+- Frontend: layar Budget (`isBudget` di `.dc.html`, kunci `bp*` di `logic.tsx`), wizard langkah 7 (`pay*`), kartu kebiasaan (`hab`/`rpHab`, `rv_hab`), `applyStyle()` (gaya langsung berlaku). `useLive`: `/habits` global, `weekInfo` dari `today.cycle`.
+- Tes: `budget-period.check.ts`, `habit-engine.check.ts`, `scripts/budget-period-e2e.mjs`.
