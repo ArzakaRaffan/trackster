@@ -70,6 +70,23 @@ function runChecks() {
   // Total = 115500
   assert.strictEqual(res4.grandTotal, 115500);
 
+  // 5. equalFees: pajak & service dibagi rata antar peserta ber-item; subtotal tetap per orang
+  const res5 = calculate({
+    participants: [{ id: 1, name: 'A' }, { id: 2, name: 'B' }, { id: 3, name: 'C' }],
+    items: [
+      { id: 1, price: 150000, qty: 1, shares: [{ participantId: 1, weight: 1 }] },
+      { id: 2, price: 50000, qty: 1, shares: [{ participantId: 2, weight: 1 }] },
+    ],
+    servicePercent: 10,
+    taxPercent: 10,
+    equalFees: true,
+  });
+  // Service 20000 + pajak 20000 = 40000 → 20000 per peserta ber-item; C (tanpa item) 0
+  assert.strictEqual(res5.participants[0].total, 150000 + 20000);
+  assert.strictEqual(res5.participants[1].total, 50000 + 20000);
+  assert.strictEqual(res5.participants[2].total, 0);
+  assert.strictEqual(res5.grandTotal, 240000);
+
   console.log('All checks passed!');
 }
 

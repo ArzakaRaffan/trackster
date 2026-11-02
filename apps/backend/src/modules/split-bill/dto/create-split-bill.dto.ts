@@ -1,5 +1,5 @@
 import { Type } from 'class-transformer';
-import { ArrayMaxSize, ArrayMinSize, IsArray, IsISO8601, IsInt, IsNumber, IsOptional, IsString, Matches, Max, MaxLength, Min, MinLength, ValidateNested } from 'class-validator';
+import { ArrayMaxSize, ArrayMinSize, IsArray, IsBoolean, IsISO8601, IsInt, IsNumber, IsOptional, IsString, Matches, Max, MaxLength, Min, MinLength, ValidateNested } from 'class-validator';
 import { AVATAR_SPEC_RE } from './set-avatar.dto';
 
 class ParticipantInputDto {
@@ -100,6 +100,10 @@ export class CreateSplitBillDto {
   taxAfterService?: boolean;
 
   @IsOptional()
+  @IsBoolean()
+  equalFees?: boolean;
+
+  @IsOptional()
   @IsString()
   @MaxLength(200)
   payerBankName?: string;
@@ -113,6 +117,13 @@ export class CreateSplitBillDto {
   @IsString()
   @MaxLength(200)
   payerAccountName?: string;
+
+  // Foto struk (data URL, sudah dikecilkan di browser ±900px).
+  @IsOptional()
+  @IsString()
+  @MaxLength(400_000)
+  @Matches(/^data:image\/(jpeg|png|webp);base64,[A-Za-z0-9+/=]+$/)
+  receiptImage?: string;
 
   @IsArray()
   @ArrayMaxSize(200)

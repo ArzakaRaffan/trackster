@@ -365,9 +365,14 @@ deviasi dari rencana (+alasan), env baru yang Arzaka harus tambahkan, langkah be
 ## 2026-10-30 s/d 2026-11-01 — Budget dari kebiasaan + analisis kebiasaan mingguan
 - Sesi oleh: Claude (Opus 5.5)   Branch: `feat/budget-kebiasaan` (worktree dari `origin/main`, terpisah dari `feat/invest-foundation`). Desain: [`docs/budget-kebiasaan.md`](../budget-kebiasaan.md).
 - Keputusan Arzaka: pemasukan di tengah periode dipakai periode itu; tanpa pemasukan pasti = target sendiri; user lama pindah otomatis + banner; dasar budget setelah ≥3 pembayaran = kebiasaan asli; check-in/jenis pemasukan/forecast/3 mode/50-30-20 dibuang.
-- **Migrasi (aditif saja):** `20261030100000_budget_period` (enum `BudgetPeriod`/`BudgetBasis`, 5 kolom `BudgetSetting`). Tidak ada UPDATE data; setelan lama diturunkan on-the-fly.
+- **Migrasi (aditif saja):** `20261102090000_budget_period` (enum `BudgetPeriod`/`BudgetBasis`, 5 kolom `BudgetSetting`). Tidak ada UPDATE data; setelan lama diturunkan on-the-fly.
 - **Baru:** engine `budget-period.ts` (40 kasus) + `habit-engine.ts` (16 kasus), modul `habit` (`GET /habits`), gaya langsung berlaku (`POST /budget/apply`), tautan otomatis pemasukan mirip pasti, notif Telegram dampak pemasukan, kebiasaan di laporan/Telegram Senin/`/pagi`/AI/maskot. Frontend: layar Budget baru, wizard langkah 7, kartu kebiasaan Beranda & Laporan, modal pemasukan dengan jenis.
 - **Dihapus:** modul `income-checkin`, `budget-allocation`, BudgetAdvisor (+cron), endpoint forecast/allocation/rollover/budget-suggestions, layar Check-in. `calcStreamForecast` dipertahankan (Invest).
 - **Bug ditemukan & diperbaiki:** pemasukan manual "hari ini" tersimpan jam 12.00 → pagi hari belum ikut budget; payday sebelum daftar dianggap "belum masuk".
 - Verifikasi (Postgres scratch port 5435, karena 5434 dipakai DB dev berisi migrasi Invest): check 37/37, tenancy-audit 0, build BE, tsc FE, e2e budget 12/12, isolasi 164/164, ingest 17/18 (gagal = tes rate limit butuh `INGEST_RATE_LIMIT=30`). Browser: demo & live Budget (klik gaya → POST 201, jatah berubah), wizard user baru (600rb/minggu → ≈Rp77.000/hari, setelan tersimpan), banner user lama + "Sudah benar", target sendiri, Pemasukan, Laporan, Beranda, 375px, EN. Telegram tidak terkirim sungguhan (token palsu).
 - **Belum:** merge/push ke `main` (menunggu Arzaka + backup DB). Saat merge dengan Invest: view generated (`pseudo.css`, shell) & `logic.tsx` kemungkinan konflik — generate ulang setelah merge. Golden snapshot sengaja berubah (endpoint dihapus + bentuk `cycle`).
+
+## 2026-11-02 — Persetujuan keputusan (dokumen saja)
+- Sesi oleh: Claude   Branch: `feat/multi-user` (di-reset ke `main`; seluruh commit F0–F6 sudah ada di `main`)
+- Arzaka menyetujui di chat: **P1, P4, P7, P8, P13, P14** dan **O2 (`MAX_USERS`=10)** → ditandai ✅ di `00-Decisions.md`. Tidak ada perubahan kode.
+- Catatan: entri F6 di atas (2026-10-07) menyebut "belum merge"; kenyataannya kode sudah di `main` (status di README/Codemap yang lebih baru benar).

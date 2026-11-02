@@ -525,6 +525,9 @@ model SplitBill {
   deliveryFee     Decimal? @db.Decimal(12, 2)
   roundingUnit    Int      @default(0)
   taxAfterService Boolean  @default(false)
+  equalFees       Boolean  @default(false)
+
+  receipt SplitBillReceipt?
 
   participants SplitBillParticipant[]
   items        SplitBillItem[]
@@ -955,4 +958,11 @@ model AiUsage {
   count  Int    @default(0)
 
   @@unique([userId, dayKey, kind])
+}
+
+// Foto struk (data URL, sudah dikecilkan di browser) — tabel terpisah supaya daftar/detail bill tidak membawa ±150KB tiap baris.
+model SplitBillReceipt {
+  splitBillId Int       @id
+  image       String    @db.Text
+  splitBill   SplitBill @relation(fields: [splitBillId], references: [id], onDelete: Cascade)
 }

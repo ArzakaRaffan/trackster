@@ -1,0 +1,1 @@
+ALTER TABLE "SplitBill" ADD COLUMN "equalFees" BOOLEAN NOT NULL DEFAULT false;

@@ -1,5 +1,5 @@
-import { Body, Controller, Get, HttpException, HttpStatus, Param, ParseIntPipe, Patch, Post, Req, UseGuards } from '@nestjs/common';
-import { Request } from 'express';
+import { Body, Controller, Get, HttpException, HttpStatus, Param, ParseIntPipe, Patch, Post, Req, Res, UseGuards } from '@nestjs/common';
+import { Request, Response } from 'express';
 import { ThrottlerGuard } from '@nestjs/throttler';
 import { SplitBillService } from './split-bill.service';
 import { SplitBillAiService } from './split-bill-ai.service';
@@ -95,6 +95,14 @@ export class SplitBillController {
   @Get('public/:slug')
   async getPublic(@Param('slug') slug: string) {
     return this.splitBillService.getPublicSummary(slug);
+  }
+
+  @Get('public/:slug/receipt')
+  async getReceiptPublic(@Param('slug') slug: string, @Res() res: Response) {
+    const { mime, bytes } = await this.splitBillService.getReceiptPublic(slug);
+    res.setHeader('Content-Type', mime);
+    res.setHeader('Cache-Control', 'private, max-age=3600'); // foto tak berubah setelah bill dibuat
+    res.send(bytes);
   }
 
   // Tanpa JwtAuthGuard secara sengaja — lihat komentar di SplitBillService.togglePaidPublic.

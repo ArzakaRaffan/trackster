@@ -10,6 +10,7 @@ export interface SplitInput {
   deliveryFee?: number;       // dibagi rata
   roundingUnit?: 0 | 100 | 500 | 1000; // default 0
   taxAfterService?: boolean;  // default false
+  equalFees?: boolean;        // pajak & service dibagi rata (bukan proporsional subtotal); diskon tetap proporsional
 }
 
 export interface ParticipantResult {
@@ -36,6 +37,7 @@ export function calculate(input: SplitInput): { participants: ParticipantResult[
     deliveryFee = 0,
     roundingUnit = 0,
     taxAfterService = false,
+    equalFees = false,
   } = input;
 
   const participantResults = new Map<number, ParticipantResult>();
@@ -96,6 +98,10 @@ export function calculate(input: SplitInput): { participants: ParticipantResult[
     totalTax += (baseForTax * taxPercent) / 100;
   }
 
+  // Rata: hanya peserta yang punya item (subtotal > 0) menanggung pajak/service; tak ada yang punya item → semua.
+  const feePayers = participants.filter((p) => participantResults.get(p.id)!.subtotal > 0).length;
+  const equalShare = (subtotal: number) => (feePayers ? (subtotal > 0 ? 1 / feePayers : 0) : 1 / (participants.length || 1));
+
   const numParticipants = participants.length;
   const deliveryPerPerson = numParticipants > 0 ? deliveryFee / numParticipants : 0;
 
@@ -108,14 +114,14 @@ export function calculate(input: SplitInput): { participants: ParticipantResult[
     const prop = totalSubtotal > 0 ? pRes.subtotal / totalSubtotal : 0;
 
     pRes.discount = totalDiscount * prop;
-    pRes.service = totalService * prop;
+    pRes.service = totalService * (equalFees ? equalShare(pRes.subtotal) : prop);
 
     let pBaseForTax = pRes.subtotal - pRes.discount;
     if (taxAfterService) {
       pBaseForTax += pRes.service;
     }
     const propTax = baseForTax > 0 ? pBaseForTax / baseForTax : 0;
-    pRes.tax = totalTax * propTax;
+    pRes.tax = totalTax * (equalFees ? equalShare(pRes.subtotal) : propTax);
     
     pRes.delivery = deliveryPerPerson;
 

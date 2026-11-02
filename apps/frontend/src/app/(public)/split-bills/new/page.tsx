@@ -38,6 +38,8 @@ export default function NewSplitBillPage() {
   const [step, setStep] = useState(0);
   const [submitting, setSubmitting] = useState(false);
   const [scanning, setScanning] = useState(false);
+  const [scanPct, setScanPct] = useState(0);
+  const [receipt, setReceipt] = useState(''); // pratinjau + disimpan bersama bill
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [isOwner, setIsOwner] = useState<boolean | null>(null);
   const [picking, setPicking] = useState<string | null>(null);
@@ -68,6 +70,7 @@ export default function NewSplitBillPage() {
   const [deliveryFee, setDeliveryFee] = useState('');
   const [roundingUnit, setRoundingUnit] = useState<0 | 100 | 500 | 1000>(0);
   const [taxAfterService, setTaxAfterService] = useState(false);
+  const [equalFees, setEqualFees] = useState(false);
 
   // Rekening terakhir dipakai diingat di perangkat ini.
   useEffect(() => {
@@ -107,6 +110,14 @@ export default function NewSplitBillPage() {
     );
   };
 
+  // Progres semu (tak ada streaming dari AI): merambat ke ±92% lalu menunggu respons.
+  useEffect(() => {
+    if (!scanning) return;
+    setScanPct(6);
+    const t = setInterval(() => setScanPct((p) => p + (92 - p) * 0.07), 300);
+    return () => clearInterval(t);
+  }, [scanning]);
+
   const handleScanReceipt = async (file: File) => {
     setScanning(true);
     setErrorMsg(null);
@@ -117,9 +128,11 @@ export default function NewSplitBillPage() {
         reader.onerror = reject;
         reader.readAsDataURL(file);
       });
+      setReceipt(await shrinkDataUrl(imageBase64, 900, 0.6));
       const { items: scanned } = await api.post<{ items: { description: string; amount: number; quantity: number }[] }>('/split-bills/scan-receipt', { imageBase64: await shrinkDataUrl(imageBase64) });
       if (scanned.length === 0) {
         setErrorMsg('Struk tidak terbaca, coba foto ulang atau tambah item manual.');
+        setReceipt('');
         return;
       }
       setItems((rows) => {
@@ -128,6 +141,7 @@ export default function NewSplitBillPage() {
       });
     } catch (e) {
       setErrorMsg(e instanceof ApiError ? e.message : 'Gagal scan struk.');
+      setReceipt('');
     } finally {
       setScanning(false);
     }
@@ -152,6 +166,21 @@ export default function NewSplitBillPage() {
       <button type="button" className="pb-btn" style={{ width: '100%', marginBottom: 14 }} onClick={() => fileInputRef.current?.click()} disabled={scanning}>
         {scanning ? 'Memindai struk…' : 'Scan struk'}
       </button>
+      {(scanning || receipt) && (
+        <div style={{ display: 'flex', gap: 12, alignItems: 'center', marginBottom: 14 }}>
+          {receipt && <img src={receipt} alt="Foto struk" style={{ width: 56, height: 74, objectFit: 'cover', borderRadius: 8 }} />}
+          <div style={{ flex: 1 }}>
+            {scanning ? (
+              <>
+                <div className="pb-mono" style={{ marginBottom: 6 }}>{scanPct < 25 ? 'Mengunggah foto struk…' : scanPct < 65 ? 'Membaca teks struk…' : 'Menyusun daftar item…'}</div>
+                <div className="pb-bar" role="progressbar" aria-label="Memindai struk" aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(scanPct)}><i style={{ width: `${scanPct}%` }} /></div>
+              </>
+            ) : (
+              <button type="button" className="pb-btn sm" onClick={() => setReceipt('')}>Hapus foto struk</button>
+            )}
+          </div>
+        </div>
+      )}
     </>
   );
 
@@ -200,9 +229,11 @@ export default function NewSplitBillPage() {
         deliveryFee: parseFloat(deliveryFee) || 0,
         roundingUnit,
         taxAfterService,
+        equalFees,
         payerBankName: payerBankName.trim() || undefined,
         payerAccountNumber: payerAccountNumber.trim() || undefined,
         payerAccountName: payerAccountName.trim() || undefined,
+        receiptImage: receipt || undefined,
         participants: validParticipants.map((p) => ({ name: p.name.trim(), avatar: p.avatar })),
         items: validItems.map((r) => {
           const shares = r.assignedTo
@@ -246,6 +277,7 @@ export default function NewSplitBillPage() {
     deliveryFee: parseFloat(deliveryFee) || 0,
     roundingUnit,
     taxAfterService,
+    equalFees,
   };
   const preview = step === 2 ? calculate(splitInput) : null;
   const pickP = picking ? participants.find((p) => p.id === picking) ?? null : null;
@@ -405,6 +437,13 @@ export default function NewSplitBillPage() {
               <span>
                 Pajak setelah service?
                 <small>Hitung pajak dari subtotal + service fee</small>
+              </span>
+            </label>
+            <label className="pb-chk">
+              <input type="checkbox" checked={equalFees} onChange={(e) => setEqualFees(e.target.checked)} />
+              <span>
+                Pajak &amp; service dibagi rata?
+                <small>Tiap orang menanggung sama besar, bukan sesuai pesanan</small>
               </span>
             </label>
             <div className="pb-2">

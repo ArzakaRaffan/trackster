@@ -4,7 +4,7 @@ import { useState } from 'react';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import useSWR from 'swr';
-import { api } from '@/lib/api';
+import { api, API_URL } from '@/lib/api';
 import { formatRupiah } from '@/lib/format';
 import { avatarCss } from '@/lib/avatars';
 import { PublicSplitBillSummary } from '@/lib/splitBillTypes';
@@ -99,6 +99,12 @@ export default function PublicSplitBillPage() {
         <div className="pb-mono">Trackster · Split bill</div>
         <h1>{data.restaurantName}</h1>
         <div className="pb-mono">{fmtDate(data.billDate)}</div>
+        {data.hasReceipt && (
+          <a href={`${API_URL}/split-bills/public/${slug}/receipt`} target="_blank" rel="noopener" style={{ display: 'flex', alignItems: 'center', gap: 12, marginTop: 12, color: 'inherit', textDecoration: 'none' }}>
+            <img src={`${API_URL}/split-bills/public/${slug}/receipt`} alt="Foto struk" style={{ width: 56, height: 74, objectFit: 'cover', borderRadius: 8 }} />
+            <span className="pb-mono">Lihat foto struk</span>
+          </a>
+        )}
         <hr />
         <div className="pb-mono">Total tagihan</div>
         <p className="pb-total">{formatRupiah(grandTotal)}</p>

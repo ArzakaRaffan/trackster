@@ -37,6 +37,10 @@ async function bootstrap() {
   app.use('/ingest/email', express.raw({ type: () => true, limit: '3mb' }));
   // Foto struk (data URL base64, sudah dikecilkan di browser) — satu-satunya rute JSON besar.
   app.use('/split-bills/scan-receipt', express.json({ limit: '6mb' }));
+  // Pembuatan bill membawa foto struk (≤400k karakter) — hanya dua rute POST ini yang boleh lebih dari 200kb.
+  const bigJson = express.json({ limit: '500kb' });
+  app.use(['/split-bills', '/split-bills/public'], (req: express.Request, res: express.Response, next: express.NextFunction) =>
+    req.method === 'POST' && (req.baseUrl + req.path).replace(/\/$/, '').match(/^\/split-bills(\/public)?$/) ? bigJson(req, res, next) : next());
   app.use(express.json({ limit: '200kb' }));
   // Form hanya untuk Shortcut/HTTP client ber-token (Bearer, bukan cookie) — rute cookie tak menerima form (lapisan CSRF).
   app.use('/ingest', express.urlencoded({ extended: false, limit: '20kb' }));
