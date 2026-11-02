@@ -42,7 +42,7 @@ const PRIVATE = [
   ['GET', '/analytics/stats'], ['GET', '/auth/me'], ['POST', '/auth/change-password'], ['POST', '/auth/logout-all'],
   ['GET', '/balance'], ['PUT', '/balance/BCA'], ['GET', '/balance/BCA/adjustments'],
   ['GET', '/budget'], ['GET', '/budget/settings'], ['GET', '/budget/allowances'], ['GET', '/budget/today'], ['GET', '/budget/runway'],
-  ['PUT', '/budget'], ['PUT', '/budget/settings'], ['POST', '/budget/apply'], ['GET', '/habits'],
+  ['PUT', '/budget'], ['PUT', '/budget/settings'], ['PUT', '/budget/weights'], ['POST', '/budget/apply'], ['GET', '/habits'],
   ['GET', '/gmail/auth-url'], ['GET', '/gmail/status'], ['POST', '/gmail/disconnect'],
   ['GET', '/goal'], ['POST', '/goal'], ['POST', '/goal/1/contribute'], ['POST', '/goal/1/simulate'], ['PATCH', '/goal/1/archive'],
   ['GET', '/income-streams'], ['POST', '/income-streams'], ['PUT', '/income-streams/1'], ['DELETE', '/income-streams/1'],
@@ -162,8 +162,10 @@ else {
   // Pasca-C1 (ISO_PRE_C1=0): B menulis baris dengan kunci unik yang SAMA dengan milik A (unik kini komposit (userId, ...)) -> sukses, A tak bergeser.
   if (!PRE_C1) {
     await test('C1: B menulis kunci unik yang sama (saldo/budget/alias/income/laporan) tanpa error & tanpa menggeser A', async () => {
+      const aAuto = (await body(await call('GET', '/budget/settings', cookieA))).autoWeights;
       for (const [m, p, b] of [
         ['PUT', '/balance/BCA', { newBalance: 777 }], ['PUT', '/budget', { budgets: [{ dayOfWeek: 1, amount: 11111 }] }],
+        ['PUT', '/budget/weights', { autoWeights: false, amounts: [22222, 22222, 22222, 22222, 22222, 22222, 22223] }],
         ['POST', '/merchant-aliases', { rawDescription: `${TAG} raw`, displayName: 'b alias' }],
         ['POST', '/income', { amount: 1, description: 'b', source: 'BCA', receivedAt: new Date().toISOString() }],
       ]) {
@@ -172,7 +174,8 @@ else {
       }
       for (const c of [cookieB, cookieA]) expect((await call('GET', '/reports/aggregate', c)).status < 300, '/reports/aggregate gagal');
       const aBudget = JSON.stringify(await body(await call('GET', '/budget', cookieA)));
-      expect(!aBudget.includes('11111'), 'budget A tergeser oleh tulisan B');
+      expect(!aBudget.includes('11111') && !aBudget.includes('22222'), 'budget A tergeser oleh tulisan B');
+      expect((await body(await call('GET', '/budget/settings', cookieA))).autoWeights === aAuto, 'pola harian A tergeser oleh B');
     });
   }
 

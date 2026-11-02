@@ -5,7 +5,7 @@ import { PrismaService } from '../../prisma.service';
 import { UpdateBudgetDto } from './dto/update-budget.dto';
 import { UpdateBudgetSettingsDto } from './dto/update-budget-settings.dto';
 import {
-  activeStyle, AnchorSchedule, BudgetOption, computePeriodAllowance, cycleBounds, learnedWeights, normalizeWeights, pastiPart,
+  activeStyle, AnchorSchedule, BudgetOption, computePeriodAllowance, cycleBounds, dayWeights, learnedWeights, pastiPart,
   paydayDates, PeriodAllowanceInput, periodSchedule, previousPeriods, RESERVE_PCT, round500, stylePreviews, TARGET_FACTOR, usualAmount,
 } from './budget-period';
 import { calcStreamForecast } from '../income-forecast/income-forecast.service';
@@ -171,6 +171,19 @@ export class BudgetService {
     return this.getTodaySummary(userId);
   }
 
+  /** Pola harian — langsung berlaku: `autoWeights` true = belajar dari kebiasaan, false = nominal per hari (`amounts`,
+   * index 0=Min; tanpa `amounts` = nominal yang tersimpan) jadi bobot. Lewat updateSettings → setelan lama yang masih
+   * diturunkan otomatis ikut tersimpan (seperti "Sudah benar"), kalau tidak pilihan ini tertimpa turunan. Ringkasan baru
+   * dikembalikan. ponytail: dua tulis berurutan, bukan satu transaksi — gagal di tengah = mode sudah pindah dengan nominal
+   * per hari yang lama (request berikutnya memperbaikinya). */
+  async setWeights(userId: number, autoWeights: boolean, amounts?: number[]) {
+    if (!autoWeights && amounts && !amounts.some((a) => a > 0)) throw new BadRequestException('Minimal satu hari harus lebih dari 0');
+    // Setelan dulu: target turunan user lama (Σ nominal per hari) dibekukan sebelum nominalnya diganti pola baru.
+    await this.updateSettings(userId, { autoWeights });
+    if (!autoWeights && amounts) await this.updateAll(userId, { budgets: amounts.map((amount, dayOfWeek) => ({ dayOfWeek, amount })) });
+    return this.getTodaySummary(userId);
+  }
+
   async getAllowances(userId: number, from: string, to: string) {
     const rows = await this.prisma.dailyAllowance.findMany({
       where: { userId, date: { gte: new Date(`${from}T00:00:00Z`), lte: new Date(`${to}T00:00:00Z`) } },
@@ -220,7 +233,7 @@ export class BudgetService {
     const dailyAmounts: number[] = [];
     for (const r of dailyRows) dailyAmounts[r.dayOfWeek] = Number(r.amount);
     const learned = s.autoWeights ? learnedWeights(baseline.avgByDow, baseline.weeksObserved) : null;
-    const weights = learned ?? normalizeWeights(dailyAmounts);
+    const weights = dayWeights(s.autoWeights, learned, dailyAmounts);
 
     // Batas periode. Pemasukan pasti utama dengan jadwal yang sama → gaji lebih awal membuka periode baru (cycleBounds).
     const schedule = periodSchedule(s.period, s.periodDay);
@@ -275,16 +288,19 @@ export class BudgetService {
     const dailySum = dailyAmounts.reduce((t, a) => t + (a ?? 0), 0);
     const target = s.targetAmount ?? usualSpend ?? round500((dailySum / 7) * totalDays);
 
-    // Sisa periode lalu (satu tingkat): pemasukan nyata − disisihkan, atau target, dikurangi belanjanya.
+    // Sisa periode lalu (satu tingkat): pemasukan nyata − disisihkan, atau target + tambahan, dikurangi belanjanya.
     let carry = 0;
     if (s.rolloverEnabled && !firstPeriod) {
       const [prev] = previousPeriods(schedule, start, 1);
       if (prev.start.getTime() >= activeFrom.getTime()) {
-        const prevIncome = (await this.prisma.income.aggregate({
-          _sum: { amount: true },
+        const prevIncomes = await this.prisma.income.findMany({
           where: { userId, status: IncomeStatus.CONFIRMED, receivedAt: { gte: prev.start, lt: prev.end } },
-        }))._sum.amount;
-        const prevBudget = s.basis === BudgetBasis.INCOME ? Number(prevIncome ?? 0) * (1 - s.reservePct / 100) : target;
+          select: { amount: true, streamId: true },
+        });
+        const sumOf = (rows: typeof prevIncomes) => rows.reduce((t, i) => t + Number(i.amount), 0);
+        const prevBudget = s.basis === BudgetBasis.INCOME
+          ? sumOf(prevIncomes) * (1 - s.reservePct / 100)
+          : target + sumOf(prevIncomes.filter((i) => i.streamId == null || !pastiIds.has(i.streamId)));
         carry = Math.max(0, Math.round(prevBudget - spentIn(prev.start, prev.end)));
       }
     }

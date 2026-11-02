@@ -1,6 +1,7 @@
 /** Engine budget periode — pure functions, tanpa DB. Desain: docs/budget-kebiasaan.md.
  * Periode mingguan (mulai hari X) / bulanan (mulai tanggal X). Budget periode = pemasukan pasti (kebiasaan) + tambahan yang
- * sudah masuk − disisihkan (basis INCOME), atau angka yang ditentukan user (basis TARGET). Jatah hari ini = sisa ÷ sisa hari,
+ * sudah masuk − disisihkan (basis INCOME), atau angka yang ditentukan user + tambahan yang sudah masuk (basis TARGET; keputusan
+ * Arzaka 2026-11-02). Jatah hari ini = sisa ÷ sisa hari,
  * berbobot hari-dalam-minggu, beku terhadap belanja hari ini. */
 import { addWibDays, startOfWibDay, startOfWibMonth, wibDayOfWeek, wibParts } from '../../common/wib';
 
@@ -154,6 +155,12 @@ export function learnedWeights(avgRoutineByDow: number[], weeksObserved: number)
   return normalizeWeights(avgRoutineByDow.map((v) => Math.max(v, avg * 0.4)));
 }
 
+/** Bobot hari yang dipakai. Belajar dari kebiasaan tapi riwayat belum cukup → rata ("pembagian bawaan" di UI), BUKAN
+ * nominal "atur sendiri" yang tersimpan — kalau tidak, pindah mode tidak mengubah apa-apa. */
+export function dayWeights(autoWeights: boolean, learned: number[] | null, dailyAmounts: number[]): number[] {
+  return autoWeights ? learned ?? normalizeWeights([]) : normalizeWeights(dailyAmounts);
+}
+
 function weightSum(from: Date, days: number, weights: number[]): number {
   const startDow = wibDayOfWeek(from);
   let sum = 0;
@@ -170,7 +177,7 @@ export interface PeriodAllowanceInput {
   basis: 'INCOME' | 'TARGET';
   pastiReceived: number; // pemasukan pasti yang sudah masuk di periode
   pastiExpected: number; // perkiraan pemasukan pasti yang belum masuk (kebiasaan)
-  tambahan: number; // pemasukan tidak pasti yang sudah masuk di periode
+  tambahan: number; // pemasukan tidak pasti yang sudah masuk di periode (dua basis)
   target: number; // basis TARGET
   reservePct: number; // basis INCOME: 0..100
   carry: number; // sisa periode lalu (0 kalau dimatikan)
@@ -203,7 +210,8 @@ export function computePeriodAllowance(i: PeriodAllowanceInput): PeriodAllowance
   // Yang sudah benar-benar masuk tidak diprorata — hanya perkiraan & target.
   const income = i.pastiReceived + i.pastiExpected * prorate + i.tambahan;
   const reserve = i.basis === 'INCOME' ? income * (i.reservePct / 100) : 0;
-  const base = i.basis === 'INCOME' ? income - reserve : i.target * prorate;
+  // TARGET: target = batas dasar; uang tambahan yang masuk tetap menambah budget periode itu.
+  const base = i.basis === 'INCOME' ? income - reserve : i.target * prorate + i.tambahan;
   const periodBudget = Math.round(base + i.carry);
   const remaining = Math.round(periodBudget - i.commitments - i.spentBeforeToday);
   const daysLeft = Math.max(1, daysBetween(today, i.end));

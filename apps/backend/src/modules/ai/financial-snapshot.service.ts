@@ -109,7 +109,7 @@ export class FinancialSnapshotService {
     const w = periodWords(c);
     const basisTxt = c.basis === 'INCOME'
       ? `ikut pemasukan (pemasukan dihitung ${fmtRp(c.income)}, disisihkan ${c.reservePct}% = ${fmtRp(c.reserve)})`
-      : `target sendiri ${fmtRp(c.target ?? 0)}${c.targetIsUsual ? ' (= belanja rutin biasanya)' : ''}`;
+      : `target sendiri ${fmtRp(c.target ?? 0)}${c.targetIsUsual ? ' (= belanja rutin biasanya)' : ''}${c.tambahan ? ` + pemasukan tambahan ${fmtRp(c.tambahan)}` : ''}`;
     lines.push(
       `Budget ${w.label} (${c.start}–${c.end}, ${c.period === 'WEEKLY' ? 'mingguan' : 'bulanan'}): ${fmtRp(c.periodBudget)}, ${basisTxt}` +
         `${c.carry ? `, sisa periode lalu +${fmtRp(c.carry)}` : ''}${c.commitments ? `, langganan mendatang −${fmtRp(c.commitments)}` : ''}. ` +

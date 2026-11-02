@@ -115,10 +115,11 @@ try {
     const start = new Date(`${t.cycle.start}T00:00:00+07:00`);
     const total = Math.round((end - start) / DAY);
     const left = Math.round((end - today) / DAY);
-    const spent = 0;
     eq(t.cycle.target, 3100000 * 1, 'target tampil');
-    eq(t.budget, round500((3100000 * (left / total) - spent) / left), 'jatah target prorata');
-    eq(t.cycle.tambahan, 300000, 'pemasukan tetap tercatat tapi tidak memengaruhi target');
+    // Target diprorata; tambahan 300rb ikut menambah (tidak diprorata); pasti 590rb tidak dihitung (target mewakilinya).
+    eq(t.cycle.tambahan, 300000, 'tambahan tercatat');
+    eq(t.cycle.periodBudget, Math.round(3100000 * (left / total) + 300000), 'budget = target prorata + tambahan');
+    eq(t.budget, round500((3100000 * (left / total) + 300000) / left), 'jatah target prorata + tambahan');
   });
 
   await test('validasi setelan: periodDay mingguan 9 → 400, anchor milik user lain → 400', async () => {
@@ -170,9 +171,13 @@ try {
       rows.push(tx(new Date(ws.getTime() + 1 * DAY + 19 * 3600_000), 30000, 'Kopi Kenangan'), tx(new Date(ws.getTime() + 3 * DAY + 19 * 3600_000), 30000, 'Kopi Kenangan'));
       if (w <= 6) incomes.push({ userId: H.id, amount: w % 2 ? 650000 : 600000, description: 'Uang mingguan', source: 'BCA', receivedAt: new Date(ws.getTime() + 9 * 3600_000), streamId: st.id, status: 'CONFIRMED' });
     }
-    // minggu ini: kopi tiap hari yang sudah lewat (minimal 3×)
+    // minggu ini: kopi tiap hari yang sudah lewat, minimal 4× (biasanya 2× → naik ≥ 2) supaya tidak bergantung hari apa tes jalan.
+    // Semua di [Senin 00:00, sekarang).
     const elapsed = Math.round((today - monday) / DAY) + 1;
-    for (let d = 0; d < Math.max(3, elapsed); d++) rows.push(tx(new Date(Math.min(monday.getTime() + d * DAY + 8 * 3600_000, now.getTime() - 60_000)), 30000, 'Kopi Kenangan'));
+    for (let d = 0; d < Math.max(4, elapsed); d++) {
+      const at = Math.min(monday.getTime() + d * DAY + 8 * 3600_000, now.getTime() - (d + 1) * 60_000);
+      rows.push(tx(new Date(Math.max(at, monday.getTime() + d * 60_000)), 30000, 'Kopi Kenangan'));
+    }
     await prisma.transaction.createMany({ data: rows });
     await prisma.income.createMany({ data: incomes });
 
@@ -197,6 +202,162 @@ try {
     const h = await ok('GET', '/habits', B.cookie);
     expect(!JSON.stringify(h).includes('Kopi Kenangan'), 'bocor');
     expect(h.learning, 'akun baru = masih kenalan');
+  });
+
+  // ── 4. Pola harian langsung berlaku (PUT /budget/weights) ──
+  const W = await newUser('w');
+  const TGT = 700000;
+  const flatAllowance = (t) => round500(Math.max(0, t.cycle.remaining) / t.cycle.daysLeft);
+  // Jatah = sisa × w[hari ini] / Σ w[hari ini .. akhir periode) — rumus computePeriodAllowance.
+  const weightedAllowance = (t, amounts) => {
+    const tot = amounts.reduce((a, v) => a + v, 0);
+    const w = amounts.map((v) => v / tot);
+    let sum = 0;
+    for (let i = 0; i < t.cycle.daysLeft; i++) sum += w[(dow(today) + i) % 7];
+    return round500(Math.max(0, t.cycle.remaining) * (w[dow(today)] / sum));
+  };
+  // Hari ini 3× hari lain: jatah pasti berubah dari pola rata kalau masih ada ≥2 hari di periode.
+  const heavyToday = [0, 1, 2, 3, 4, 5, 6].map((d) => (d === dow(today) ? 300000 : 100000));
+  const lightToday = [0, 1, 2, 3, 4, 5, 6].map((d) => (d === dow(today) ? 50000 : 200000));
+  await test('pola harian: default belajar dari kebiasaan (riwayat kosong → rata)', async () => {
+    await ok('PUT', '/budget/settings', W.cookie, { period: 'WEEKLY', periodDay: 1, basis: 'TARGET', targetAmount: TGT });
+    const t = await ok('GET', '/budget/today', W.cookie);
+    eq([t.cycle.autoWeights, t.cycle.weightsLearned], [true, false], 'auto, belum dipelajari');
+    eq(t.budget, flatAllowance(t), 'jatah rata');
+  });
+
+  await test('pola harian: "Atur sendiri" langsung mengubah jatah hari ini (respons = ringkasan baru)', async () => {
+    const before = await ok('GET', '/budget/today', W.cookie);
+    const t = await ok('PUT', '/budget/weights', W.cookie, { autoWeights: false, amounts: heavyToday });
+    eq(t.cycle.autoWeights, false, 'manual');
+    eq(t.budget, weightedAllowance(t, heavyToday), 'jatah berbobot');
+    if (t.cycle.daysLeft > 1) expect(t.budget > before.budget, `jatah naik (hari ini 3×): ${before.budget} → ${t.budget}`);
+    eq(t.cycle.weights.map((w) => Math.round(w * 900)), heavyToday.map((v) => v / 1000), 'bobot ternormalisasi');
+    const again = await ok('GET', '/budget/today', W.cookie);
+    eq(again.budget, t.budget, 'GET berikutnya sama dengan respons');
+    eq((await ok('GET', '/budget', W.cookie)).map((r) => Number(r.amount)), heavyToday, 'nominal per hari tersimpan');
+    eq((await ok('GET', '/budget/settings', W.cookie)).autoWeights, false, 'setelan tersimpan');
+  });
+
+  await test('pola harian: ubah nominal lagi → jatah ikut berubah', async () => {
+    const t = await ok('PUT', '/budget/weights', W.cookie, { autoWeights: false, amounts: lightToday });
+    eq(t.budget, weightedAllowance(t, lightToday), 'jatah berbobot baru');
+    if (t.cycle.daysLeft > 1) expect(t.budget < weightedAllowance(t, heavyToday), 'jatah turun saat hari ini dibuat ringan');
+  });
+
+  await test('pola harian: tanpa amounts = pakai nominal tersimpan', async () => {
+    await ok('PUT', '/budget/weights', W.cookie, { autoWeights: true });
+    const t = await ok('PUT', '/budget/weights', W.cookie, { autoWeights: false });
+    eq(t.budget, weightedAllowance(t, lightToday), 'nominal tersimpan dipakai lagi');
+  });
+
+  await test('pola harian: kembali "Belajar dari kebiasaan" → jatah rata lagi, nominal per hari tetap disimpan', async () => {
+    const t = await ok('PUT', '/budget/weights', W.cookie, { autoWeights: true });
+    eq(t.cycle.autoWeights, true, 'auto');
+    eq(t.budget, flatAllowance(t), 'jatah rata');
+    eq((await ok('GET', '/budget', W.cookie)).map((r) => Number(r.amount)), lightToday, 'pola manual tidak hilang');
+  });
+
+  await test('pola harian: periode pertama — porsi target sejak daftar ikut bobot hari', async () => {
+    const P = await newUser('p');
+    await ok('PUT', '/budget/settings', P.cookie, { period: 'WEEKLY', periodDay: 1, basis: 'TARGET', targetAmount: TGT });
+    const t = await ok('PUT', '/budget/weights', P.cookie, { autoWeights: false, amounts: heavyToday });
+    eq(t.cycle.firstPeriod, daysToMonday < 7, 'firstPeriod');
+    const tot = heavyToday.reduce((a, v) => a + v, 0);
+    let rest = 0;
+    for (let i = 0; i < daysToMonday; i++) rest += heavyToday[(dow(today) + i) % 7];
+    eq(t.cycle.periodBudget, Math.round(TGT * (rest / tot)), 'target × Σbobot sisa hari / Σbobot seminggu');
+  });
+
+  await test('pola harian: validasi (semua 0, 6 hari, negatif, > 100jt, autoWeights bukan boolean, tanpa body) → 400; tanpa login → 401', async () => {
+    const bad = [
+      { autoWeights: false, amounts: [0, 0, 0, 0, 0, 0, 0] },
+      { autoWeights: false, amounts: [1, 1, 1, 1, 1, 1] },
+      { autoWeights: false, amounts: [1, 1, 1, 1, 1, 1, 1, 1] },
+      { autoWeights: false, amounts: [1, 1, 1, -5, 1, 1, 1] },
+      { autoWeights: false, amounts: [1, 1, 1, 200_000_000, 1, 1, 1] },
+      { autoWeights: false, amounts: [1, 1, 1, 'x', 1, 1, 1] },
+      { autoWeights: 'ya' },
+      {},
+    ];
+    for (const b of bad) eq((await req('PUT', '/budget/weights', W.cookie, b)).status, 400, JSON.stringify(b));
+    eq((await req('PUT', '/budget/weights', null, { autoWeights: true })).status, 401, 'tanpa login');
+    eq((await ok('GET', '/budget/settings', W.cookie)).autoWeights, true, 'request gagal tidak mengubah setelan');
+  });
+
+  await test('pola harian: hari terakhir periode → semua sisa jadi jatah, bobot tidak berpengaruh', async () => {
+    const lastDayStart = (dow(today) + 1) % 7; // periode mulai besok = hari ini hari terakhir
+    // Bukan periode pertama: di periode pertama bobot memang ikut menentukan prorata (porsi hari sejak daftar).
+    await prisma.user.updateMany({ where: { id: W.id }, data: { createdAt: new Date(today.getTime() - 30 * DAY) } });
+    await ok('PUT', '/budget/settings', W.cookie, { period: 'WEEKLY', periodDay: lastDayStart });
+    const a = await ok('PUT', '/budget/weights', W.cookie, { autoWeights: false, amounts: lightToday });
+    eq(a.cycle.daysLeft, 1, 'sisa 1 hari');
+    eq(a.budget, round500(Math.max(0, a.cycle.remaining)), 'jatah = semua sisa');
+    eq(a.cycle.firstPeriod, false, 'bukan periode pertama');
+    const b = await ok('PUT', '/budget/weights', W.cookie, { autoWeights: false, amounts: heavyToday });
+    eq(b.budget, a.budget, 'bobot tidak mengubah jatah di hari terakhir');
+    eq(b.budget, round500(TGT), 'jatah = seluruh target (belum ada belanja)');
+    await ok('PUT', '/budget/settings', W.cookie, { period: 'WEEKLY', periodDay: 1 });
+  });
+
+  await test('pola harian: user lama (banner) — pilihan tersimpan, setelan turunan ikut disimpan', async () => {
+    const L2 = await newUser('m');
+    await ok('PUT', '/budget', L2.cookie, { budgets: [0, 1, 2, 3, 4, 5, 6].map((d) => ({ dayOfWeek: d, amount: 100000 })) });
+    const s0 = await ok('GET', '/budget/settings', L2.cookie);
+    eq([s0.needsReview, s0.autoWeights, s0.targetAmount], [true, true, 700000], 'turunan awal (rata → auto)');
+    const t = await ok('PUT', '/budget/weights', L2.cookie, { autoWeights: false, amounts: heavyToday });
+    eq(t.cycle.autoWeights, false, 'manual dipakai');
+    eq(t.budget, weightedAllowance(t, heavyToday), 'jatah berbobot');
+    const s1 = await ok('GET', '/budget/settings', L2.cookie);
+    eq([s1.needsReview, s1.autoWeights, s1.basis, s1.period, s1.periodDay, s1.targetAmount], [false, false, 'TARGET', 'WEEKLY', 1, 700000], 'tersimpan penuh, target turunan tetap');
+  });
+
+  await test('pola harian: isolasi — user lain tidak mengubah pola W', async () => {
+    const b4W = (await ok('GET', '/budget', W.cookie)).map((r) => Number(r.amount));
+    const X = await newUser('x');
+    await ok('PUT', '/budget/weights', X.cookie, { autoWeights: false, amounts: [5, 5, 5, 5, 5, 5, 9] });
+    const w = await ok('GET', '/budget', W.cookie);
+    expect(w.every((r) => r.userId === W.id), 'baris milik W saja');
+    eq(w.map((r) => Number(r.amount)), b4W, 'pola W tidak berubah');
+  });
+
+  // ── 5. Target ikut pemasukan tambahan (keputusan Arzaka 2026-11-02) ──
+  await test('target: pemasukan tambahan menambah budget, pemasukan pasti tidak', async () => {
+    const T = await newUser('t');
+    const st = await ok('POST', '/income-streams', T.cookie, { name: 'Gaji', kind: 'FIXED', cadence: 'WEEKLY', source: 'BCA', amount: 500000, payDayOfWeek: 1, isActive: true });
+    await ok('PUT', '/budget/settings', T.cookie, { period: 'WEEKLY', periodDay: 1, basis: 'TARGET', targetAmount: TGT });
+    const t0 = await ok('GET', '/budget/today', T.cookie);
+    await ok('POST', '/income', T.cookie, { amount: 200000, description: 'Jual barang', source: 'BCA', receivedAt: now.toISOString() });
+    const t1 = await ok('GET', '/budget/today', T.cookie);
+    eq(t1.cycle.tambahan, 200000, 'tambahan');
+    eq(t1.cycle.periodBudget - t0.cycle.periodBudget, 200000, 'budget naik penuh (tidak diprorata)');
+    expect(t1.budget > t0.budget, `jatah naik ${t0.budget} → ${t1.budget}`);
+    await ok('POST', '/income', T.cookie, { amount: 500000, description: 'Gaji', source: 'BCA', receivedAt: now.toISOString(), streamId: st.id });
+    const t2 = await ok('GET', '/budget/today', T.cookie);
+    eq(t2.cycle.periodBudget, t1.cycle.periodBudget, 'pemasukan pasti tidak menambah target');
+    const del = (await ok('GET', '/income', T.cookie)).find((i) => i.description === 'Jual barang');
+    await ok('PUT', `/income/${del.id}`, T.cookie, { amount: 250000 });
+    eq((await ok('GET', '/budget/today', T.cookie)).cycle.periodBudget, t1.cycle.periodBudget + 50000, 'edit nominal tambahan → budget ikut');
+    await ok('DELETE', `/income/${del.id}`, T.cookie);
+    eq((await ok('GET', '/budget/today', T.cookie)).cycle.periodBudget, t0.cycle.periodBudget, 'hapus tambahan → budget kembali');
+  });
+
+  await test('carry: sisa minggu lalu (target + tambahan − belanja) dan (pemasukan × 90% − belanja)', async () => {
+    const R = await newUser('r');
+    const prevMon = new Date(monday.getTime() - 7 * DAY);
+    await prisma.user.updateMany({ where: { id: R.id }, data: { createdAt: new Date(monday.getTime() - 21 * DAY) } });
+    const st = await ok('POST', '/income-streams', R.cookie, { name: 'Gaji', kind: 'FIXED', cadence: 'WEEKLY', source: 'BCA', amount: 500000, payDayOfWeek: 1, isActive: true });
+    await prisma.income.createMany({ data: [
+      { userId: R.id, amount: 100000, description: 'Tambahan', source: 'BCA', receivedAt: new Date(prevMon.getTime() + 2 * DAY + 10 * 3600_000), status: 'CONFIRMED' },
+      { userId: R.id, amount: 500000, description: 'Gaji', source: 'BCA', receivedAt: new Date(prevMon.getTime() + 9 * 3600_000), streamId: st.id, status: 'CONFIRMED' },
+    ] });
+    await prisma.transaction.create({ data: { userId: R.id, amount: 500000, description: 'Belanja minggu lalu', source: 'BCA', category: 'MAKANAN', occurredAt: new Date(prevMon.getTime() + 3 * DAY + 12 * 3600_000), emailId: `manual:${randomUUID()}`, isManual: true } });
+    await ok('PUT', '/budget/settings', R.cookie, { period: 'WEEKLY', periodDay: 1, basis: 'TARGET', targetAmount: TGT, rolloverEnabled: true });
+    eq((await ok('GET', '/budget/today', R.cookie)).cycle.carry, 300000, 'TARGET: 700rb + 100rb − 500rb');
+    await ok('PUT', '/budget/settings', R.cookie, { basis: 'INCOME', reservePct: 10 });
+    eq((await ok('GET', '/budget/today', R.cookie)).cycle.carry, 40000, 'INCOME: 600rb × 90% − 500rb');
+    await ok('PUT', '/budget/settings', R.cookie, { rolloverEnabled: false });
+    eq((await ok('GET', '/budget/today', R.cookie)).cycle.carry, 0, 'carry dimatikan');
   });
 
   await test('endpoint lama sudah tidak ada (404)', async () => {

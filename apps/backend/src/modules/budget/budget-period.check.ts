@@ -5,7 +5,7 @@
 import * as assert from 'assert';
 import { wibDateKey } from '../../common/wib';
 import {
-  activeStyle, bigPurchaseImpact, computePeriodAllowance, cycleBounds, incomeImpact, learnedWeights, normalizeWeights, pastiPart,
+  activeStyle, bigPurchaseImpact, computePeriodAllowance, cycleBounds, dayWeights, incomeImpact, learnedWeights, normalizeWeights, pastiPart,
   paydaysIn, periodSchedule, PeriodAllowanceInput, stylePreviews, usualAmount,
 } from './budget-period';
 
@@ -79,9 +79,21 @@ check('langganan mendatang & carry', () => {
   const r = computePeriodAllowance({ ...base, commitments: 100_000, carry: 50_000 });
   assert.deepStrictEqual([r.periodBudget, r.remaining], [750_000, 250_000]);
 });
-check('TARGET: pemasukan tidak berpengaruh', () => {
-  const r = computePeriodAllowance({ ...base, basis: 'TARGET', target: 1_000_000, tambahan: 5_000_000 });
+check('TARGET: pemasukan pasti tidak dihitung (target sudah mewakilinya)', () => {
+  const r = computePeriodAllowance({ ...base, basis: 'TARGET', target: 1_000_000, pastiReceived: 800_000, pastiExpected: 700_000 });
   assert.deepStrictEqual([r.periodBudget, r.allowance], [1_000_000, 200_000]);
+});
+check('TARGET: pemasukan tambahan menambah budget periode', () => {
+  const r = computePeriodAllowance({ ...base, basis: 'TARGET', target: 1_000_000, tambahan: 300_000 });
+  assert.deepStrictEqual([r.periodBudget, r.remaining, r.allowance], [1_300_000, 900_000, 300_000]);
+});
+check('TARGET: tambahan tidak diprorata di periode pertama', () => {
+  const r = computePeriodAllowance({ ...base, basis: 'TARGET', target: 700_000, tambahan: 100_000, now: at('2026-10-29'), activeFrom: at('2026-10-29'), spentBeforeToday: 0 });
+  assert.strictEqual(r.periodBudget, 500_000); // 700rb × 4/7 + 100rb
+});
+check('TARGET: gaya tetap ikut tambahan', () => {
+  const s = stylePreviews({ ...base, basis: 'TARGET', tambahan: 200_000, spentBeforeToday: 0 }, 600_000);
+  assert.deepStrictEqual(s.map((x) => x.periodBudget), [710_000, 800_000, 860_000]);
 });
 check('defisit → jatah 0', () => {
   const r = computePeriodAllowance({ ...base, spentBeforeToday: 900_000 });
@@ -129,6 +141,15 @@ check('Sabtu boros → bobot Sabtu terbesar, hari sepi tetap ≥ 40% rata-rata',
   assert.ok(w[0] > 0);
   assert.ok(Math.abs(w.reduce((s, v) => s + v, 0) - 1) < 1e-9);
 });
+
+check('auto + riwayat belum cukup → rata, bukan nominal "atur sendiri" lama', () =>
+  assert.deepStrictEqual(dayWeights(true, null, [1, 1, 1, 1, 1, 1, 8]), normalizeWeights([])));
+check('auto + sudah dipelajari → bobot belajar', () => assert.deepStrictEqual(dayWeights(true, [0, 0, 0, 0, 0, 0, 1], [1, 1, 1, 1, 1, 1, 1]), [0, 0, 0, 0, 0, 0, 1]));
+check('atur sendiri → nominal per hari dinormalisasi', () => {
+  const w = dayWeights(false, [0, 0, 0, 0, 0, 0, 1], [100, 100, 100, 100, 100, 100, 400]);
+  assert.ok(Math.abs(w[6] - 0.4) < 1e-9 && Math.abs(w[1] - 0.1) < 1e-9);
+});
+check('atur sendiri, nominal kosong → rata', () => assert.deepStrictEqual(dayWeights(false, null, []), normalizeWeights([])));
 
 console.log('dampak');
 check('pembelian besar: jatah hari berikutnya turun', () => {

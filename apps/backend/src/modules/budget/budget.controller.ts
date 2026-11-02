@@ -3,6 +3,7 @@ import { BudgetService } from './budget.service';
 import { BudgetOption } from './budget-period';
 import { UpdateBudgetDto } from './dto/update-budget.dto';
 import { UpdateBudgetSettingsDto } from './dto/update-budget-settings.dto';
+import { UpdateBudgetWeightsDto } from './dto/update-budget-weights.dto';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { AuthUser, CurrentUser } from '../../common/decorators/current-user.decorator';
 
@@ -30,6 +31,12 @@ export class BudgetController {
   @Put('settings')
   async updateSettings(@CurrentUser() user: AuthUser, @Body() dto: UpdateBudgetSettingsDto) {
     return this.budgetService.updateSettings(user.id, dto);
+  }
+
+  /** Pola harian — langsung berlaku, mengembalikan ringkasan hari ini yang baru. */
+  @Put('weights')
+  async setWeights(@CurrentUser() user: AuthUser, @Body() dto: UpdateBudgetWeightsDto) {
+    return this.budgetService.setWeights(user.id, dto.autoWeights, dto.amounts);
   }
 
   /** Snapshot jatah harian, `from`/`to` = 'YYYY-MM-DD' (inklusif). Hari tanpa baris = sebelum snapshot ada. */
