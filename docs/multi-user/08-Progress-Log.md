@@ -361,3 +361,8 @@ deviasi dari rencana (+alasan), env baru yang Arzaka harus tambahkan, langkah be
 - Verifikasi: check 37/37, tsc BE/FE, nest build, migrasi di DB scratch, browser (hapus paralel, Beranda).
 - **Belum:** push ke `main` (menunggu Arzaka).
 - **Susulan (sesi yang sama):** kuota AI harian → tabel `AiUsage`; debit `balanceOnly` + log satu transaksi; `useLive` 27 → 21 request di Beranda; docs basi dirapikan (status multi-user live, versi stack, route `(public)`/`(legal)`). Check 39/39.
+
+## 2026-11-02 — Persetujuan keputusan (dokumen saja)
+- Sesi oleh: Claude   Branch: `feat/multi-user` (di-reset ke `main`; seluruh commit F0–F6 sudah ada di `main`)
+- Arzaka menyetujui di chat: **P1, P4, P7, P8, P13, P14** dan **O2 (`MAX_USERS`=10)** → ditandai ✅ di `00-Decisions.md`. Tidak ada perubahan kode.
+- Catatan: entri F6 di atas (2026-10-07) menyebut "belum merge"; kenyataannya kode sudah di `main` (status di README/Codemap yang lebih baru benar).
