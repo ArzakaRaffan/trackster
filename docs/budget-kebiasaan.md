@@ -22,11 +22,17 @@ butuh tombol "Terapkan" terpisah. Rumus saldo ÷ 30 hari menganggap user mau men
 - **Periode**: mingguan (mulai hari X) / bulanan (mulai tanggal X). Pemasukan pasti utama (`anchorStreamId`) dengan jadwal
   sama → gaji yang masuk ≤2 hari (mingguan) / ≤7 hari (bulanan) lebih awal membuka periode baru (`cycleBounds`).
 - **INCOME**: Σ pasti (`diterima + biasanya × payday yang belum masuk`) + tambahan − `reservePct`%.
-- **TARGET**: `targetAmount`, atau belanja rutin biasanya kalau kosong.
+- **TARGET**: `targetAmount` (atau belanja rutin biasanya kalau kosong) + tambahan yang sudah masuk (keputusan Arzaka
+  2026-11-02: uang tambahan tetap menambah budget periode itu; pemasukan pasti tidak, target sudah mewakilinya). Carry TARGET
+  = target + tambahan periode lalu − belanjanya.
 - `sisa = budget + carry − langganan [hari ini, akhir) − belanja [awal, hari ini)`; `jatah = sisa × w[hari ini] / Σ w[hari ini..akhir)`.
 - **Periode pertama**: perkiraan & target diprorata dengan bobot hari sejak hari pertama memakai Trackster; payday sebelum
   itu tidak dianggap "belum masuk".
-- **Bobot hari**: dipelajari dari rata-rata belanja rutin per hari 8 minggu (≥4 minggu, lantai 40%), atau `DailyBudget`.
+- **Pola harian** (`dayWeights`): "belajar dari kebiasaan" = rata-rata belanja rutin per hari 8 minggu (≥4 minggu, lantai
+  40%; riwayat belum cukup → **rata**, bukan `DailyBudget`); "atur sendiri" = `DailyBudget` sebagai bobot. Langsung berlaku:
+  `PUT /budget/weights {autoWeights, amounts?}` → ringkasan baru (lewat `updateSettings`, jadi setelan lama ikut tersimpan
+  dan banner hilang). Layar: pindah ke atur sendiri = mulai dari pola yang tampil (atau pola lama yang tidak rata), ketikan
+  dipratinjau lokal lalu disimpan otomatis berurutan (600 ms). Hari terakhir periode → bobot tidak berpengaruh (catatan di UI).
 - **Gaya**: INCOME → sisihkan 15/10/5%; TARGET → 85/100/110% belanja biasanya. Diklik = langsung berlaku.
 
 ## Kebiasaan mingguan (`habit-engine.ts`)

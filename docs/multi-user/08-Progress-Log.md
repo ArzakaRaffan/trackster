@@ -376,3 +376,10 @@ deviasi dari rencana (+alasan), env baru yang Arzaka harus tambahkan, langkah be
 - Sesi oleh: Claude   Branch: `feat/multi-user` (di-reset ke `main`; seluruh commit F0–F6 sudah ada di `main`)
 - Arzaka menyetujui di chat: **P1, P4, P7, P8, P13, P14** dan **O2 (`MAX_USERS`=10)** → ditandai ✅ di `00-Decisions.md`. Tidak ada perubahan kode.
 - Catatan: entri F6 di atas (2026-10-07) menyebut "belum merge"; kenyataannya kode sudah di `main` (status di README/Codemap yang lebih baru benar).
+
+## 2026-11-02 — Pola harian langsung berlaku + target ikut pemasukan tambahan
+- Sesi oleh: Claude (Opus 5.5)   Branch: `feat/budget-kebiasaan` (worktree `trackster-budget`). Laporan Arzaka: mengganti "Pola harian" tidak mengubah budget.
+- **Penyebab:** (1) "Atur sendiri" hanya membuka kolom, tidak menyimpan; nominal baru tersimpan lewat tombol terpisah. (2) "Belajar dari kebiasaan" dengan riwayat < 4 minggu diam-diam memakai nominal "atur sendiri" lama → pindah mode tidak mengubah apa pun.
+- **Perbaikan:** `PUT /budget/weights` (ringkasan baru, lewat `updateSettings`), `dayWeights()` (auto tanpa riwayat = rata), layar: pindah mode/ketik nominal langsung dipratinjau + disimpan otomatis berurutan (respons lama tidak menimpa), catatan hari terakhir periode. `/budget/today` yang dipoll tiap menit kini ikut memuat ulang transaksi & saldo kalau ada yang baru.
+- **Keputusan Arzaka:** basis TARGET ikut pemasukan tambahan (pasti tidak); jatah hari ini tetap beku terhadap belanja hari ini.
+- Verifikasi: check 37/37 (engine 47 kasus), tenancy-audit 0, build BE, tsc FE, e2e budget 24/24 (pola harian, validasi, user lama, isolasi, hari terakhir, periode pertama, target + tambahan + edit/hapus, carry dua basis), isolasi 165/165 (lintas-user, `ISO_PRE_C1=0`), ingest 18/18. Browser (live + demo): atur sendiri/belajar → jatah & Beranda berubah seketika, pratinjau = angka server, target + tambahan Rp100rb, EN, 375px.
