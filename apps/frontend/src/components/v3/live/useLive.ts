@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo } from 'react';
+import { useEffect, useMemo } from 'react';
 import useSWR, { useSWRConfig } from 'swr';
 import { API_URL, api } from '@/lib/api';
 import { shrinkDataUrl } from '@/lib/image';
@@ -64,6 +64,15 @@ export function useLive(enabled: boolean, path: string, chatActive: number | nul
   const balRes = useGet(k('/balance'));
   const adjBca = useGet(on('/app/settings', '/balance/BCA/adjustments'));
   const adjJago = useGet(on('/app/settings', '/balance/JAGO/adjustments'));
+  // Ringkasan hari ini dipoll tiap menit; kalau ada transaksi/pemasukan baru (mis. dari email bank), daftar transaksi & saldo
+  // ikut dimuat ulang supaya "terpakai/sisa" tidak tertinggal dari jatah.
+  const todaySig = today.data ? `${today.data.transactions?.length}|${today.data.incomes?.length}|${today.data.totalSpent}|${today.data.totalIncome}` : '';
+  useEffect(() => {
+    if (!todaySig) return;
+    txRes.mutate();
+    balRes.mutate();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [todaySig]);
   const aliasRes = useGet(k('/merchant-aliases'));
   const catIconRes = useGet(k('/merchant-aliases/category-icons'));
   const parseLogRes = useGet(k('/sync/parse-log?limit=200'));
@@ -258,6 +267,14 @@ export function useLive(enabled: boolean, path: string, chatActive: number | nul
         const sum = await api.post<any>('/budget/apply', { option });
         await mutate('/budget/today', sum, { revalidate: false });
         return sum;
+      },
+      // Pola harian langsung berlaku (PUT /budget/weights → ringkasan baru). Cache baru diganti lewat commitWeights setelah
+      // logic.tsx memastikan respons ini masih yang terbaru, supaya respons lama tidak menimpa angka yang sedang diketik.
+      setWeights: (autoWeights: boolean, amounts?: number[]) => api.put<any>('/budget/weights', { autoWeights, ...(amounts ? { amounts } : {}) }),
+      commitWeights: (sum: any, amounts?: number[]) => {
+        mutate('/budget/today', sum, { revalidate: false });
+        if (amounts) mutate('/budget', amounts.map((amount, dayOfWeek) => ({ dayOfWeek, amount })), { revalidate: false });
+        mutate('/budget/settings');
       },
       sync: () => api.post<any>('/sync/trigger'),
       reportData: async (tab: number, off: number) => {

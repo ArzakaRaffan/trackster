@@ -315,7 +315,12 @@
     "bpFormula",
     "bpGoSettings",
     "bpIncomeOn",
+    "bpLastDay",
+    "bpLastDayTxt",
+    "bpManualHint",
     "bpManualShow",
+    "bpManualStatus",
+    "bpManualStatusColor",
     "bpNote",
     "bpNoteShow",
     "bpPastiList",
@@ -355,8 +360,6 @@
     "onBpDay",
     "onBpDom",
     "onBpTarget",
-    "saveLabel",
-    "saveManual",
     "showMascot"
   ],
   "Income": [

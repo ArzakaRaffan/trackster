@@ -1182,7 +1182,8 @@ export class V3Logic extends React.Component {
       bpRows.push(row(en ? 'Extra income' : 'Pemasukan tambahan', '+' + RP(cyB.tambahan), cyB.tambahan ? 'var(--success-text)' : 'var(--text-subtle)', en ? `irregular income already received this ${pw}` : `pemasukan tidak pasti yang sudah masuk ${pw} ini`));
       bpRows.push(row((en ? 'Set aside ' : 'Disisihkan ') + cyB.reservePct + '%', '−' + RP(cyB.reserve), 'var(--text)', en ? 'stays in your account as savings' : 'tetap di rekening sebagai tabungan'));
     } else {
-      bpRows.push(row(en ? `Target this ${pw}` : `Target ${pw} ini`, RP(cyB.periodBudget - cyB.carry), 'var(--text)', cyB.targetIsUsual ? (en ? 'same as your usual routine spending' : 'sama dengan belanja rutinmu biasanya') : (en ? 'the amount you set' : 'angka yang kamu tentukan')));
+      bpRows.push(row(en ? `Target this ${pw}` : `Target ${pw} ini`, RP(cyB.periodBudget - cyB.carry - (cyB.tambahan || 0)), 'var(--text)', cyB.targetIsUsual ? (en ? 'same as your usual routine spending' : 'sama dengan belanja rutinmu biasanya') : (en ? 'the amount you set' : 'angka yang kamu tentukan')));
+      bpRows.push(row(en ? 'Extra income' : 'Pemasukan tambahan', '+' + RP(cyB.tambahan || 0), cyB.tambahan ? 'var(--success-text)' : 'var(--text-subtle)', en ? `income not from your fixed income, received this ${pw}, adds to the budget` : `pemasukan di luar pemasukan pasti yang masuk ${pw} ini, ikut menambah budget`));
     }
     if (cyB.carry) bpRows.push(row(en ? `Left over from last ${pw}` : `Sisa ${pw} lalu`, '+' + RP(cyB.carry), 'var(--success-text)'));
     if (cyB.commitments) bpRows.push(row(en ? 'Upcoming subscriptions' : 'Langganan yang akan jatuh tempo', '−' + RP(cyB.commitments), 'var(--text)', en ? 'kept aside so they don’t eat your daily budget' : 'disiapkan dulu supaya tidak memakan jatah harian'));
@@ -1208,11 +1209,48 @@ export class V3Logic extends React.Component {
       this.props.live.actions.saveBudgetSettings(body).then(() => this.props.live.refresh()).then(() => this.setState({ ...clearDraft, bpSaveState:'saved' }))
         .catch(e => { this.setState({ bpSaveState:'idle' }); this.toast((e && e.message) || (en ? 'Failed to save settings.' : 'Gagal menyimpan pengaturan.')); });
     };
-    // Pola harian: bobot dari backend (dipelajari dari kebiasaan atau nominal per hari).
-    const Wt = cyB.weights || [0, 0, 0, 0, 0, 0, 0].map(() => 1 / 7), autoW = s.bpManual ? false : cyB.autoWeights !== false, ORD = [1, 2, 3, 4, 5, 6, 0];
+    // Pola harian — langsung berlaku. Atur sendiri: nominal per hari = bobot, pratinjau jatah dihitung di sini (rumus sama
+    // dengan computePeriodAllowance) lalu disimpan otomatis (PUT /budget/weights) dan diganti angka dari server.
+    const autoW = cyB.autoWeights !== false, ORD = [1, 2, 3, 4, 5, 6, 0];
+    const normW = m => { const t = m.reduce((a, v) => a + Math.max(0, v || 0), 0); return [0, 1, 2, 3, 4, 5, 6].map(d => (t > 0 ? Math.max(0, m[d] || 0) / t : 1 / 7)); };
+    const Wt = autoW ? (cyB.weights || normW([])) : normW(s.manual);
     const todayDow = new Date(TODAY_ISO + 'T00:00:00Z').getUTCDay(), peak = ORD.reduce((a, d) => (Wt[d] > Wt[a] ? d : a), 1);
+    const previewAllowance = w => { let sum = 0; for (let i = 0; i < Math.max(1, cyB.daysLeft); i++) sum += w[(todayDow + i) % 7]; return sum > 0 ? Math.round(Math.max(0, cyB.remaining) * w[todayDow] / sum / 500) * 500 : 0; };
+    // Simpan berurutan (wChain) dan lewati simpanan yang sudah digantikan ketikan berikutnya (wSeq): server selalu berakhir di
+    // angka terakhir, respons lama tidak menimpa layar.
+    const runWeights = (auto, m, msg, delay) => {
+      const L = this.props.live, seq = (this.wSeq = (this.wSeq || 0) + 1);
+      clearTimeout(this.wT);
+      this.wT = setTimeout(() => {
+        this.wChain = (this.wChain || Promise.resolve()).catch(() => {}).then(() => (seq === this.wSeq ? L.actions.setWeights(auto, auto ? undefined : m) : null))
+          .then(sum => { if (!sum || seq !== this.wSeq) return; L.actions.commitWeights(sum, auto ? undefined : m); this.setState({ cyc:sum.cycle, todayBudget:Number(sum.budget), wState:'saved' }); if (msg) this.toast(msg(Number(sum.budget))); })
+          .catch(e => { if (seq !== this.wSeq) return; this.setState({ wState:'error' }); this.toast((e && e.message) || (en ? 'Failed to save the daily pattern.' : 'Gagal menyimpan pola harian.')); L.refresh(); });
+      }, delay);
+    };
+    const saveManualW = (m, msg) => {
+      const w = normW(m);
+      this.setState({ manual:m, cyc:{ ...cyB, autoWeights:false, weights:w, weightsLearned:false }, todayBudget:previewAllowance(w), wState:isLiveB ? 'saving' : 'saved' });
+      if (!isLiveB) { if (msg) this.toast(msg(previewAllowance(w))); return; }
+      runWeights(false, m, msg, msg ? 0 : 600);
+    };
+    const onAuto = () => {
+      if (autoW) return;
+      const msg = n => (en ? `Daily pattern learned from your habits. Today's allowance ${RP(n)}.` : `Pola harian belajar dari kebiasaanmu. Jatah hari ini ${RP(n)}.`);
+      if (!isLiveB) { const w = DEMO_W; this.setState({ cyc:{ ...cyB, autoWeights:true, weights:w, weightsLearned:true }, todayBudget:previewAllowance(w), wState:'idle' }); return this.toast(msg(previewAllowance(w))); }
+      this.setState({ cyc:{ ...cyB, autoWeights:true }, wState:'saving' });
+      runWeights(true, null, msg, 0);
+    };
+    const onManual = () => {
+      if (!autoW) return;
+      // Pola lama yang benar-benar diatur (tidak rata) dipakai lagi; selain itu mulai dari pola yang sedang tampil, dalam rupiah
+      // seukuran budget per hari, supaya angkanya masuk akal dan jatah tidak loncat.
+      const cur = s.manual || [], own = cur.some(v => v > 0) && cur.some(v => v !== cur[0]);
+      const perWeek = cyB.daysTotal > 0 && cyB.periodBudget > 0 ? cyB.periodBudget / cyB.daysTotal * 7 : 700000;
+      const m = own ? [...cur] : Wt.map(w => Math.max(500, Math.round(w * perWeek / 500) * 500));
+      saveManualW(m, n => (en ? `Daily pattern set manually. Today's allowance ${RP(n)}.` : `Pola harian kamu atur sendiri. Jatah hari ini ${RP(n)}.`));
+    };
     const bud = { total:RP(s.todayBudget ?? cyB.allowance), strip:ORD.map(d => ({ day:DS[d], value:Math.round(Wt[d] * 100) + '%', bg: d === todayDow ? 'var(--brand-subtle)' : 'var(--neutral)' })),
-      inputs:s.manual.map((v, i) => ({ day:DAYN[i], value: v ? v.toLocaleString('id-ID') : '', onChange:e => { const n = Number(digits(e.target.value)) || 0; this.setState(x => { const m = [...x.manual]; m[i] = n; return { manual:m, saveState:'idle' }; }); } })) };
+      inputs:ORD.map(i => ({ day:DN[i], value: s.manual[i] ? s.manual[i].toLocaleString('id-ID') : '', onChange:e => { const m = [...s.manual]; m[i] = Number(digits(e.target.value)) || 0; if (!m.some(v => v > 0)) { this.setState({ manual:m, wState:'empty' }); return; } saveManualW(m); } })) };
     const reviewTarget = bset.targetAmount ?? cyB.periodBudget;
     const bp = {
       bpReview:!!cyB.needsReview,
@@ -1237,7 +1275,7 @@ export class V3Logic extends React.Component {
       bpDayOpts:ORD.map(d => ({ value:String(d), label:DN[d] })), bpDayVal:dP === 'WEEKLY' ? dDay : '1', onBpDay:e => setDraft({ bpDay:e.target.value }),
       bpDomVal:dP === 'MONTHLY' ? dDay : '', onBpDom:e => setDraft({ bpDay:digits(e.target.value).slice(0, 2) }),
       bpBasisOpts:[['INCOME', en ? 'Follow income' : 'Ikut pemasukan', en ? 'Your fixed income (learned from your history) + extra income that arrives, minus what you set aside.' : 'Pemasukan pasti (dipelajari dari kebiasaanmu) + tambahan yang masuk, dikurangi yang disisihkan.'],
-        ['TARGET', en ? 'Set it yourself' : 'Tentukan sendiri', en ? 'You decide how much to spend per week or month. Good when your income isn’t fixed.' : 'Kamu tentukan mau belanja berapa per minggu/bulan. Cocok kalau pemasukan nggak tentu.']]
+        ['TARGET', en ? 'Set it yourself' : 'Tentukan sendiri', en ? 'You decide how much to spend per week or month; extra income that comes in adds to it. Good when your income isn’t fixed.' : 'Kamu tentukan mau belanja berapa per minggu/bulan; pemasukan tambahan yang masuk ikut menambah. Cocok kalau pemasukan nggak tentu.']]
         .map(([k, label, desc]) => ({ label, desc, ...pick(dBasis === k), onClick:() => setDraft({ bpBasis:k }) })),
       bpIncomeOn:dBasis === 'INCOME', bpTargetOn:dBasis === 'TARGET',
       bpPastiList:(cyB.pasti || []).map(p => { const st = (s.streams || []).find(x => x.id === p.id), when = st ? (st.cadence === 'WEEKLY' ? (en ? 'every ' : 'tiap ') + DN[Number(st.payDOW) || 0] : (en ? 'monthly on day ' : 'tiap tanggal ') + (st.payDOM || '?')) : '';
@@ -1250,11 +1288,16 @@ export class V3Logic extends React.Component {
       bpSaveNote: en ? 'Your allowance is recalculated as soon as you save.' : 'Jatah dihitung ulang begitu disimpan.', bpSave, bpBusy:String(s.bpSaveState === 'saving'),
       bpSaveLabel:{ idle:en ? 'Save settings' : 'Simpan pengaturan', saving:'Menyimpan…', saved:'✓ Tersimpan' }[s.bpSaveState || 'idle'],
       bpWeightOpts:[['auto', en ? 'Learn from my habits' : 'Belajar dari kebiasaan'], ['manual', en ? 'Set manually' : 'Atur sendiri']].map(([k, label]) => ({ label, ...pick(k === 'auto' ? autoW : !autoW),
-        onClick:() => { if (k === 'manual') return this.setState({ bpManual:true }); this.setState({ bpManual:false }); if (!isLiveB) return this.setState({ cyc:{ ...cyB, autoWeights:true } }); this.liveCall(() => this.props.live.actions.saveBudgetSettings({ autoWeights:true })); } })),
-      bpWeightNote: !autoW ? (en ? 'You set how days compare. A bigger amount means a bigger share of the budget.' : 'Kamu atur sendiri perbandingan antarhari. Nominal lebih besar = porsi lebih besar.')
+        onClick: k === 'auto' ? onAuto : onManual })),
+      bpWeightNote: !autoW ? (en ? `Your own pattern: ${DN[peak]} gets the biggest share (${Math.round(Wt[peak] * 100)}%).` : `Pola buatanmu: hari ${DN[peak]} dapat porsi paling besar (${Math.round(Wt[peak] * 100)}%).`)
         : cyB.weightsLearned ? (en ? `Learned from your routine spending over the last ${Math.min(8, cyB.weeksObserved)} weeks: ${DN[peak]} gets the biggest share.` : `Dipelajari dari belanja rutinmu ${Math.min(8, cyB.weeksObserved)} minggu terakhir: hari ${DN[peak]} dapat porsi paling besar.`)
         : (en ? `Not enough history yet (needs 4 weeks, have ${cyB.weeksObserved}). Your days use the default split for now.` : `Belum cukup riwayat (butuh 4 minggu, baru ${cyB.weeksObserved}). Sementara pakai pembagian bawaan.`),
       bpManualShow:!autoW,
+      bpManualHint: en ? 'Each day is compared with the others: a bigger amount gets a bigger share of what’s left. Changes apply right away.' : 'Nominal tiap hari dibandingkan satu sama lain: makin besar, makin besar porsinya dari sisa budget. Perubahan langsung berlaku.',
+      bpManualStatus:{ saving:en ? 'Saving…' : 'Menyimpan…', saved:(en ? '✓ Saved · today ' : '✓ Tersimpan · hari ini ') + RP(s.todayBudget ?? cyB.allowance), error:en ? 'Not saved, try again' : 'Gagal tersimpan, coba lagi', empty:en ? 'Fill at least one day' : 'Isi minimal satu hari' }[s.wState] || '',
+      bpManualStatusColor: s.wState === 'error' || s.wState === 'empty' ? 'var(--danger-text)' : s.wState === 'saved' ? 'var(--success-text)' : 'var(--text-subtle)',
+      bpLastDay:cyB.daysLeft <= 1,
+      bpLastDayTxt: en ? `Today is the last day of this ${pw}, so everything left is today’s allowance. The daily pattern kicks in again next ${pw}.` : `Hari ini hari terakhir ${pw} ini, jadi semua sisa budget jadi jatah hari ini. Pola harian berlaku lagi mulai ${pw} depan.`,
     };
 
     // income
@@ -1325,8 +1368,7 @@ export class V3Logic extends React.Component {
       runway: s.runwayInfo ? { value:s.runwayInfo.value, badge:s.runwayInfo.short ? 'Defisit' : 'Aman', color:s.runwayInfo.short ? 'var(--danger-text)' : 'var(--success-text)', bg:s.runwayInfo.short ? 'var(--danger-subtle)' : 'var(--success-subtle)' } : { value:'Rp4.049.000', badge:'Aman', color:'var(--success-text)', bg:'var(--success-subtle)' },
       todayRows, todayCount:tTx.length, todayEmpty:tTx.length === 0,
       wk, bars, dayRows,
-      bud, ...bp, saveLabel:{ idle:en ? 'Save day weights' : 'Simpan bobot hari', saving:'Menyimpan…', saved:'✓ Tersimpan' }[s.saveState],
-      saveManual:() => { this.setState({ saveState:'saving' }); if (this.props.live !== undefined) { this.props.live.actions.saveBudget(s.manual).then(() => this.props.live.actions.saveBudgetSettings({ autoWeights:false })).then(() => this.props.live.refresh()).then(() => this.setState({ saveState:'saved', bpManual:false })).catch(e => { this.setState({ saveState:'idle' }); this.toast((e && e.message) || 'Gagal menyimpan bobot hari.'); }); return; } this.t4 = setTimeout(() => this.setState({ saveState:'saved' }), 700); },
+      bud, ...bp,
       showMascot: presence !== 'sembunyi' && s.page !== 'chat', mascotSm:this.mascot(28, 'happy'), mascotMd:this.mascot(44, tipOpen ? (isRem ? 'alert' : 'happy') : (isRem && !s.tipDismissed ? 'alert' : 'idle')),
       weekStreams, pendingVisible:s.pending, pendingPick:s.pick, streamOpts, onPendingPick:e => this.setState({ pick:e.target.value }), pendingNoPick:String(!s.pick),
       pendingBtnBg: s.pick ? 'var(--text)' : 'var(--neutral)', pendingBtnFg: s.pick ? 'var(--page)' : 'var(--text-subtlest)',
