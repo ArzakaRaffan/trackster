@@ -7,8 +7,7 @@ const PORT = Number(process.env.PORT || 3000);
 const DATA_PATH = process.env.DATA_PATH || "/data/status.json";
 const CHECK_INTERVAL_MS = 60_000;
 const CHECK_TIMEOUT_MS = 10_000;
-const HISTORY_DAYS = 90;
-const RECENT_CHECKS = 90;
+const HISTORY_DAYS = 30;
 const PUBLIC_DIR = fileURLToPath(new URL("./public", import.meta.url));
 
 const services = [
@@ -123,18 +122,6 @@ function updateHistory(previous = [], currentStatus) {
   return history.sort((a, b) => a.day.localeCompare(b.day));
 }
 
-function updateRecentChecks(previous = [], result, checkedAt) {
-  return [
-    ...previous,
-    {
-      at: checkedAt,
-      status: result.status,
-      latency: result.latency,
-      statusCode: result.statusCode,
-    },
-  ].slice(-RECENT_CHECKS);
-}
-
 function updateIncident(service, previousStatus, result, checkedAt) {
   if (!service.public) return;
 
@@ -190,7 +177,6 @@ async function runChecks() {
         error: result.error,
         checkedAt,
         history: updateHistory(previous?.history, result.status),
-        checks: updateRecentChecks(previous?.checks, result, checkedAt),
       };
     });
 
@@ -216,7 +202,6 @@ function publicStatus() {
       latency: null,
       statusCode: null,
       history: [],
-      checks: [],
     }),
     error: undefined,
     checkedAt: undefined,
@@ -270,7 +255,8 @@ const server = createServer(async (request, response) => {
     return;
   }
 
-  const requestedFile = pathname === "/" ? "index.html" : pathname.slice(1);
+  const pageRoutes = { "/": "index.html", "/uptime": "uptime.html", "/uptime/": "uptime.html" };
+  const requestedFile = pageRoutes[pathname] || pathname.slice(1);
   if (!/^[a-zA-Z0-9._-]+$/.test(requestedFile)) {
     response.writeHead(404).end("Not found\n");
     return;

@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="description" content="30-day uptime history for Trackster products.">
+    <meta name="theme-color" content="#f7faf7">
+    <title>Uptime History · Trackster Status</title>
+    <link rel="stylesheet" href="/styles.css?v=3">
+    <script src="/uptime.js?v=3" defer></script>
+  </head>
+  <body>
+    <main class="site-shell history-page">
+      <header class="site-header">
+        <a class="brand" href="/" aria-label="Trackster Status home">
+          <span class="brand-mark" aria-hidden="true"><span></span><span></span><span></span></span>
+          <span>Trackster</span><span class="brand-divider"></span><span class="brand-status">Status</span>
+        </a>
+        <nav aria-label="Status page navigation">
+          <a href="/">Current status</a>
+          <a class="product-link" href="https://trackster.dev">Go to Trackster <span aria-hidden="true">↗</span></a>
+        </nav>
+      </header>
+
+      <section class="page-intro">
+        <p class="eyebrow">Availability</p>
+        <h1>Uptime history</h1>
+        <p>Daily health for Trackster products during the last 30 days.</p>
+      </section>
+
+      <div class="history-tabs" aria-label="Status history navigation">
+        <a href="/">Current status</a><a class="active" href="/uptime" aria-current="page">Uptime</a>
+      </div>
+
+      <section class="uptime-panel" aria-live="polite">
+        <div class="uptime-toolbar">
+          <div><p class="eyebrow">Service</p><h2 id="uptime-service-name">Loading…</h2></div>
+          <label>Product<select id="service-select" aria-label="Select Trackster product"></select></label>
+        </div>
+        <div class="uptime-summary">
+          <div><span>30-day health</span><strong id="uptime-percentage">—</strong></div>
+          <div><span>Days monitored</span><strong id="days-monitored">—</strong></div>
+          <div><span>Current status</span><strong id="current-health">—</strong></div>
+        </div>
+        <div class="calendar-heading">
+          <h3>Last 30 days</h3>
+          <div class="uptime-legend"><span class="operational">Healthy</span><span class="degraded">Degraded</span><span class="outage">Outage</span><span class="unknown">No data</span></div>
+        </div>
+        <div class="calendar-grid" id="calendar-grid"></div>
+      </section>
+
+      <a class="back-status" href="/">← Current status</a>
+
+      <footer>
+        <div class="footer-brand"><span class="brand-mark small" aria-hidden="true"><span></span><span></span><span></span></span><span>Trackster Status</span></div>
+        <p>Automatic service monitoring · Asia/Singapore</p>
+        <a href="https://trackster.dev">trackster.dev</a>
+      </footer>
+    </main>
+  </body>
+</html>

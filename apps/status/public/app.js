@@ -10,12 +10,6 @@ const overallCopy = {
   outage: "We’re experiencing an outage",
 };
 
-const healthLabels = {
-  operational: "Healthy",
-  degraded: "Slow response",
-  outage: "Unavailable",
-};
-
 const statusIcons = {
   operational: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="m5 12 4 4L19 6"/></svg>',
   degraded: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M3 12h4l2-7 4 14 2-7h6"/></svg>',
@@ -35,30 +29,41 @@ function formatTime(value) {
   }).format(new Date(value));
 }
 
-function formatCheckTime(value) {
+function formatDay(value) {
   return new Intl.DateTimeFormat("en", {
-    month: "short", day: "numeric", hour: "2-digit", minute: "2-digit", second: "2-digit",
-  }).format(new Date(value));
+    weekday: "short", month: "short", day: "numeric", year: "numeric", timeZone: "UTC",
+  }).format(new Date(`${value}T00:00:00Z`));
 }
 
-function checkStripMarkup(service) {
-  const checks = (service.checks || []).slice(-90);
-  const slots = Array.from({ length: 90 }, (_, index) => checks[index] || null);
-  const healthy = checks.length
-    ? checks.filter((check) => check.status === "operational").length / checks.length * 100
+function dailyDescription(status, isToday, latency) {
+  if (status === "operational") return isToday && latency !== null
+    ? `Healthy · latest response ${latency} ms`
+    : "Healthy · all recorded checks passed";
+  if (status === "degraded") return "Degraded · at least one slow check";
+  if (status === "outage") return "Outage · at least one check failed";
+  return "No data · monitoring had not started";
+}
+
+function dailyStripMarkup(service) {
+  const stored = new Map((service.history || []).map((item) => [item.day, item.status]));
+  const days = Array.from({ length: 30 }, (_, index) => {
+    const day = new Date(Date.now() - (29 - index) * 86_400_000).toISOString().slice(0, 10);
+    return { day, status: stored.get(day) || (index === 29 ? service.status : "unknown") };
+  });
+  const recorded = days.filter((day) => day.status !== "unknown");
+  const healthy = recorded.length
+    ? recorded.filter((day) => day.status === "operational").length / recorded.length * 100
     : null;
 
   return `
     <div class="uptime-wrap">
-      <div class="uptime-strip" aria-label="Last 90 live health checks">
-        ${slots.map((check) => {
-          if (!check) return '<span class="uptime-check empty" aria-hidden="true"></span>';
-          const code = check.statusCode === null ? "No HTTP response" : `HTTP ${check.statusCode}`;
-          const detail = `${formatCheckTime(check.at)} · ${healthLabels[check.status]} · ${check.latency} ms · ${code}`;
-          return `<span class="uptime-check ${check.status}" aria-label="${escapeHtml(detail)}" data-tooltip="${escapeHtml(detail)}" title="${escapeHtml(detail)}"></span>`;
+      <div class="uptime-strip" aria-label="30 day health history">
+        ${days.map((day, index) => {
+          const detail = `${formatDay(day.day)} · ${dailyDescription(day.status, index === 29, service.latency)}`;
+          return `<span class="uptime-check ${day.status}" aria-label="${escapeHtml(detail)}" data-status="${day.status}" data-tooltip="${escapeHtml(detail)}" title="${escapeHtml(detail)}"></span>`;
         }).join("")}
       </div>
-      <div class="uptime-meta"><span>${checks.length} of 90 checks</span><span class="history-note">${healthy === null ? "Waiting for first check" : `${healthy.toFixed(1)}% healthy · green means healthy`}</span><span>Latest</span></div>
+      <div class="uptime-meta"><span>30 days ago</span><span class="history-note">${healthy === null ? "Monitoring starts today" : `${healthy.toFixed(2)}% healthy`}</span><a href="/uptime">View uptime →</a></div>
     </div>`;
 }
 
@@ -73,7 +78,7 @@ function renderServices(services) {
         ${service.latency !== null ? `<span>${service.latency} ms</span>` : ""}
         <strong class="${service.status}">${labels[service.status]}</strong>
       </div>
-      ${checkStripMarkup(service)}
+      ${dailyStripMarkup(service)}
     </article>`).join("");
 }
 
@@ -133,6 +138,7 @@ document.addEventListener("pointerover", (event) => {
   const check = event.target.closest?.(".uptime-check[data-tooltip]");
   if (!check) return;
   checkTooltip.textContent = check.dataset.tooltip;
+  checkTooltip.dataset.status = check.dataset.status;
   checkTooltip.classList.add("visible");
   const rect = check.getBoundingClientRect();
   const half = checkTooltip.offsetWidth / 2;
