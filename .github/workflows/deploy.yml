@@ -54,6 +54,16 @@ jobs:
             ${{ env.REGISTRY }}/trackster-frontend:${{ github.sha }}
           cache-from: type=gha,scope=frontend
           cache-to: type=gha,scope=frontend,mode=max
+      - name: Build & push status
+        uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6
+        with:
+          context: ./apps/status
+          push: true
+          tags: |
+            ${{ env.REGISTRY }}/trackster-status:latest
+            ${{ env.REGISTRY }}/trackster-status:${{ github.sha }}
+          cache-from: type=gha,scope=status
+          cache-to: type=gha,scope=status,mode=max
 
   deploy:
     needs: build
@@ -79,7 +89,7 @@ jobs:
               echo "nginx -t gagal: config baru tidak dipasang" >&2
               exit 1
             fi
-            docker compose -f docker-compose.prod.yml pull backend frontend
+            docker compose -f docker-compose.prod.yml pull backend frontend status
             # Backup SEBELUM backend baru menjalankan `prisma migrate deploy`. Gagal → deploy berhenti, versi lama tetap jalan.
             docker compose -f docker-compose.prod.yml run --rm --no-deps -T db-backup once predeploy
             docker compose -f docker-compose.prod.yml up -d

@@ -110,6 +110,31 @@ services:
     expose:
       - '3000'
 
+  status:
+    image: ghcr.io/arzakaraffan/trackster-status:${IMAGE_TAG:-latest}
+    logging: *default-logging
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    build:
+      context: ./apps/status
+    restart: unless-stopped
+    environment:
+      PORT: 3000
+      DATA_PATH: /data/status.json
+      PANEL_URL: https://panel.trackster.dev
+    volumes:
+      - trackster_status_data:/data
+    expose:
+      - '3000'
+    healthcheck:
+      test: ['CMD', 'node', '-e', "fetch('http://127.0.0.1:3000/healthz').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
   nginx:
     image: nginx:alpine
     logging: *default-logging
@@ -117,6 +142,7 @@ services:
     depends_on:
       - backend
       - frontend
+      - status
     extra_hosts:
       - 'host.docker.internal:host-gateway'
     ports:
@@ -140,6 +166,7 @@ services:
 volumes:
   trackster_pg_data:
   trackster_backups:
+  trackster_status_data:
 networks:
   shared-web-net:
     external: true

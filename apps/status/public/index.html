@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="description" content="Live availability and incident updates for Trackster products.">
+    <meta name="theme-color" content="#f7faf7">
+    <title>Trackster Status</title>
+    <link rel="stylesheet" href="/styles.css">
+    <script src="/app.js" defer></script>
+  </head>
+  <body>
+    <main class="site-shell">
+      <header class="site-header">
+        <a class="brand" href="#top" aria-label="Trackster Status home">
+          <span class="brand-mark" aria-hidden="true"><span></span><span></span><span></span></span>
+          <span>Trackster</span><span class="brand-divider"></span><span class="brand-status">Status</span>
+        </a>
+        <nav aria-label="Status page navigation">
+          <a href="#systems">Systems</a><a href="#incidents">Incidents</a>
+          <a class="product-link" href="https://trackster.dev">Go to Trackster <span aria-hidden="true">↗</span></a>
+        </nav>
+      </header>
+
+      <section class="hero operational" id="top">
+        <div class="hero-orb status-icon" aria-hidden="true"></div>
+        <div>
+          <p class="eyebrow">Current status</p>
+          <h1 id="overall-title">Checking all systems…</h1>
+          <p class="hero-copy" id="overall-copy">Live availability checks run automatically every minute.</p>
+        </div>
+        <div class="last-checked">
+          <span aria-hidden="true">◷</span><span id="last-checked">Checking services…</span>
+          <button id="refresh" type="button" aria-label="Refresh service status">↻</button>
+        </div>
+      </section>
+
+      <section class="section" id="systems">
+        <div class="section-heading">
+          <div><p class="eyebrow">Live systems</p><h2>Service availability</h2></div>
+          <div class="monitoring-note"><span class="live-dot"></span> Live checks every 60 seconds</div>
+        </div>
+        <div class="service-list" id="service-list" aria-live="polite"></div>
+      </section>
+
+      <section class="section incidents" id="incidents">
+        <div class="section-heading">
+          <div><p class="eyebrow">Latest updates</p><h2>Incident history</h2></div>
+        </div>
+        <div id="incident-list" aria-live="polite"></div>
+      </section>
+
+      <footer>
+        <div class="footer-brand">
+          <span class="brand-mark small" aria-hidden="true"><span></span><span></span><span></span></span>
+          <span>Trackster Status</span>
+        </div>
+        <p>Automatic service monitoring · Asia/Singapore</p>
+        <a href="https://trackster.dev">trackster.dev</a>
+      </footer>
+    </main>
+  </body>
+</html>
