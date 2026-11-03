@@ -40,3 +40,12 @@ docker compose -f docker-compose.prod.yml exec status node admin.mjs create \
 
 Public service IDs are `trackster-web`, `trackster-api`, `router-web`, and
 `router-api`.
+
+The bundled showcase history can be applied once with:
+
+```bash
+docker compose -f docker-compose.prod.yml exec status node seed-history.mjs
+```
+
+It fills the rolling 30-day daily history and inserts idempotent resolved
+incident records for the finance tracker and API gateway.

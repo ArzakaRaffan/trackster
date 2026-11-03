@@ -215,6 +215,54 @@ async function manageIncident(request, response) {
     const body = await readJsonBody(request);
     const allowedStatuses = ["investigating", "monitoring", "resolved"];
 
+    if (body.action === "seed") {
+      const dailyStatuses = ["operational", "degraded", "outage"];
+      for (const service of services.filter((item) => item.public)) {
+        const history = Array.isArray(body.histories?.[service.id])
+          ? body.histories[service.id].filter((item) =>
+            /^\d{4}-\d{2}-\d{2}$/.test(item.day) && dailyStatuses.includes(item.status),
+          ).slice(-HISTORY_DAYS)
+          : null;
+        if (history) {
+          state.services[service.id] ||= {};
+          state.services[service.id].history = history.sort((a, b) => a.day.localeCompare(b.day));
+        }
+      }
+
+      let added = 0;
+      for (const candidate of Array.isArray(body.incidents) ? body.incidents : []) {
+        const service = services.find((item) => item.public && item.id === candidate.serviceId);
+        if (!service || !candidate.id || !candidate.title || !candidate.details) continue;
+        if (state.incidents.some((item) => item.id === candidate.id)) continue;
+        const updates = Array.isArray(candidate.updates)
+          ? candidate.updates.filter((update) =>
+            allowedStatuses.includes(update.status) && update.details && update.at,
+          ).map((update) => ({
+            status: update.status,
+            details: String(update.details),
+            at: new Date(update.at).toISOString(),
+          }))
+          : [];
+        state.incidents.push({
+          id: String(candidate.id),
+          serviceId: service.id,
+          title: String(candidate.title),
+          status: "resolved",
+          startedAt: new Date(candidate.startedAt).toISOString(),
+          resolvedAt: new Date(candidate.resolvedAt).toISOString(),
+          details: String(candidate.details),
+          source: "historical",
+          updates,
+        });
+        added += 1;
+      }
+      state.incidents.sort((a, b) => b.startedAt.localeCompare(a.startedAt));
+      state.incidents = state.incidents.slice(0, 100);
+      await saveState();
+      sendJson(response, 200, { added, incidents: state.incidents.length });
+      return;
+    }
+
     if (body.action === "create") {
       const service = services.find((item) => item.public && item.id === body.serviceId);
       if (!service || !body.title?.trim() || !body.details?.trim()) {
