@@ -3,7 +3,8 @@ import Link from 'next/link';
 import ThemeToggle from '@/components/legal/ThemeToggle';
 
 export const metadata: Metadata = {
-  title: 'Tools Keuangan Gratis',
+  title: 'Tools Keuangan Gratis: Split Bill, Target Tabungan, PayLater, Patungan Trip',
+  alternates: { canonical: '/tools' },
   description:
     'Kalkulator keuangan gratis tanpa akun: split bill patungan, target tabungan, cicilan PayLater, dan patungan trip. Bantu anak muda Indonesia ngatur duit bareng.',
   openGraph: {
