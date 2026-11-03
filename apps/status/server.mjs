@@ -8,6 +8,7 @@ const DATA_PATH = process.env.DATA_PATH || "/data/status.json";
 const CHECK_INTERVAL_MS = 60_000;
 const CHECK_TIMEOUT_MS = 10_000;
 const HISTORY_DAYS = 90;
+const RECENT_CHECKS = 90;
 const PUBLIC_DIR = fileURLToPath(new URL("./public", import.meta.url));
 
 const services = [
@@ -122,6 +123,18 @@ function updateHistory(previous = [], currentStatus) {
   return history.sort((a, b) => a.day.localeCompare(b.day));
 }
 
+function updateRecentChecks(previous = [], result, checkedAt) {
+  return [
+    ...previous,
+    {
+      at: checkedAt,
+      status: result.status,
+      latency: result.latency,
+      statusCode: result.statusCode,
+    },
+  ].slice(-RECENT_CHECKS);
+}
+
 function updateIncident(service, previousStatus, result, checkedAt) {
   if (!service.public) return;
 
@@ -177,6 +190,7 @@ async function runChecks() {
         error: result.error,
         checkedAt,
         history: updateHistory(previous?.history, result.status),
+        checks: updateRecentChecks(previous?.checks, result, checkedAt),
       };
     });
 
@@ -202,6 +216,7 @@ function publicStatus() {
       latency: null,
       statusCode: null,
       history: [],
+      checks: [],
     }),
     error: undefined,
     checkedAt: undefined,
@@ -265,7 +280,7 @@ const server = createServer(async (request, response) => {
     const file = await readFile(join(PUBLIC_DIR, requestedFile));
     response.writeHead(200, {
       "content-type": contentTypes[extname(requestedFile)] || "application/octet-stream",
-      "cache-control": requestedFile === "index.html" ? "no-cache" : "public, max-age=3600",
+      "cache-control": "no-cache",
     });
     response.end(file);
   } catch {

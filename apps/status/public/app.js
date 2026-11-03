@@ -10,6 +10,12 @@ const overallCopy = {
   outage: "We’re experiencing an outage",
 };
 
+const healthLabels = {
+  operational: "Healthy",
+  degraded: "Slow response",
+  outage: "Unavailable",
+};
+
 const statusIcons = {
   operational: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="m5 12 4 4L19 6"/></svg>',
   degraded: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M3 12h4l2-7 4 14 2-7h6"/></svg>',
@@ -29,23 +35,30 @@ function formatTime(value) {
   }).format(new Date(value));
 }
 
-function uptimeMarkup(service) {
-  const stored = new Map((service.history || []).map((item) => [item.day, item.status]));
-  const days = Array.from({ length: 90 }, (_, index) => {
-    const date = new Date(Date.now() - (89 - index) * 86_400_000).toISOString().slice(0, 10);
-    return { date, status: stored.get(date) || (index === 89 ? service.status : "unknown") };
-  });
-  const recorded = days.filter((day) => day.status !== "unknown");
-  const uptime = recorded.length
-    ? recorded.filter((day) => day.status === "operational").length / recorded.length * 100
+function formatCheckTime(value) {
+  return new Intl.DateTimeFormat("en", {
+    month: "short", day: "numeric", hour: "2-digit", minute: "2-digit", second: "2-digit",
+  }).format(new Date(value));
+}
+
+function checkStripMarkup(service) {
+  const checks = (service.checks || []).slice(-90);
+  const slots = Array.from({ length: 90 }, (_, index) => checks[index] || null);
+  const healthy = checks.length
+    ? checks.filter((check) => check.status === "operational").length / checks.length * 100
     : null;
 
   return `
     <div class="uptime-wrap">
-      <div class="uptime-strip" aria-label="90 day uptime history">
-        ${days.map((day) => `<span class="uptime-day ${day.status}" title="${day.date}: ${labels[day.status] || "No data yet"}"></span>`).join("")}
+      <div class="uptime-strip" aria-label="Last 90 live health checks">
+        ${slots.map((check) => {
+          if (!check) return '<span class="uptime-check empty" aria-hidden="true"></span>';
+          const code = check.statusCode === null ? "No HTTP response" : `HTTP ${check.statusCode}`;
+          const detail = `${formatCheckTime(check.at)} · ${healthLabels[check.status]} · ${check.latency} ms · ${code}`;
+          return `<span class="uptime-check ${check.status}" aria-label="${escapeHtml(detail)}" data-tooltip="${escapeHtml(detail)}" title="${escapeHtml(detail)}"></span>`;
+        }).join("")}
       </div>
-      <div class="uptime-meta"><span>90 days ago</span><span class="history-note">${uptime === null ? "Monitoring starts today" : `${uptime.toFixed(2)}% uptime`}</span><span>Today</span></div>
+      <div class="uptime-meta"><span>${checks.length} of 90 checks</span><span class="history-note">${healthy === null ? "Waiting for first check" : `${healthy.toFixed(1)}% healthy · green means healthy`}</span><span>Latest</span></div>
     </div>`;
 }
 
@@ -60,7 +73,7 @@ function renderServices(services) {
         ${service.latency !== null ? `<span>${service.latency} ms</span>` : ""}
         <strong class="${service.status}">${labels[service.status]}</strong>
       </div>
-      ${uptimeMarkup(service)}
+      ${checkStripMarkup(service)}
     </article>`).join("");
 }
 
@@ -110,5 +123,27 @@ async function loadStatus(manual = false) {
 }
 
 document.querySelector("#refresh").addEventListener("click", () => loadStatus(true));
+
+const checkTooltip = document.createElement("div");
+checkTooltip.className = "check-tooltip";
+checkTooltip.setAttribute("role", "tooltip");
+document.body.append(checkTooltip);
+
+document.addEventListener("pointerover", (event) => {
+  const check = event.target.closest?.(".uptime-check[data-tooltip]");
+  if (!check) return;
+  checkTooltip.textContent = check.dataset.tooltip;
+  checkTooltip.classList.add("visible");
+  const rect = check.getBoundingClientRect();
+  const half = checkTooltip.offsetWidth / 2;
+  const left = Math.min(window.innerWidth - half - 10, Math.max(half + 10, rect.left + rect.width / 2));
+  checkTooltip.style.left = `${left}px`;
+  checkTooltip.style.top = `${rect.top - 9}px`;
+});
+
+document.addEventListener("pointerout", (event) => {
+  if (event.target.closest?.(".uptime-check[data-tooltip]")) checkTooltip.classList.remove("visible");
+});
+
 loadStatus();
 setInterval(loadStatus, 60_000);
