@@ -126,17 +126,26 @@ function updateIncident(service, previousStatus, result, checkedAt) {
   if (!service.public) return;
 
   const active = state.incidents.find(
-    (incident) => incident.serviceId === service.id && incident.status !== "resolved",
+    (incident) => incident.serviceId === service.id
+      && incident.status !== "resolved"
+      && incident.source !== "manual",
   );
 
   if (result.status === "operational" && active) {
     active.status = "resolved";
     active.resolvedAt = checkedAt;
     active.details = `${service.name} has recovered and is operating normally.`;
+    active.updates = [
+      ...(active.updates || []),
+      { status: "resolved", details: active.details, at: checkedAt },
+    ];
     return;
   }
 
   if (result.status !== "operational" && !active) {
+    const details = result.error
+      ? `Automated monitoring detected: ${result.error}.`
+      : `Automated monitoring detected elevated response time (${result.latency} ms).`;
     state.incidents.unshift({
       id: `${service.id}-${Date.now()}`,
       serviceId: service.id,
@@ -144,9 +153,9 @@ function updateIncident(service, previousStatus, result, checkedAt) {
       status: "investigating",
       startedAt: checkedAt,
       resolvedAt: null,
-      details: result.error
-        ? `Automated monitoring detected: ${result.error}.`
-        : `Automated monitoring detected elevated response time (${result.latency} ms).`,
+      details,
+      source: "automatic",
+      updates: [{ status: "investigating", details, at: checkedAt }],
     });
     return;
   }
@@ -156,6 +165,113 @@ function updateIncident(service, previousStatus, result, checkedAt) {
     active.details = result.error
       ? `Automated monitoring detected: ${result.error}.`
       : `Automated monitoring detected elevated response time (${result.latency} ms).`;
+    active.updates = [
+      ...(active.updates || []),
+      { status: "investigating", details: active.details, at: checkedAt },
+    ];
+  }
+}
+
+function isLoopback(request) {
+  return ["127.0.0.1", "::1", "::ffff:127.0.0.1"].includes(request.socket.remoteAddress);
+}
+
+async function readJsonBody(request) {
+  const chunks = [];
+  let size = 0;
+  for await (const chunk of request) {
+    size += chunk.length;
+    if (size > 32_768) throw new Error("Request body is too large");
+    chunks.push(chunk);
+  }
+  return JSON.parse(Buffer.concat(chunks).toString("utf8") || "{}");
+}
+
+function sendJson(response, statusCode, body) {
+  response.writeHead(statusCode, {
+    "content-type": "application/json; charset=utf-8",
+    "cache-control": "no-store",
+  });
+  response.end(JSON.stringify(body));
+}
+
+async function manageIncident(request, response) {
+  if (!isLoopback(request)) {
+    sendJson(response, 404, { error: "Not found" });
+    return;
+  }
+
+  if (request.method === "GET") {
+    sendJson(response, 200, { incidents: state.incidents });
+    return;
+  }
+
+  if (request.method !== "POST") {
+    sendJson(response, 405, { error: "Method not allowed" });
+    return;
+  }
+
+  try {
+    const body = await readJsonBody(request);
+    const allowedStatuses = ["investigating", "monitoring", "resolved"];
+
+    if (body.action === "create") {
+      const service = services.find((item) => item.public && item.id === body.serviceId);
+      if (!service || !body.title?.trim() || !body.details?.trim()) {
+        sendJson(response, 400, { error: "A public service, title, and details are required" });
+        return;
+      }
+      const status = allowedStatuses.includes(body.status) ? body.status : "investigating";
+      const startedAt = body.startedAt ? new Date(body.startedAt).toISOString() : new Date().toISOString();
+      const resolvedAt = status === "resolved"
+        ? (body.resolvedAt ? new Date(body.resolvedAt).toISOString() : new Date().toISOString())
+        : null;
+      const incident = {
+        id: `manual-${Date.now()}`,
+        serviceId: service.id,
+        title: body.title.trim(),
+        status,
+        startedAt,
+        resolvedAt,
+        details: body.details.trim(),
+        source: "manual",
+        updates: [{ status, details: body.details.trim(), at: resolvedAt || startedAt }],
+      };
+      state.incidents.unshift(incident);
+      state.incidents.sort((a, b) => b.startedAt.localeCompare(a.startedAt));
+      state.incidents = state.incidents.slice(0, 100);
+      await saveState();
+      sendJson(response, 201, { incident });
+      return;
+    }
+
+    const incident = state.incidents.find((item) => item.id === body.id);
+    if (!incident) {
+      sendJson(response, 404, { error: "Incident not found" });
+      return;
+    }
+
+    if (body.action === "update" || body.action === "resolve") {
+      const status = body.action === "resolve" ? "resolved" : body.status;
+      if (!allowedStatuses.includes(status)) {
+        sendJson(response, 400, { error: "Status must be investigating, monitoring, or resolved" });
+        return;
+      }
+      const at = body.resolvedAt ? new Date(body.resolvedAt).toISOString() : new Date().toISOString();
+      const details = body.details?.trim() || incident.details;
+      incident.status = status;
+      incident.details = details;
+      if (body.title?.trim()) incident.title = body.title.trim();
+      incident.resolvedAt = status === "resolved" ? at : null;
+      incident.updates = [...(incident.updates || []), { status, details, at }];
+      await saveState();
+      sendJson(response, 200, { incident });
+      return;
+    }
+
+    sendJson(response, 400, { error: "Unknown action" });
+  } catch (error) {
+    sendJson(response, 400, { error: error.message });
   }
 }
 
@@ -255,7 +371,18 @@ const server = createServer(async (request, response) => {
     return;
   }
 
-  const pageRoutes = { "/": "index.html", "/uptime": "uptime.html", "/uptime/": "uptime.html" };
+  if (pathname === "/api/admin/incidents") {
+    await manageIncident(request, response);
+    return;
+  }
+
+  const pageRoutes = {
+    "/": "index.html",
+    "/history": "history.html",
+    "/history/": "history.html",
+    "/uptime": "uptime.html",
+    "/uptime/": "uptime.html",
+  };
   const requestedFile = pageRoutes[pathname] || pathname.slice(1);
   if (!/^[a-zA-Z0-9._-]+$/.test(requestedFile)) {
     response.writeHead(404).end("Not found\n");

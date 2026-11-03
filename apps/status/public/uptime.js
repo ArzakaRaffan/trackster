@@ -42,7 +42,7 @@ function render(service) {
   document.querySelector("#calendar-grid").innerHTML = days.map((day) => {
     const detail = `${formatDay(day.day)} · ${healthLabels[day.status]} · ${description(day.status)}`;
     const date = new Date(`${day.day}T00:00:00Z`);
-    return `<div class="calendar-day ${day.status}" data-status="${day.status}" data-tooltip="${escapeHtml(detail)}" title="${escapeHtml(detail)}">
+    return `<div class="calendar-day ${day.status}" aria-label="${escapeHtml(detail)}" data-status="${day.status}" data-tooltip="${escapeHtml(detail)}">
       <span>${new Intl.DateTimeFormat("en", { weekday: "short", timeZone: "UTC" }).format(date)}</span>
       <strong>${date.getUTCDate()}</strong>
     </div>`;
@@ -68,7 +68,8 @@ document.addEventListener("pointerover", (event) => {
 });
 
 document.addEventListener("pointerout", (event) => {
-  if (event.target.closest?.("[data-tooltip]")) tooltip.classList.remove("visible");
+  const day = event.target.closest?.("[data-tooltip]");
+  if (day && !day.contains(event.relatedTarget)) tooltip.classList.remove("visible");
 });
 
 async function load() {

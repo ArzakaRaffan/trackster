@@ -60,7 +60,7 @@ function dailyStripMarkup(service) {
       <div class="uptime-strip" aria-label="30 day health history">
         ${days.map((day, index) => {
           const detail = `${formatDay(day.day)} · ${dailyDescription(day.status, index === 29, service.latency)}`;
-          return `<span class="uptime-check ${day.status}" aria-label="${escapeHtml(detail)}" data-status="${day.status}" data-tooltip="${escapeHtml(detail)}" title="${escapeHtml(detail)}"></span>`;
+          return `<span class="uptime-check ${day.status}" aria-label="${escapeHtml(detail)}" data-status="${day.status}" data-tooltip="${escapeHtml(detail)}"></span>`;
         }).join("")}
       </div>
       <div class="uptime-meta"><span>30 days ago</span><span class="history-note">${healthy === null ? "Monitoring starts today" : `${healthy.toFixed(2)}% healthy`}</span><a href="/uptime">View uptime →</a></div>

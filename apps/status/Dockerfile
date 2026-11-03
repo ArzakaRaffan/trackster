@@ -3,6 +3,7 @@ FROM node:22-alpine
 WORKDIR /app
 
 COPY --chown=node:node server.mjs ./server.mjs
+COPY --chown=node:node admin.mjs ./admin.mjs
 COPY --chown=node:node public ./public
 
 RUN mkdir -p /data && chown node:node /data

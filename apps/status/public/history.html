@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="description" content="Incident history for Trackster products.">
+    <meta name="theme-color" content="#f7faf7">
+    <title>Incident History · Trackster Status</title>
+    <link rel="stylesheet" href="/styles.css?v=4">
+    <script src="/history.js?v=4" defer></script>
+  </head>
+  <body>
+    <main class="site-shell history-page">
+      <header class="site-header">
+        <a class="brand" href="/" aria-label="Trackster Status home">
+          <span class="brand-mark" aria-hidden="true"><span></span><span></span><span></span></span>
+          <span>Trackster</span><span class="brand-divider"></span><span class="brand-status">Status</span>
+        </a>
+        <nav aria-label="Status page navigation">
+          <a href="/">Current status</a>
+          <a class="product-link" href="https://trackster.dev">Go to Trackster <span aria-hidden="true">↗</span></a>
+        </nav>
+      </header>
+
+      <section class="page-intro">
+        <p class="eyebrow">Past events</p>
+        <h1>Incident history</h1>
+        <p>Service interruptions, maintenance updates, and recovery notes from Trackster.</p>
+      </section>
+
+      <div class="history-tabs" aria-label="Status history navigation">
+        <a class="active" href="/history" aria-current="page">Incidents</a><a href="/uptime">Uptime</a>
+      </div>
+
+      <section class="history-list" id="history-list" aria-live="polite">
+        <div class="history-loading">Loading incident history…</div>
+      </section>
+
+      <a class="back-status" href="/">← Current status</a>
+
+      <footer>
+        <div class="footer-brand"><span class="brand-mark small" aria-hidden="true"><span></span><span></span><span></span></span><span>Trackster Status</span></div>
+        <p>Automatic service monitoring · Asia/Singapore</p>
+        <a href="https://trackster.dev">trackster.dev</a>
+      </footer>
+    </main>
+  </body>
+</html>
