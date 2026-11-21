@@ -7,7 +7,7 @@ import useSWR from 'swr';
 import { api } from '@/lib/api';
 import { formatRupiah } from '@/lib/format';
 import { avatarCss } from '@/lib/avatars';
-import { SplitBillDetail } from '@/lib/splitBillTypes';
+import { SplitBillDetail, personBillText, openWa } from '@/lib/splitBillTypes';
 import ThemeToggle from '@/components/legal/ThemeToggle';
 import { AvatarPicker } from '@/components/avatar/AvatarPicker';
 
@@ -150,7 +150,13 @@ export default function ManageSplitBillPage() {
                       </span>
                     </span>
                     <span className="pb-amt">{formatRupiah(p.total)}</span>
-                    <span className={`pb-tag ${p.isPaid ? 'ok' : 'no'}`}>{p.isPaid ? 'Lunas' : 'Belum'}</span>
+                    {p.isPaid ? (
+                      <span className="pb-tag ok">Lunas</span>
+                    ) : (
+                      <button className="pb-btn sm pri" onClick={() => openWa(personBillText(data, p, `${window.location.origin}/s/${data.publicSlug}`, formatRupiah))} aria-label={`Tagih ${p.name} lewat WhatsApp`}>
+                        Tagih
+                      </button>
+                    )}
                   </div>
                 </li>
               ))}

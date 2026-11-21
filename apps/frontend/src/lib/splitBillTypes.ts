@@ -91,3 +91,37 @@ export interface PublicSplitBillSummary {
   }[];
   participants: ParticipantTotal[];
 }
+
+/** Respons POST /split-bills/scan-receipt. Biaya = nominal Rupiah dari struk, 0 kalau tidak ada. */
+export interface ScanResult {
+  items: { description: string; amount: number; quantity: number }[];
+  subtotal?: number;
+  tax?: number;
+  service?: number;
+  discount?: number;
+}
+
+type BillForText = Pick<PublicSplitBillSummary, 'restaurantName' | 'payerBankName' | 'payerAccountNumber' | 'payerAccountName'> & {
+  items: { description: string; quantity: number; shares: { participantId: number }[] }[];
+};
+
+/** Pesan tagihan untuk SATU orang (dikirim lewat wa.me), berisi item pesanannya, total, rekening, dan link. */
+export function personBillText(bill: BillForText, p: ParticipantTotal, link: string, rupiah: (n: number) => string): string {
+  const mine = bill.items.filter((i) => i.shares.some((s) => s.participantId === p.participantId));
+  let text = `Halo ${p.name}, ini tagihan *${bill.restaurantName}* kamu:\n\n`;
+  for (const i of mine) {
+    const shared = i.shares.length > 1 ? ` (bagi ${i.shares.length})` : '';
+    text += `• ${i.description}${i.quantity > 1 ? ` ×${i.quantity}` : ''}${shared}\n`;
+  }
+  text += `${mine.length ? '\n' : ''}*Total: ${rupiah(p.total)}*\n`;
+  if (p.tax + p.service + p.delivery > 0 || p.discount > 0) text += '(sudah termasuk pajak/service/diskon)\n';
+  if (bill.payerAccountNumber) {
+    text += `\nTransfer ke ${[bill.payerBankName, bill.payerAccountNumber].filter(Boolean).join(' ')}`;
+    if (bill.payerAccountName) text += ` a.n ${bill.payerAccountName}`;
+    text += '\n';
+  }
+  return text + `\nDetail & tandai lunas: ${link}`;
+}
+
+/** Buka WhatsApp dengan teks terisi (pilih kontak di WA; nomor peserta tidak disimpan). */
+export const openWa = (text: string) => window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, '_blank');

@@ -4,6 +4,7 @@ import { useEffect, useMemo } from 'react';
 import useSWR, { useSWRConfig } from 'swr';
 import { API_URL, api } from '@/lib/api';
 import { shrinkDataUrl } from '@/lib/image';
+import type { ScanResult } from '@/lib/splitBillTypes';
 import { addDaysISO, buildDates, dynamicBudgetOf, wibHHMM, wibISO, wibLogDate } from './dates';
 import { buildAggregateReport, buildPeriodReport, dayLabelOf } from './reports';
 import { RPf, mapBill, mapGoal, mapIncome, mapMem, mapMsg, mapStream, mapSub, streamPayload } from './map';
@@ -338,7 +339,7 @@ export function useLive(enabled: boolean, path: string, chatActive: number | nul
       splitPaid: (slug: string, pid: number) => api.patch(`/split-bills/public/${slug}/participants/${pid}/mark-paid`, {}),
       splitAssign: (billId: number, itemId: number, pids: number[]) => api.patch(`/split-bills/${billId}/items/${itemId}/assign`, { shares: pids.map((participantId) => ({ participantId, weight: 1 })) }),
       scanReceipt: async (imageBase64: string) => ({
-        ...(await api.post<{ items: { description: string; amount: number; quantity: number }[] }>('/split-bills/scan-receipt', { imageBase64: await shrinkDataUrl(imageBase64) })),
+        ...(await api.post<ScanResult>('/split-bills/scan-receipt', { imageBase64: await shrinkDataUrl(imageBase64) })),
         thumb: await shrinkDataUrl(imageBase64, 900, 0.6), // pratinjau + disimpan bersama bill
       }),
       setMerchantIcon: (rawDescription: string, icon: string | null) => api.put('/merchant-aliases/icon', { rawDescription, icon }),

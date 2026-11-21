@@ -62,8 +62,7 @@ export class SplitBillController {
         HttpStatus.TOO_MANY_REQUESTS,
       );
     }
-    const items = await this.splitBillAiService.scanReceipt(dto.imageBase64);
-    return { items };
+    return this.splitBillAiService.scanReceipt(dto.imageBase64); // { items, subtotal, tax, service, discount }
   }
 
   // Tanpa JwtAuthGuard — Split Bill adalah produk publik Trackster, siapapun boleh bikin bill
