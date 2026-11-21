@@ -34,6 +34,7 @@ const STEP_LABELS = ['Info & peserta', 'Menu & pembagian', 'Pajak, fee & ringkas
 export default function NewSplitBillPage() {
   const router = useRouter();
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const cameraInputRef = useRef<HTMLInputElement>(null);
 
   const [step, setStep] = useState(0);
   const [submitting, setSubmitting] = useState(false);
@@ -151,21 +152,30 @@ export default function NewSplitBillPage() {
   // Satu tombol, dipakai di langkah 1 (biar langsung kelihatan) dan langkah 2 (tambah dari struk lain).
   const scanButton = (
     <>
-      <input
-        ref={fileInputRef}
-        type="file"
-        accept="image/*"
-        capture="environment"
-        hidden
-        onChange={(e) => {
-          const file = e.target.files?.[0];
-          if (file) handleScanReceipt(file);
-          e.target.value = '';
-        }}
-      />
-      <button type="button" className="pb-btn" style={{ width: '100%', marginBottom: 14 }} onClick={() => fileInputRef.current?.click()} disabled={scanning}>
-        {scanning ? 'Memindai struk…' : 'Scan struk'}
-      </button>
+      {/* Dua input: `capture` memaksa kamera (tanpa galeri), jadi galeri butuh input sendiri. */}
+      {[cameraInputRef, fileInputRef].map((ref, i) => (
+        <input
+          key={i}
+          ref={ref}
+          type="file"
+          accept="image/*"
+          capture={i === 0 ? 'environment' : undefined}
+          hidden
+          onChange={(e) => {
+            const file = e.target.files?.[0];
+            if (file) handleScanReceipt(file);
+            e.target.value = '';
+          }}
+        />
+      ))}
+      <div style={{ display: 'flex', gap: 8, marginBottom: 14 }}>
+        <button type="button" className="pb-btn" style={{ flex: 1 }} onClick={() => cameraInputRef.current?.click()} disabled={scanning}>
+          {scanning ? 'Memindai struk…' : 'Foto struk'}
+        </button>
+        <button type="button" className="pb-btn" style={{ flex: 1 }} onClick={() => fileInputRef.current?.click()} disabled={scanning}>
+          Pilih dari galeri
+        </button>
+      </div>
       {(scanning || receipt) && (
         <div style={{ display: 'flex', gap: 12, alignItems: 'center', marginBottom: 14 }}>
           {receipt && <img src={receipt} alt="Foto struk" style={{ width: 56, height: 74, objectFit: 'cover', borderRadius: 8 }} />}
