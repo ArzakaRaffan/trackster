@@ -91,3 +91,13 @@ export interface PublicSplitBillSummary {
   }[];
   participants: ParticipantTotal[];
 }
+
+/** Respons POST /split-bills/scan-receipt. Biaya = nominal Rupiah dari struk, 0 kalau tidak ada. */
+export interface ScanResult {
+  items: { description: string; amount: number; quantity: number }[];
+  subtotal?: number;
+  tax?: number;
+  service?: number;
+  discount?: number;
+}
+

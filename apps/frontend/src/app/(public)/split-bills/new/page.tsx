@@ -8,6 +8,7 @@ import { shrinkDataUrl } from '@/lib/image';
 import { formatRupiah } from '@/lib/format';
 import { avatarCss } from '@/lib/avatars';
 import { calculate, SplitInput } from '@/lib/split-calc';
+import { ScanResult } from '@/lib/splitBillTypes';
 import ThemeToggle from '@/components/legal/ThemeToggle';
 import { AvatarPicker } from '@/components/avatar/AvatarPicker';
 
@@ -41,6 +42,7 @@ export default function NewSplitBillPage() {
   const [scanning, setScanning] = useState(false);
   const [scanPct, setScanPct] = useState(0);
   const [receipt, setReceipt] = useState(''); // pratinjau + disimpan bersama bill
+  const [scanNote, setScanNote] = useState('');
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [isOwner, setIsOwner] = useState<boolean | null>(null);
   const [picking, setPicking] = useState<string | null>(null);
@@ -122,6 +124,7 @@ export default function NewSplitBillPage() {
   const handleScanReceipt = async (file: File) => {
     setScanning(true);
     setErrorMsg(null);
+    setScanNote('');
     try {
       const imageBase64: string = await new Promise((resolve, reject) => {
         const reader = new FileReader();
@@ -130,12 +133,21 @@ export default function NewSplitBillPage() {
         reader.readAsDataURL(file);
       });
       setReceipt(await shrinkDataUrl(imageBase64, 900, 0.6));
-      const { items: scanned } = await api.post<{ items: { description: string; amount: number; quantity: number }[] }>('/split-bills/scan-receipt', { imageBase64: await shrinkDataUrl(imageBase64) });
+      const scan = await api.post<ScanResult>('/split-bills/scan-receipt', { imageBase64: await shrinkDataUrl(imageBase64) });
+      const scanned = scan.items;
       if (scanned.length === 0) {
         setErrorMsg('Struk tidak terbaca, coba foto ulang atau tambah item manual.');
         setReceipt('');
         return;
       }
+      // Biaya dari struk hanya mengisi kolom yang masih kosong (struk kedua / isian manual tidak ditimpa).
+      const fill = (v: number | undefined, cur: string, set: (s: string) => void) => (v && !cur ? (set(String(v)), 1) : 0);
+      const filled =
+        fill(scan.subtotal, subtotalCheck, setSubtotalCheck) +
+        fill(scan.tax, taxAmount || taxPercent, setTaxAmount) +
+        fill(scan.service, serviceFeeAmount || servicePercent, setServiceFeeAmount) +
+        fill(scan.discount, discountAmount || discountPercent, setDiscountAmount);
+      setScanNote(filled ? 'Subtotal, pajak, service & diskon dari struk ikut terisi. Cek lagi di langkah 3.' : '');
       setItems((rows) => {
         const cleaned = rows.filter((r) => r.description.trim() || r.amount.trim());
         return [...cleaned, ...scanned.map((s) => ({ id: genId(), description: s.description, amount: String(s.amount), quantity: String(s.quantity || 1), assignedTo: [] }))];
@@ -186,7 +198,10 @@ export default function NewSplitBillPage() {
                 <div className="pb-bar" role="progressbar" aria-label="Memindai struk" aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(scanPct)}><i style={{ width: `${scanPct}%` }} /></div>
               </>
             ) : (
-              <button type="button" className="pb-btn sm" onClick={() => setReceipt('')}>Hapus foto struk</button>
+              <>
+                {scanNote && <div className="pb-mono" style={{ marginBottom: 6 }}>{scanNote}</div>}
+                <button type="button" className="pb-btn sm" onClick={() => setReceipt('')}>Hapus foto struk</button>
+              </>
             )}
           </div>
         </div>
