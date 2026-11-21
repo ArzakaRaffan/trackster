@@ -7,7 +7,7 @@ import useSWR from 'swr';
 import { api, API_URL } from '@/lib/api';
 import { formatRupiah } from '@/lib/format';
 import { avatarCss } from '@/lib/avatars';
-import { PublicSplitBillSummary } from '@/lib/splitBillTypes';
+import { PublicSplitBillSummary, personBillText, openWa } from '@/lib/splitBillTypes';
 import ThemeToggle from '@/components/legal/ThemeToggle';
 import { AvatarPicker } from '@/components/avatar/AvatarPicker';
 
@@ -112,7 +112,7 @@ export default function PublicSplitBillPage() {
           <button className="pb-btn" onClick={() => { navigator.clipboard.writeText(shareText()); flash(setCopiedAll); }}>
             {copiedAll ? 'Tersalin ✓' : 'Salin semua'}
           </button>
-          <button className="pb-btn pri" onClick={() => window.open(`https://wa.me/?text=${encodeURIComponent(shareText())}`, '_blank')}>
+          <button className="pb-btn pri" onClick={() => openWa(shareText())}>
             Kirim ke WhatsApp
           </button>
         </div>
@@ -185,9 +185,16 @@ export default function PublicSplitBillPage() {
                   <b>{p.name}</b>
                   <span>{formatRupiah(p.total)}</span>
                 </span>
-                <button className={`pb-btn sm${p.isPaid ? ' done' : ' pri'}`} onClick={() => markPaid(p.participantId)}>
-                  {p.isPaid ? '✓ Lunas' : 'Tandai lunas'}
-                </button>
+                <span style={{ display: 'flex', gap: 8 }}>
+                  {!p.isPaid && (
+                    <button className="pb-btn sm" onClick={() => openWa(personBillText(data, p, window.location.href, formatRupiah))} aria-label={`Tagih ${p.name} lewat WhatsApp`}>
+                      Tagih
+                    </button>
+                  )}
+                  <button className={`pb-btn sm${p.isPaid ? ' done' : ' pri'}`} onClick={() => markPaid(p.participantId)}>
+                    {p.isPaid ? '✓ Lunas' : 'Tandai lunas'}
+                  </button>
+                </span>
               </div>
               <div className="pb-bd">
                 <div><span>Subtotal</span><span>{formatRupiah(p.subtotal)}</span></div>
